@@ -23,8 +23,10 @@ class GoogleIdentityService {
   constructor() {
     this.clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
     
-    if (!this.clientId) {
-      console.error('Google Client ID is not configured');
+    // Only log error if this service is actually being used
+    // Since we're using Supabase OAuth, this is just a fallback service
+    if (!this.clientId && import.meta.env.NODE_ENV === 'development') {
+      console.warn('Google Client ID is not configured for googleIdentityService (using Supabase OAuth instead)');
     }
   }
 
