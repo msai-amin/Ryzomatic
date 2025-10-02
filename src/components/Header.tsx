@@ -1,28 +1,26 @@
 import React from 'react'
-import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud } from 'lucide-react'
+import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { DocumentUpload } from './DocumentUpload'
 import { TypographySettings } from './TypographySettings'
 import { LibraryModal } from './LibraryModal'
 import { AuthModal } from './AuthModal'
-import { simpleGoogleAuth, GoogleUser } from '../services/simpleGoogleAuth'
 
 export const Header: React.FC = () => {
-  const { toggleChat, currentDocument } = useAppStore()
+  const { 
+    toggleChat, 
+    currentDocument, 
+    isAuthenticated, 
+    user, 
+    logout 
+  } = useAppStore()
   const [showUpload, setShowUpload] = React.useState(false)
   const [showSettings, setShowSettings] = React.useState(false)
   const [showLibrary, setShowLibrary] = React.useState(false)
   const [showAuth, setShowAuth] = React.useState(false)
-  const [user, setUser] = React.useState<GoogleUser | null>(null)
 
-  React.useEffect(() => {
-    // Check if user is already signed in
-    const currentUser = simpleGoogleAuth.getCurrentUser()
-    setUser(currentUser)
-  }, [])
-
-  const handleAuthChange = (newUser: GoogleUser | null) => {
-    setUser(newUser)
+  const handleLogout = async () => {
+    await logout()
   }
 
   return (
@@ -77,22 +75,34 @@ export const Header: React.FC = () => {
             </button>
 
             {/* Auth Button */}
-            <button
-              onClick={() => setShowAuth(true)}
-              className={`btn-ghost flex items-center space-x-2 ${user ? 'text-green-600' : ''}`}
-            >
-              {user ? (
-                <>
-                  <Cloud className="w-4 h-4" />
-                  <span>Sync</span>
-                </>
-              ) : (
-                <>
+            {isAuthenticated && user ? (
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2 text-gray-700">
                   <User className="w-4 h-4" />
-                  <span>Sign In</span>
-                </>
-              )}
-            </button>
+                  <span className="text-sm font-medium">
+                    {user.full_name || user.email}
+                  </span>
+                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                    {user.tier}
+                  </span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="btn-ghost flex items-center space-x-2 text-red-600 hover:text-red-700"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAuth(true)}
+                className="btn-ghost flex items-center space-x-2"
+              >
+                <User className="w-4 h-4" />
+                <span>Sign In</span>
+              </button>
+            )}
             
             <button
               onClick={toggleChat}
@@ -110,7 +120,7 @@ export const Header: React.FC = () => {
         <AuthModal 
           isOpen={showAuth} 
           onClose={() => setShowAuth(false)} 
-          onAuthChange={handleAuthChange}
+          onAuthSuccess={() => setShowAuth(false)}
         />
       )}
 

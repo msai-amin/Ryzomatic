@@ -1,0 +1,24 @@
+[
+  {
+    "AllowedOrigins": [
+      "https://smart-reader-serverless-4sx79ia3h-vstyle-ltds-projects.vercel.app",
+      "http://localhost:5173",
+      "http://localhost:3001"
+    ],
+    "AllowedMethods": [
+      "GET",
+      "PUT",
+      "POST",
+      "DELETE",
+      "HEAD"
+    ],
+    "AllowedHeaders": [
+      "*"
+    ],
+    "ExposeHeaders": [
+      "ETag",
+      "x-amz-version-id"
+    ],
+    "MaxAgeSeconds": 3000
+  }
+]

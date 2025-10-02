@@ -31,12 +31,6 @@
       ]
     }
   ],
-  "env": {
-    "VITE_GEMINI_API_KEY": "@gemini-api-key",
-    "VITE_SUPABASE_URL": "@supabase-url",
-    "VITE_SUPABASE_ANON_KEY": "@supabase-anon-key",
-    "VITE_GOOGLE_CLIENT_ID": "@google-client-id"
-  },
   "functions": {
     "api/**/*.ts": {
       "memory": 1024,

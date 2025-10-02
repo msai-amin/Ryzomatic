@@ -10,9 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.901.0",
+    "@aws-sdk/s3-request-presigner": "^3.901.0",
     "@google-cloud/storage": "^7.17.1",
     "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.58.0",
     "clsx": "^2.0.0",
+    "formidable": "^3.5.4",
     "googleapis": "^160.0.0",
     "lucide-react": "^0.294.0",
     "openai": "^4.20.1",
@@ -25,10 +29,12 @@
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.10",
+    "@types/formidable": "^3.4.5",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@typescript-eslint/eslint-plugin": "^6.14.0",
     "@typescript-eslint/parser": "^6.14.0",
+    "@vercel/node": "^5.3.24",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
     "eslint": "^8.55.0",

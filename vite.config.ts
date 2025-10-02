@@ -12,24 +12,19 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}']
       },
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['favicon.ico'],
       manifest: {
-        name: 'AI Reader Assistant',
-        short_name: 'AI Reader',
-        description: 'An intelligent document reader with AI chat capabilities',
-        theme_color: '#ffffff',
+        name: 'Smart Reader',
+        short_name: 'SmartReader',
+        description: 'Your intelligent document reading assistant',
+        theme_color: '#667eea',
         background_color: '#ffffff',
         display: 'standalone',
         icons: [
           {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
+            src: 'favicon.ico',
+            sizes: '32x32',
+            type: 'image/x-icon'
           }
         ]
       }

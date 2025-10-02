@@ -3,7 +3,7 @@
  * Handles file operations with Google Drive and Google Docs
  */
 
-import { simpleGoogleAuth } from './simpleGoogleAuth';
+import { googleAuthService } from './googleAuthService';
 
 export interface GoogleDriveFile {
   id: string;

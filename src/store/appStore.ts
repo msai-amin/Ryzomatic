@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { authService, AuthUser } from '../services/supabaseAuthService'
 
 export interface Document {
   id: string
@@ -49,6 +50,10 @@ export interface TTSSettings {
 }
 
 interface AppState {
+  // Authentication
+  isAuthenticated: boolean
+  user: AuthUser | null
+  
   // Document state
   currentDocument: Document | null
   documents: Document[]
@@ -71,6 +76,10 @@ interface AppState {
   isTyping: boolean
   
   // Actions
+  setUser: (user: AuthUser | null) => void
+  setAuthenticated: (authenticated: boolean) => void
+  checkAuth: () => Promise<void>
+  logout: () => Promise<void>
   setCurrentDocument: (document: Document | null) => void
   addDocument: (document: Document) => void
   removeDocument: (id: string) => void
@@ -84,8 +93,10 @@ interface AppState {
   setTyping: (typing: boolean) => void
 }
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   // Initial state
+  isAuthenticated: false,
+  user: null,
   currentDocument: null,
   documents: [],
   isChatOpen: false,
@@ -118,6 +129,81 @@ export const useAppStore = create<AppState>((set) => ({
   },
   chatMessages: [],
   isTyping: false,
+  
+  // Authentication actions
+  setUser: (user) => set({ user }),
+  
+  setAuthenticated: (authenticated) => set({ isAuthenticated: authenticated }),
+  
+  checkAuth: async () => {
+    try {
+      const user = await authService.getCurrentUser();
+      
+      if (user) {
+        console.log('User authenticated:', user.email);
+        
+        // Try to get user profile
+        let profile = await authService.getUserProfile(user.id);
+        
+        // If profile doesn't exist, create it (fallback in case trigger didn't fire)
+        if (!profile) {
+          console.log('Profile not found, creating one...');
+          try {
+            profile = await authService.createUserProfile({
+              id: user.id,
+              email: user.email || '',
+              full_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+              tier: 'free',
+              credits: 100
+            });
+            console.log('Profile created successfully');
+          } catch (createError) {
+            console.error('Failed to create profile:', createError);
+            // If profile creation fails, use basic auth data
+            profile = {
+              id: user.id,
+              email: user.email || '',
+              full_name: user.user_metadata?.full_name || user.user_metadata?.name,
+              tier: 'free',
+              credits: 100
+            } as AuthUser;
+          }
+        }
+        
+        set({ 
+          isAuthenticated: true, 
+          user: profile 
+        });
+      } else {
+        console.log('No authenticated user found');
+        set({ 
+          isAuthenticated: false, 
+          user: null 
+        });
+      }
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      set({ 
+        isAuthenticated: false, 
+        user: null 
+      });
+    }
+  },
+  
+  logout: async () => {
+    try {
+      await authService.signOut();
+      set({ 
+        isAuthenticated: false, 
+        user: null,
+        documents: [],
+        currentDocument: null,
+        chatMessages: []
+      });
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  },
   
   // Actions
   setCurrentDocument: (document) => set({ currentDocument: document }),

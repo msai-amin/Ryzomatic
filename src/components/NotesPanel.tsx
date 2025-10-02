@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Save, Trash2, FileText, Cloud, Edit2, Check } from 'lucide-react';
 import { storageService, Note } from '../services/storageService';
 import { googleIntegrationService } from '../services/googleIntegrationService';
@@ -223,7 +223,7 @@ export function NotesPanel({
               New Note (Page {currentPage})
             </label>
             {simpleGoogleAuth.isSignedIn() && (
-              <Cloud className="w-4 h-4 text-green-600" title="Will sync to Google Docs" />
+              <Cloud className="w-4 h-4 text-green-600" />
             )}
           </div>
           <textarea
@@ -328,14 +328,12 @@ export function NotesPanel({
                       <button
                         onClick={() => handleEditNote(note)}
                         className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                        title="Edit note"
                       >
                         <Edit2 className="w-3 h-3 text-gray-600 dark:text-gray-400" />
                       </button>
                       <button
                         onClick={() => handleDeleteNote(note)}
                         className="p-1 hover:bg-red-100 dark:hover:bg-red-900/20 rounded"
-                        title="Delete note"
                       >
                         <Trash2 className="w-3 h-3 text-red-600" />
                       </button>

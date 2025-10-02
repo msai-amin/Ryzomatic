@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Book, FileText, Music, Trash2, Download, Upload, HardDrive, Cloud, CloudOff, RefreshCw } from 'lucide-react';
 import { storageService, SavedBook, Note, SavedAudio } from '../services/storageService';
 import { useAppStore } from '../store/appStore';
-import { googleAuthService } from '../services/googleAuthService';
+// import { googleAuthService } from '../services/googleAuthService';
 
 interface LibraryModalProps {
   isOpen: boolean;
@@ -18,7 +18,7 @@ export function LibraryModal({ isOpen, onClose }: LibraryModalProps) {
   const [isGoogleDriveEnabled, setIsGoogleDriveEnabled] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{ lastSync: Date | null; isEnabled: boolean }>({ lastSync: null, isEnabled: false });
-  const { setCurrentDocument, addDocument } = useAppStore();
+  const { /* setCurrentDocument, */ addDocument } = useAppStore();
 
   useEffect(() => {
     if (isOpen) {
