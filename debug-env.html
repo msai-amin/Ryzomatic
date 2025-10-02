@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Environment Variables Debug</title>
+</head>
+<body>
+    <h1>Environment Variables Debug</h1>
+    <div id="output"></div>
+
+    <script>
+        // Check if environment variables are available
+        console.log('=== Environment Variables Debug ===');
+        console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
+        console.log('VITE_SUPABASE_ANON_KEY:', import.meta.env.VITE_SUPABASE_ANON_KEY);
+        console.log('All env vars:', import.meta.env);
+        
+        document.getElementById('output').innerHTML = `
+            <p>VITE_SUPABASE_URL: ${import.meta.env.VITE_SUPABASE_URL || 'NOT FOUND'}</p>
+            <p>VITE_SUPABASE_ANON_KEY: ${import.meta.env.VITE_SUPABASE_ANON_KEY ? 'FOUND' : 'NOT FOUND'}</p>
+        `;
+    </script>
+</body>
+</html>
