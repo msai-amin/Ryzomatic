@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OAuth Test</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>OAuth Test</h1>
+    <button id="signIn">Sign In with Google</button>
+    <button id="checkSession">Check Session</button>
+    <div id="output"></div>
+
+    <script>
+        const supabaseUrl = 'https://pbfipmvtkbivnwwgukpw.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBiZmlwbXZ0a2Jpdm53d2d1a3B3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU0NzQwNzQsImV4cCI6MjA1MTA1MDA3NH0.YourAnonKeyHere'; // Replace with your actual anon key
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        document.getElementById('signIn').onclick = async () => {
+            const { data, error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: window.location.origin
+                }
+            });
+            
+            if (error) {
+                document.getElementById('output').innerHTML = 'Error: ' + error.message;
+            } else {
+                document.getElementById('output').innerHTML = 'Redirecting...';
+            }
+        };
+        
+        document.getElementById('checkSession').onclick = async () => {
+            const { data: { session }, error } = await supabase.auth.getSession();
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            
+            document.getElementById('output').innerHTML = `
+                <h3>Session:</h3>
+                <pre>${JSON.stringify(session, null, 2)}</pre>
+                <h3>User:</h3>
+                <pre>${JSON.stringify(user, null, 2)}</pre>
+                <h3>Errors:</h3>
+                <pre>Session Error: ${error || 'None'}</pre>
+                <pre>User Error: ${userError || 'None'}</pre>
+            `;
+        };
+        
+        // Check session on page load
+        window.onload = () => {
+            document.getElementById('checkSession').click();
+        };
+    </script>
+</body>
+</html>

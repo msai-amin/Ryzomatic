@@ -4,7 +4,7 @@ import { ChatModal } from './components/ChatModal'
 import { Header } from './components/Header'
 import { AuthModal } from './components/AuthModal'
 import { useAppStore } from './store/appStore'
-import { authService } from './services/supabaseAuthService'
+import { authService, supabase } from './services/supabaseAuthService'
 
 function App() {
   const { 
@@ -21,6 +21,30 @@ function App() {
   useEffect(() => {
     // Check authentication status on app load
     const initializeAuth = async () => {
+      // Check if we're coming back from OAuth callback
+      const urlParams = new URLSearchParams(window.location.search)
+      const hashParams = new URLSearchParams(window.location.hash.substring(1))
+      
+      console.log('URL search params:', Object.fromEntries(urlParams.entries()))
+      console.log('URL hash params:', Object.fromEntries(hashParams.entries()))
+      
+      // If we have OAuth callback parameters, let Supabase handle them
+      if (urlParams.has('code') || hashParams.has('access_token')) {
+        console.log('OAuth callback detected, processing...')
+        
+        // Let Supabase process the OAuth callback
+        try {
+          const { data, error } = await supabase.auth.getSession()
+          if (error) {
+            console.error('OAuth callback error:', error)
+          } else if (data.session) {
+            console.log('OAuth session found:', data.session.user.email)
+          }
+        } catch (error) {
+          console.error('Error processing OAuth callback:', error)
+        }
+      }
+      
       await checkAuth()
       setIsInitialized(true)
     }
