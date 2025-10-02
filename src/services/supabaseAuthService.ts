@@ -236,6 +236,47 @@ class SupabaseAuthService {
     }
     return session;
   }
+
+  /**
+   * Manually process OAuth callback from URL hash
+   */
+  async processOAuthCallback(): Promise<boolean> {
+    try {
+      console.log('Processing OAuth callback manually...');
+      
+      // Get the current session
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        return false;
+      }
+      
+      if (sessionData.session) {
+        console.log('Session found:', sessionData.session.user.email);
+        return true;
+      }
+      
+      // If no session, try to refresh
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError) {
+        console.error('Refresh error:', refreshError);
+        return false;
+      }
+      
+      if (refreshData.session) {
+        console.log('Session refreshed:', refreshData.session.user.email);
+        return true;
+      }
+      
+      console.log('No session found after refresh');
+      return false;
+    } catch (error) {
+      console.error('Error processing OAuth callback:', error);
+      return false;
+    }
+  }
 }
 
 export const authService = new SupabaseAuthService();

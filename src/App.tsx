@@ -34,28 +34,19 @@ function App() {
         console.log('Code param:', urlParams.get('code'))
         console.log('Access token param:', hashParams.get('access_token'))
         
+        // Clear the URL parameters to prevent re-processing
+        window.history.replaceState({}, document.title, window.location.pathname)
+        
         // Wait a moment for Supabase to process the callback
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        await new Promise(resolve => setTimeout(resolve, 3000))
         
         // Force Supabase to process the OAuth callback
         try {
-          // Get session from URL parameters
-          const { data, error } = await supabase.auth.getSession()
-          if (error) {
-            console.error('OAuth callback error:', error)
-          } else if (data.session) {
-            console.log('OAuth session found:', data.session.user.email)
-            // Force a refresh to ensure the session is properly loaded
-            await supabase.auth.refreshSession()
+          const success = await authService.processOAuthCallback()
+          if (success) {
+            console.log('OAuth callback processed successfully!')
           } else {
-            console.log('No session found, trying to get user...')
-            // Try to get user directly
-            const { data: userData, error: userError } = await supabase.auth.getUser()
-            if (userError) {
-              console.error('User fetch error:', userError)
-            } else if (userData.user) {
-              console.log('User found:', userData.user.email)
-            }
+            console.log('OAuth callback processing failed')
           }
         } catch (error) {
           console.error('Error processing OAuth callback:', error)
