@@ -40,6 +40,77 @@
   .modal-content {
     @apply bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden;
   }
+
+/* NeoReader Terminal Styles */
+.neoreader-terminal {
+  font-family: 'Courier New', monospace;
+  background: #000;
+}
+
+.neoreader-terminal ::selection {
+  background: #00ff88;
+  color: #000;
+}
+
+/* Terminal scrollbar */
+.neoreader-terminal .overflow-y-auto::-webkit-scrollbar {
+  width: 4px;
+}
+
+.neoreader-terminal .overflow-y-auto::-webkit-scrollbar-track {
+  background: #001100;
+}
+
+.neoreader-terminal .overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #00ff88;
+}
+
+/* Landing Page Styles */
+.landing-page {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #000;
+}
+
+.landing-page ::selection {
+  background: #00ff88;
+  color: #000;
+}
+
+/* Grid Pattern Background */
+.grid-pattern {
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Glow Text Effect */
+.glow-text {
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+}
+
+/* Smooth Transitions */
+.landing-page * {
+  transition: all 0.3s ease;
+}
+
+/* Custom Scrollbar for Landing Page */
+.landing-page ::-webkit-scrollbar {
+  width: 8px;
+}
+
+.landing-page ::-webkit-scrollbar-track {
+  background: #111;
+}
+
+.landing-page ::-webkit-scrollbar-thumb {
+  background: #00ff88;
+  border-radius: 4px;
+}
+
+.landing-page ::-webkit-scrollbar-thumb:hover {
+  background: #00cc6a;
+}
 }
 
 

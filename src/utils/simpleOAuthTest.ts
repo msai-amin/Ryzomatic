@@ -39,7 +39,7 @@ export function testSimpleOAuth() {
 }
 
 // Auto-run the test
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && false) { // Temporarily disabled
   setTimeout(() => {
     testSimpleOAuth();
   }, 1000);

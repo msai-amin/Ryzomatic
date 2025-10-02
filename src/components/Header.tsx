@@ -24,20 +24,20 @@ export const Header: React.FC = () => {
   }
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
+    <header className="bg-black border-b border-green-400 sticky top-0 z-40">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           {/* Logo and Title */}
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <FileText className="w-5 h-5 text-white" />
+            <div className="bg-white text-black px-3 py-1 border border-gray-300 font-bold text-sm">
+              VStyle
             </div>
-            <h1 className="text-xl font-semibold text-gray-900">AI Reader Assistant</h1>
+            <h1 className="text-xl font-semibold text-white">NEO_READER</h1>
           </div>
 
           {/* Document Info */}
           {currentDocument && (
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <div className="flex items-center space-x-2 text-sm text-green-400">
               <FileText className="w-4 h-4" />
               <span className="truncate max-w-xs">{currentDocument.name}</span>
             </div>
@@ -50,66 +50,66 @@ export const Header: React.FC = () => {
               <>
                 <button
                   onClick={() => setShowLibrary(true)}
-                  className="btn-ghost flex items-center space-x-2"
+                  className="border border-green-400 text-green-400 px-3 py-1 rounded hover:bg-green-400 hover:text-black transition-colors flex items-center space-x-2"
                 >
                   <Library className="w-4 h-4" />
-                  <span>Library</span>
+                  <span>LIBRARY</span>
                 </button>
 
                 <button
                   onClick={() => setShowUpload(true)}
-                  className="btn-secondary flex items-center space-x-2"
+                  className="bg-green-400 text-black px-3 py-1 rounded hover:bg-green-300 transition-colors flex items-center space-x-2"
                 >
                   <Upload className="w-4 h-4" />
-                  <span>Upload</span>
+                  <span>UPLOAD</span>
                 </button>
               </>
             )}
             
             <button
               onClick={() => setShowSettings(true)}
-              className="btn-ghost flex items-center space-x-2"
+              className="border border-green-400 text-green-400 px-3 py-1 rounded hover:bg-green-400 hover:text-black transition-colors flex items-center space-x-2"
             >
               <Settings className="w-4 h-4" />
-              <span>Settings</span>
+              <span>SETTINGS</span>
             </button>
 
             {/* Auth Button */}
             {isAuthenticated && user ? (
               <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2 text-gray-700">
+                <div className="flex items-center space-x-2 text-green-400">
                   <User className="w-4 h-4" />
                   <span className="text-sm font-medium">
                     {user.full_name || user.email}
                   </span>
-                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                    {user.tier}
+                  <span className="text-xs bg-green-400 text-black px-2 py-1 rounded-full">
+                    {user.tier?.toUpperCase()}
                   </span>
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="btn-ghost flex items-center space-x-2 text-red-600 hover:text-red-700"
+                  className="border border-red-500 text-red-400 px-3 py-1 rounded hover:bg-red-500 hover:text-white transition-colors flex items-center space-x-2"
                 >
                   <LogOut className="w-4 h-4" />
-                  <span>Logout</span>
+                  <span>LOGOUT</span>
                 </button>
               </div>
             ) : (
               <button
                 onClick={() => setShowAuth(true)}
-                className="btn-ghost flex items-center space-x-2"
+                className="border border-green-400 text-green-400 px-3 py-1 rounded hover:bg-green-400 hover:text-black transition-colors flex items-center space-x-2"
               >
                 <User className="w-4 h-4" />
-                <span>Sign In</span>
+                <span>SIGN IN</span>
               </button>
             )}
             
             <button
               onClick={toggleChat}
-              className="btn-primary flex items-center space-x-2"
+              className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-400 transition-colors flex items-center space-x-2"
             >
               <MessageCircle className="w-4 h-4" />
-              <span>AI Chat</span>
+              <span>AI CHAT</span>
             </button>
           </div>
         </div>

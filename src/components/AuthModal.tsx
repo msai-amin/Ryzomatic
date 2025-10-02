@@ -97,15 +97,20 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {isSignUp ? 'Create Account' : 'Sign In'}
-          </h2>
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+      <div className="bg-black border border-green-400 rounded-lg shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-green-400">
+          <div className="flex items-center space-x-3">
+            <div className="bg-white text-black px-3 py-1 border border-gray-300 font-bold text-sm">
+              VStyle
+            </div>
+            <h2 className="text-xl font-semibold text-white">
+              {isSignUp ? 'CREATE_ACCOUNT' : 'AUTHENTICATE'}
+            </h2>
+          </div>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-green-400 hover:text-green-300 transition-colors"
           >
             <X className="w-6 h-6" />
           </button>
@@ -113,25 +118,25 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
 
         <div className="p-6">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-sm text-red-600">{error}</p>
+            <div className="mb-4 p-3 bg-red-900 border border-red-500 rounded-md">
+              <p className="text-sm text-red-300">{error}</p>
             </div>
           )}
 
           <form onSubmit={handleEmailAuth} className="space-y-4">
             {isSignUp && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Full Name
+                <label className="block text-sm font-medium text-green-400 mb-1">
+                  FULL_NAME
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400 w-5 h-5" />
                   <input
                     type="text"
                     name="fullName"
                     value={formData.fullName}
                     onChange={handleInputChange}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full pl-10 pr-3 py-2 bg-black border border-green-400 rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent"
                     placeholder="Enter your full name"
                     required={isSignUp}
                   />
@@ -140,17 +145,17 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
+              <label className="block text-sm font-medium text-green-400 mb-1">
+                EMAIL_ADDRESS
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400 w-5 h-5" />
                 <input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-3 py-2 bg-black border border-green-400 rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent"
                   placeholder="Enter your email"
                   required
                 />
@@ -158,24 +163,24 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
+              <label className="block text-sm font-medium text-green-400 mb-1">
+                PASSWORD
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400 w-5 h-5" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-10 py-2 bg-black border border-green-400 rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent"
                   placeholder="Enter your password"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-400 hover:text-green-300"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -184,17 +189,17 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
 
             {isSignUp && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Confirm Password
+                <label className="block text-sm font-medium text-green-400 mb-1">
+                  CONFIRM_PASSWORD
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400 w-5 h-5" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full pl-10 pr-3 py-2 bg-black border border-green-400 rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent"
                     placeholder="Confirm your password"
                     required={isSignUp}
                   />
@@ -205,26 +210,26 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full bg-green-400 text-black py-2 px-4 rounded-md hover:bg-green-300 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold"
             >
-              {isLoading ? 'Loading...' : (isSignUp ? 'Create Account' : 'Sign In')}
+              {isLoading ? 'PROCESSING...' : (isSignUp ? 'CREATE_ACCOUNT' : 'AUTHENTICATE')}
             </button>
           </form>
 
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
+                <div className="w-full border-t border-green-400" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                <span className="px-2 bg-black text-green-400">OR CONTINUE WITH</span>
               </div>
             </div>
 
             <button
               onClick={handleGoogleAuth}
               disabled={isLoading}
-              className="mt-4 w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="mt-4 w-full flex items-center justify-center px-4 py-2 border border-green-400 rounded-md shadow-sm bg-black text-sm font-medium text-white hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path
@@ -244,18 +249,18 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              Continue with Google
+              CONTINUE WITH GOOGLE
             </button>
           </div>
 
           <div className="mt-6 text-center">
             <button
               onClick={() => setIsSignUp(!isSignUp)}
-              className="text-sm text-blue-600 hover:text-blue-500 focus:outline-none focus:underline"
+              className="text-sm text-green-400 hover:text-green-300 focus:outline-none focus:underline"
             >
               {isSignUp 
-                ? 'Already have an account? Sign in' 
-                : "Don't have an account? Sign up"
+                ? 'ALREADY HAVE AN ACCOUNT? SIGN IN' 
+                : "DON'T HAVE AN ACCOUNT? SIGN UP"
               }
             </button>
           </div>

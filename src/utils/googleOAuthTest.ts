@@ -97,7 +97,7 @@ export function testGoogleOAuthConfig() {
 }
 
 // Auto-run the test when imported
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && false) { // Temporarily disabled
   // Run after a short delay to ensure everything is loaded
   setTimeout(() => {
     testGoogleOAuthConfig();

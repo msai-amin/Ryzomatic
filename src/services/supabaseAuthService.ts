@@ -12,10 +12,18 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables:');
   console.error('URL:', supabaseUrl);
   console.error('Key present:', !!supabaseAnonKey);
-  throw new Error('Missing Supabase environment variables');
+  console.warn('Running without Supabase - some features may not work');
+  // Don't throw error in development, just warn
+  if (import.meta.env.DEV) {
+    console.warn('Development mode: Supabase not configured');
+  } else {
+    throw new Error('Missing Supabase environment variables');
+  }
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = supabaseUrl && supabaseAnonKey 
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
 
 export interface AuthUser {
   id: string;

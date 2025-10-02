@@ -56,7 +56,7 @@ export const testGoogleApiConfig = () => {
 };
 
 // Auto-run test in development
-if (import.meta.env.DEV) {
+if (import.meta.env.DEV && false) { // Temporarily disabled
   // Run test after a short delay to allow scripts to load
   setTimeout(testGoogleApiConfig, 1000);
 }
