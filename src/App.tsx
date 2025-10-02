@@ -34,19 +34,15 @@ function App() {
         console.log('Code param:', urlParams.get('code'))
         console.log('Access token param:', hashParams.get('access_token'))
         
-        // Clear the URL parameters to prevent re-processing
-        window.history.replaceState({}, document.title, window.location.pathname)
-        
-        // Wait a moment for Supabase to process the callback
-        await new Promise(resolve => setTimeout(resolve, 3000))
-        
-        // Force Supabase to process the OAuth callback
+        // Force Supabase to process the OAuth callback BEFORE clearing URL
         try {
           const success = await authService.processOAuthCallback()
           if (success) {
-            console.log('OAuth callback processed successfully!')
+            console.log('✅ OAuth callback processed successfully!')
+            // Clear the URL parameters after successful processing
+            window.history.replaceState({}, document.title, window.location.pathname)
           } else {
-            console.log('OAuth callback processing failed')
+            console.log('❌ OAuth callback processing failed')
           }
         } catch (error) {
           console.error('Error processing OAuth callback:', error)

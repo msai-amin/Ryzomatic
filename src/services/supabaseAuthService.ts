@@ -244,8 +244,24 @@ class SupabaseAuthService {
     try {
       console.log('Processing OAuth callback manually...');
       
-      // Get the current session
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      // Extract tokens from URL hash
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+      
+      console.log('Access token present:', !!accessToken);
+      console.log('Refresh token present:', !!refreshToken);
+      
+      if (!accessToken) {
+        console.log('No access token found in URL');
+        return false;
+      }
+      
+      // Set the session manually using the tokens from the URL
+      const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken || '',
+      });
       
       if (sessionError) {
         console.error('Session error:', sessionError);
@@ -253,24 +269,11 @@ class SupabaseAuthService {
       }
       
       if (sessionData.session) {
-        console.log('Session found:', sessionData.session.user.email);
+        console.log('✅ Session created successfully:', sessionData.session.user.email);
         return true;
       }
       
-      // If no session, try to refresh
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-      
-      if (refreshError) {
-        console.error('Refresh error:', refreshError);
-        return false;
-      }
-      
-      if (refreshData.session) {
-        console.log('Session refreshed:', refreshData.session.user.email);
-        return true;
-      }
-      
-      console.log('No session found after refresh');
+      console.log('❌ No session created');
       return false;
     } catch (error) {
       console.error('Error processing OAuth callback:', error);
