@@ -31,9 +31,11 @@ function App() {
       // If we have OAuth callback parameters, let Supabase handle them
       if (urlParams.has('code') || hashParams.has('access_token')) {
         console.log('OAuth callback detected, processing...')
+        console.log('Code param:', urlParams.get('code'))
+        console.log('Access token param:', hashParams.get('access_token'))
         
         // Wait a moment for Supabase to process the callback
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise(resolve => setTimeout(resolve, 2000))
         
         // Force Supabase to process the OAuth callback
         try {
@@ -58,6 +60,9 @@ function App() {
         } catch (error) {
           console.error('Error processing OAuth callback:', error)
         }
+      } else {
+        console.log('No OAuth callback parameters found')
+        console.log('Current URL:', window.location.href)
       }
       
       await checkAuth()

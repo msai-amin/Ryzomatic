@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple OAuth Test</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Simple OAuth Test</h1>
+    <button id="testOAuth">Test OAuth</button>
+    <div id="output"></div>
+
+    <script>
+        // Use your actual Supabase credentials
+        const supabaseUrl = 'https://pbfipmvtkbivnwwgukpw.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBiZmlwbXZ0a2Jpdm53d2d1a3B3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU0NzQwNzQsImV4cCI6MjA1MTA1MDA3NH0.YourAnonKeyHere'; // Replace with your actual anon key
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        document.getElementById('testOAuth').onclick = async () => {
+            try {
+                console.log('Starting OAuth test...');
+                
+                const { data, error } = await supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                        redirectTo: window.location.origin
+                    }
+                });
+                
+                if (error) {
+                    document.getElementById('output').innerHTML = 'Error: ' + error.message;
+                    console.error('OAuth error:', error);
+                } else {
+                    document.getElementById('output').innerHTML = 'Redirecting... Check console for details.';
+                    console.log('OAuth data:', data);
+                }
+            } catch (err) {
+                document.getElementById('output').innerHTML = 'Exception: ' + err.message;
+                console.error('Exception:', err);
+            }
+        };
+        
+        // Check for OAuth callback on page load
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const hashParams = new URLSearchParams(window.location.hash.substring(1));
+            
+            console.log('URL search params:', Object.fromEntries(urlParams.entries()));
+            console.log('URL hash params:', Object.fromEntries(hashParams.entries()));
+            
+            if (urlParams.has('code') || hashParams.has('access_token')) {
+                console.log('OAuth callback detected!');
+                document.getElementById('output').innerHTML = 'OAuth callback detected! Processing...';
+                
+                // Try to get session
+                supabase.auth.getSession().then(({ data: { session }, error }) => {
+                    if (error) {
+                        console.error('Session error:', error);
+                        document.getElementById('output').innerHTML = 'Session error: ' + error.message;
+                    } else if (session) {
+                        console.log('Session found:', session.user.email);
+                        document.getElementById('output').innerHTML = 'Success! User: ' + session.user.email;
+                    } else {
+                        console.log('No session found');
+                        document.getElementById('output').innerHTML = 'No session found';
+                    }
+                });
+            } else {
+                console.log('No OAuth callback parameters found');
+                document.getElementById('output').innerHTML = 'No OAuth callback. Click "Test OAuth" to start.';
+            }
+        };
+    </script>
+</body>
+</html>

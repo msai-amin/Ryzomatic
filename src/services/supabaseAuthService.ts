@@ -79,6 +79,8 @@ class SupabaseAuthService {
     const redirectUrl = import.meta.env.VITE_APP_URL || window.location.origin;
     
     console.log('Initiating Google OAuth with redirect:', redirectUrl);
+    console.log('Current URL:', window.location.href);
+    console.log('Supabase URL:', supabaseUrl);
     
     const { data: oauthData, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -96,6 +98,7 @@ class SupabaseAuthService {
       throw new Error(error.message);
     }
 
+    console.log('OAuth data:', oauthData);
     return oauthData;
   }
 
