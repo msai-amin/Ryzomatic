@@ -588,7 +588,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   return (
     <div className={`pdf-viewer w-full ${isFullscreen ? 'fixed inset-0 z-50 bg-white' : ''}`}>
       {/* PDF Controls */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <div className="flex items-center justify-between p-3">
           <div className="flex items-center gap-3">
             {/* Page Navigation (only show in single page mode) */}
@@ -649,16 +649,26 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             {/* Scroll Mode Toggle */}
             <div className="flex items-center gap-1 border-l border-gray-300 pl-3">
               <button
-                onClick={toggleScrollMode}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleScrollMode();
+                }}
                 className={`btn-ghost p-1.5 ${scrollMode === 'single' ? 'bg-indigo-100 text-indigo-600' : ''}`}
                 title="Single Page Mode (S)"
+                type="button"
               >
                 <Square className="w-4 h-4" />
               </button>
               <button
-                onClick={toggleScrollMode}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleScrollMode();
+                }}
                 className={`btn-ghost p-1.5 ${scrollMode === 'continuous' ? 'bg-indigo-100 text-indigo-600' : ''}`}
                 title="Continuous Scroll Mode (S)"
+                type="button"
               >
                 <Rows className="w-4 h-4" />
               </button>
@@ -667,30 +677,50 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             {/* Zoom Controls */}
             <div className="flex items-center gap-1 border-l border-gray-300 pl-3">
               <button
-                onClick={zoomOut}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  zoomOut();
+                }}
                 className="btn-ghost p-1.5"
                 title="Zoom Out (-)"
+                type="button"
               >
                 <ZoomOut className="w-4 h-4" />
               </button>
               <button
-                onClick={resetZoom}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  resetZoom();
+                }}
                 className="text-sm text-gray-700 min-w-[50px] text-center hover:bg-gray-100 rounded px-2 py-1"
                 title="Reset Zoom"
+                type="button"
               >
                 {Math.round(scale * 100)}%
               </button>
               <button
-                onClick={zoomIn}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  zoomIn();
+                }}
                 className="btn-ghost p-1.5"
                 title="Zoom In (+)"
+                type="button"
               >
                 <ZoomIn className="w-4 h-4" />
               </button>
               <button
-                onClick={fitToWidth}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  fitToWidth();
+                }}
                 className="btn-ghost p-1.5 text-xs"
                 title="Fit to Width"
+                type="button"
               >
                 Fit
               </button>
@@ -791,21 +821,29 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
             {/* Notes Button */}
             <button
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 setShowNotesPanel(!showNotesPanel);
                 setSelectedTextForNote('');
               }}
               className={`btn-ghost p-1.5 ${showNotesPanel ? 'bg-green-100 text-green-600' : ''}`}
               title="Notes (N)"
+              type="button"
             >
               <StickyNote className="w-4 h-4" />
             </button>
 
             {/* Reading Mode Toggle */}
             <button
-              onClick={toggleReadingMode}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleReadingMode();
+              }}
               className={`btn-ghost p-1.5 ${pdfViewer.readingMode ? 'bg-green-100 text-green-600' : ''}`}
               title="Reading Mode (M)"
+              type="button"
             >
               <BookOpen className="w-4 h-4" />
             </button>
