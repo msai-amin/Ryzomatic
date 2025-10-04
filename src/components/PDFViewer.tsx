@@ -246,6 +246,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     // Check if it's a worker-related error
     if (error.message.includes('worker') || error.message.includes('Setting up fake worker failed')) {
       setError('PDF.js worker failed to load. Please refresh the page or try text-only view.')
+    } else if (error.message.includes('detached ArrayBuffer') || error.message.includes('Cannot perform Construct')) {
+      setError('PDF data error. Please try uploading the file again.')
     } else {
       setError('Failed to load PDF. Using text-only view.')
     }
@@ -1031,7 +1033,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                     options={{
                       cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
                       cMapPacked: true,
-                      standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`
+                      standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+                      verbosity: 0
                     }}
                     loading={
                       <div className="flex items-center justify-center p-12">
@@ -1085,7 +1088,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                     options={{
                       cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
                       cMapPacked: true,
-                      standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`
+                      standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+                      verbosity: 0
                     }}
                     loading={
                       <div className="flex items-center justify-center p-12">

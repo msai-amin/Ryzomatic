@@ -148,13 +148,13 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
       // Read the file as array buffer
       const originalArrayBuffer = await file.arrayBuffer()
       
-      // Clone the ArrayBuffer to prevent it from being detached
-      // This is necessary because PDF.js transfers the buffer to the worker
-      const clonedArrayBuffer = originalArrayBuffer.slice(0)
+      // Create a new ArrayBuffer copy to prevent detachment issues
+      const bufferCopy = new ArrayBuffer(originalArrayBuffer.byteLength)
+      new Uint8Array(bufferCopy).set(new Uint8Array(originalArrayBuffer))
       
-      // Load the PDF document with the original buffer
+      // Load the PDF document with the copy to avoid detachment
       const pdf = await pdfjsLib.getDocument({ 
-        data: originalArrayBuffer,
+        data: bufferCopy,
         useWorkerFetch: false,
         isEvalSupported: false,
         useSystemFonts: true
@@ -185,7 +185,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
       
       return {
         content: fullText.trim() || 'PDF loaded successfully. Text extraction may be limited for some PDFs.',
-        pdfData: clonedArrayBuffer, // Use the cloned buffer for storage
+        pdfData: originalArrayBuffer, // Use the original buffer for storage (copy was used for processing)
         totalPages: pdf.numPages,
         pageTexts
       }
