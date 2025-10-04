@@ -5,7 +5,7 @@
 
 export interface AIModelConfig {
   name: string;
-  provider: 'openai' | 'google' | 'anthropic';
+  provider: 'openai' | 'google';
   modelId: string;
   maxTokens: number;
   temperature: number;
@@ -64,13 +64,13 @@ export const aiConfig: AIEngineSettings = {
     },
     synapse: {
       name: 'Synapse Synthesis Engine',
-      provider: 'anthropic',
-      modelId: 'claude-3-sonnet-20240229',
+      provider: 'openai',
+      modelId: 'gpt-4o-mini',
       maxTokens: 5000,
       temperature: 0.6,
       timeout: 35000,
       retries: 2,
-      costPerToken: 0.000015
+      costPerToken: 0.00015
     }
   },
   features: {
@@ -138,8 +138,7 @@ export const getAIEnvironmentConfig = () => {
 export const getAPIKeys = () => {
   return {
     openai: import.meta.env.VITE_OPENAI_API_KEY,
-    google: import.meta.env.VITE_GEMINI_API_KEY,
-    anthropic: import.meta.env.VITE_ANTHROPIC_API_KEY
+    google: import.meta.env.VITE_GEMINI_API_KEY
   };
 };
 
@@ -150,7 +149,6 @@ export const validateAPIKeys = (): { valid: boolean; missing: string[] } => {
 
   if (!keys.openai) missing.push('VITE_OPENAI_API_KEY');
   if (!keys.google) missing.push('VITE_GEMINI_API_KEY');
-  if (!keys.anthropic) missing.push('VITE_ANTHROPIC_API_KEY');
 
   return {
     valid: missing.length === 0,
@@ -163,9 +161,8 @@ export const getAvailableModels = () => {
   const keys = getAPIKeys();
   const available: string[] = [];
 
-  if (keys.openai) available.push('neural');
+  if (keys.openai) available.push('neural', 'synapse');
   if (keys.google) available.push('quantum');
-  if (keys.anthropic) available.push('synapse');
 
   return available;
 };

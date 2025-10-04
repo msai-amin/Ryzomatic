@@ -53,11 +53,11 @@ class AIEngineCore {
 
   constructor(config?: Partial<AIEngineConfig>) {
     this.config = {
-      models: {
-        neural: 'gpt-4-turbo',
-        quantum: 'gemini-pro',
-        synapse: 'claude-3-sonnet',
-      },
+  models: {
+    neural: 'gpt-4o-mini',
+    quantum: 'gemini-pro',
+    synapse: 'gpt-4o-mini',
+  },
       settings: {
         maxTokens: 4000,
         temperature: 0.7,

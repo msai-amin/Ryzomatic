@@ -37,6 +37,7 @@ export interface PDFViewerSettings {
   scrollMode: 'single' | 'continuous'
   showPageNumbers: boolean
   showProgress: boolean
+  readingMode: boolean
 }
 
 export interface TTSSettings {
@@ -116,7 +117,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     viewMode: 'pdf',
     scrollMode: 'single',
     showPageNumbers: true,
-    showProgress: true
+    showProgress: true,
+    readingMode: false
   },
   tts: {
     isEnabled: false,

@@ -129,8 +129,21 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
       // Import PDF.js dynamically
       const pdfjsLib = await import('pdfjs-dist')
       
-      // Set up PDF.js worker - use local worker first
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
+      // Set up PDF.js worker with fallback
+      const localWorker = '/pdf.worker.min.js'
+      const cdnWorker = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`
+      
+      // Set the worker source with fallback
+      pdfjsLib.GlobalWorkerOptions.workerSrc = localWorker
+      
+      // Test if local worker is accessible
+      try {
+        await fetch(localWorker, { method: 'HEAD' })
+        console.log('✅ PDF.js worker configured to use local file')
+      } catch {
+        console.warn('⚠️ Local PDF.js worker not found, using CDN fallback')
+        pdfjsLib.GlobalWorkerOptions.workerSrc = cdnWorker
+      }
       
       // Read the file as array buffer
       const originalArrayBuffer = await file.arrayBuffer()

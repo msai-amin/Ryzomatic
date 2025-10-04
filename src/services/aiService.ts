@@ -68,44 +68,46 @@ Please provide a helpful, accurate response:`;
     }
   }
 
-  // Fallback to OpenAI if Gemini is not available or failed
+  // Try GPT-4o-mini next (cost-effective for academic analysis)
   if (openai && openaiApiKey && openaiApiKey !== 'your_openai_api_key_here') {
     try {
-      console.log('✅ Using OpenAI API to generate response...');
+      console.log('✅ Using GPT-4o-mini API to generate response...');
       console.log('Message:', message.substring(0, 100) + '...');
       console.log('Has document content:', !!documentContent);
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-            content: `You are an AI assistant helping users understand and analyze documents. 
-                     ${truncatedContent ? 
-                       `The user has uploaded a document. Here is a portion of the content:\n\n${truncatedContent}\n\n` +
-                       (documentContent && documentContent.length > maxContentLength ? 
-                         'Note: The document is very long, so only the beginning is shown. If the user asks about later parts, let them know you can only see the beginning of the document.' :
-                         'Please provide helpful, accurate responses based on the document content.') :
-                       'The user has not uploaded any document yet. Please ask them to upload a document first.'
-                     }`
+            content: `You are an AI assistant helping users understand and analyze documents, with particular expertise in literary and academic analysis.
+
+${truncatedContent ? 
+  `The user has uploaded a document. Here is a portion of the content:\n\n${truncatedContent}\n\n` +
+  (documentContent && documentContent.length > maxContentLength ? 
+    'Note: The document is very long, so only the beginning is shown. If the user asks about later parts, let them know you can only see the beginning of the document.' :
+    'Please provide helpful, accurate responses based on the document content.') :
+  'The user has not uploaded any document yet. Please ask them to upload a document first.'
+}`
           },
           {
             role: "user",
             content: message
           }
         ],
-        max_tokens: 1000,
+        max_tokens: 4000,
         temperature: 0.7,
-      })
+      });
 
       const response = completion.choices[0]?.message?.content || 'Sorry, I couldn\'t generate a response.';
-      console.log('✅ OpenAI API Response received:', response.substring(0, 100) + '...');
+      console.log('✅ GPT-4o-mini API Response received:', response.substring(0, 100) + '...');
       return response;
     } catch (error) {
-      console.error('❌ Error calling OpenAI API:', error);
-      console.warn('Both AI APIs failed, falling back to mock responses');
+      console.error('❌ Error calling GPT-4o-mini API:', error);
+      console.log('⚠️ Falling back to mock responses...');
     }
   }
+
 
   // If both APIs are unavailable or failed, use mock responses
   console.warn('❌ No AI API keys configured. Using mock responses.');
@@ -164,6 +166,74 @@ const getMockResponse = (message: string, documentContent?: string): string => {
     'To provide more helpful responses, please upload a document first.'
   }`
 }
+
+// Specialized GPT-4o-mini function for academic and literary analysis
+export const analyzeWithGPT = async (
+  text: string, 
+  analysisType: 'framework' | 'literary' | 'argument' | 'synthesis' = 'framework'
+): Promise<string> => {
+  if (!openai) {
+    throw new Error('OpenAI API is not configured. Please set VITE_OPENAI_API_KEY in your .env file');
+  }
+
+  const prompts = {
+    framework: `Analyze this academic text and identify all theoretical frameworks, methodologies, and key concepts. For each framework:
+1. Name and describe the framework
+2. Identify the author/originator
+3. List key terms and concepts
+4. Explain how it's applied in this text
+5. Suggest related frameworks
+
+Text: ${text}`,
+    
+    literary: `Perform a close reading of this literary passage. Analyze:
+1. Rhetorical devices and literary techniques
+2. Themes and motifs
+3. Tone and style
+4. Symbolism and metaphor
+5. Historical and cultural context
+
+Text: ${text}`,
+    
+    argument: `Reconstruct the philosophical argument in this text. Provide:
+1. Main thesis/conclusion
+2. Supporting premises
+3. Logical structure
+4. Assumptions and presuppositions
+5. Potential counterarguments
+
+Text: ${text}`,
+    
+    synthesis: `Synthesize the key ideas from this text and:
+1. Identify main themes and concepts
+2. Connect to broader scholarly conversations
+3. Suggest research questions and gaps
+4. Provide interdisciplinary connections
+5. Recommend related readings
+
+Text: ${text}`
+  };
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{
+        role: 'user',
+        content: prompts[analysisType]
+      }],
+      max_tokens: 4000,
+      temperature: 0.7
+    });
+
+    return completion.choices[0]?.message?.content || 'Analysis failed';
+  } catch (error) {
+    console.error('Error in GPT analysis:', error);
+    throw error;
+  }
+};
+
+// Export the AI clients for advanced usage
+export { openai, genAI };
 
 // In a real implementation, you would replace this with actual API calls:
 /*

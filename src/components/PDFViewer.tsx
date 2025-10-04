@@ -20,7 +20,8 @@ import {
   Play,
   Pause,
   Volume2,
-  StickyNote
+  StickyNote,
+  BookOpen
 } from 'lucide-react'
 import { useAppStore, Document as DocumentType } from '../store/appStore'
 import { ttsService } from '../services/ttsService'
@@ -30,8 +31,27 @@ import { storageService } from '../services/storageService'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 
-// Set up PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.js`
+// Set up PDF.js worker with fallback
+const setupPDFWorker = () => {
+  // Try local worker first, then fallback to CDN
+  const localWorker = '/pdf.worker.min.js'
+  const cdnWorker = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
+  
+  // Set the worker source with fallback
+  pdfjs.GlobalWorkerOptions.workerSrc = localWorker
+  
+  // Test if local worker is accessible
+  fetch(localWorker, { method: 'HEAD' })
+    .then(() => {
+      console.log('✅ PDF.js worker configured to use local file')
+    })
+    .catch(() => {
+      console.warn('⚠️ Local PDF.js worker not found, using CDN fallback')
+      pdfjs.GlobalWorkerOptions.workerSrc = cdnWorker
+    })
+}
+
+setupPDFWorker()
 
 interface Highlight {
   id: string
@@ -135,6 +155,9 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         case 's':
           toggleScrollMode()
           break
+        case 'm':
+          toggleReadingMode()
+          break
       }
     }
 
@@ -214,7 +237,18 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
   const onDocumentLoadError = useCallback((error: Error) => {
     console.error('❌ PDF load error:', error)
-    setError('Failed to load PDF. Using text-only view.')
+    console.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      stack: error.stack
+    })
+    
+    // Check if it's a worker-related error
+    if (error.message.includes('worker') || error.message.includes('Setting up fake worker failed')) {
+      setError('PDF.js worker failed to load. Please refresh the page or try text-only view.')
+    } else {
+      setError('Failed to load PDF. Using text-only view.')
+    }
   }, [])
 
   const goToPrevPage = () => {
@@ -299,6 +333,11 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen)
+  }
+
+  const toggleReadingMode = () => {
+    const newReadingMode = !pdfViewer.readingMode
+    updatePDFViewer({ readingMode: newReadingMode })
   }
 
   const toggleHighlightMode = () => {
@@ -762,6 +801,15 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               <StickyNote className="w-4 h-4" />
             </button>
 
+            {/* Reading Mode Toggle */}
+            <button
+              onClick={toggleReadingMode}
+              className={`btn-ghost p-1.5 ${pdfViewer.readingMode ? 'bg-green-100 text-green-600' : ''}`}
+              title="Reading Mode (M)"
+            >
+              <BookOpen className="w-4 h-4" />
+            </button>
+
             {/* TTS Controls - Always visible */}
             <div className="flex items-center gap-1 border-l border-gray-300 pl-2">
               {/* TTS Enable/Settings Toggle */}
@@ -874,15 +922,15 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       </div>
 
       {/* PDF Content */}
-      <div className={`flex justify-center bg-gray-100 ${isFullscreen ? 'h-[calc(100vh-60px)] overflow-auto' : 'min-h-screen p-4'}`}>
+      <div className={`flex justify-center ${pdfViewer.readingMode ? 'bg-amber-50' : 'bg-gray-100'} ${isFullscreen ? 'h-[calc(100vh-60px)] overflow-auto' : 'min-h-screen p-4'}`}>
         <div className="relative" ref={pageContainerRef}>
           {pdfViewer.viewMode === 'text' ? (
-            <div className="p-8 max-w-4xl bg-white shadow-lg border border-gray-200 rounded-lg">
+            <div className={`p-8 max-w-4xl bg-white shadow-lg border border-gray-200 rounded-lg ${pdfViewer.readingMode ? 'max-w-3xl' : ''}`}>
               <div className="prose prose-lg max-w-none">
                 <h3 className="text-lg font-semibold mb-4">
                   {scrollMode === 'single' ? `Page ${pageNumber} Text Content:` : 'Full Document Text:'}
                 </h3>
-                <div className="whitespace-pre-wrap text-gray-700 leading-relaxed relative">
+                <div className={`whitespace-pre-wrap text-gray-700 leading-relaxed relative ${pdfViewer.readingMode ? 'text-lg leading-8 font-serif' : ''}`}>
                   {scrollMode === 'single' ? (
                     currentReadingText && tts.isPlaying && tts.highlightCurrentWord ? (
                       <>
@@ -905,6 +953,35 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                 </div>
               </div>
             </div>
+          ) : pdfViewer.readingMode ? (
+            /* Reading Mode - Text-only view with optimized typography */
+            <div className="max-w-4xl mx-auto p-8">
+              <div className="bg-white shadow-lg border border-gray-200 rounded-lg p-12">
+                <div className="prose prose-xl max-w-none">
+                  <div className="text-2xl leading-10 font-serif text-gray-800 tracking-wide">
+                    {scrollMode === 'single' ? (
+                      currentReadingText && tts.isPlaying && tts.highlightCurrentWord ? (
+                        <>
+                          <span className="transition-colors duration-100">
+                            {currentReadingText.substring(0, spokenTextLength)}
+                          </span>
+                          <span className="bg-yellow-300 transition-colors duration-100 px-1 rounded">
+                            {currentReadingText.substring(spokenTextLength, spokenTextLength + 50).split(' ')[0]}
+                          </span>
+                          <span className="text-gray-400">
+                            {currentReadingText.substring(spokenTextLength + currentReadingText.substring(spokenTextLength, spokenTextLength + 50).split(' ')[0].length)}
+                          </span>
+                        </>
+                      ) : (
+                        document.pageTexts?.[pageNumber - 1] || 'No text content available for this page.'
+                      )
+                    ) : (
+                      document.content
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           ) : (
             <>
               {scrollMode === 'single' ? (
@@ -913,11 +990,17 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                     file={document.pdfData}
                     onLoadSuccess={onDocumentLoadSuccess}
                     onLoadError={onDocumentLoadError}
+                    options={{
+                      cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
+                      cMapPacked: true,
+                      standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`
+                    }}
                     loading={
                       <div className="flex items-center justify-center p-12">
                         <div className="text-center">
                           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
                           <p className="text-gray-600">Loading PDF...</p>
+                          <p className="text-sm text-gray-500 mt-2">If this takes too long, try text-only view</p>
                         </div>
                       </div>
                     }
@@ -961,11 +1044,17 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                     file={document.pdfData}
                     onLoadSuccess={onDocumentLoadSuccess}
                     onLoadError={onDocumentLoadError}
+                    options={{
+                      cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
+                      cMapPacked: true,
+                      standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`
+                    }}
                     loading={
                       <div className="flex items-center justify-center p-12">
                         <div className="text-center">
                           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
                           <p className="text-gray-600">Loading PDF...</p>
+                          <p className="text-sm text-gray-500 mt-2">If this takes too long, try text-only view</p>
                         </div>
                       </div>
                     }
@@ -1010,7 +1099,18 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           <div>F : Fullscreen</div>
           <div>H : Toggle highlight mode</div>
           <div>S : Toggle scroll mode</div>
+          <div>M : Toggle reading mode</div>
           <div>ESC : Close panels/Exit fullscreen</div>
+        </div>
+      )}
+
+      {/* Reading Mode Indicator */}
+      {pdfViewer.readingMode && !isFullscreen && (
+        <div className="fixed bottom-4 right-4 bg-green-600 text-white text-sm px-4 py-2 rounded-lg shadow-lg">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-4 h-4" />
+            <span>Reading Mode Active - Optimized for reading</span>
+          </div>
         </div>
       )}
 

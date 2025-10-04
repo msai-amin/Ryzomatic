@@ -75,6 +75,15 @@ export default defineConfig({
       plugins: [
         rollupNodePolyFill(),
       ],
+      output: {
+        // Ensure PDF.js worker is copied to the correct location
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name === 'pdf.worker.min.js') {
+            return 'pdf.worker.min.js'
+          }
+          return 'assets/[name]-[hash][extname]'
+        }
+      }
     },
   },
   server: {
@@ -89,7 +98,9 @@ export default defineConfig({
   // Configure PDF.js worker
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
-  }
+  },
+  // Ensure PDF.js worker is properly handled
+  assetsInclude: ['**/*.worker.js', '**/*.worker.min.js']
 })
 
 

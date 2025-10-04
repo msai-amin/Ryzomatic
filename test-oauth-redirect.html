@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth Redirect Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .info { background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .success { background: #f0fff0; }
+        .error { background: #fff0f0; }
+        button { padding: 10px 20px; margin: 10px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>OAuth Redirect Test</h1>
+    
+    <div class="info">
+        <h3>Current Environment Info:</h3>
+        <p><strong>Current URL:</strong> <span id="currentUrl"></span></p>
+        <p><strong>Origin:</strong> <span id="origin"></span></p>
+        <p><strong>Is Development:</strong> <span id="isDev"></span></p>
+        <p><strong>VITE_APP_URL:</strong> <span id="appUrl"></span></p>
+    </div>
+
+    <div class="info">
+        <h3>Expected Redirect URL:</h3>
+        <p id="expectedRedirect"></p>
+    </div>
+
+    <button onclick="testRedirect()">Test OAuth Redirect Logic</button>
+    <button onclick="checkSupabaseConfig()">Check Supabase Config</button>
+
+    <div id="result"></div>
+
+    <script>
+        // Display current environment info
+        document.getElementById('currentUrl').textContent = window.location.href;
+        document.getElementById('origin').textContent = window.location.origin;
+        document.getElementById('isDev').textContent = window.location.hostname === 'localhost' ? 'Yes' : 'No';
+        
+        // Simulate the same logic as supabaseAuthService.ts
+        const isDevelopment = window.location.hostname === 'localhost';
+        const redirectUrl = isDevelopment 
+            ? window.location.origin 
+            : (import.meta?.env?.VITE_APP_URL || window.location.origin);
+        
+        document.getElementById('expectedRedirect').textContent = redirectUrl;
+        document.getElementById('appUrl').textContent = import.meta?.env?.VITE_APP_URL || 'Not set';
+
+        function testRedirect() {
+            const result = document.getElementById('result');
+            result.innerHTML = `
+                <div class="info success">
+                    <h3>✅ OAuth Redirect Test Results:</h3>
+                    <p><strong>Current Origin:</strong> ${window.location.origin}</p>
+                    <p><strong>Expected Redirect:</strong> ${redirectUrl}</p>
+                    <p><strong>Match:</strong> ${window.location.origin === redirectUrl ? '✅ YES' : '❌ NO'}</p>
+                    <p><strong>Status:</strong> ${window.location.origin === redirectUrl ? 'Ready for OAuth' : 'Redirect mismatch - check Supabase config'}</p>
+                </div>
+            `;
+        }
+
+        function checkSupabaseConfig() {
+            const result = document.getElementById('result');
+            result.innerHTML = `
+                <div class="info">
+                    <h3>🔧 Supabase Configuration Check:</h3>
+                    <p><strong>Required Redirect URLs in Supabase:</strong></p>
+                    <ul>
+                        <li>${window.location.origin}</li>
+                        <li>${window.location.origin}/</li>
+                        <li>${window.location.origin}/**</li>
+                    </ul>
+                    <p><strong>Instructions:</strong></p>
+                    <ol>
+                        <li>Go to <a href="https://supabase.com/dashboard" target="_blank">Supabase Dashboard</a></li>
+                        <li>Select your project: pbfipmvtkbivnwwgukpw</li>
+                        <li>Go to Authentication → URL Configuration</li>
+                        <li>Add the redirect URLs above to "Redirect URLs"</li>
+                        <li>Save the configuration</li>
+                    </ol>
+                </div>
+            `;
+        }
+
+        // Auto-run test on load
+        window.onload = testRedirect;
+    </script>
+</body>
+</html>
