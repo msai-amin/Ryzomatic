@@ -21,7 +21,8 @@ import {
   Pause,
   Volume2,
   StickyNote,
-  BookOpen
+  BookOpen,
+  MousePointer2
 } from 'lucide-react'
 import { useAppStore, Document as DocumentType } from '../store/appStore'
 import { ttsService } from '../services/ttsService'
@@ -68,12 +69,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   } | null>(null)
   const [showNotesPanel, setShowNotesPanel] = useState<boolean>(false)
   const [selectedTextForNote, setSelectedTextForNote] = useState<string>('')
+  const [selectionMode, setSelectionMode] = useState(false)
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const textLayerRef = useRef<HTMLDivElement>(null)
   const pageContainerRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
   const renderTaskRef = useRef<pdfjsLib.RenderTask | null>(null)
+  const pageCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map())
 
   const highlightColors = [
     { name: 'Yellow', value: '#FFFF00' },
@@ -122,8 +126,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     }
   }, [document.pdfData])
 
-  // Render current page
+  // Render current page (single page mode)
   useEffect(() => {
+    if (pdfViewer.scrollMode === 'continuous') return
+
     const renderPage = async () => {
       if (!pdfDocRef.current || !canvasRef.current) return
 
@@ -179,7 +185,42 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     }
 
     renderPage()
-  }, [pageNumber, scale, rotation])
+  }, [pageNumber, scale, rotation, pdfViewer.scrollMode])
+
+  // Render all pages (continuous scroll mode)
+  useEffect(() => {
+    if (pdfViewer.scrollMode !== 'continuous' || !pdfDocRef.current || !numPages) return
+
+    const renderAllPages = async () => {
+      for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+        const canvas = pageCanvasRefs.current.get(pageNum)
+        if (!canvas) continue
+
+        try {
+          const page = await pdfDocRef.current!.getPage(pageNum)
+          const context = canvas.getContext('2d')
+          
+          if (!context) continue
+
+          const viewport = page.getViewport({ scale, rotation })
+          
+          canvas.height = viewport.height
+          canvas.width = viewport.width
+
+          const renderContext = {
+            canvasContext: context,
+            viewport: viewport
+          }
+
+          await page.render(renderContext).promise
+        } catch (error) {
+          console.error(`Error rendering page ${pageNum}:`, error)
+        }
+      }
+    }
+
+    renderAllPages()
+  }, [pdfViewer.scrollMode, numPages, scale, rotation])
 
   useEffect(() => {
     setPageInputValue(String(pageNumber))
@@ -553,6 +594,20 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
+                setSelectionMode(!selectionMode)
+              }}
+              className={`p-2 rounded-lg transition-colors ${
+                selectionMode ? 'bg-purple-100 text-purple-600' : 'hover:bg-gray-100'
+              }`}
+              title="Selection Mode"
+            >
+              <MousePointer2 className="w-5 h-5" />
+            </button>
+
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
                 toggleReadingMode()
               }}
               className={`p-2 rounded-lg transition-colors ${
@@ -644,46 +699,88 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       </div>
 
       {/* PDF Canvas Container */}
-      <div className="flex-1 overflow-auto bg-gray-100 p-8">
-        <div className="flex justify-center">
-          <div ref={pageContainerRef} className="relative bg-white shadow-2xl">
-            <canvas ref={canvasRef} className="block" />
-            <div
-              ref={textLayerRef}
-              className="absolute top-0 left-0 right-0 bottom-0 overflow-hidden"
-              style={{
-                opacity: 0.2,
-                lineHeight: 1.0
-              }}
-            />
-            
-            {/* Render highlights */}
-            {highlights
-              .filter(h => h.pageNumber === pageNumber)
-              .map(highlight => (
-                <div
-                  key={highlight.id}
-                  className="absolute group"
-                  style={{
-                    left: highlight.position.x,
-                    top: highlight.position.y,
-                    width: highlight.position.width,
-                    height: highlight.position.height,
-                    backgroundColor: highlight.color,
-                    opacity: 0.4,
-                    pointerEvents: 'auto'
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto bg-gray-100 p-8">
+        {pdfViewer.scrollMode === 'continuous' ? (
+          // Continuous scroll mode - render all pages
+          <div className="flex flex-col items-center gap-4">
+            {numPages && Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
+              <div key={pageNum} className="relative bg-white shadow-2xl" data-page-number={pageNum}>
+                <canvas
+                  ref={(el) => {
+                    if (el) pageCanvasRefs.current.set(pageNum, el)
                   }}
-                >
-                  <button
-                    onClick={() => removeHighlight(highlight.id)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
+                  className="block"
+                />
+                {/* Render highlights for this page */}
+                {highlights
+                  .filter(h => h.pageNumber === pageNum)
+                  .map(highlight => (
+                    <div
+                      key={highlight.id}
+                      className="absolute group"
+                      style={{
+                        left: highlight.position.x,
+                        top: highlight.position.y,
+                        width: highlight.position.width,
+                        height: highlight.position.height,
+                        backgroundColor: highlight.color,
+                        opacity: 0.4,
+                        pointerEvents: 'auto'
+                      }}
+                    >
+                      <button
+                        onClick={() => removeHighlight(highlight.id)}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            ))}
           </div>
-        </div>
+        ) : (
+          // Single page mode
+          <div className="flex justify-center">
+            <div ref={pageContainerRef} className="relative bg-white shadow-2xl">
+              <canvas ref={canvasRef} className="block" />
+              <div
+                ref={textLayerRef}
+                className="absolute top-0 left-0 right-0 bottom-0 overflow-hidden"
+                style={{
+                  opacity: 0.2,
+                  lineHeight: 1.0
+                }}
+              />
+              
+              {/* Render highlights */}
+              {highlights
+                .filter(h => h.pageNumber === pageNumber)
+                .map(highlight => (
+                  <div
+                    key={highlight.id}
+                    className="absolute group"
+                    style={{
+                      left: highlight.position.x,
+                      top: highlight.position.y,
+                      width: highlight.position.width,
+                      height: highlight.position.height,
+                      backgroundColor: highlight.color,
+                      opacity: 0.4,
+                      pointerEvents: 'auto'
+                    }}
+                  >
+                    <button
+                      onClick={() => removeHighlight(highlight.id)}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Context Menu */}
