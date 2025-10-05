@@ -43,6 +43,7 @@ export interface PDFViewerSettings {
 export interface TTSSettings {
   isEnabled: boolean
   isPlaying: boolean
+  provider: 'native' | 'google-cloud'
   rate: number
   pitch: number
   volume: number
@@ -123,6 +124,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   tts: {
     isEnabled: false,
     isPlaying: false,
+    provider: 'native',
     rate: 1.0,
     pitch: 1.0,
     volume: 1.0,
