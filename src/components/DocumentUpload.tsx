@@ -126,41 +126,22 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
 
   const extractPDFData = async (file: File) => {
     try {
-      // Import PDF.js dynamically
+      // Import PDF.js directly
       const pdfjsLib = await import('pdfjs-dist')
       
-      // Set up PDF.js worker with fallback - use the same version as react-pdf
-      const localWorker = '/pdf.worker.min.js'
-      // Use the version that matches react-pdf to avoid version mismatch
-      const cdnWorker = `https://unpkg.com/pdfjs-dist@5.3.93/build/pdf.worker.min.js`
+      // Set up PDF.js worker
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
       
-      // Set the worker source with fallback
-      pdfjsLib.GlobalWorkerOptions.workerSrc = localWorker
+      console.log('✅ PDF.js worker configured')
       
-      // Test if local worker is accessible
-      try {
-        await fetch(localWorker, { method: 'HEAD' })
-        console.log('✅ PDF.js worker configured to use local file')
-      } catch {
-        console.warn('⚠️ Local PDF.js worker not found, using CDN fallback')
-        pdfjsLib.GlobalWorkerOptions.workerSrc = cdnWorker
-      }
-      
-      // Store the file itself to avoid ArrayBuffer detachment issues
-      // We'll create a fresh ArrayBuffer each time we need it
+      // Store the file as a Blob to avoid ArrayBuffer detachment issues
       const fileBlob = new Blob([file], { type: 'application/pdf' })
       
       // For initial processing, read the file
       const arrayBuffer = await file.arrayBuffer()
-      const uint8Array = new Uint8Array(arrayBuffer)
       
       // Load the PDF document for text extraction
-      const pdf = await pdfjsLib.getDocument({ 
-        data: uint8Array,
-        useWorkerFetch: false,
-        isEvalSupported: false,
-        useSystemFonts: true
-      }).promise
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
       
       let fullText = ''
       const pageTexts: string[] = []
@@ -185,12 +166,10 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
         }
       }
       
-      // Store the blob directly to avoid ArrayBuffer detachment
-      // The blob will be converted to a blob URL in PDFViewer
-      
+      // Store the blob directly - PDFViewer will convert to blob URL
       return {
         content: fullText.trim() || 'PDF loaded successfully. Text extraction may be limited for some PDFs.',
-        pdfData: fileBlob, // Store the blob directly
+        pdfData: fileBlob,
         totalPages: pdf.numPages,
         pageTexts
       }

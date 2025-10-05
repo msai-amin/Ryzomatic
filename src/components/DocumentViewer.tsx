@@ -1,7 +1,7 @@
 import React from 'react'
 import { useAppStore } from '../store/appStore'
 import { EmptyState } from './EmptyState'
-import PDFViewer from './PDFViewer'
+import { PDFViewer } from './PDFViewer'
 
 export const DocumentViewer: React.FC = () => {
   const { currentDocument, typography } = useAppStore()

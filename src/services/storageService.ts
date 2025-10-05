@@ -14,7 +14,7 @@ export interface SavedBook {
   savedAt: Date;
   lastReadPage?: number;
   totalPages?: number;
-  fileData?: ArrayBuffer | string;
+  fileData?: ArrayBuffer | string | Blob;
   notes?: Note[];
   googleDriveId?: string; // Google Drive file ID for sync
   syncedAt?: Date; // Last sync timestamp
