@@ -7,6 +7,9 @@ import NeoReaderTerminal from './components/NeoReaderTerminal'
 import LandingPage from './components/LandingPage'
 import { useAppStore } from './store/appStore'
 import { authService, supabase } from './services/supabaseAuthService'
+import { healthMonitor } from './services/healthMonitor'
+import { logger } from './services/logger'
+import { errorHandler } from './services/errorHandler'
 
 function App() {
   const { 
@@ -23,16 +26,41 @@ function App() {
   const [showLandingPage, setShowLandingPage] = useState(false)
 
   useEffect(() => {
+    // Initialize monitoring and error handling
+    const context = {
+      component: 'App',
+      action: 'initialize'
+    };
+
+    logger.info('Application initializing', context);
+
+    // Set up error notification callback
+    errorHandler.setUserNotificationCallback((error) => {
+      logger.error('User notification error', context, error);
+      // Could show toast notification here
+    });
+
+    // Set up health monitoring alert callback
+    healthMonitor.addAlertCallback((alert) => {
+      logger.warn(`Health alert: ${alert.type}`, context, undefined, {
+        message: alert.message,
+        alertId: alert.id
+      });
+      // Could show alert notification here
+    });
+
     // Check if we should show NeoReader Terminal first
     const urlParams = new URLSearchParams(window.location.search)
     const hashParams = new URLSearchParams(window.location.hash.substring(1))
     
-    console.log('URL search params:', Object.fromEntries(urlParams.entries()))
-    console.log('URL hash params:', Object.fromEntries(hashParams.entries()))
+    logger.debug('URL parameters parsed', context, {
+      searchParams: Object.fromEntries(urlParams.entries()),
+      hashParams: Object.fromEntries(hashParams.entries())
+    });
     
     // Check if we should show NeoReader Terminal
     if (urlParams.get('neo') === 'true') {
-      console.log('Setting showNeoReader to true')
+      logger.info('NeoReader Terminal requested', context);
       setShowNeoReader(true)
       setIsInitialized(true)
       return
@@ -40,63 +68,78 @@ function App() {
 
     // Check if we should show auth modal from landing page
     if (urlParams.get('auth') === 'true') {
-      console.log('Showing auth modal from landing page')
+      logger.info('Auth modal requested from landing page', context);
       setIsAuthModalOpen(true)
       setIsInitialized(true)
       return
     }
 
     // Check if we should show landing page (default behavior)
-    console.log('Checking landing page conditions...')
-    console.log('Has code param:', urlParams.has('code'))
-    console.log('Has access_token param:', hashParams.has('access_token'))
-    console.log('Should show landing page:', !urlParams.has('code') && !hashParams.has('access_token'))
+    logger.debug('Checking landing page conditions', context);
+    const hasCodeParam = urlParams.has('code');
+    const hasAccessTokenParam = hashParams.has('access_token');
+    const shouldShowLandingPage = !hasCodeParam && !hasAccessTokenParam;
     
-    if (!urlParams.has('code') && !hashParams.has('access_token')) {
-      console.log('✅ Showing landing page')
+    logger.debug('Landing page conditions evaluated', context, {
+      hasCodeParam,
+      hasAccessTokenParam,
+      shouldShowLandingPage
+    });
+    
+    if (shouldShowLandingPage) {
+      logger.info('Showing landing page - no OAuth params', context);
       setShowLandingPage(true)
       setIsInitialized(true)
       return
     } else {
-      console.log('❌ Not showing landing page - has OAuth params')
+      logger.info('Not showing landing page - has OAuth params', context);
     }
 
     // Check authentication status on app load
     const initializeAuth = async () => {
       // If we have OAuth callback parameters, let Supabase handle them
       if (urlParams.has('code') || hashParams.has('access_token')) {
-        console.log('OAuth callback detected, processing...')
-        console.log('Code param:', urlParams.get('code'))
-        console.log('Access token param:', hashParams.get('access_token'))
+        logger.info('OAuth callback detected, processing', context, {
+          hasCode: urlParams.has('code'),
+          hasAccessToken: hashParams.has('access_token')
+        });
         
         // Force Supabase to process the OAuth callback BEFORE clearing URL
         try {
           if (supabase) {
             const success = await authService.processOAuthCallback()
             if (success) {
-              console.log('✅ OAuth callback processed successfully!')
+              logger.info('OAuth callback processed successfully', context);
               // Clear the URL parameters after successful processing
               window.history.replaceState({}, document.title, window.location.pathname)
             } else {
-              console.log('❌ OAuth callback processing failed')
+              logger.warn('OAuth callback processing failed', context);
             }
           } else {
-            console.log('Supabase not available - skipping OAuth processing')
+            logger.warn('Supabase not available - skipping OAuth processing', context);
           }
         } catch (error) {
-          console.error('Error processing OAuth callback:', error)
+          logger.error('Error processing OAuth callback', context, error as Error);
         }
       } else {
-        console.log('No OAuth callback parameters found')
-        console.log('Current URL:', window.location.href)
+        logger.debug('No OAuth callback parameters found', context, {
+          currentUrl: window.location.href
+        });
       }
       
-      if (supabase) {
-        await checkAuth()
-      } else {
-        console.log('Supabase not available - skipping auth check')
+      try {
+        if (supabase) {
+          await checkAuth()
+        } else {
+          logger.warn('Supabase not available - skipping auth check', context);
+        }
+        setIsInitialized(true)
+        logger.info('Authentication initialization completed', context);
+      } catch (error) {
+        logger.error('Authentication initialization failed', context, error as Error);
+        await errorHandler.handleError(error as Error, context);
+        setIsInitialized(true); // Still initialize to show error state
       }
-      setIsInitialized(true)
     }
     
     initializeAuth()
@@ -105,7 +148,10 @@ function App() {
     let subscription: any = null
     if (supabase) {
       const authStateChange = authService.onAuthStateChange(async (user) => {
-        console.log('Auth state changed:', user ? 'signed in' : 'signed out')
+        logger.info('Auth state changed', context, {
+          signedIn: !!user,
+          userId: user?.id
+        });
         
         if (user) {
           // User just signed in (via OAuth or email)

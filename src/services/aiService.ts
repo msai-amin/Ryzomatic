@@ -1,18 +1,24 @@
 // AI Service for handling chat interactions with OpenAI and Gemini support
 import OpenAI from 'openai'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { logger, trackPerformance } from './logger'
+import { errorHandler, ErrorType, ErrorSeverity } from './errorHandler'
+import { validateAIPrompt, validateDocumentContent } from './validation'
 
 // Get API keys from environment
 const openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY;
 const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
-// Debug logging
-console.log('=== AI Service Initialization ===');
-console.log('OpenAI Key configured:', !!openaiApiKey);
-console.log('Gemini Key configured:', !!geminiApiKey);
-if (openaiApiKey) console.log('OpenAI Key starts with:', openaiApiKey.substring(0, 7) + '...');
-if (geminiApiKey) console.log('Gemini Key starts with:', geminiApiKey.substring(0, 20) + '...');
-console.log('===================================');
+// Initialize logging
+logger.info('AI Service Initialization', {
+  component: 'AIService',
+  action: 'Initialize'
+}, {
+  openaiConfigured: !!openaiApiKey,
+  geminiConfigured: !!geminiApiKey,
+  openaiKeyPrefix: openaiApiKey ? openaiApiKey.substring(0, 7) + '...' : 'none',
+  geminiKeyPrefix: geminiApiKey ? geminiApiKey.substring(0, 20) + '...' : 'none'
+});
 
 // Initialize OpenAI client
 const openai = openaiApiKey ? new OpenAI({
@@ -24,25 +30,59 @@ const openai = openaiApiKey ? new OpenAI({
 const genAI = geminiApiKey ? new GoogleGenerativeAI(geminiApiKey) : null;
 
 export const sendMessageToAI = async (message: string, documentContent?: string): Promise<string> => {
-  // Truncate document content to fit within token limits
-  const maxContentLength = 12000;
-  let truncatedContent = documentContent;
-  
-  if (documentContent && documentContent.length > maxContentLength) {
-    truncatedContent = documentContent.substring(0, maxContentLength);
-    console.warn(`⚠️ Document truncated from ${documentContent.length} to ${maxContentLength} characters to fit token limit`);
+  const context = {
+    component: 'AIService',
+    action: 'sendMessageToAI'
+  };
+
+  // Validate inputs
+  const messageValidation = validateAIPrompt(message, context);
+  if (!messageValidation.isValid) {
+    const error = errorHandler.createError(
+      `Invalid AI prompt: ${messageValidation.errors.join(', ')}`,
+      ErrorType.VALIDATION,
+      ErrorSeverity.MEDIUM,
+      context,
+      { validationErrors: messageValidation.errors }
+    );
+    throw error;
   }
 
-  // Try Gemini first (better for large contexts and free tier)
-  if (genAI) {
-    try {
-      console.log('✅ Using Gemini API to generate response...');
-      console.log('Message:', message.substring(0, 100) + '...');
-      console.log('Has document content:', !!documentContent);
+  if (documentContent) {
+    const contentValidation = validateDocumentContent(documentContent, context);
+    if (!contentValidation.isValid) {
+      logger.warn('Document content validation failed', context, undefined, {
+        errors: contentValidation.errors,
+        warnings: contentValidation.warnings
+      });
+    }
+  }
 
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-      
-      const prompt = `You are an AI assistant helping users understand and analyze documents.
+  return trackPerformance('sendMessageToAI', async () => {
+    // Truncate document content to fit within token limits
+    const maxContentLength = 12000;
+    let truncatedContent = documentContent;
+    
+    if (documentContent && documentContent.length > maxContentLength) {
+      truncatedContent = documentContent.substring(0, maxContentLength);
+      logger.warn('Document content truncated', context, undefined, {
+        originalLength: documentContent.length,
+        truncatedLength: maxContentLength
+      });
+    }
+
+    // Try Gemini first (better for large contexts and free tier)
+    if (genAI) {
+      try {
+        logger.info('Using Gemini API', context, {
+          messageLength: message.length,
+          hasDocumentContent: !!documentContent,
+          documentLength: documentContent?.length || 0
+        });
+
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        
+        const prompt = `You are an AI assistant helping users understand and analyze documents.
 
 ${truncatedContent ? 
   `The user has uploaded a document. Here is a portion of the content:\n\n${truncatedContent}\n\n` +
@@ -56,31 +96,36 @@ User Question: ${message}
 
 Please provide a helpful, accurate response:`;
 
-      const result = await model.generateContent(prompt);
-      const response = result.response;
-      const text = response.text();
-      
-      console.log('✅ Gemini API Response received:', text.substring(0, 100) + '...');
-      return text;
-    } catch (error) {
-      console.error('❌ Error calling Gemini API:', error);
-      console.log('⚠️ Falling back to OpenAI...');
+        const result = await model.generateContent(prompt);
+        const response = result.response;
+        const text = response.text();
+        
+        logger.info('Gemini API response received', context, {
+          responseLength: text.length
+        });
+        
+        return text;
+      } catch (error) {
+        logger.error('Gemini API error', context, error as Error);
+        // Continue to OpenAI fallback
+      }
     }
-  }
 
-  // Try GPT-4o-mini next (cost-effective for academic analysis)
-  if (openai && openaiApiKey && openaiApiKey !== 'your_openai_api_key_here') {
-    try {
-      console.log('✅ Using GPT-4o-mini API to generate response...');
-      console.log('Message:', message.substring(0, 100) + '...');
-      console.log('Has document content:', !!documentContent);
+    // Try GPT-4o-mini next (cost-effective for academic analysis)
+    if (openai && openaiApiKey && openaiApiKey !== 'your_openai_api_key_here') {
+      try {
+        logger.info('Using OpenAI GPT-4o-mini API', context, {
+          messageLength: message.length,
+          hasDocumentContent: !!documentContent,
+          documentLength: documentContent?.length || 0
+        });
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are an AI assistant helping users understand and analyze documents, with particular expertise in literary and academic analysis.
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: `You are an AI assistant helping users understand and analyze documents, with particular expertise in literary and academic analysis.
 
 ${truncatedContent ? 
   `The user has uploaded a document. Here is a portion of the content:\n\n${truncatedContent}\n\n` +
@@ -89,30 +134,41 @@ ${truncatedContent ?
     'Please provide helpful, accurate responses based on the document content.') :
   'The user has not uploaded any document yet. Please ask them to upload a document first.'
 }`
-          },
-          {
-            role: "user",
-            content: message
-          }
-        ],
-        max_tokens: 4000,
-        temperature: 0.7,
-      });
+            },
+            {
+              role: "user",
+              content: message
+            }
+          ],
+          max_tokens: 4000,
+          temperature: 0.7,
+        });
 
-      const response = completion.choices[0]?.message?.content || 'Sorry, I couldn\'t generate a response.';
-      console.log('✅ GPT-4o-mini API Response received:', response.substring(0, 100) + '...');
-      return response;
-    } catch (error) {
-      console.error('❌ Error calling GPT-4o-mini API:', error);
-      console.log('⚠️ Falling back to mock responses...');
+        const response = completion.choices[0]?.message?.content || 'Sorry, I couldn\'t generate a response.';
+        
+        logger.info('OpenAI API response received', context, {
+          responseLength: response.length
+        });
+        
+        return response;
+      } catch (error) {
+        logger.error('OpenAI API error', context, error as Error);
+        // Continue to mock response fallback
+      }
     }
-  }
 
-
-  // If both APIs are unavailable or failed, use mock responses
-  console.warn('❌ No AI API keys configured. Using mock responses.');
-  console.warn('Please set VITE_OPENAI_API_KEY or VITE_GEMINI_API_KEY in your .env file');
-  return getMockResponse(message, documentContent);
+    // If both APIs are unavailable or failed, use mock responses
+    logger.warn('No AI API keys configured, using mock responses', context, undefined, {
+      openaiConfigured: !!openaiApiKey,
+      geminiConfigured: !!geminiApiKey
+    });
+    
+    return getMockResponse(message, documentContent);
+  }, context, {
+    messageLength: message.length,
+    hasDocumentContent: !!documentContent,
+    documentLength: documentContent?.length || 0
+  });
 }
 
 // Fallback mock responses when OpenAI API is not available
@@ -172,12 +228,38 @@ export const analyzeWithGPT = async (
   text: string, 
   analysisType: 'framework' | 'literary' | 'argument' | 'synthesis' = 'framework'
 ): Promise<string> => {
-  if (!openai) {
-    throw new Error('OpenAI API is not configured. Please set VITE_OPENAI_API_KEY in your .env file');
+  const context = {
+    component: 'AIService',
+    action: 'analyzeWithGPT',
+    analysisType
+  };
+
+  // Validate inputs
+  const textValidation = validateDocumentContent(text, context);
+  if (!textValidation.isValid) {
+    const error = errorHandler.createError(
+      `Invalid text for analysis: ${textValidation.errors.join(', ')}`,
+      ErrorType.VALIDATION,
+      ErrorSeverity.MEDIUM,
+      context,
+      { validationErrors: textValidation.errors }
+    );
+    throw error;
   }
 
-  const prompts = {
-    framework: `Analyze this academic text and identify all theoretical frameworks, methodologies, and key concepts. For each framework:
+  if (!openai) {
+    const error = errorHandler.createError(
+      'OpenAI API is not configured. Please set VITE_OPENAI_API_KEY in your .env file',
+      ErrorType.AI_SERVICE,
+      ErrorSeverity.HIGH,
+      context
+    );
+    throw error;
+  }
+
+  return trackPerformance('analyzeWithGPT', async () => {
+    const prompts = {
+      framework: `Analyze this academic text and identify all theoretical frameworks, methodologies, and key concepts. For each framework:
 1. Name and describe the framework
 2. Identify the author/originator
 3. List key terms and concepts
@@ -185,8 +267,8 @@ export const analyzeWithGPT = async (
 5. Suggest related frameworks
 
 Text: ${text}`,
-    
-    literary: `Perform a close reading of this literary passage. Analyze:
+      
+      literary: `Perform a close reading of this literary passage. Analyze:
 1. Rhetorical devices and literary techniques
 2. Themes and motifs
 3. Tone and style
@@ -194,8 +276,8 @@ Text: ${text}`,
 5. Historical and cultural context
 
 Text: ${text}`,
-    
-    argument: `Reconstruct the philosophical argument in this text. Provide:
+      
+      argument: `Reconstruct the philosophical argument in this text. Provide:
 1. Main thesis/conclusion
 2. Supporting premises
 3. Logical structure
@@ -203,8 +285,8 @@ Text: ${text}`,
 5. Potential counterarguments
 
 Text: ${text}`,
-    
-    synthesis: `Synthesize the key ideas from this text and:
+      
+      synthesis: `Synthesize the key ideas from this text and:
 1. Identify main themes and concepts
 2. Connect to broader scholarly conversations
 3. Suggest research questions and gaps
@@ -212,24 +294,39 @@ Text: ${text}`,
 5. Recommend related readings
 
 Text: ${text}`
-  };
+    };
 
-  try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{
-        role: 'user',
-        content: prompts[analysisType]
-      }],
-      max_tokens: 4000,
-      temperature: 0.7
-    });
+    try {
+      logger.info('Starting GPT analysis', context, {
+        textLength: text.length,
+        analysisType
+      });
 
-    return completion.choices[0]?.message?.content || 'Analysis failed';
-  } catch (error) {
-    console.error('Error in GPT analysis:', error);
-    throw error;
-  }
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{
+          role: 'user',
+          content: prompts[analysisType]
+        }],
+        max_tokens: 4000,
+        temperature: 0.7
+      });
+
+      const result = completion.choices[0]?.message?.content || 'Analysis failed';
+      
+      logger.info('GPT analysis completed', context, {
+        resultLength: result.length
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('GPT analysis failed', context, error as Error);
+      throw error;
+    }
+  }, context, {
+    textLength: text.length,
+    analysisType
+  });
 };
 
 // Export the AI clients for advanced usage

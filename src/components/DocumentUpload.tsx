@@ -4,6 +4,9 @@ import { useAppStore } from '../store/appStore'
 import { storageService } from '../services/storageService'
 import { googleIntegrationService } from '../services/googleIntegrationService'
 import { simpleGoogleAuth } from '../services/simpleGoogleAuth'
+import { logger, trackPerformance } from '../services/logger'
+import { errorHandler, ErrorType, ErrorSeverity } from '../services/errorHandler'
+import { validatePDFFile, validateFile } from '../services/validation'
 
 interface DocumentUploadProps {
   onClose: () => void
@@ -42,12 +45,59 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
   }, [])
 
   const handleFile = async (file: File) => {
+    const context = {
+      component: 'DocumentUpload',
+      action: 'handleFile'
+    };
+
     setError(null)
     setLoading(true)
 
     try {
+      logger.info('Starting file upload', context, {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type
+      });
+
+      // Validate file
       if (file.type === 'application/pdf') {
-        const { content, pdfData, totalPages, pageTexts } = await extractPDFData(file)
+        const validation = validatePDFFile(file, context);
+        if (!validation.isValid) {
+          const error = errorHandler.createError(
+            `Invalid PDF file: ${validation.errors.join(', ')}`,
+            ErrorType.VALIDATION,
+            ErrorSeverity.MEDIUM,
+            context,
+            { validationErrors: validation.errors }
+          );
+          throw error;
+        }
+      } else {
+        const validation = validateFile(file, { 
+          maxSize: 10 * 1024 * 1024, // 10MB
+          allowedTypes: ['text/plain', 'text/markdown']
+        }, context);
+        if (!validation.isValid) {
+          const error = errorHandler.createError(
+            `Invalid file: ${validation.errors.join(', ')}`,
+            ErrorType.VALIDATION,
+            ErrorSeverity.MEDIUM,
+            context,
+            { validationErrors: validation.errors }
+          );
+          throw error;
+        }
+      }
+
+      if (file.type === 'application/pdf') {
+        const { content, pdfData, totalPages, pageTexts } = await trackPerformance(
+          'extractPDFData',
+          () => extractPDFData(file),
+          context,
+          { fileName: file.name, fileSize: file.size }
+        );
+
         const document = {
           id: crypto.randomUUID(),
           name: file.name,
@@ -58,39 +108,61 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
           totalPages,
           pageTexts
         }
+        
         addDocument(document)
+        
+        logger.info('PDF document processed successfully', context, {
+          documentId: document.id,
+          totalPages,
+          contentLength: content.length
+        });
         
         // Save to library if checkbox is checked
         if (saveToLibrary) {
-          try {
-            // Save locally
-            await storageService.saveBook({
-              id: document.id,
-              title: document.name,
-              fileName: file.name,
-              type: 'pdf',
-              savedAt: new Date(),
-              totalPages,
-              fileData: pdfData,
-            })
-            
-            // Upload to Google Drive "Readings In Progress" if user is signed in
-            if (simpleGoogleAuth.isSignedIn()) {
-              try {
-                console.log('Uploading PDF to Google Drive...')
-                const readingFile = await googleIntegrationService.uploadPDFToReadings(file)
-                console.log('PDF uploaded to Google Drive:', readingFile.url)
-              } catch (driveError) {
-                console.error('Error uploading to Google Drive:', driveError)
-                // Don't fail the whole operation if Drive upload fails
+          await trackPerformance('saveToLibrary', async () => {
+            try {
+              // Save locally
+              await storageService.saveBook({
+                id: document.id,
+                title: document.name,
+                fileName: file.name,
+                type: 'pdf',
+                savedAt: new Date(),
+                totalPages,
+                fileData: pdfData,
+              })
+              
+              logger.info('Document saved to local library', context, {
+                documentId: document.id
+              });
+              
+              // Upload to Google Drive "Readings In Progress" if user is signed in
+              if (simpleGoogleAuth.isSignedIn()) {
+                try {
+                  logger.info('Uploading PDF to Google Drive', context);
+                  const readingFile = await googleIntegrationService.uploadPDFToReadings(file)
+                  logger.info('PDF uploaded to Google Drive successfully', context, {
+                    url: readingFile.url
+                  });
+                } catch (driveError) {
+                  logger.error('Error uploading to Google Drive', context, driveError as Error);
+                  // Don't fail the whole operation if Drive upload fails
+                }
               }
+            } catch (err) {
+              logger.error('Error saving to library', context, err as Error);
+              throw err;
             }
-          } catch (err) {
-            console.error('Error saving to library:', err)
-          }
+          }, context);
         }
       } else {
-        const content = await extractTextFromFile(file)
+        const content = await trackPerformance(
+          'extractTextFromFile',
+          () => extractTextFromFile(file),
+          context,
+          { fileName: file.name, fileSize: file.size }
+        );
+
         const document = {
           id: crypto.randomUUID(),
           name: file.name,
@@ -98,41 +170,69 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
           type: 'text' as const,
           uploadedAt: new Date()
         }
+        
         addDocument(document)
+        
+        logger.info('Text document processed successfully', context, {
+          documentId: document.id,
+          contentLength: content.length
+        });
         
         // Save to library if checkbox is checked
         if (saveToLibrary) {
-          try {
-            await storageService.saveBook({
-              id: document.id,
-              title: document.name,
-              fileName: file.name,
-              type: 'text',
-              savedAt: new Date(),
-              fileData: content,
-            })
-          } catch (err) {
-            console.error('Error saving to library:', err)
-          }
+          await trackPerformance('saveToLibrary', async () => {
+            try {
+              await storageService.saveBook({
+                id: document.id,
+                title: document.name,
+                fileName: file.name,
+                type: 'text',
+                savedAt: new Date(),
+                fileData: content,
+              })
+              
+              logger.info('Document saved to local library', context, {
+                documentId: document.id
+              });
+            } catch (err) {
+              logger.error('Error saving to library', context, err as Error);
+              throw err;
+            }
+          }, context);
         }
       }
+      
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to process file')
+      const error = err instanceof Error ? err : new Error('Failed to process file');
+      logger.error('File upload failed', context, error);
+      
+      await errorHandler.handleError(error, context);
+      setError(error.message);
     } finally {
       setLoading(false)
     }
   }
 
   const extractPDFData = async (file: File) => {
+    const context = {
+      component: 'DocumentUpload',
+      action: 'extractPDFData'
+    };
+
     try {
+      logger.info('Starting PDF data extraction', context, {
+        fileName: file.name,
+        fileSize: file.size
+      });
+
       // Import PDF.js directly
       const pdfjsLib = await import('pdfjs-dist')
       
       // Set up PDF.js worker
       pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
       
-      console.log('✅ PDF.js worker configured')
+      logger.info('PDF.js worker configured', context);
       
       // Store the file as a Blob to avoid ArrayBuffer detachment issues
       const fileBlob = new Blob([file], { type: 'application/pdf' })
@@ -143,8 +243,14 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
       // Load the PDF document for text extraction
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
       
+      logger.info('PDF document loaded', context, {
+        totalPages: pdf.numPages
+      });
+      
       let fullText = ''
       const pageTexts: string[] = []
+      let successfulPages = 0
+      let failedPages = 0
       
       // Extract text from each page
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
@@ -159,12 +265,21 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
           
           pageTexts.push(pageText)
           fullText += pageText + '\n\n'
+          successfulPages++
         } catch (pageError) {
-          console.warn(`Error extracting text from page ${pageNum}:`, pageError)
+          logger.warn(`Error extracting text from page ${pageNum}`, context, pageError as Error);
           pageTexts.push('')
           fullText += '\n\n'
+          failedPages++
         }
       }
+      
+      logger.info('PDF text extraction completed', context, {
+        totalPages: pdf.numPages,
+        successfulPages,
+        failedPages,
+        extractedTextLength: fullText.length
+      });
       
       // Store the blob directly - PDFViewer will convert to blob URL
       return {
@@ -174,16 +289,52 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
         pageTexts
       }
     } catch (error) {
-      console.error('Error extracting PDF data:', error)
-      throw new Error(`Failed to load PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      logger.error('PDF data extraction failed', context, error as Error);
+      const appError = errorHandler.createError(
+        `Failed to load PDF: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        ErrorType.PDF_PROCESSING,
+        ErrorSeverity.HIGH,
+        context,
+        { fileName: file.name, fileSize: file.size }
+      );
+      throw appError;
     }
   }
 
   const extractTextFromFile = async (file: File): Promise<string> => {
-    if (file.type.startsWith('text/') || file.name.endsWith('.txt')) {
-      return await file.text()
-    } else {
-      throw new Error('Unsupported file type. Please upload a text file or PDF.')
+    const context = {
+      component: 'DocumentUpload',
+      action: 'extractTextFromFile'
+    };
+
+    try {
+      logger.info('Starting text file extraction', context, {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type
+      });
+
+      if (file.type.startsWith('text/') || file.name.endsWith('.txt')) {
+        const content = await file.text();
+        
+        logger.info('Text file extracted successfully', context, {
+          contentLength: content.length
+        });
+        
+        return content;
+      } else {
+        const error = errorHandler.createError(
+          'Unsupported file type. Please upload a text file or PDF.',
+          ErrorType.VALIDATION,
+          ErrorSeverity.MEDIUM,
+          context,
+          { fileName: file.name, fileType: file.type }
+        );
+        throw error;
+      }
+    } catch (error) {
+      logger.error('Text file extraction failed', context, error as Error);
+      throw error;
     }
   }
 
