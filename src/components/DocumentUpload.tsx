@@ -149,8 +149,17 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
       const originalArrayBuffer = await file.arrayBuffer()
       
       // Convert ArrayBuffer to base64 data URL to avoid CSP issues
+      // Use chunked approach to prevent call stack overflow for large files
       const uint8Array = new Uint8Array(originalArrayBuffer)
-      const base64String = btoa(String.fromCharCode(...uint8Array))
+      const chunkSize = 8192 // Process in 8KB chunks
+      let binaryString = ''
+      
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize)
+        binaryString += String.fromCharCode(...chunk)
+      }
+      
+      const base64String = btoa(binaryString)
       const dataUrl = `data:application/pdf;base64,${base64String}`
       
       // Load the PDF document using the data URL
