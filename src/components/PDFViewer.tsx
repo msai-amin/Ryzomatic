@@ -89,14 +89,32 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const [pdfFile, setPdfFile] = useState<ArrayBuffer | string | null>(null)
   const pageContainerRef = useRef<HTMLDivElement>(null)
   
-  // Create a fresh copy of the PDF data to avoid detachment
+  // Create a Blob URL from PDF data to avoid ArrayBuffer detachment
   useEffect(() => {
     if (document.pdfData) {
-      // If it's an ArrayBuffer, create a fresh copy
+      // If it's an ArrayBuffer, create a Blob and Blob URL
       if (document.pdfData instanceof ArrayBuffer) {
-        const copy = document.pdfData.slice(0)
-        setPdfFile(copy)
-      } else {
+        const blob = new Blob([document.pdfData], { type: 'application/pdf' })
+        const blobUrl = URL.createObjectURL(blob)
+        setPdfFile(blobUrl)
+        
+        // Cleanup function to revoke the blob URL
+        return () => {
+          URL.revokeObjectURL(blobUrl)
+        }
+      } 
+      // If it's a Blob, create a Blob URL
+      else if (document.pdfData instanceof Blob) {
+        const blobUrl = URL.createObjectURL(document.pdfData)
+        setPdfFile(blobUrl)
+        
+        // Cleanup function to revoke the blob URL
+        return () => {
+          URL.revokeObjectURL(blobUrl)
+        }
+      } 
+      // If it's already a string (blob URL), use it directly
+      else {
         setPdfFile(document.pdfData)
       }
     }

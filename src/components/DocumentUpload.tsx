@@ -185,13 +185,12 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
         }
       }
       
-      // Store the blob instead of ArrayBuffer to avoid detachment
-      // Convert blob to ArrayBuffer for storage (will be fresh each time)
-      const storageBuffer = await fileBlob.arrayBuffer()
+      // Store the blob directly to avoid ArrayBuffer detachment
+      // The blob will be converted to a blob URL in PDFViewer
       
       return {
         content: fullText.trim() || 'PDF loaded successfully. Text extraction may be limited for some PDFs.',
-        pdfData: storageBuffer, // Use a fresh ArrayBuffer for storage
+        pdfData: fileBlob, // Store the blob directly
         totalPages: pdf.numPages,
         pageTexts
       }
