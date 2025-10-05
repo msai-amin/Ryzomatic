@@ -146,30 +146,18 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
       }
       
       // Read the file as array buffer
-      const originalArrayBuffer = await file.arrayBuffer()
+      const arrayBuffer = await file.arrayBuffer()
       
-      // Convert ArrayBuffer to base64 data URL to avoid CSP issues
-      // Use chunked approach to prevent call stack overflow for large files
-      const uint8Array = new Uint8Array(originalArrayBuffer)
-      const chunkSize = 8192 // Process in 8KB chunks
-      let binaryString = ''
+      // Create a Uint8Array view (doesn't copy data)
+      const uint8Array = new Uint8Array(arrayBuffer)
       
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.slice(i, i + chunkSize)
-        binaryString += String.fromCharCode(...chunk)
-      }
-      
-      const base64String = btoa(binaryString)
-      const dataUrl = `data:application/pdf;base64,${base64String}`
-      
-      // Load the PDF document using the data URL
+      // Load the PDF document directly with Uint8Array
+      // This avoids CSP issues and doesn't detach the buffer
       const pdf = await pdfjsLib.getDocument({ 
-        url: dataUrl,
+        data: uint8Array,
         useWorkerFetch: false,
         isEvalSupported: false,
-        useSystemFonts: true,
-        disableAutoFetch: true,
-        disableStream: true
+        useSystemFonts: true
       }).promise
       
       let fullText = ''
@@ -197,7 +185,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
       
       return {
         content: fullText.trim() || 'PDF loaded successfully. Text extraction may be limited for some PDFs.',
-        pdfData: dataUrl, // Use the data URL for storage to prevent detachment and CSP issues
+        pdfData: arrayBuffer, // Use the ArrayBuffer for storage
         totalPages: pdf.numPages,
         pageTexts
       }
