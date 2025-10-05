@@ -32,6 +32,7 @@ Your app is deployed but can't connect to Supabase because environment variables
 | Variable Name | Value | Notes |
 |--------------|-------|-------|
 | `VITE_GOOGLE_CLIENT_ID` | Your Google OAuth Client ID | Only if using Google Drive features |
+| `VITE_GOOGLE_CLOUD_TTS_API_KEY` | Your Google Cloud TTS API Key | For premium TTS voices |
 | `VITE_APP_URL` | `https://smart-reader-serverless-pb4xfa1w1-vstyle-ltds-projects.vercel.app` | Your production URL |
 
 5. **Select "Production"** for each variable
@@ -71,6 +72,10 @@ vercel env add AWS_REGION production
 # Optional: Google OAuth
 vercel env add VITE_GOOGLE_CLIENT_ID production
 # Or press Ctrl+C to skip
+
+# Optional: Google Cloud TTS
+vercel env add VITE_GOOGLE_CLOUD_TTS_API_KEY production
+# Or press Ctrl+C to skip
 ```
 
 Then redeploy:
@@ -107,6 +112,14 @@ vercel --prod
 1. Go to: https://console.cloud.google.com/
 2. APIs & Services → Credentials
 3. Copy your OAuth 2.0 Client ID
+
+### **Google Cloud TTS API Key** (Optional)
+1. Go to: https://console.cloud.google.com/
+2. APIs & Services → Credentials
+3. Click "Create Credentials" → "API Key"
+4. Copy the generated API key
+5. **Important**: Enable the "Cloud Text-to-Speech API" for this key
+6. Use for `VITE_GOOGLE_CLOUD_TTS_API_KEY`
 
 ---
 
