@@ -149,7 +149,7 @@ class HealthMonitor {
         try {
           // Simple connectivity check
           const response = await fetch('/api/health', { 
-            method: 'HEAD',
+            method: 'GET',
             signal: AbortSignal.timeout(5000)
           });
           return response.ok;
