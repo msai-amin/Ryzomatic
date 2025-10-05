@@ -7,3 +7,6 @@ dist
 logs/
 .DS_Store
 .vercel
+
+# Archive directory (keep in git for reference)
+# archive/
