@@ -90,17 +90,13 @@ class SupabaseAuthService {
    * Sign in with Google OAuth
    */
   async signInWithGoogle() {
-    // For development, always use current origin to avoid redirect issues
-    // For production, use VITE_APP_URL if set
-    const isDevelopment = import.meta.env.DEV;
-    const redirectUrl = isDevelopment 
-      ? window.location.origin 
-      : (import.meta.env.VITE_APP_URL || window.location.origin);
+    // Always use current origin to avoid redirect issues
+    // This ensures localhost stays on localhost and production stays on production
+    const redirectUrl = window.location.origin;
     
     console.log('Initiating Google OAuth with redirect:', redirectUrl);
     console.log('Current URL:', window.location.href);
     console.log('Supabase URL:', supabaseUrl);
-    console.log('Is development:', isDevelopment);
     
     const { data: oauthData, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
