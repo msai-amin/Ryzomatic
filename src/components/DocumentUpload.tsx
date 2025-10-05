@@ -148,16 +148,21 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
       // Read the file as array buffer
       const originalArrayBuffer = await file.arrayBuffer()
       
-      // Create a new ArrayBuffer copy to prevent detachment issues
-      const bufferCopy = new ArrayBuffer(originalArrayBuffer.byteLength)
-      new Uint8Array(bufferCopy).set(new Uint8Array(originalArrayBuffer))
+      // Create a deep copy of the ArrayBuffer to prevent detachment
+      const bufferCopy = originalArrayBuffer.slice(0)
       
-      // Load the PDF document with the copy to avoid detachment
+      // Create a new ArrayBuffer for PDF.js processing to avoid any detachment
+      const processingBuffer = new ArrayBuffer(bufferCopy.byteLength)
+      new Uint8Array(processingBuffer).set(new Uint8Array(bufferCopy))
+      
+      // Load the PDF document with the processing buffer
       const pdf = await pdfjsLib.getDocument({ 
-        data: bufferCopy,
+        data: processingBuffer,
         useWorkerFetch: false,
         isEvalSupported: false,
-        useSystemFonts: true
+        useSystemFonts: true,
+        disableAutoFetch: true,
+        disableStream: true
       }).promise
       
       let fullText = ''
@@ -185,7 +190,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
       
       return {
         content: fullText.trim() || 'PDF loaded successfully. Text extraction may be limited for some PDFs.',
-        pdfData: originalArrayBuffer, // Use the original buffer for storage (copy was used for processing)
+        pdfData: bufferCopy, // Use the buffer copy for storage to prevent detachment
         totalPages: pdf.numPages,
         pageTexts
       }

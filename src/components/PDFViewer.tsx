@@ -1034,7 +1034,10 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                       cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
                       cMapPacked: true,
                       standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
-                      verbosity: 0
+                      verbosity: 0,
+                      disableAutoFetch: true,
+                      disableStream: true,
+                      useWorkerFetch: false
                     }}
                     loading={
                       <div className="flex items-center justify-center p-12">
@@ -1089,7 +1092,10 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                       cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
                       cMapPacked: true,
                       standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
-                      verbosity: 0
+                      verbosity: 0,
+                      disableAutoFetch: true,
+                      disableStream: true,
+                      useWorkerFetch: false
                     }}
                     loading={
                       <div className="flex items-center justify-center p-12">
