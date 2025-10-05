@@ -35,7 +35,8 @@ import 'react-pdf/dist/Page/TextLayer.css'
 const setupPDFWorker = () => {
   // Try local worker first, then fallback to CDN
   const localWorker = '/pdf.worker.min.js'
-  const cdnWorker = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
+  // Use the version that matches react-pdf to avoid version mismatch
+  const cdnWorker = `https://unpkg.com/pdfjs-dist@5.3.93/build/pdf.worker.min.js`
   
   // Set the worker source with fallback
   pdfjs.GlobalWorkerOptions.workerSrc = localWorker

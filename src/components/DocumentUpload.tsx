@@ -129,9 +129,10 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
       // Import PDF.js dynamically
       const pdfjsLib = await import('pdfjs-dist')
       
-      // Set up PDF.js worker with fallback
+      // Set up PDF.js worker with fallback - use the same version as react-pdf
       const localWorker = '/pdf.worker.min.js'
-      const cdnWorker = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`
+      // Use the version that matches react-pdf to avoid version mismatch
+      const cdnWorker = `https://unpkg.com/pdfjs-dist@5.3.93/build/pdf.worker.min.js`
       
       // Set the worker source with fallback
       pdfjsLib.GlobalWorkerOptions.workerSrc = localWorker
