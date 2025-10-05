@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 import rollupNodePolyFill from 'rollup-plugin-node-polyfills'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     VitePWA({
@@ -68,7 +68,19 @@ export default defineConfig({
         global: 'globalThis',
       },
     },
-    exclude: ['pdfjs-dist']
+    exclude: [
+      'pdfjs-dist',
+      '@google-cloud/text-to-speech',
+      '@google-cloud/storage',
+      'googleapis',
+      'natural',
+      'citation-js',
+      'neo4j-driver',
+      'd3',
+      'mermaid',
+      'vis-timeline',
+      'vis-data'
+    ]
   },
   build: {
     rollupOptions: {
@@ -76,6 +88,17 @@ export default defineConfig({
         rollupNodePolyFill(),
       ],
       output: {
+        // Manual chunking to reduce bundle size
+        manualChunks: {
+          // Vendor chunks
+          'react-vendor': ['react', 'react-dom'],
+          'pdf-vendor': ['pdfjs-dist'],
+          'ui-vendor': ['lucide-react', 'clsx', 'tailwind-merge'],
+          'supabase-vendor': ['@supabase/supabase-js'],
+          'ai-vendor': ['@google/generative-ai', 'openai'],
+          'aws-vendor': ['@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner'],
+          'utils-vendor': ['marked', 'compromise'],
+        },
         // Ensure PDF.js worker is copied to the correct location
         assetFileNames: (assetInfo) => {
           if (assetInfo.name === 'pdf.worker.min.js') {
@@ -85,6 +108,14 @@ export default defineConfig({
         }
       }
     },
+    // Increase chunk size warning limit
+    chunkSizeWarningLimit: 1000,
+    // Enable source maps for debugging (disable in production for faster builds)
+    sourcemap: mode === 'development',
+    // Optimize for faster builds
+    minify: mode === 'production' ? 'esbuild' : false,
+    // Disable source maps in production for faster builds
+    cssCodeSplit: true,
   },
   server: {
     port: 3001,
@@ -101,6 +132,6 @@ export default defineConfig({
   },
   // Ensure PDF.js worker is properly handled
   assetsInclude: ['**/*.worker.js', '**/*.worker.min.js']
-})
+}))
 
 
