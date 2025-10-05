@@ -8,7 +8,7 @@ export interface Document {
   type: 'text' | 'pdf'
   uploadedAt: Date
   // PDF-specific properties
-  pdfData?: ArrayBuffer
+  pdfData?: ArrayBuffer | string // Support both ArrayBuffer and blob URL
   totalPages?: number
   pageTexts?: string[]
 }
