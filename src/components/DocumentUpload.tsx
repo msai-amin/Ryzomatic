@@ -145,14 +145,15 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
         pdfjsLib.GlobalWorkerOptions.workerSrc = cdnWorker
       }
       
-      // Read the file as array buffer
-      const arrayBuffer = await file.arrayBuffer()
+      // Store the file itself to avoid ArrayBuffer detachment issues
+      // We'll create a fresh ArrayBuffer each time we need it
+      const fileBlob = new Blob([file], { type: 'application/pdf' })
       
-      // Create a Uint8Array view (doesn't copy data)
+      // For initial processing, read the file
+      const arrayBuffer = await file.arrayBuffer()
       const uint8Array = new Uint8Array(arrayBuffer)
       
-      // Load the PDF document directly with Uint8Array
-      // This avoids CSP issues and doesn't detach the buffer
+      // Load the PDF document for text extraction
       const pdf = await pdfjsLib.getDocument({ 
         data: uint8Array,
         useWorkerFetch: false,
@@ -183,9 +184,13 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
         }
       }
       
+      // Store the blob instead of ArrayBuffer to avoid detachment
+      // Convert blob to ArrayBuffer for storage (will be fresh each time)
+      const storageBuffer = await fileBlob.arrayBuffer()
+      
       return {
         content: fullText.trim() || 'PDF loaded successfully. Text extraction may be limited for some PDFs.',
-        pdfData: arrayBuffer, // Use the ArrayBuffer for storage
+        pdfData: storageBuffer, // Use a fresh ArrayBuffer for storage
         totalPages: pdf.numPages,
         pageTexts
       }

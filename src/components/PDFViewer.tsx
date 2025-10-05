@@ -85,7 +85,21 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string } | null>(null)
   const [showNotesPanel, setShowNotesPanel] = useState<boolean>(false)
   const [selectedTextForNote, setSelectedTextForNote] = useState<string>('')
+  const [pdfFile, setPdfFile] = useState<ArrayBuffer | string | null>(null)
   const pageContainerRef = useRef<HTMLDivElement>(null)
+  
+  // Create a fresh copy of the PDF data to avoid detachment
+  useEffect(() => {
+    if (document.pdfData) {
+      // If it's an ArrayBuffer, create a fresh copy
+      if (document.pdfData instanceof ArrayBuffer) {
+        const copy = document.pdfData.slice(0)
+        setPdfFile(copy)
+      } else {
+        setPdfFile(document.pdfData)
+      }
+    }
+  }, [document.pdfData])
 
   const highlightColors = [
     { name: 'Yellow', value: '#FFFF00' },
@@ -1027,7 +1041,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               {scrollMode === 'single' ? (
                 <div className="shadow-lg border border-gray-200 rounded-lg overflow-hidden bg-white">
                   <Document
-                    file={document.pdfData}
+                    file={pdfFile}
                     onLoadSuccess={onDocumentLoadSuccess}
                     onLoadError={onDocumentLoadError}
                     options={{
@@ -1082,7 +1096,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               ) : (
                 <div className="space-y-4">
                   <Document
-                    file={document.pdfData}
+                    file={pdfFile}
                     onLoadSuccess={onDocumentLoadSuccess}
                     onLoadError={onDocumentLoadError}
                     options={{
