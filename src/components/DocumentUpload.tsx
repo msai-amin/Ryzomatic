@@ -148,15 +148,14 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
       // Read the file as array buffer
       const originalArrayBuffer = await file.arrayBuffer()
       
-      // Convert ArrayBuffer to Blob to prevent detachment issues
-      const pdfBlob = new Blob([originalArrayBuffer], { type: 'application/pdf' })
+      // Convert ArrayBuffer to base64 data URL to avoid CSP issues
+      const uint8Array = new Uint8Array(originalArrayBuffer)
+      const base64String = btoa(String.fromCharCode(...uint8Array))
+      const dataUrl = `data:application/pdf;base64,${base64String}`
       
-      // Create a URL for the blob to use with PDF.js
-      const blobUrl = URL.createObjectURL(pdfBlob)
-      
-      // Load the PDF document using the blob URL
+      // Load the PDF document using the data URL
       const pdf = await pdfjsLib.getDocument({ 
-        url: blobUrl,
+        url: dataUrl,
         useWorkerFetch: false,
         isEvalSupported: false,
         useSystemFonts: true,
@@ -189,7 +188,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
       
       return {
         content: fullText.trim() || 'PDF loaded successfully. Text extraction may be limited for some PDFs.',
-        pdfData: blobUrl, // Use the blob URL for storage to prevent detachment
+        pdfData: dataUrl, // Use the data URL for storage to prevent detachment and CSP issues
         totalPages: pdf.numPages,
         pageTexts
       }
