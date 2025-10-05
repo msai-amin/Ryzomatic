@@ -31,7 +31,7 @@ import { NotesPanel } from './NotesPanel'
 import { storageService } from '../services/storageService'
 
 // Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
 
 interface Highlight {
   id: string

@@ -230,7 +230,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
       const pdfjsLib = await import('pdfjs-dist')
       
       // Set up PDF.js worker
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
       
       logger.info('PDF.js worker configured', context);
       
