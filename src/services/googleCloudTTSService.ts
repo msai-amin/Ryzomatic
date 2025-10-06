@@ -234,27 +234,16 @@ class GoogleCloudTTSService {
     // Create a copy of the voice object
     const voiceWithModel = { ...voice };
     
-    // Set model for voices that require it
-    // Be comprehensive - if a voice requires a model, the API will tell us
-    // We'll try with model first, and if it fails, we can fall back
-    if (voice.name.includes('Neural2')) {
+    // Only set model for voices that actually require it
+    // Studio voices and some specific voice types need the model field
+    if (voice.name.includes('Studio')) {
       voiceWithModel.model = 'latest';
-    } else if (voice.name.includes('Studio')) {
+    } else if (voice.name.includes('Journey')) {
       voiceWithModel.model = 'latest';
-    } else if (voice.name.includes('Wavenet')) {
-      voiceWithModel.model = 'latest';
-    } else if (voice.name.includes('Neural')) {
-      voiceWithModel.model = 'latest';
-    } else if (voice.name.includes('Journey') || voice.name.includes('Polyglot')) {
-      voiceWithModel.model = 'latest';
-    } else if (voice.name.includes('Achernar') || voice.name.includes('Algenib') || voice.name.includes('Fenrir')) {
-      // These are specific voice names that require models
-      voiceWithModel.model = 'latest';
-    } else {
-      // For any other voice, try with model to be safe
-      // If the voice doesn't support model, the API will reject it and we can handle that
+    } else if (voice.name.includes('Polyglot')) {
       voiceWithModel.model = 'latest';
     }
+    // Note: Wavenet, Neural2, Neural, and Standard voices don't need model field
     
     return voiceWithModel;
   }
@@ -303,8 +292,9 @@ class GoogleCloudTTSService {
       ssmlGender: voice.ssmlGender || 'NEUTRAL'
     };
 
-    // Add model if available (required for some voices)
-    if (voice.model) {
+    // Only add model field for voices that actually require it
+    // Studio voices and some specific voice types need the model field
+    if (voice.model && (voice.name.includes('Studio') || voice.name.includes('Journey') || voice.name.includes('Polyglot'))) {
       voiceConfig.model = voice.model;
     }
 
