@@ -166,8 +166,9 @@ class GoogleCloudTTSService {
     }
 
     try {
+      // Use v1beta1 endpoint to get complete voice information including model requirements
       const response = await fetch(
-        `https://texttospeech.googleapis.com/v1/voices?key=${this.apiKey}`
+        `https://texttospeech.googleapis.com/v1beta1/voices?key=${this.apiKey}`
       );
 
       if (!response.ok) {
@@ -323,12 +324,16 @@ class GoogleCloudTTSService {
       voice: this.settings.voice,
       textLength: text.length,
       textPreview: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
-      audioConfig: requestBody.audioConfig
+      audioConfig: requestBody.audioConfig,
+      endpoint: voice.model ? 'v1beta1' : 'v1',
+      hasModel: !!voice.model
     });
 
     try {
+      // Use v1beta1 endpoint for voices that require model field
+      const endpoint = voice.model ? 'v1beta1' : 'v1';
       const response = await fetch(
-        `https://texttospeech.googleapis.com/v1/text:synthesize?key=${this.apiKey}`,
+        `https://texttospeech.googleapis.com/${endpoint}/text:synthesize?key=${this.apiKey}`,
         {
           method: 'POST',
           headers: {
