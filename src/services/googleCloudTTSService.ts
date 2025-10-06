@@ -69,35 +69,23 @@ class GoogleCloudTTSService {
         model: v.model
       })));
       
-      // Prioritize voices that don't require a model first
-      const voicesWithoutModel = voices.filter(v => 
-        v.name && v.languageCode && v.languageCode.startsWith('en-') && !v.model
+      // Prioritize voices that work well and don't require a model
+      const standardVoices = voices.filter(v => 
+        v.name && v.languageCode && v.languageCode.startsWith('en-') && 
+        !v.name.includes('Neural2') && !v.name.includes('Studio') && !v.name.includes('Neural')
       );
       
-      // Try to find a good voice without model requirement
-      let selectedVoice = voicesWithoutModel.find(v => v.name.includes('Neural2')) ||
-                         voicesWithoutModel.find(v => v.name.includes('Studio')) ||
-                         voicesWithoutModel.find(v => v.name.includes('Wavenet')) ||
-                         voicesWithoutModel[0];
+      // Try to find a good standard voice first (most reliable)
+      let selectedVoice = standardVoices.find(v => v.name.includes('Wavenet')) ||
+                         standardVoices.find(v => v.name.includes('Standard')) ||
+                         standardVoices[0];
       
-      // If no voice without model, use any English voice and set a default model
+      // If no standard voice found, try Neural2 or Studio voices (they need models)
       if (!selectedVoice) {
         selectedVoice = voices.find(v => 
-          v.name && v.languageCode && v.languageCode.startsWith('en-')
+          v.name && v.languageCode && v.languageCode.startsWith('en-') &&
+          (v.name.includes('Neural2') || v.name.includes('Studio'))
         );
-        
-        // If the selected voice requires a model, set a default one
-        if (selectedVoice && selectedVoice.model === undefined) {
-          // For voices that require a model, try to set a reasonable default
-          if (selectedVoice.name.includes('Neural2')) {
-            selectedVoice.model = 'latest'; // Use latest model for Neural2 voices
-          } else if (selectedVoice.name.includes('Studio')) {
-            selectedVoice.model = 'latest'; // Use latest model for Studio voices
-          } else if (selectedVoice.name.includes('Wavenet')) {
-            // Wavenet voices typically don't need a model, but just in case
-            selectedVoice.model = 'latest';
-          }
-        }
       }
       
       if (selectedVoice) {
@@ -238,23 +226,21 @@ class GoogleCloudTTSService {
     // Create a copy of the voice object
     const voiceWithModel = { ...voice };
     
-    // Set model for voices that require it
-    // Based on Google Cloud TTS documentation, many voices now require a model
-    // We'll be conservative and set model for most voices to avoid API errors
+    // Only set model for voices that actually require it
+    // Based on Google Cloud TTS documentation, only specific voice types need models
     if (voice.name.includes('Neural2')) {
       voiceWithModel.model = 'latest';
     } else if (voice.name.includes('Studio')) {
       voiceWithModel.model = 'latest';
     } else if (voice.name.includes('Wavenet')) {
-      // Wavenet voices typically don't need a model, but set it just in case
-      voiceWithModel.model = 'latest';
+      // Wavenet voices typically don't need a model
+      // Don't set model for Wavenet voices
     } else if (voice.name.includes('Neural')) {
-      // Other neural voices might also need a model
-      voiceWithModel.model = 'latest';
+      // Other neural voices might need a model, but be more selective
+      // Only set for voices that explicitly require it
     } else {
-      // For any other voice, set model to 'latest' to be safe
-      // This prevents the "model name required" error
-      voiceWithModel.model = 'latest';
+      // For other voices (like Standard voices), don't set model
+      // This prevents the "Unknown name model" error
     }
     
     return voiceWithModel;
