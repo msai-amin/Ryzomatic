@@ -25,7 +25,7 @@ import {
   MousePointer2
 } from 'lucide-react'
 import { useAppStore, Document as DocumentType } from '../store/appStore'
-import { ttsService } from '../services/ttsService'
+import { ttsManager } from '../services/ttsManager'
 import { TTSControls } from './TTSControls'
 import { NotesPanel } from './NotesPanel'
 import { storageService } from '../services/storageService'
@@ -344,7 +344,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   useEffect(() => {
     return () => {
       if (tts.isPlaying) {
-        ttsService.stop()
+        ttsManager.stop()
       }
     }
   }, [])
@@ -416,9 +416,28 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
   const handleTTSPlay = useCallback(async () => {
     if (tts.isPlaying) {
-      ttsService.pause()
+      ttsManager.pause()
       updateTTS({ isPlaying: false })
     } else {
+      // Debug TTS provider info
+      const providers = ttsManager.getProviders()
+      const availableProviders = ttsManager.getAvailableProviders()
+      const configuredProviders = ttsManager.getConfiguredProviders()
+      const currentProvider = ttsManager.getCurrentProvider()
+      
+      console.log('TTS Provider Info:', {
+        allProviders: providers.map(p => ({ name: p.name, type: p.type, available: p.isAvailable, configured: p.isConfigured })),
+        availableProviders: availableProviders.map(p => ({ name: p.name, type: p.type })),
+        configuredProviders: configuredProviders.map(p => ({ name: p.name, type: p.type })),
+        currentProvider: currentProvider ? { name: currentProvider.name, type: currentProvider.type } : null
+      })
+      
+      // Try to switch to Google Cloud TTS if available and configured
+      if (configuredProviders.some(p => p.type === 'google-cloud')) {
+        const switched = ttsManager.setProvider('google-cloud')
+        console.log('Switched to Google Cloud TTS:', switched)
+      }
+      
       // Debug logging
       console.log('TTS Debug:', {
         pageNumber,
@@ -463,7 +482,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           textPreview: pageText.substring(0, 50) + '...'
         })
         try {
-          await ttsService.speak(pageText, () => {
+          await ttsManager.speak(pageText, () => {
             updateTTS({ isPlaying: false })
           })
           updateTTS({ isPlaying: true })
@@ -485,8 +504,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   }, [tts, pageNumber, document.pageTexts, updateTTS])
 
   const handleTTSStop = useCallback(() => {
-    ttsService.stop()
-        updateTTS({ isPlaying: false })
+    ttsManager.stop()
+    updateTTS({ isPlaying: false })
   }, [updateTTS])
 
   const handleAddNote = useCallback((text: string) => {
