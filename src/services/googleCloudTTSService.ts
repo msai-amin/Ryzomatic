@@ -344,6 +344,15 @@ class GoogleCloudTTSService {
         originalRequestBody: requestBody
       });
       
+      console.log('DETAILED VOICE MAPPING DEBUG:', {
+        selectedVoiceName: voice.name,
+        selectedVoiceLanguageCode: voice.languageCode,
+        selectedVoiceSsmlGender: voice.ssmlGender,
+        selectedVoiceModel: voice.model,
+        selectedVoiceHasModel: !!voice.model,
+        originalRequestVoiceConfig: requestBody.voice
+      });
+      
       const response = await fetch(`${API_ENDPOINT}?key=${this.apiKey}`, {
         method: 'POST',
         headers: {
