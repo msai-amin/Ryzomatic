@@ -81,7 +81,22 @@ class StorageService {
   private async cleanupOldBooks(): Promise<void> {
     try {
       const books = this.getAllBooks();
-      if (books.length <= 1) return; // Keep at least one book
+      
+      if (books.length === 0) {
+        // No books to clean up, but we can still clean up notes and audio
+        safeConsole.log('No books to clean up, cleaning up notes and audio only');
+        this.cleanupOldNotes();
+        this.cleanupOldAudio();
+        return;
+      }
+      
+      if (books.length <= 1) {
+        // Only one book, clean up notes and audio
+        safeConsole.log('Only one book, cleaning up notes and audio only');
+        this.cleanupOldNotes();
+        this.cleanupOldAudio();
+        return;
+      }
       
       // Sort by savedAt date (oldest first)
       const sortedBooks = books.sort((a, b) => 
@@ -220,14 +235,25 @@ class StorageService {
           fileDataConstructor: book.fileData.constructor.name
         });
         
-        bookToSave.pdfDataBase64 = this.arrayBufferToBase64(book.fileData);
-        console.log('Base64 conversion successful:', {
-          base64Length: bookToSave.pdfDataBase64.length,
-          base64Preview: bookToSave.pdfDataBase64.substring(0, 50) + '...'
-        });
-        
-        // Remove the ArrayBuffer as it can't be serialized
-        delete bookToSave.fileData;
+        // Check if the PDF is too large for localStorage (estimate 5MB limit)
+        const estimatedSize = book.fileData.byteLength * 1.37; // Base64 is ~37% larger
+        if (estimatedSize > 5 * 1024 * 1024) { // 5MB
+          safeConsole.warn('PDF is too large for localStorage, saving metadata only:', {
+            estimatedSize: Math.round(estimatedSize / 1024 / 1024) + 'MB',
+            bookTitle: book.title
+          });
+          // Don't include PDF data, just save metadata
+          delete bookToSave.fileData;
+        } else {
+          bookToSave.pdfDataBase64 = this.arrayBufferToBase64(book.fileData);
+          safeConsole.log('Base64 conversion successful:', {
+            base64Length: bookToSave.pdfDataBase64.length,
+            base64Preview: bookToSave.pdfDataBase64.substring(0, 50) + '...'
+          });
+          
+          // Remove the ArrayBuffer as it can't be serialized
+          delete bookToSave.fileData;
+        }
       }
       
       if (existingIndex >= 0) {
@@ -239,33 +265,43 @@ class StorageService {
       // Try to save, if quota exceeded, clean up old books
       try {
         localStorage.setItem(this.BOOKS_KEY, JSON.stringify(books));
-        console.log('Book saved to localStorage successfully');
-      } catch (quotaError) {
+        safeConsole.log('Book saved to localStorage successfully');
+      } catch (quotaError: any) {
         if (quotaError.name === 'QuotaExceededError') {
-          console.warn('Storage quota exceeded, cleaning up old books...');
+          safeConsole.warn('Storage quota exceeded, cleaning up old books...');
           await this.cleanupOldBooks();
           
           // Try saving again after cleanup
           try {
             localStorage.setItem(this.BOOKS_KEY, JSON.stringify(books));
-            console.log('Book saved to localStorage after cleanup');
-          } catch (retryError) {
-            console.error('Still unable to save after cleanup:', retryError);
-            // Try one more time with even more aggressive cleanup
+            safeConsole.log('Book saved to localStorage after cleanup');
+          } catch (retryError: any) {
+            safeConsole.error('Still unable to save after cleanup:', retryError);
+            
+            // If the book itself is too large, try saving without the PDF data
             try {
-              const books = this.getAllBooks();
-              if (books.length > 1) {
-                // Keep only the most recent book
-                const sortedBooks = books.sort((a, b) => 
-                  new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime()
-                );
-                const singleBook = [sortedBooks[0]];
-                localStorage.setItem(this.BOOKS_KEY, JSON.stringify(singleBook));
-                console.log('Emergency cleanup: Kept only most recent book');
+              const booksWithoutPdfData = books.map(book => {
+                const { pdfDataBase64, ...bookWithoutPdf } = book;
+                return bookWithoutPdf;
+              });
+              
+              localStorage.setItem(this.BOOKS_KEY, JSON.stringify(booksWithoutPdfData));
+              safeConsole.log('Book saved to localStorage without PDF data (metadata only)');
+            } catch (noPdfError: any) {
+              safeConsole.error('Still unable to save even without PDF data:', noPdfError);
+              
+              // Last resort: try to save just the current book without PDF data
+              try {
+                const currentBookWithoutPdf = { ...bookToSave };
+                delete currentBookWithoutPdf.pdfDataBase64;
+                delete currentBookWithoutPdf.fileData;
+                
+                localStorage.setItem(this.BOOKS_KEY, JSON.stringify([currentBookWithoutPdf]));
+                safeConsole.log('Emergency cleanup: Saved only current book metadata without PDF data');
+              } catch (finalError: any) {
+                safeConsole.error('Final cleanup attempt failed:', finalError);
+                safeConsole.warn('localStorage backup completely failed, but this is not critical if Supabase succeeded');
               }
-            } catch (finalError) {
-              console.error('Final cleanup attempt failed:', finalError);
-              console.warn('localStorage backup completely failed, but this is not critical if Supabase succeeded');
             }
           }
         } else {
