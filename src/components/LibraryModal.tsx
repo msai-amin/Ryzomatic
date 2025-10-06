@@ -27,6 +27,9 @@ export function LibraryModal({ isOpen, onClose }: LibraryModalProps) {
   }, [isOpen, activeTab]);
 
   const loadData = async () => {
+    // Clean up corrupted legacy books first
+    storageService.cleanupCorruptedBooks();
+    
     setBooks(storageService.getAllBooks());
     setNotes(storageService.getAllNotes());
     setAudio(await storageService.getAllAudio());
@@ -83,6 +86,15 @@ export function LibraryModal({ isOpen, onClose }: LibraryModalProps) {
             // If it's an array of numbers, convert to ArrayBuffer
             const bytes = new Uint8Array(book.fileData);
             book.fileData = bytes.buffer as ArrayBuffer;
+          } else if (typeof book.fileData === 'object' && book.fileData !== null) {
+            // Handle legacy data format - this is likely corrupted data from before base64 conversion
+            console.warn('Legacy PDF data detected, this book may need to be re-uploaded:', {
+              fileDataType: typeof book.fileData,
+              fileDataConstructor: book.fileData.constructor?.name,
+              fileDataKeys: Object.keys(book.fileData),
+              hasPdfDataBase64: !!book.pdfDataBase64
+            });
+            throw new Error('This PDF was saved in an old format and cannot be loaded. Please re-upload the PDF file.');
           } else {
             console.error('Unknown fileData type:', typeof book.fileData, book.fileData?.constructor?.name);
             throw new Error('Invalid PDF data format in library');

@@ -133,6 +133,37 @@ class StorageService {
     }
   }
 
+  // Clean up corrupted legacy books that can't be loaded
+  cleanupCorruptedBooks(): void {
+    try {
+      const books = this.getAllBooks();
+      const corruptedBooks: string[] = [];
+      
+      books.forEach(book => {
+        if (book.type === 'pdf') {
+          // Check if it's a corrupted legacy book
+          if (book.fileData && 
+              typeof book.fileData === 'object' && 
+              !(book.fileData instanceof ArrayBuffer) && 
+              !(book.fileData instanceof Uint8Array) && 
+              !Array.isArray(book.fileData) &&
+              !book.pdfDataBase64) {
+            console.warn('Found corrupted legacy book:', book.id, book.title);
+            corruptedBooks.push(book.id);
+          }
+        }
+      });
+      
+      if (corruptedBooks.length > 0) {
+        const validBooks = books.filter(book => !corruptedBooks.includes(book.id));
+        localStorage.setItem(this.BOOKS_KEY, JSON.stringify(validBooks));
+        console.log(`Removed ${corruptedBooks.length} corrupted legacy books from library`);
+      }
+    } catch (error) {
+      console.error('Error cleaning up corrupted books:', error);
+    }
+  }
+
   // Books Management
   async saveBook(book: SavedBook): Promise<void> {
     try {
