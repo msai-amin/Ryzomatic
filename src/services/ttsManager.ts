@@ -302,22 +302,23 @@ class TTSManager {
     // Create a copy of the voice object
     const voiceWithModel = { ...voice };
     
-    // Only set model for voices that actually require it
-    // Based on Google Cloud TTS documentation, only specific voice types need models
+    // Set model for voices that require it
+    // According to Google Cloud TTS API behavior, we need to be more comprehensive
     if (voice.name && voice.name.includes('Neural2')) {
       voiceWithModel.model = 'latest';
     } else if (voice.name && voice.name.includes('Studio')) {
       voiceWithModel.model = 'latest';
     } else if (voice.name && voice.name.includes('Wavenet')) {
-      // Wavenet voices typically don't need a model
-      // Don't set model for Wavenet voices
+      // Some Wavenet voices DO require a model field, so add it
+      voiceWithModel.model = 'latest';
     } else if (voice.name && voice.name.includes('Neural')) {
-      // Other neural voices might need a model, but be more selective
-      // Only set for voices that explicitly require it
-    } else {
-      // For other voices (like Standard voices), don't set model
-      // This prevents the "Unknown name model" error
+      // Other neural voices might need a model
+      voiceWithModel.model = 'latest';
+    } else if (voice.name && (voice.name.includes('Journey') || voice.name.includes('Polyglot'))) {
+      // Journey and Polyglot voices require model
+      voiceWithModel.model = 'latest';
     }
+    // Note: Standard voices don't get a model field to avoid "Unknown name model" error
     
     return voiceWithModel;
   }
