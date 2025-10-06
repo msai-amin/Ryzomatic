@@ -13,7 +13,7 @@ interface DocumentUploadProps {
 }
 
 export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
-  const { addDocument, setLoading } = useAppStore()
+  const { addDocument, setLoading, refreshLibrary } = useAppStore()
   const [dragActive, setDragActive] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saveToLibrary, setSaveToLibrary] = useState(true)
@@ -137,6 +137,9 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
                 documentId: document.id
               });
               
+              // Trigger library refresh
+              refreshLibrary();
+              
               // Upload to Google Drive "Readings In Progress" if user is signed in
               if (simpleGoogleAuth.isSignedIn()) {
                 try {
@@ -195,6 +198,9 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
               logger.info('Document saved to local library', context, {
                 documentId: document.id
               });
+              
+              // Trigger library refresh
+              refreshLibrary();
             } catch (err) {
               logger.error('Error saving to library', context, err as Error);
               throw err;

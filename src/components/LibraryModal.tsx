@@ -7,9 +7,10 @@ import { useAppStore } from '../store/appStore';
 interface LibraryModalProps {
   isOpen: boolean;
   onClose: () => void;
+  refreshTrigger?: number; // Add refresh trigger
 }
 
-export function LibraryModal({ isOpen, onClose }: LibraryModalProps) {
+export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalProps) {
   const [activeTab, setActiveTab] = useState<'books' | 'notes' | 'audio'>('books');
   const [books, setBooks] = useState<SavedBook[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -24,13 +25,28 @@ export function LibraryModal({ isOpen, onClose }: LibraryModalProps) {
     if (isOpen) {
       loadData();
     }
-  }, [isOpen, activeTab]);
+  }, [isOpen, activeTab, refreshTrigger]);
 
   const loadData = async () => {
+    console.log('LibraryModal: Loading data...');
+    
     // Clean up corrupted legacy books first
     storageService.cleanupCorruptedBooks();
     
-    setBooks(storageService.getAllBooks());
+    const allBooks = storageService.getAllBooks();
+    console.log('LibraryModal: Loaded books from storage:', {
+      count: allBooks.length,
+      books: allBooks.map(book => ({
+        id: book.id,
+        title: book.title,
+        type: book.type,
+        savedAt: book.savedAt,
+        hasFileData: !!book.fileData,
+        hasPdfDataBase64: !!book.pdfDataBase64
+      }))
+    });
+    
+    setBooks(allBooks);
     setNotes(storageService.getAllNotes());
     setAudio(await storageService.getAllAudio());
     setStorageInfo(storageService.getStorageInfo());
@@ -41,6 +57,8 @@ export function LibraryModal({ isOpen, onClose }: LibraryModalProps) {
     
     const status = await storageService.getSyncStatus();
     setSyncStatus(status);
+    
+    console.log('LibraryModal: Data loading completed');
   };
 
   const handleOpenBook = (book: SavedBook) => {

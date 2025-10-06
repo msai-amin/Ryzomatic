@@ -85,6 +85,9 @@ interface AppState {
   chatMessages: ChatMessage[]
   isTyping: boolean
   
+  // Library refresh
+  libraryRefreshTrigger: 0
+  
   // Actions
   setUser: (user: AuthUser | null) => void
   setAuthenticated: (authenticated: boolean) => void
@@ -101,6 +104,7 @@ interface AppState {
   addChatMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void
   clearChat: () => void
   setTyping: (typing: boolean) => void
+  refreshLibrary: () => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -142,6 +146,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   chatMessages: [],
   isTyping: false,
+  libraryRefreshTrigger: 0,
   
   // Authentication actions
   setUser: (user) => set({ user }),
@@ -257,7 +262,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   
   clearChat: () => set({ chatMessages: [] }),
   
-  setTyping: (typing) => set({ isTyping: typing })
+  setTyping: (typing) => set({ isTyping: typing }),
+  
+  refreshLibrary: () => set((state) => ({
+    libraryRefreshTrigger: state.libraryRefreshTrigger + 1
+  }))
 }))
 
 

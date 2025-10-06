@@ -12,7 +12,8 @@ export const Header: React.FC = () => {
     currentDocument, 
     isAuthenticated, 
     user, 
-    logout 
+    logout,
+    libraryRefreshTrigger
   } = useAppStore()
   const [showUpload, setShowUpload] = React.useState(false)
   const [showSettings, setShowSettings] = React.useState(false)
@@ -125,7 +126,11 @@ export const Header: React.FC = () => {
       )}
 
       {showLibrary && (
-        <LibraryModal isOpen={showLibrary} onClose={() => setShowLibrary(false)} />
+        <LibraryModal 
+          isOpen={showLibrary} 
+          onClose={() => setShowLibrary(false)} 
+          refreshTrigger={libraryRefreshTrigger}
+        />
       )}
 
       {showUpload && (

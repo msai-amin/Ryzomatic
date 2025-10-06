@@ -226,9 +226,30 @@ class StorageService {
   getAllBooks(): SavedBook[] {
     try {
       const data = localStorage.getItem(this.BOOKS_KEY);
-      if (!data) return [];
+      console.log('StorageService: Getting all books from localStorage:', {
+        hasData: !!data,
+        dataLength: data ? data.length : 0,
+        key: this.BOOKS_KEY
+      });
+      
+      if (!data) {
+        console.log('StorageService: No books data found in localStorage');
+        return [];
+      }
       
       const books = JSON.parse(data);
+      console.log('StorageService: Parsed books from JSON:', {
+        count: books.length,
+        books: books.map((book: any) => ({
+          id: book.id,
+          title: book.title,
+          type: book.type,
+          savedAt: book.savedAt,
+          hasFileData: !!book.fileData,
+          hasPdfDataBase64: !!book.pdfDataBase64
+        }))
+      });
+      
       return books.map((book: any) => {
         const savedBook = {
           ...book,
