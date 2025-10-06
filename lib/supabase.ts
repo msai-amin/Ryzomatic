@@ -1,10 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../src/services/supabaseAuthService';
 
-// Client-side Supabase client (uses anon key)
-export const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+// Re-export the single Supabase client instance
+export { supabase };
 
 // Database types
 export interface Profile {

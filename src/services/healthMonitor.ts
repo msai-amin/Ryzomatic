@@ -147,19 +147,35 @@ class HealthMonitor {
       name: 'connectivity',
       check: async () => {
         try {
-          // Simple connectivity check
+          // Simple connectivity check - use a more reliable endpoint
           const response = await fetch('/api/health', { 
             method: 'GET',
-            signal: AbortSignal.timeout(5000)
+            signal: AbortSignal.timeout(10000) // Increased timeout
           });
-          return response.ok;
+          
+          if (!response.ok) {
+            logger.warn('Health check endpoint returned non-200 status', { 
+              component: 'HealthMonitor', 
+              action: 'connectivity' 
+            }, undefined, { 
+              status: response.status, 
+              statusText: response.statusText 
+            });
+            return false;
+          }
+          
+          return true;
         } catch (error) {
+          logger.warn('Network connectivity check failed', { 
+            component: 'HealthMonitor', 
+            action: 'connectivity' 
+          }, error as Error);
           this.createAlert('warning', 'Network connectivity issues detected');
           return false;
         }
       },
-      timeout: 5000,
-      critical: true
+      timeout: 10000, // Increased timeout
+      critical: false // Made non-critical to avoid blocking other checks
     });
   }
 

@@ -144,21 +144,26 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
                 documentId: document.id
               });
               
-              // Also save to localStorage as backup
-              await storageService.saveBook({
-                id: document.id,
-                title: document.name,
-                fileName: file.name,
-                type: 'pdf',
-                savedAt: new Date(),
-                totalPages,
-                fileData: pdfData,
-                pageTexts, // Include pageTexts for TTS functionality
-              })
-              
-              logger.info('Document saved to local library (backup)', context, {
-                documentId: document.id
-              });
+              // Try to save to localStorage as backup (optional)
+              try {
+                await storageService.saveBook({
+                  id: document.id,
+                  title: document.name,
+                  fileName: file.name,
+                  type: 'pdf',
+                  savedAt: new Date(),
+                  totalPages,
+                  fileData: pdfData,
+                  pageTexts, // Include pageTexts for TTS functionality
+                })
+                
+                logger.info('Document saved to local library (backup)', context, {
+                  documentId: document.id
+                });
+              } catch (localStorageError) {
+                // localStorage backup failed, but Supabase succeeded - this is OK
+                logger.warn('localStorage backup failed, but Supabase save succeeded', context, localStorageError as Error);
+              }
               
               // Trigger library refresh
               refreshLibrary();
@@ -223,19 +228,24 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
                 documentId: document.id
               });
               
-              // Also save to localStorage as backup
-              await storageService.saveBook({
-                id: document.id,
-                title: document.name,
-                fileName: file.name,
-                type: 'text',
-                savedAt: new Date(),
-                fileData: content,
-              })
-              
-              logger.info('Document saved to local library (backup)', context, {
-                documentId: document.id
-              });
+              // Try to save to localStorage as backup (optional)
+              try {
+                await storageService.saveBook({
+                  id: document.id,
+                  title: document.name,
+                  fileName: file.name,
+                  type: 'text',
+                  savedAt: new Date(),
+                  fileData: content,
+                })
+                
+                logger.info('Document saved to local library (backup)', context, {
+                  documentId: document.id
+                });
+              } catch (localStorageError) {
+                // localStorage backup failed, but Supabase succeeded - this is OK
+                logger.warn('localStorage backup failed, but Supabase save succeeded', context, localStorageError as Error);
+              }
               
               // Trigger library refresh
               refreshLibrary();

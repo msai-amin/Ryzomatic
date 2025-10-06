@@ -147,11 +147,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         voiceObject: voice
       });
       
-      // Update the TTS manager with the new voice
-      const currentProvider = ttsManager.getCurrentProvider()
-      if (currentProvider) {
-        currentProvider.setVoice(voice)
-      }
+      // Use TTSManager.setVoice to ensure proper model assignment
+      ttsManager.setVoice(voice)
       
       // Update the store
       updateTTS({ 

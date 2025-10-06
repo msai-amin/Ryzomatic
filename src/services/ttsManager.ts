@@ -162,9 +162,12 @@ class TTSManager {
             }
             
             if (defaultVoice) {
-              provider.setVoice(defaultVoice)
+              // Ensure the voice has a model field if required
+              const voiceWithModel = this.ensureGoogleCloudVoiceHasModel(defaultVoice)
+              provider.setVoice(voiceWithModel)
               console.log('Set default Google Cloud TTS voice:', defaultVoice.name, `(${defaultVoice.languageCode})`)
               console.log('Voice object structure:', defaultVoice)
+              console.log('Voice with model:', voiceWithModel)
             }
           }
         } catch (error) {
@@ -300,12 +303,16 @@ class TTSManager {
     const voiceWithModel = { ...voice };
     
     // Set model for voices that require it
+    // Based on Google Cloud TTS documentation, Neural2 and Studio voices require a model
     if (voice.name && voice.name.includes('Neural2')) {
       voiceWithModel.model = 'latest';
     } else if (voice.name && voice.name.includes('Studio')) {
       voiceWithModel.model = 'latest';
     } else if (voice.name && voice.name.includes('Wavenet')) {
       // Wavenet voices typically don't need a model, but set it just in case
+      voiceWithModel.model = 'latest';
+    } else if (voice.name && voice.name.includes('Neural')) {
+      // Other neural voices might also need a model
       voiceWithModel.model = 'latest';
     }
     

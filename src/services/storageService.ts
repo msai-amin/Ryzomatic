@@ -5,6 +5,7 @@
 
 import { googleAuthService } from './googleAuthService';
 import { googleDriveService } from './googleDriveService';
+import { getStorageKeys, safeConsole, isProduction } from '../utils/productionGuard';
 
 export interface SavedBook {
   id: string;
@@ -50,9 +51,10 @@ export interface SavedAudio {
 }
 
 class StorageService {
-  private readonly BOOKS_KEY = 'smart_reader_books';
-  private readonly NOTES_KEY = 'smart_reader_notes';
-  private readonly AUDIO_KEY = 'smart_reader_audio';
+  private readonly storageKeys = getStorageKeys();
+  private readonly BOOKS_KEY = this.storageKeys.books;
+  private readonly NOTES_KEY = this.storageKeys.notes;
+  private readonly AUDIO_KEY = this.storageKeys.audio;
   private readonly MAX_STORAGE = 50 * 1024 * 1024; // 50MB limit for localStorage
 
   // Helper function to convert ArrayBuffer to base64 string
@@ -90,7 +92,7 @@ class StorageService {
       const booksToRemove = Math.max(1, Math.floor(books.length * 0.5));
       const booksToKeep = sortedBooks.slice(booksToRemove);
       
-      console.log(`Cleaning up ${booksToRemove} old books, keeping ${booksToKeep.length}`);
+      safeConsole.log(`Cleaning up ${booksToRemove} old books, keeping ${booksToKeep.length}`);
       
       // Save the remaining books
       localStorage.setItem(this.BOOKS_KEY, JSON.stringify(booksToKeep));
@@ -100,7 +102,7 @@ class StorageService {
       this.cleanupOldAudio();
       
     } catch (error) {
-      console.error('Error during cleanup:', error);
+      safeConsole.error('Error during cleanup:', error);
     }
   }
 
@@ -117,9 +119,9 @@ class StorageService {
       const notesToKeep = sortedNotes.slice(notesToRemove);
       
       localStorage.setItem(this.NOTES_KEY, JSON.stringify(notesToKeep));
-      console.log(`Cleaned up ${notesToRemove} old notes`);
+      safeConsole.log(`Cleaned up ${notesToRemove} old notes`);
     } catch (error) {
-      console.error('Error cleaning up notes:', error);
+      safeConsole.error('Error cleaning up notes:', error);
     }
   }
 
@@ -127,9 +129,9 @@ class StorageService {
     try {
       // Audio cleanup would go here if needed
       // For now, just log that we're cleaning up
-      console.log('Cleaning up old audio files...');
+      safeConsole.log('Cleaning up old audio files...');
     } catch (error) {
-      console.error('Error cleaning up audio:', error);
+      safeConsole.error('Error cleaning up audio:', error);
     }
   }
 
@@ -148,7 +150,7 @@ class StorageService {
               !(book.fileData instanceof Uint8Array) && 
               !Array.isArray(book.fileData) &&
               !book.pdfDataBase64) {
-            console.warn('Found corrupted legacy book:', book.id, book.title);
+            safeConsole.warn('Found corrupted legacy book:', book.id, book.title);
             corruptedBooks.push(book.id);
           }
         }
@@ -157,10 +159,10 @@ class StorageService {
       if (corruptedBooks.length > 0) {
         const validBooks = books.filter(book => !corruptedBooks.includes(book.id));
         localStorage.setItem(this.BOOKS_KEY, JSON.stringify(validBooks));
-        console.log(`Removed ${corruptedBooks.length} corrupted legacy books from library`);
+        safeConsole.log(`Removed ${corruptedBooks.length} corrupted legacy books from library`);
       }
     } catch (error) {
-      console.error('Error cleaning up corrupted books:', error);
+      safeConsole.error('Error cleaning up corrupted books:', error);
     }
   }
 
@@ -185,7 +187,7 @@ class StorageService {
         percentage: Math.min(percentage, 100)
       };
     } catch (error) {
-      console.error('Error checking storage quota:', error);
+      safeConsole.error('Error checking storage quota:', error);
       return { used: 0, available: 0, percentage: 0 };
     }
   }
@@ -201,7 +203,7 @@ class StorageService {
     try {
       // Check if storage is near limit before attempting to save
       if (this.isStorageNearLimit()) {
-        console.warn('Storage is near limit, cleaning up old books...');
+        safeConsole.warn('Storage is near limit, cleaning up old books...');
         await this.cleanupOldBooks();
       }
 
@@ -211,7 +213,7 @@ class StorageService {
       // Convert ArrayBuffer to base64 for storage if it's a PDF
       const bookToSave = { ...book };
       if (book.type === 'pdf' && book.fileData instanceof ArrayBuffer) {
-        console.log('Converting ArrayBuffer to base64 for storage:', {
+        safeConsole.log('Converting ArrayBuffer to base64 for storage:', {
           bookId: book.id,
           bookTitle: book.title,
           fileDataByteLength: book.fileData.byteLength,

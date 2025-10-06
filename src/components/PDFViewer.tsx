@@ -29,6 +29,7 @@ import { ttsManager } from '../services/ttsManager'
 import { TTSControls } from './TTSControls'
 import { NotesPanel } from './NotesPanel'
 import { AudioWidget } from './AudioWidget'
+import { VoiceSelector } from './VoiceSelector'
 import { storageService } from '../services/storageService'
 
 // Set up PDF.js worker
@@ -71,6 +72,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const [showNotesPanel, setShowNotesPanel] = useState<boolean>(false)
   const [selectedTextForNote, setSelectedTextForNote] = useState<string>('')
   const [selectionMode, setSelectionMode] = useState(false)
+  const [showVoiceSelector, setShowVoiceSelector] = useState(false)
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const textLayerRef = useRef<HTMLDivElement>(null)
@@ -232,6 +234,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   useEffect(() => {
     setPageInputValue(String(pageNumber))
   }, [pageNumber])
+
+  // Update store with current page for TTS
+  useEffect(() => {
+    updatePDFViewer({ currentPage: pageNumber })
+  }, [pageNumber, updatePDFViewer])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -416,10 +423,20 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   }, [pdfViewer.readingMode, updatePDFViewer])
 
   const handleTTSPlay = useCallback(async () => {
+    console.log('PDFViewer: handleTTSPlay called', {
+      isPlaying: tts.isPlaying,
+      hasDocument: !!document,
+      documentType: document?.type,
+      hasPageTexts: !!document?.pageTexts,
+      pageTextsLength: document?.pageTexts?.length || 0
+    });
+    
     if (tts.isPlaying) {
+      console.log('PDFViewer: TTS is playing, pausing...');
       ttsManager.pause()
       updateTTS({ isPlaying: false })
     } else {
+      console.log('PDFViewer: TTS is not playing, starting...');
       // Debug TTS provider info
       const providers = ttsManager.getProviders()
       const availableProviders = ttsManager.getAvailableProviders()
@@ -477,6 +494,25 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             isEmpty: pageText.length === 0,
             isWhitespace: pageText.trim().length === 0
           })
+          
+          // If we successfully extracted text, update the document in the store
+          if (pageText && pageText.trim().length > 0) {
+            console.log('Updating document with extracted pageText...')
+            const { updateDocument } = useAppStore.getState()
+            const updatedPageTexts = [...(document.pageTexts || [])]
+            updatedPageTexts[pageNumber - 1] = pageText
+            
+            updateDocument({
+              ...document,
+              pageTexts: updatedPageTexts
+            })
+            
+            console.log('Document updated with pageTexts:', {
+              pageNumber,
+              totalPageTexts: updatedPageTexts.length,
+              currentPageTextLength: pageText.length
+            })
+          }
         } catch (error) {
           console.error('On-demand text extraction failed:', error)
         }
@@ -487,14 +523,45 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           textLength: pageText.length,
           textPreview: pageText.substring(0, 50) + '...'
         })
+        
+        // Try TTS with error handling and fallback
         try {
+          console.log('PDFViewer: About to call ttsManager.speak with text:', {
+            textLength: pageText.length,
+            textPreview: pageText.substring(0, 50) + '...',
+            currentProvider: ttsManager.getCurrentProvider()?.name,
+            isPlaying: tts.isPlaying
+          });
+          
           await ttsManager.speak(pageText, () => {
+            console.log('PDFViewer: TTS onEnd callback triggered');
       updateTTS({ isPlaying: false })
           })
+          
+          console.log('PDFViewer: ttsManager.speak completed, updating TTS state to playing');
       updateTTS({ isPlaying: true })
         } catch (error) {
-          console.error('TTS Error:', error)
+          console.error('PDFViewer: TTS Error:', error)
+          
+          // If native TTS fails and Google Cloud TTS is available, try switching
+          if (currentProvider?.type === 'native' && configuredProviders.some(p => p.type === 'google-cloud')) {
+            console.log('Native TTS failed, attempting to switch to Google Cloud TTS...')
+            try {
+              const switched = await ttsManager.setProvider('google-cloud')
+              if (switched) {
+                console.log('Successfully switched to Google Cloud TTS, retrying...')
+                await ttsManager.speak(pageText, () => {
           updateTTS({ isPlaying: false })
+                })
+      updateTTS({ isPlaying: true })
+                return
+              }
+            } catch (fallbackError) {
+              console.error('Google Cloud TTS fallback also failed:', fallbackError)
+            }
+          }
+          
+        updateTTS({ isPlaying: false })
         }
       } else {
         console.warn('No text available for TTS on this page', {
@@ -511,7 +578,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
   const handleTTSStop = useCallback(() => {
     ttsManager.stop()
-    updateTTS({ isPlaying: false })
+        updateTTS({ isPlaying: false })
   }, [updateTTS])
 
   const handleAddNote = useCallback((text: string) => {
@@ -523,6 +590,23 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const removeHighlight = useCallback((id: string) => {
     setHighlights(highlights.filter(h => h.id !== id))
   }, [highlights])
+
+  const handleVoiceSelect = useCallback((voice: any) => {
+    // Convert voice to the format expected by the store
+    const storeVoice = {
+      name: voice.name,
+      languageCode: voice.languageCode || voice.lang,
+      gender: voice.gender,
+      type: voice.type || 'native'
+    };
+    
+    ttsManager.setVoice(voice)
+    updateTTS({ 
+      voice: storeVoice,
+      voiceName: voice.name 
+    })
+    setShowVoiceSelector(false)
+  }, [updateTTS])
 
   if (pdfViewer.readingMode) {
     const pageText = document.pageTexts?.[pageNumber - 1] || ''
@@ -722,8 +806,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             >
               <Highlighter className="w-5 h-5" />
             </button>
-
-              <button
+            
+            <button
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
@@ -735,18 +819,26 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               title="Notes"
             >
               <StickyNote className="w-5 h-5" />
-              </button>
+            </button>
 
-                  <button
-                    onClick={handleTTSPlay}
+              <button
+                    onClick={(e) => {
+                      console.log('TTS Button clicked!', {
+                        event: e,
+                        target: e.target,
+                        currentTarget: e.currentTarget,
+                        isPlaying: tts.isPlaying
+                      });
+                      handleTTSPlay();
+                    }}
               className={`p-2 rounded-lg transition-colors ${
                 tts.isPlaying ? 'bg-green-100 text-green-600' : 'hover:bg-gray-100'
               }`}
               title="Text-to-Speech"
             >
               {tts.isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-                  </button>
-            
+              </button>
+
             {tts.isPlaying && (
                   <button
                     onClick={handleTTSStop}
@@ -756,6 +848,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                 <Square className="w-5 h-5" />
                   </button>
             )}
+
+                <button
+              onClick={() => setShowVoiceSelector(true)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Select Voice"
+                >
+              <Volume2 className="w-5 h-5" />
+                </button>
             
                 <button
               onClick={handleDownload}
@@ -901,6 +1001,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       <div className="fixed bottom-4 right-4 z-40">
         <AudioWidget />
       </div>
+
+      {/* Voice Selector Modal */}
+      <VoiceSelector
+        isOpen={showVoiceSelector}
+        onClose={() => setShowVoiceSelector(false)}
+        onVoiceSelect={handleVoiceSelect}
+        currentVoice={tts.voice}
+      />
     </div>
   )
 }

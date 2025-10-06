@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAppStore, Voice } from '../store/appStore';
 import { ttsManager } from '../services/ttsManager';
-import { TTSVoiceSelector } from './TTSVoiceSelector';
+import { VoiceSelector } from './VoiceSelector';
 import { 
   Volume2, VolumeX, Play, Pause, Square, Settings, 
   ChevronDown, FastForward, Rewind, User, Users, X, Cloud, Monitor
@@ -10,6 +10,7 @@ import {
 export function TTSControls() {
   const { tts, updateTTS } = useAppStore();
   const [showSettings, setShowSettings] = useState(false);
+  const [showVoiceSelector, setShowVoiceSelector] = useState(false);
   const [availableProviders, setAvailableProviders] = useState<any[]>([]);
   const [currentProvider, setCurrentProvider] = useState<any | null>(null);
 
@@ -27,8 +28,16 @@ export function TTSControls() {
     }
   }, []);
 
-  const handleVoiceChange = async (voice: Voice) => {
+  const handleVoiceChange = (voice: any) => {
     try {
+      // Convert voice to the format expected by the store
+      const storeVoice = {
+        name: voice.name,
+        languageCode: voice.languageCode || voice.lang,
+        gender: voice.gender,
+        type: voice.type || 'native'
+      };
+      
       // Update the TTS manager with the new voice
       if (currentProvider) {
         currentProvider.setVoice(voice);
@@ -36,11 +45,12 @@ export function TTSControls() {
       
       // Update the store
       updateTTS({ 
-        voice: voice,
+        voice: storeVoice,
         voiceName: voice.name 
       });
       
       console.log('Voice changed to:', voice.name);
+      setShowVoiceSelector(false);
     } catch (error) {
       console.error('Error changing voice:', error);
     }
@@ -110,6 +120,14 @@ export function TTSControls() {
           title={tts.isEnabled ? 'Disable TTS' : 'Enable TTS'}
         >
           <Volume2 className="w-4 h-4" />
+        </button>
+
+        <button
+          onClick={() => setShowVoiceSelector(true)}
+          className="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+          title="Select Voice"
+        >
+          <User className="w-4 h-4" />
         </button>
 
         <button
@@ -213,13 +231,22 @@ export function TTSControls() {
           {currentProvider && (
             <div>
               <label className="block text-sm font-medium mb-3">
-                Choose a Voice ({currentProvider.name})
+                Current Voice: {tts.voice?.name || 'Default'}
               </label>
-              <TTSVoiceSelector
-                currentVoice={tts.voice}
-                onVoiceChange={handleVoiceChange}
-                disabled={tts.isPlaying}
-              />
+              <button
+                onClick={() => setShowVoiceSelector(true)}
+                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">{tts.voice?.name || 'Select a voice...'}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      {tts.voice?.languageCode || 'Click to choose'}
+                    </div>
+                  </div>
+                  <ChevronDown className="w-4 h-4" />
+                </div>
+              </button>
             </div>
           )}
 
@@ -308,6 +335,14 @@ export function TTSControls() {
           </div>
         </div>
       )}
+
+      {/* Voice Selector Modal */}
+      <VoiceSelector
+        isOpen={showVoiceSelector}
+        onClose={() => setShowVoiceSelector(false)}
+        onVoiceSelect={handleVoiceChange}
+        currentVoice={tts.voice}
+      />
     </div>
   );
 }

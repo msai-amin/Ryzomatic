@@ -136,6 +136,14 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
           console.error('Error converting base64 to ArrayBuffer:', error);
           throw new Error('Failed to load PDF data from library');
         }
+      } else if (!book.fileData && !book.pdfDataBase64) {
+        console.error('PDF book has no data:', {
+          id: book.id,
+          title: book.title,
+          hasFileData: !!book.fileData,
+          hasPdfDataBase64: !!book.pdfDataBase64
+        });
+        throw new Error('PDF data is missing from library. Please re-upload the file.');
       } else if (book.fileData && !(book.fileData instanceof ArrayBuffer)) {
         console.log('FileData is not ArrayBuffer, attempting conversion...');
         try {
@@ -175,9 +183,17 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
           hasFileData: !!book.fileData,
           fileDataType: typeof book.fileData,
           fileDataConstructor: book.fileData?.constructor?.name,
-          hasPdfDataBase64: !!book.pdfDataBase64
+          hasPdfDataBase64: !!book.pdfDataBase64,
+          pdfDataBase64Length: book.pdfDataBase64?.length || 0,
+          pdfDataBase64Preview: book.pdfDataBase64?.substring(0, 50) + '...' || 'N/A'
         });
-        throw new Error('PDF data is not in the correct format');
+        
+        // Try to provide a more helpful error message
+        if (book.pdfDataBase64) {
+          throw new Error('PDF data conversion failed. The file may be corrupted. Please try re-uploading the PDF.');
+        } else {
+          throw new Error('PDF data is missing. Please try re-uploading the PDF file.');
+        }
       }
     }
 

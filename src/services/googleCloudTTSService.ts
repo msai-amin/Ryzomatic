@@ -232,12 +232,16 @@ class GoogleCloudTTSService {
     const voiceWithModel = { ...voice };
     
     // Set model for voices that require it
+    // Based on Google Cloud TTS documentation, Neural2 and Studio voices require a model
     if (voice.name.includes('Neural2')) {
       voiceWithModel.model = 'latest';
     } else if (voice.name.includes('Studio')) {
       voiceWithModel.model = 'latest';
     } else if (voice.name.includes('Wavenet')) {
       // Wavenet voices typically don't need a model, but set it just in case
+      voiceWithModel.model = 'latest';
+    } else if (voice.name.includes('Neural')) {
+      // Other neural voices might also need a model
       voiceWithModel.model = 'latest';
     }
     
