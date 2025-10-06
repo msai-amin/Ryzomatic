@@ -320,28 +320,37 @@ class GoogleCloudTTSService {
     });
 
     try {
-      // Use v1beta1 endpoint for all voices to support model field
-      // TODO: Can optimize later to use v1 for voices that don't need model
-      const endpoint = 'v1beta1';
-      const url = `https://texttospeech.googleapis.com/${endpoint}/text:synthesize?key=${this.apiKey}`;
+      // HARDCODED TEST - Use v1 endpoint with a known working voice
+      const API_ENDPOINT = 'https://texttospeech.googleapis.com/v1/text:synthesize';
       
-      console.log('TTS API Call Details:', {
-        voiceName: voice.name,
-        hasModel: !!voice.model,
-        modelValue: voice.model,
-        endpoint: endpoint,
-        url: url
+      // Hardcode the entire request body for this test
+      const testRequestBody = {
+        "input": {
+          "text": "This is a simple test to see if the API is working."
+        },
+        "voice": {
+          "languageCode": "en-US",
+          "name": "en-US-Wavenet-F"  // A standard WaveNet voice
+        },
+        "audioConfig": {
+          "audioEncoding": "MP3"
+        }
+      };
+      
+      console.log('HARDCODED TEST - TTS API Call Details:', {
+        endpoint: API_ENDPOINT,
+        testRequestBody: testRequestBody,
+        originalVoice: voice.name,
+        originalRequestBody: requestBody
       });
       
-      const response = await fetch(url,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody)
-        }
-      );
+      const response = await fetch(`${API_ENDPOINT}?key=${this.apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(testRequestBody)
+      });
 
       if (!response.ok) {
         let errorMessage = `TTS synthesis failed: ${response.statusText}`;
