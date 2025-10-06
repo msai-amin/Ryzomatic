@@ -41,6 +41,17 @@ export function LibraryModal({ isOpen, onClose }: LibraryModalProps) {
   };
 
   const handleOpenBook = (book: SavedBook) => {
+    // Ensure PDF data is properly loaded
+    if (book.type === 'pdf' && !book.fileData && book.pdfDataBase64) {
+      // Convert base64 to ArrayBuffer if needed
+      const binary = atob(book.pdfDataBase64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      book.fileData = bytes.buffer;
+    }
+
     const doc = {
       id: book.id,
       name: book.title,

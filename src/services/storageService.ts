@@ -15,6 +15,7 @@ export interface SavedBook {
   lastReadPage?: number;
   totalPages?: number;
   fileData?: ArrayBuffer | string | Blob;
+  pdfDataBase64?: string; // Base64 encoded PDF data for storage
   pageTexts?: string[]; // Add pageTexts for PDF documents
   notes?: Note[];
   googleDriveId?: string; // Google Drive file ID for sync
@@ -54,16 +55,44 @@ class StorageService {
   private readonly AUDIO_KEY = 'smart_reader_audio';
   private readonly MAX_STORAGE = 50 * 1024 * 1024; // 50MB limit for localStorage
 
+  // Helper function to convert ArrayBuffer to base64 string
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
+  // Helper function to convert base64 string to ArrayBuffer
+  private base64ToArrayBuffer(base64: string): ArrayBuffer {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+
   // Books Management
   async saveBook(book: SavedBook): Promise<void> {
     try {
       const books = this.getAllBooks();
       const existingIndex = books.findIndex(b => b.id === book.id);
       
+      // Convert ArrayBuffer to base64 for storage if it's a PDF
+      const bookToSave = { ...book };
+      if (book.type === 'pdf' && book.fileData instanceof ArrayBuffer) {
+        bookToSave.pdfDataBase64 = this.arrayBufferToBase64(book.fileData);
+        // Remove the ArrayBuffer as it can't be serialized
+        delete bookToSave.fileData;
+      }
+      
       if (existingIndex >= 0) {
-        books[existingIndex] = book;
+        books[existingIndex] = bookToSave;
       } else {
-        books.push(book);
+        books.push(bookToSave);
       }
       
       localStorage.setItem(this.BOOKS_KEY, JSON.stringify(books));
@@ -79,10 +108,19 @@ class StorageService {
       if (!data) return [];
       
       const books = JSON.parse(data);
-      return books.map((book: any) => ({
-        ...book,
-        savedAt: new Date(book.savedAt),
-      }));
+      return books.map((book: any) => {
+        const savedBook = {
+          ...book,
+          savedAt: new Date(book.savedAt),
+        };
+        
+        // Convert base64 back to ArrayBuffer for PDF files
+        if (book.type === 'pdf' && book.pdfDataBase64) {
+          savedBook.fileData = this.base64ToArrayBuffer(book.pdfDataBase64);
+        }
+        
+        return savedBook;
+      });
     } catch (error) {
       console.error('Error loading books:', error);
       return [];
@@ -91,7 +129,14 @@ class StorageService {
 
   getBook(id: string): SavedBook | null {
     const books = this.getAllBooks();
-    return books.find(b => b.id === id) || null;
+    const book = books.find(b => b.id === id);
+    
+    if (book && book.type === 'pdf' && book.pdfDataBase64) {
+      // Ensure ArrayBuffer is properly converted
+      book.fileData = this.base64ToArrayBuffer(book.pdfDataBase64);
+    }
+    
+    return book || null;
   }
 
   deleteBook(id: string): void {
