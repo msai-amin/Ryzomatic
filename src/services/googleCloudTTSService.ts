@@ -9,6 +9,7 @@ export interface GoogleCloudVoice {
   gender: 'MALE' | 'FEMALE' | 'NEUTRAL';
   ssmlGender: 'MALE' | 'FEMALE' | 'NEUTRAL';
   naturalSampleRateHertz: number;
+  model?: string; // Required for some voices
 }
 
 export interface GoogleCloudTTSSettings {
@@ -61,8 +62,51 @@ class GoogleCloudTTSService {
 
     try {
       const voices = await this.getVoices();
+      console.log('Available Google Cloud TTS voices:', voices.slice(0, 5).map(v => ({
+        name: v.name,
+        languageCode: v.languageCode,
+        gender: v.gender,
+        model: v.model
+      })));
       
-      // Prioritize neural voices for natural sound
+      // Prioritize voices that don't require a model first
+      const voicesWithoutModel = voices.filter(v => 
+        v.name && v.languageCode && v.languageCode.startsWith('en-') && !v.model
+      );
+      
+      // Try to find a good voice without model requirement
+      let selectedVoice = voicesWithoutModel.find(v => v.name.includes('Neural2')) ||
+                         voicesWithoutModel.find(v => v.name.includes('Studio')) ||
+                         voicesWithoutModel.find(v => v.name.includes('Wavenet')) ||
+                         voicesWithoutModel[0];
+      
+      // If no voice without model, use any English voice and set a default model
+      if (!selectedVoice) {
+        selectedVoice = voices.find(v => 
+          v.name && v.languageCode && v.languageCode.startsWith('en-')
+        );
+        
+        // If the selected voice requires a model, set a default one
+        if (selectedVoice && selectedVoice.model === undefined) {
+          // For voices that require a model, try to set a reasonable default
+          if (selectedVoice.name.includes('Neural2')) {
+            selectedVoice.model = 'latest'; // Use latest model for Neural2 voices
+          } else if (selectedVoice.name.includes('Studio')) {
+            selectedVoice.model = 'latest'; // Use latest model for Studio voices
+          } else if (selectedVoice.name.includes('Wavenet')) {
+            // Wavenet voices typically don't need a model, but just in case
+            selectedVoice.model = 'latest';
+          }
+        }
+      }
+      
+      if (selectedVoice) {
+        this.settings.voice = selectedVoice;
+        console.log('Set default Google Cloud TTS voice:', selectedVoice.name, selectedVoice.model ? `(model: ${selectedVoice.model})` : '(no model required)');
+        return;
+      }
+      
+      // Fallback to old logic if needed
       const neuralVoice = voices.find(v => 
         v.name && v.name.includes('Neural2') && v.languageCode && v.languageCode.startsWith('en-')
       );
@@ -211,13 +255,20 @@ class GoogleCloudTTSService {
       }
     }
 
+    const voiceConfig: any = {
+      languageCode: voice.languageCode,
+      name: voice.name,
+      ssmlGender: voice.ssmlGender || 'NEUTRAL'
+    };
+
+    // Add model if available (required for some voices)
+    if (voice.model) {
+      voiceConfig.model = voice.model;
+    }
+
     const requestBody = {
       input: { text },
-      voice: {
-        languageCode: voice.languageCode,
-        name: voice.name,
-        ssmlGender: voice.ssmlGender || 'NEUTRAL'
-      },
+      voice: voiceConfig,
       audioConfig: {
         audioEncoding: this.settings.audioEncoding,
         speakingRate: this.settings.speakingRate,
@@ -252,10 +303,21 @@ class GoogleCloudTTSService {
           const errorData = await response.json();
           if (errorData.error) {
             errorMessage += ` - ${errorData.error.message || JSON.stringify(errorData.error)}`;
+            
+            // Provide specific guidance for model-related errors
+            if (errorData.error.message && errorData.error.message.includes('model name')) {
+              errorMessage += '\n\nTip: This voice requires a model field. Try selecting a different voice or contact support.';
+            }
           }
         } catch (e) {
           // Ignore JSON parsing errors
         }
+        console.error('Google Cloud TTS Error Details:', {
+          status: response.status,
+          statusText: response.statusText,
+          voice: this.settings.voice,
+          requestBody: requestBody
+        });
         throw new Error(errorMessage);
       }
 
