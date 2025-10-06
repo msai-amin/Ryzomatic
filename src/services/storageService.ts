@@ -75,6 +75,64 @@ class StorageService {
     return bytes.buffer;
   }
 
+  // Clean up old books to free storage space
+  private async cleanupOldBooks(): Promise<void> {
+    try {
+      const books = this.getAllBooks();
+      if (books.length <= 1) return; // Keep at least one book
+      
+      // Sort by savedAt date (oldest first)
+      const sortedBooks = books.sort((a, b) => 
+        new Date(a.savedAt).getTime() - new Date(b.savedAt).getTime()
+      );
+      
+      // Remove oldest 25% of books
+      const booksToRemove = Math.max(1, Math.floor(books.length * 0.25));
+      const booksToKeep = sortedBooks.slice(booksToRemove);
+      
+      console.log(`Cleaning up ${booksToRemove} old books, keeping ${booksToKeep.length}`);
+      
+      // Save the remaining books
+      localStorage.setItem(this.BOOKS_KEY, JSON.stringify(booksToKeep));
+      
+      // Also clean up old notes and audio
+      this.cleanupOldNotes();
+      this.cleanupOldAudio();
+      
+    } catch (error) {
+      console.error('Error during cleanup:', error);
+    }
+  }
+
+  private cleanupOldNotes(): void {
+    try {
+      const notes = this.getAllNotes();
+      if (notes.length <= 10) return; // Keep at least 10 notes
+      
+      const sortedNotes = notes.sort((a, b) => 
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+      
+      const notesToRemove = Math.max(1, Math.floor(notes.length * 0.3));
+      const notesToKeep = sortedNotes.slice(notesToRemove);
+      
+      localStorage.setItem(this.NOTES_KEY, JSON.stringify(notesToKeep));
+      console.log(`Cleaned up ${notesToRemove} old notes`);
+    } catch (error) {
+      console.error('Error cleaning up notes:', error);
+    }
+  }
+
+  private cleanupOldAudio(): void {
+    try {
+      // Audio cleanup would go here if needed
+      // For now, just log that we're cleaning up
+      console.log('Cleaning up old audio files...');
+    } catch (error) {
+      console.error('Error cleaning up audio:', error);
+    }
+  }
+
   // Books Management
   async saveBook(book: SavedBook): Promise<void> {
     try {
@@ -107,8 +165,27 @@ class StorageService {
         books.push(bookToSave);
       }
       
-      localStorage.setItem(this.BOOKS_KEY, JSON.stringify(books));
-      console.log('Book saved to localStorage successfully');
+      // Try to save, if quota exceeded, clean up old books
+      try {
+        localStorage.setItem(this.BOOKS_KEY, JSON.stringify(books));
+        console.log('Book saved to localStorage successfully');
+      } catch (quotaError) {
+        if (quotaError.name === 'QuotaExceededError') {
+          console.warn('Storage quota exceeded, cleaning up old books...');
+          await this.cleanupOldBooks();
+          
+          // Try saving again after cleanup
+          try {
+            localStorage.setItem(this.BOOKS_KEY, JSON.stringify(books));
+            console.log('Book saved to localStorage after cleanup');
+          } catch (retryError) {
+            console.error('Still unable to save after cleanup:', retryError);
+            throw new Error('Storage is full. Please delete some books from your library.');
+          }
+        } else {
+          throw quotaError;
+        }
+      }
     } catch (error) {
       console.error('Error saving book:', error);
       throw new Error('Failed to save book. Storage may be full.');

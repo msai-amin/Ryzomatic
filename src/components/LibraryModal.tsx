@@ -41,42 +41,71 @@ export function LibraryModal({ isOpen, onClose }: LibraryModalProps) {
   };
 
   const handleOpenBook = (book: SavedBook) => {
-    console.log('Opening book from Library:', {
-      id: book.id,
-      title: book.title,
-      type: book.type,
-      hasFileData: !!book.fileData,
-      hasPdfDataBase64: !!book.pdfDataBase64,
-      fileDataType: typeof book.fileData,
-      fileDataConstructor: book.fileData?.constructor?.name,
-      fileDataLength: book.fileData ? (book.fileData as any).byteLength || (book.fileData as any).length : 0
-    });
+    try {
+      console.log('Opening book from Library:', {
+        id: book.id,
+        title: book.title,
+        type: book.type,
+        hasFileData: !!book.fileData,
+        hasPdfDataBase64: !!book.pdfDataBase64,
+        fileDataType: typeof book.fileData,
+        fileDataConstructor: book.fileData?.constructor?.name,
+        fileDataLength: book.fileData ? (book.fileData as any).byteLength || (book.fileData as any).length : 0
+      });
 
     // Ensure PDF data is properly loaded
     if (book.type === 'pdf') {
       if (!book.fileData && book.pdfDataBase64) {
         console.log('Converting base64 to ArrayBuffer...');
-        // Convert base64 to ArrayBuffer if needed
-        const binary = atob(book.pdfDataBase64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-          bytes[i] = binary.charCodeAt(i);
+        try {
+          // Convert base64 to ArrayBuffer if needed
+          const binary = atob(book.pdfDataBase64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          book.fileData = bytes.buffer as ArrayBuffer;
+          console.log('Converted to ArrayBuffer:', {
+            byteLength: book.fileData.byteLength,
+            constructor: book.fileData.constructor.name
+          });
+        } catch (error) {
+          console.error('Error converting base64 to ArrayBuffer:', error);
+          throw new Error('Failed to load PDF data from library');
         }
-        book.fileData = bytes.buffer as ArrayBuffer;
-        console.log('Converted to ArrayBuffer:', {
-          byteLength: book.fileData.byteLength,
-          constructor: book.fileData.constructor.name
-        });
       } else if (book.fileData && !(book.fileData instanceof ArrayBuffer)) {
         console.log('FileData is not ArrayBuffer, attempting conversion...');
-        // If it's a Uint8Array or similar, convert to ArrayBuffer
-        if (book.fileData instanceof Uint8Array) {
-          book.fileData = book.fileData.buffer as ArrayBuffer;
-        } else if (Array.isArray(book.fileData)) {
-          // If it's an array of numbers, convert to ArrayBuffer
-          const bytes = new Uint8Array(book.fileData);
-          book.fileData = bytes.buffer as ArrayBuffer;
+        try {
+          // If it's a Uint8Array or similar, convert to ArrayBuffer
+          if (book.fileData instanceof Uint8Array) {
+            book.fileData = book.fileData.buffer as ArrayBuffer;
+          } else if (Array.isArray(book.fileData)) {
+            // If it's an array of numbers, convert to ArrayBuffer
+            const bytes = new Uint8Array(book.fileData);
+            book.fileData = bytes.buffer as ArrayBuffer;
+          } else {
+            console.error('Unknown fileData type:', typeof book.fileData, book.fileData?.constructor?.name);
+            throw new Error('Invalid PDF data format in library');
+          }
+          console.log('Conversion successful:', {
+            byteLength: book.fileData.byteLength,
+            constructor: book.fileData.constructor.name
+          });
+        } catch (error) {
+          console.error('Error converting fileData to ArrayBuffer:', error);
+          throw new Error('Failed to convert PDF data to proper format');
         }
+      }
+      
+      // Final validation
+      if (!book.fileData || !(book.fileData instanceof ArrayBuffer)) {
+        console.error('PDF data validation failed:', {
+          hasFileData: !!book.fileData,
+          fileDataType: typeof book.fileData,
+          fileDataConstructor: book.fileData?.constructor?.name,
+          hasPdfDataBase64: !!book.pdfDataBase64
+        });
+        throw new Error('PDF data is not in the correct format');
       }
     }
 
@@ -91,16 +120,20 @@ export function LibraryModal({ isOpen, onClose }: LibraryModalProps) {
       pageTexts: book.pageTexts, // Include pageTexts for TTS functionality
     };
 
-    console.log('Document created for app store:', {
-      id: doc.id,
-      type: doc.type,
-      hasPdfData: !!doc.pdfData,
-      pdfDataType: doc.pdfData ? doc.pdfData.constructor.name : 'undefined',
-      pdfDataLength: doc.pdfData ? doc.pdfData.byteLength : 0
-    });
+      console.log('Document created for app store:', {
+        id: doc.id,
+        type: doc.type,
+        hasPdfData: !!doc.pdfData,
+        pdfDataType: doc.pdfData ? doc.pdfData.constructor.name : 'undefined',
+        pdfDataLength: doc.pdfData ? doc.pdfData.byteLength : 0
+      });
 
-    addDocument(doc);
-    onClose();
+      addDocument(doc);
+      onClose();
+    } catch (error) {
+      console.error('Error opening book from Library:', error);
+      alert(`Failed to open book: ${error.message}`);
+    }
   };
 
   const handleDeleteBook = (id: string) => {
