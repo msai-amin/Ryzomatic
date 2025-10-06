@@ -52,19 +52,61 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       try {
         // Get current document text for TTS
         const currentDoc = useAppStore.getState().currentDocument
-        if (currentDoc && currentDoc.pageTexts) {
-          const currentPage = useAppStore.getState().pdfViewer.currentPage
-          const text = currentDoc.pageTexts[currentPage - 1] || ''
+        const currentPage = useAppStore.getState().pdfViewer.currentPage
+        
+        console.log('AudioWidget: TTS Debug Info:', {
+          hasCurrentDoc: !!currentDoc,
+          docType: currentDoc?.type,
+          hasPageTexts: !!currentDoc?.pageTexts,
+          pageTextsLength: currentDoc?.pageTexts?.length || 0,
+          currentPage,
+          pdfViewerState: useAppStore.getState().pdfViewer,
+          pageTextsSample: currentDoc?.pageTexts?.slice(0, 3).map((text, i) => ({
+            page: i + 1,
+            length: text?.length || 0,
+            preview: text?.substring(0, 50) || 'empty',
+            isEmpty: !text || text.trim().length === 0
+          }))
+        })
+        
+        if (currentDoc && currentDoc.pageTexts && currentPage) {
+          let text = currentDoc.pageTexts[currentPage - 1] || ''
+          
+          console.log('AudioWidget: Text for TTS:', {
+            pageNumber: currentPage,
+            textLength: text.length,
+            textPreview: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
+            isEmpty: text.trim().length === 0
+          })
+          
+          // If no text available, try to find text in other pages
+          if (!text.trim()) {
+            console.log('AudioWidget: No text on current page, searching for text in other pages...')
+            
+            // Look for the first page with text
+            for (let i = 0; i < currentDoc.pageTexts.length; i++) {
+              const pageText = currentDoc.pageTexts[i]
+              if (pageText && pageText.trim().length > 0) {
+                text = pageText
+                console.log(`AudioWidget: Found text on page ${i + 1}, using it for TTS`)
+                break
+              }
+            }
+          }
           
           if (text.trim()) {
             await ttsManager.speak(text, () => {
               updateTTS({ isPlaying: false })
             })
             updateTTS({ isPlaying: true })
+          } else {
+            console.warn('AudioWidget: No text available for TTS in any page')
           }
+        } else {
+          console.warn('AudioWidget: Missing document or page data for TTS')
         }
       } catch (error) {
-        console.error('TTS Error:', error)
+        console.error('AudioWidget: TTS Error:', error)
         updateTTS({ isPlaying: false })
       }
     }
@@ -98,6 +140,13 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   // Handle voice change
   const handleVoiceChange = useCallback(async (voice: Voice) => {
     try {
+      console.log('AudioWidget: Voice change requested:', {
+        voiceName: voice.name,
+        voiceType: voice.type,
+        hasModel: !!voice.model,
+        voiceObject: voice
+      });
+      
       // Update the TTS manager with the new voice
       const currentProvider = ttsManager.getCurrentProvider()
       if (currentProvider) {
@@ -110,7 +159,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         voiceName: voice.name 
       })
       
-      console.log('Voice changed to:', voice.name)
+      console.log('AudioWidget: Voice changed to:', voice.name)
     } catch (error) {
       console.error('Error changing voice:', error)
     }

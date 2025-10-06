@@ -214,7 +214,34 @@ class GoogleCloudTTSService {
   }
 
   setVoice(voice: GoogleCloudVoice) {
-    this.settings.voice = voice;
+    // Ensure the voice has a model field if it requires one
+    const voiceWithModel = this.ensureVoiceHasModel(voice);
+    this.settings.voice = voiceWithModel;
+  }
+
+  // Ensure voice has model field if required
+  private ensureVoiceHasModel(voice: GoogleCloudVoice): GoogleCloudVoice {
+    if (!voice) return voice;
+    
+    // If voice already has a model, return as is
+    if (voice.model) {
+      return voice;
+    }
+    
+    // Create a copy of the voice object
+    const voiceWithModel = { ...voice };
+    
+    // Set model for voices that require it
+    if (voice.name.includes('Neural2')) {
+      voiceWithModel.model = 'latest';
+    } else if (voice.name.includes('Studio')) {
+      voiceWithModel.model = 'latest';
+    } else if (voice.name.includes('Wavenet')) {
+      // Wavenet voices typically don't need a model, but set it just in case
+      voiceWithModel.model = 'latest';
+    }
+    
+    return voiceWithModel;
   }
 
   setSpeakingRate(rate: number) {

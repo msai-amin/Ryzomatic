@@ -45,6 +45,7 @@ export interface Voice {
   languageCode: string
   gender: string
   type?: string
+  model?: string // Required for some Google Cloud TTS voices
 }
 
 export interface TTSSettings {
@@ -95,6 +96,7 @@ interface AppState {
   logout: () => Promise<void>
   setCurrentDocument: (document: Document | null) => void
   addDocument: (document: Document) => void
+  updateDocument: (document: Document) => void
   removeDocument: (id: string) => void
   toggleChat: () => void
   setLoading: (loading: boolean) => void
@@ -136,10 +138,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   tts: {
     isEnabled: false,
     isPlaying: false,
-    provider: 'native',
-    rate: 1.0,
-    pitch: 1.0,
-    volume: 1.0,
+    provider: 'google-cloud', // Default to Google Cloud TTS for natural voices
+    rate: 0.9, // Slightly slower for more natural speech
+    pitch: 1.1, // Slightly higher pitch for more natural sound
+    volume: 0.8, // Slightly lower volume for comfort
     voiceName: null,
     voice: null,
     highlightCurrentWord: true
@@ -242,6 +244,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({
       documents: [...state.documents, document],
       currentDocument: document
+    }));
+  },
+  
+  updateDocument: (document) => {
+    console.log('AppStore: Updating document:', {
+      id: document.id,
+      name: document.name,
+      type: document.type,
+      hasPageTexts: !!document.pageTexts,
+      pageTextsLength: document.pageTexts?.length || 0,
+      pageTextsPreview: document.pageTexts?.slice(0, 2).map((text, i) => ({
+        page: i + 1,
+        textLength: text.length,
+        textPreview: text.substring(0, 30) + (text.length > 30 ? '...' : '')
+      })) || []
+    });
+    set((state) => ({
+      documents: state.documents.map(doc => doc.id === document.id ? document : doc),
+      currentDocument: state.currentDocument?.id === document.id ? document : state.currentDocument
     }));
   },
   

@@ -264,8 +264,52 @@ class TTSManager {
 
   setVoice(voice: any): void {
     if (this.currentProvider) {
-      this.currentProvider.setVoice(voice)
+      console.log('TTSManager.setVoice called:', {
+        providerType: this.currentProvider.type,
+        voiceName: voice?.name,
+        voiceHasModel: !!voice?.model,
+        originalVoice: voice
+      });
+      
+      // For Google Cloud TTS, ensure the voice has a model field if required
+      if (this.currentProvider.type === 'google-cloud' && voice) {
+        const voiceWithModel = this.ensureGoogleCloudVoiceHasModel(voice);
+        console.log('TTSManager: Voice with model:', {
+          originalName: voice.name,
+          hasModel: !!voiceWithModel.model,
+          modelValue: voiceWithModel.model,
+          finalVoice: voiceWithModel
+        });
+        this.currentProvider.setVoice(voiceWithModel);
+      } else {
+        this.currentProvider.setVoice(voice);
+      }
     }
+  }
+
+  // Ensure Google Cloud voice has model field if required
+  private ensureGoogleCloudVoiceHasModel(voice: any): any {
+    if (!voice) return voice;
+    
+    // If voice already has a model, return as is
+    if (voice.model) {
+      return voice;
+    }
+    
+    // Create a copy of the voice object
+    const voiceWithModel = { ...voice };
+    
+    // Set model for voices that require it
+    if (voice.name && voice.name.includes('Neural2')) {
+      voiceWithModel.model = 'latest';
+    } else if (voice.name && voice.name.includes('Studio')) {
+      voiceWithModel.model = 'latest';
+    } else if (voice.name && voice.name.includes('Wavenet')) {
+      // Wavenet voices typically don't need a model, but set it just in case
+      voiceWithModel.model = 'latest';
+    }
+    
+    return voiceWithModel;
   }
 
   cleanText(text: string): string {
