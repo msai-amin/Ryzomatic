@@ -234,22 +234,26 @@ class GoogleCloudTTSService {
     const voiceWithModel = { ...voice };
     
     // Set model for voices that require it
-    // According to Google Cloud TTS API behavior, we need to be more comprehensive
+    // Be comprehensive - if a voice requires a model, the API will tell us
+    // We'll try with model first, and if it fails, we can fall back
     if (voice.name.includes('Neural2')) {
       voiceWithModel.model = 'latest';
     } else if (voice.name.includes('Studio')) {
       voiceWithModel.model = 'latest';
     } else if (voice.name.includes('Wavenet')) {
-      // Some Wavenet voices DO require a model field, so add it
       voiceWithModel.model = 'latest';
     } else if (voice.name.includes('Neural')) {
-      // Other neural voices might need a model
       voiceWithModel.model = 'latest';
     } else if (voice.name.includes('Journey') || voice.name.includes('Polyglot')) {
-      // Journey and Polyglot voices require model
+      voiceWithModel.model = 'latest';
+    } else if (voice.name.includes('Achernar') || voice.name.includes('Algenib') || voice.name.includes('Fenrir')) {
+      // These are specific voice names that require models
+      voiceWithModel.model = 'latest';
+    } else {
+      // For any other voice, try with model to be safe
+      // If the voice doesn't support model, the API will reject it and we can handle that
       voiceWithModel.model = 'latest';
     }
-    // Note: Standard voices don't get a model field to avoid "Unknown name model" error
     
     return voiceWithModel;
   }
