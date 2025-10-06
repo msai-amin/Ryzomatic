@@ -330,10 +330,20 @@ class GoogleCloudTTSService {
     });
 
     try {
-      // Use v1beta1 endpoint for voices that require model field
-      const endpoint = voice.model ? 'v1beta1' : 'v1';
-      const response = await fetch(
-        `https://texttospeech.googleapis.com/${endpoint}/text:synthesize?key=${this.apiKey}`,
+      // Use v1beta1 endpoint for all voices to support model field
+      // TODO: Can optimize later to use v1 for voices that don't need model
+      const endpoint = 'v1beta1';
+      const url = `https://texttospeech.googleapis.com/${endpoint}/text:synthesize?key=${this.apiKey}`;
+      
+      console.log('TTS API Call Details:', {
+        voiceName: voice.name,
+        hasModel: !!voice.model,
+        modelValue: voice.model,
+        endpoint: endpoint,
+        url: url
+      });
+      
+      const response = await fetch(url,
         {
           method: 'POST',
           headers: {
