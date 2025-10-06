@@ -86,8 +86,8 @@ class StorageService {
         new Date(a.savedAt).getTime() - new Date(b.savedAt).getTime()
       );
       
-      // Remove oldest 25% of books
-      const booksToRemove = Math.max(1, Math.floor(books.length * 0.25));
+      // Remove oldest 50% of books (more aggressive cleanup)
+      const booksToRemove = Math.max(1, Math.floor(books.length * 0.5));
       const booksToKeep = sortedBooks.slice(booksToRemove);
       
       console.log(`Cleaning up ${booksToRemove} old books, keeping ${booksToKeep.length}`);
@@ -164,9 +164,47 @@ class StorageService {
     }
   }
 
+  // Check localStorage quota usage
+  getStorageQuotaInfo(): { used: number; available: number; percentage: number } {
+    try {
+      let used = 0;
+      for (let key in localStorage) {
+        if (localStorage.hasOwnProperty(key)) {
+          used += localStorage[key].length;
+        }
+      }
+      
+      // Estimate available space (browsers typically allow 5-10MB)
+      const estimatedTotal = 5 * 1024 * 1024; // 5MB estimate
+      const available = Math.max(0, estimatedTotal - used);
+      const percentage = (used / estimatedTotal) * 100;
+      
+      return {
+        used,
+        available,
+        percentage: Math.min(percentage, 100)
+      };
+    } catch (error) {
+      console.error('Error checking storage quota:', error);
+      return { used: 0, available: 0, percentage: 0 };
+    }
+  }
+
+  // Check if storage is near quota limit
+  isStorageNearLimit(): boolean {
+    const quota = this.getStorageQuotaInfo();
+    return quota.percentage > 80; // Consider "near limit" if over 80% used
+  }
+
   // Books Management
   async saveBook(book: SavedBook): Promise<void> {
     try {
+      // Check if storage is near limit before attempting to save
+      if (this.isStorageNearLimit()) {
+        console.warn('Storage is near limit, cleaning up old books...');
+        await this.cleanupOldBooks();
+      }
+
       const books = this.getAllBooks();
       const existingIndex = books.findIndex(b => b.id === book.id);
       
@@ -211,7 +249,22 @@ class StorageService {
             console.log('Book saved to localStorage after cleanup');
           } catch (retryError) {
             console.error('Still unable to save after cleanup:', retryError);
-            throw new Error('Storage is full. Please delete some books from your library.');
+            // Try one more time with even more aggressive cleanup
+            try {
+              const books = this.getAllBooks();
+              if (books.length > 1) {
+                // Keep only the most recent book
+                const sortedBooks = books.sort((a, b) => 
+                  new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime()
+                );
+                const singleBook = [sortedBooks[0]];
+                localStorage.setItem(this.BOOKS_KEY, JSON.stringify(singleBook));
+                console.log('Emergency cleanup: Kept only most recent book');
+              }
+            } catch (finalError) {
+              console.error('Final cleanup attempt failed:', finalError);
+              console.warn('localStorage backup completely failed, but this is not critical if Supabase succeeded');
+            }
           }
         } else {
           throw quotaError;
@@ -219,7 +272,13 @@ class StorageService {
       }
     } catch (error) {
       console.error('Error saving book:', error);
-      throw new Error('Failed to save book. Storage may be full.');
+      // Don't throw error for localStorage failures - it's just a backup
+      if (error.message.includes('Storage is full') || error.message.includes('quota') || error.name === 'QuotaExceededError') {
+        console.warn('localStorage backup failed, but this is not critical if Supabase succeeded');
+        return; // Exit gracefully without throwing
+      } else {
+        throw new Error('Failed to save book. Storage may be full.');
+      }
     }
   }
 
