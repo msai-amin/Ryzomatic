@@ -112,6 +112,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         pdfDocRef.current = pdf
         setNumPages(pdf.numPages)
         console.log('✅ PDF loaded successfully:', pdf.numPages, 'pages')
+        console.log('PDF Document Info:', {
+          numPages: pdf.numPages,
+          hasPageTexts: !!document.pageTexts,
+          pageTextsLength: document.pageTexts?.length || 0,
+          documentId: document.id
+        })
       } catch (error) {
         console.error('Error loading PDF:', error)
       }
@@ -419,10 +425,30 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         totalPages: document.totalPages,
         pageTextsLength: document.pageTexts?.length || 0,
         pageTexts: document.pageTexts,
-        currentPageText: document.pageTexts?.[pageNumber - 1]
+        currentPageText: document.pageTexts?.[pageNumber - 1],
+        documentId: document.id,
+        documentName: document.name,
+        documentType: document.type,
+        hasPdfData: !!document.pdfData
       })
       
-      const pageText = document.pageTexts?.[pageNumber - 1] || ''
+      let pageText = document.pageTexts?.[pageNumber - 1] || ''
+      
+      // If no pageTexts available, try to extract text on-demand
+      if (!pageText && document.type === 'pdf' && pdfDocRef.current) {
+        console.log('No pageTexts available, attempting on-demand text extraction...')
+        try {
+          const page = await pdfDocRef.current.getPage(pageNumber)
+          const textContent = await page.getTextContent()
+          pageText = textContent.items
+            .map((item: any) => item.str)
+            .join(' ')
+          console.log('On-demand text extraction successful:', pageText.substring(0, 100) + '...')
+        } catch (error) {
+          console.error('On-demand text extraction failed:', error)
+        }
+      }
+      
       if (pageText) {
         try {
           await ttsService.speak(pageText, () => {
@@ -437,7 +463,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         console.warn('No text available for TTS on this page', {
           pageNumber,
           pageTextsLength: document.pageTexts?.length || 0,
-          pageTexts: document.pageTexts
+          pageTexts: document.pageTexts,
+          hasPdfDoc: !!pdfDocRef.current
         })
       }
     }
