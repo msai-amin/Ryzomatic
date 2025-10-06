@@ -22,6 +22,8 @@ export interface Note {
   id: string;
   content: string;
   pageNumber: number;
+  bookId?: string;
+  bookName?: string;
   position?: { x: number; y: number };
   createdAt: Date;
   updatedAt: Date;
@@ -31,8 +33,12 @@ export interface SavedAudio {
   id: string;
   bookId: string;
   pageNumber: number;
+  title?: string;
   audioData: ArrayBuffer;
+  audioBlob?: Blob;
   duration: number;
+  pageRange?: string;
+  voiceName?: string;
   voiceSettings: Record<string, any>;
   createdAt: Date;
 }
@@ -95,16 +101,6 @@ class SupabaseStorageService {
         });
       }
 
-      // Convert notes to UserNote format
-      const userNotes = book.notes?.map(note => ({
-        user_id: this.currentUserId!,
-        book_id: book.id,
-        page_number: note.pageNumber,
-        content: note.content,
-        position_x: note.position?.x,
-        position_y: note.position?.y
-      })) || [];
-
       const userBook: Omit<UserBook, 'id' | 'created_at' | 'updated_at'> = {
         user_id: this.currentUserId!,
         title: book.title,
@@ -138,9 +134,16 @@ class SupabaseStorageService {
       }
 
       // Save notes if any
-      if (userNotes.length > 0) {
-        for (const note of userNotes) {
-          const { error: noteError } = await userNotes.create(note);
+      if (book.notes && book.notes.length > 0) {
+        for (const note of book.notes) {
+          const { error: noteError } = await userNotes.create({
+            user_id: this.currentUserId!,
+            book_id: data.id, // Use the created book ID
+            page_number: note.pageNumber,
+            content: note.content,
+            position_x: note.position?.x,
+            position_y: note.position?.y
+          });
           if (noteError) {
             logger.warn('Failed to save note', context, noteError);
           }
@@ -346,6 +349,8 @@ class SupabaseStorageService {
         id: note.id,
         content: note.content,
         pageNumber: note.page_number,
+        bookId: note.book_id,
+        bookName: '', // Will be populated if needed
         position: note.position_x && note.position_y ? { x: note.position_x, y: note.position_y } : undefined,
         createdAt: new Date(note.created_at),
         updatedAt: new Date(note.updated_at)
@@ -418,8 +423,12 @@ class SupabaseStorageService {
         id: audio.id,
         bookId: audio.book_id,
         pageNumber: audio.page_number,
+        title: `Page ${audio.page_number} Audio`,
         audioData: this.base64ToArrayBuffer(audio.audio_data_base64),
+        audioBlob: new Blob([this.base64ToArrayBuffer(audio.audio_data_base64)]),
         duration: audio.duration_seconds || 0,
+        pageRange: `Page ${audio.page_number}`,
+        voiceName: audio.voice_settings?.voiceName || 'Unknown',
         voiceSettings: audio.voice_settings,
         createdAt: new Date(audio.created_at)
       }));

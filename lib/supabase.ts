@@ -355,7 +355,7 @@ export const userBooks = {
       .from('user_books')
       .select('*')
       .eq('user_id', userId)
-      .order('last_read_at', { ascending: false, nullsLast: true })
+      .order('last_read_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .limit(limit);
     return { data, error };
