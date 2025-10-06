@@ -40,6 +40,13 @@ export interface PDFViewerSettings {
   readingMode: boolean
 }
 
+export interface Voice {
+  name: string
+  languageCode: string
+  gender: string
+  type?: string
+}
+
 export interface TTSSettings {
   isEnabled: boolean
   isPlaying: boolean
@@ -48,6 +55,7 @@ export interface TTSSettings {
   pitch: number
   volume: number
   voiceName: string | null
+  voice: Voice | null
   highlightCurrentWord: boolean
 }
 
@@ -129,6 +137,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     pitch: 1.0,
     volume: 1.0,
     voiceName: null,
+    voice: null,
     highlightCurrentWord: true
   },
   chatMessages: [],
