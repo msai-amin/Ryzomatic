@@ -28,6 +28,7 @@ import { useAppStore, Document as DocumentType } from '../store/appStore'
 import { ttsManager } from '../services/ttsManager'
 import { TTSControls } from './TTSControls'
 import { NotesPanel } from './NotesPanel'
+import { AudioWidget } from './AudioWidget'
 import { storageService } from '../services/storageService'
 
 // Set up PDF.js worker
@@ -487,9 +488,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         })
         try {
           await ttsManager.speak(pageText, () => {
-            updateTTS({ isPlaying: false })
+      updateTTS({ isPlaying: false })
           })
-          updateTTS({ isPlaying: true })
+      updateTTS({ isPlaying: true })
         } catch (error) {
           console.error('TTS Error:', error)
           updateTTS({ isPlaying: false })
@@ -894,6 +895,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         currentPage={pageNumber}
         selectedText={selectedTextForNote}
       />
+
+      {/* Audio Widget */}
+      <div className="fixed bottom-4 right-4 z-40">
+        <AudioWidget />
+      </div>
     </div>
   )
 }
