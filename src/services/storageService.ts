@@ -84,7 +84,19 @@ class StorageService {
       // Convert ArrayBuffer to base64 for storage if it's a PDF
       const bookToSave = { ...book };
       if (book.type === 'pdf' && book.fileData instanceof ArrayBuffer) {
+        console.log('Converting ArrayBuffer to base64 for storage:', {
+          bookId: book.id,
+          bookTitle: book.title,
+          fileDataByteLength: book.fileData.byteLength,
+          fileDataConstructor: book.fileData.constructor.name
+        });
+        
         bookToSave.pdfDataBase64 = this.arrayBufferToBase64(book.fileData);
+        console.log('Base64 conversion successful:', {
+          base64Length: bookToSave.pdfDataBase64.length,
+          base64Preview: bookToSave.pdfDataBase64.substring(0, 50) + '...'
+        });
+        
         // Remove the ArrayBuffer as it can't be serialized
         delete bookToSave.fileData;
       }
@@ -96,6 +108,7 @@ class StorageService {
       }
       
       localStorage.setItem(this.BOOKS_KEY, JSON.stringify(books));
+      console.log('Book saved to localStorage successfully');
     } catch (error) {
       console.error('Error saving book:', error);
       throw new Error('Failed to save book. Storage may be full.');
@@ -116,7 +129,23 @@ class StorageService {
         
         // Convert base64 back to ArrayBuffer for PDF files
         if (book.type === 'pdf' && book.pdfDataBase64) {
-          savedBook.fileData = this.base64ToArrayBuffer(book.pdfDataBase64);
+          console.log('Converting base64 to ArrayBuffer in getAllBooks:', {
+            bookId: book.id,
+            bookTitle: book.title,
+            base64Length: book.pdfDataBase64.length,
+            base64Preview: book.pdfDataBase64.substring(0, 50) + '...'
+          });
+          
+          try {
+            savedBook.fileData = this.base64ToArrayBuffer(book.pdfDataBase64);
+            console.log('Conversion successful:', {
+              byteLength: savedBook.fileData.byteLength,
+              constructor: savedBook.fileData.constructor.name
+            });
+          } catch (error) {
+            console.error('Error converting base64 to ArrayBuffer:', error);
+            console.log('Base64 data preview:', book.pdfDataBase64.substring(0, 100));
+          }
         }
         
         return savedBook;

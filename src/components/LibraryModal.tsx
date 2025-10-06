@@ -41,15 +41,43 @@ export function LibraryModal({ isOpen, onClose }: LibraryModalProps) {
   };
 
   const handleOpenBook = (book: SavedBook) => {
+    console.log('Opening book from Library:', {
+      id: book.id,
+      title: book.title,
+      type: book.type,
+      hasFileData: !!book.fileData,
+      hasPdfDataBase64: !!book.pdfDataBase64,
+      fileDataType: typeof book.fileData,
+      fileDataConstructor: book.fileData?.constructor?.name,
+      fileDataLength: book.fileData ? (book.fileData as any).byteLength || (book.fileData as any).length : 0
+    });
+
     // Ensure PDF data is properly loaded
-    if (book.type === 'pdf' && !book.fileData && book.pdfDataBase64) {
-      // Convert base64 to ArrayBuffer if needed
-      const binary = atob(book.pdfDataBase64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
+    if (book.type === 'pdf') {
+      if (!book.fileData && book.pdfDataBase64) {
+        console.log('Converting base64 to ArrayBuffer...');
+        // Convert base64 to ArrayBuffer if needed
+        const binary = atob(book.pdfDataBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        book.fileData = bytes.buffer;
+        console.log('Converted to ArrayBuffer:', {
+          byteLength: book.fileData.byteLength,
+          constructor: book.fileData.constructor.name
+        });
+      } else if (book.fileData && !(book.fileData instanceof ArrayBuffer)) {
+        console.log('FileData is not ArrayBuffer, attempting conversion...');
+        // If it's a Uint8Array or similar, convert to ArrayBuffer
+        if (book.fileData instanceof Uint8Array) {
+          book.fileData = book.fileData.buffer;
+        } else if (Array.isArray(book.fileData)) {
+          // If it's an array of numbers, convert to ArrayBuffer
+          const bytes = new Uint8Array(book.fileData);
+          book.fileData = bytes.buffer;
+        }
       }
-      book.fileData = bytes.buffer;
     }
 
     const doc = {
@@ -62,6 +90,15 @@ export function LibraryModal({ isOpen, onClose }: LibraryModalProps) {
       totalPages: book.totalPages,
       pageTexts: book.pageTexts, // Include pageTexts for TTS functionality
     };
+
+    console.log('Document created for app store:', {
+      id: doc.id,
+      type: doc.type,
+      hasPdfData: !!doc.pdfData,
+      pdfDataType: doc.pdfData ? doc.pdfData.constructor.name : 'undefined',
+      pdfDataLength: doc.pdfData ? doc.pdfData.byteLength : 0
+    });
+
     addDocument(doc);
     onClose();
   };
