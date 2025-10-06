@@ -101,8 +101,10 @@ class GoogleCloudTTSService {
       }
       
       if (selectedVoice) {
-        this.settings.voice = selectedVoice;
-        console.log('Set default Google Cloud TTS voice:', selectedVoice.name, selectedVoice.model ? `(model: ${selectedVoice.model})` : '(no model required)');
+        // Ensure the selected voice has a model field if required
+        const voiceWithModel = this.ensureVoiceHasModel(selectedVoice);
+        this.settings.voice = voiceWithModel;
+        console.log('Set default Google Cloud TTS voice:', selectedVoice.name, voiceWithModel.model ? `(model: ${voiceWithModel.model})` : '(no model required)');
         return;
       }
       
@@ -112,8 +114,9 @@ class GoogleCloudTTSService {
       );
       
       if (neuralVoice) {
-        this.settings.voice = neuralVoice;
-        console.log('Set default Google Cloud TTS voice:', neuralVoice.name);
+        const voiceWithModel = this.ensureVoiceHasModel(neuralVoice);
+        this.settings.voice = voiceWithModel;
+        console.log('Set default Google Cloud TTS voice:', neuralVoice.name, voiceWithModel.model ? `(model: ${voiceWithModel.model})` : '(no model required)');
         return;
       }
       
@@ -123,8 +126,9 @@ class GoogleCloudTTSService {
       );
       
       if (studioVoice) {
-        this.settings.voice = studioVoice;
-        console.log('Set default Google Cloud TTS voice:', studioVoice.name);
+        const voiceWithModel = this.ensureVoiceHasModel(studioVoice);
+        this.settings.voice = voiceWithModel;
+        console.log('Set default Google Cloud TTS voice:', studioVoice.name, voiceWithModel.model ? `(model: ${voiceWithModel.model})` : '(no model required)');
         return;
       }
       
@@ -134,8 +138,9 @@ class GoogleCloudTTSService {
       );
       
       if (wavenetVoice) {
-        this.settings.voice = wavenetVoice;
-        console.log('Set default Google Cloud TTS voice:', wavenetVoice.name);
+        const voiceWithModel = this.ensureVoiceHasModel(wavenetVoice);
+        this.settings.voice = voiceWithModel;
+        console.log('Set default Google Cloud TTS voice:', wavenetVoice.name, voiceWithModel.model ? `(model: ${voiceWithModel.model})` : '(no model required)');
         return;
       }
       
@@ -143,15 +148,17 @@ class GoogleCloudTTSService {
       const englishVoice = voices.find(v => v.languageCode && v.languageCode.startsWith('en-'));
       
       if (englishVoice) {
-        this.settings.voice = englishVoice;
-        console.log('Set default Google Cloud TTS voice:', englishVoice.name);
+        const voiceWithModel = this.ensureVoiceHasModel(englishVoice);
+        this.settings.voice = voiceWithModel;
+        console.log('Set default Google Cloud TTS voice:', englishVoice.name, voiceWithModel.model ? `(model: ${voiceWithModel.model})` : '(no model required)');
         return;
       }
       
       // Last resort - first available voice
       if (voices.length > 0) {
-        this.settings.voice = voices[0];
-        console.log('Set default Google Cloud TTS voice:', voices[0].name);
+        const voiceWithModel = this.ensureVoiceHasModel(voices[0]);
+        this.settings.voice = voiceWithModel;
+        console.log('Set default Google Cloud TTS voice:', voices[0].name, voiceWithModel.model ? `(model: ${voiceWithModel.model})` : '(no model required)');
       }
     } catch (error) {
       console.warn('Failed to set default Google Cloud TTS voice:', error);
@@ -232,7 +239,8 @@ class GoogleCloudTTSService {
     const voiceWithModel = { ...voice };
     
     // Set model for voices that require it
-    // Based on Google Cloud TTS documentation, Neural2 and Studio voices require a model
+    // Based on Google Cloud TTS documentation, many voices now require a model
+    // We'll be conservative and set model for most voices to avoid API errors
     if (voice.name.includes('Neural2')) {
       voiceWithModel.model = 'latest';
     } else if (voice.name.includes('Studio')) {
@@ -242,6 +250,10 @@ class GoogleCloudTTSService {
       voiceWithModel.model = 'latest';
     } else if (voice.name.includes('Neural')) {
       // Other neural voices might also need a model
+      voiceWithModel.model = 'latest';
+    } else {
+      // For any other voice, set model to 'latest' to be safe
+      // This prevents the "model name required" error
       voiceWithModel.model = 'latest';
     }
     

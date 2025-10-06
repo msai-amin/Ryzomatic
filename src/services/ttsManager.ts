@@ -303,7 +303,8 @@ class TTSManager {
     const voiceWithModel = { ...voice };
     
     // Set model for voices that require it
-    // Based on Google Cloud TTS documentation, Neural2 and Studio voices require a model
+    // Based on Google Cloud TTS documentation, many voices now require a model
+    // We'll be conservative and set model for most voices to avoid API errors
     if (voice.name && voice.name.includes('Neural2')) {
       voiceWithModel.model = 'latest';
     } else if (voice.name && voice.name.includes('Studio')) {
@@ -313,6 +314,10 @@ class TTSManager {
       voiceWithModel.model = 'latest';
     } else if (voice.name && voice.name.includes('Neural')) {
       // Other neural voices might also need a model
+      voiceWithModel.model = 'latest';
+    } else {
+      // For any other voice, set model to 'latest' to be safe
+      // This prevents the "model name required" error
       voiceWithModel.model = 'latest';
     }
     
