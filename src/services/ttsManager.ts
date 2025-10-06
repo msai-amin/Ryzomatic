@@ -98,10 +98,34 @@ class TTSManager {
     return this.currentProvider
   }
 
-  setProvider(providerType: 'native' | 'google-cloud'): boolean {
+  async setProvider(providerType: 'native' | 'google-cloud'): Promise<boolean> {
     const provider = this.providers.get(providerType)
     if (provider && provider.isAvailable && provider.isConfigured) {
       this.currentProvider = provider
+      
+      // For Google Cloud TTS, set a default voice if none is selected
+      if (providerType === 'google-cloud') {
+        try {
+          const voices = await provider.getVoices()
+          if (voices.length > 0) {
+            // Find a good default voice (prefer neural voices)
+            const neuralVoice = voices.find((voice: any) => 
+              voice.name && (
+                voice.name.includes('Neural') || 
+                voice.name.includes('Wavenet') ||
+                voice.name.includes('Studio')
+              )
+            )
+            
+            const defaultVoice = neuralVoice || voices[0]
+            provider.setVoice(defaultVoice)
+            console.log('Set default Google Cloud TTS voice:', defaultVoice.name)
+          }
+        } catch (error) {
+          console.warn('Failed to set default voice for Google Cloud TTS:', error)
+        }
+      }
+      
       return true
     }
     return false

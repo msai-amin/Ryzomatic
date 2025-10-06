@@ -434,8 +434,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       
       // Try to switch to Google Cloud TTS if available and configured
       if (configuredProviders.some(p => p.type === 'google-cloud')) {
-        const switched = ttsManager.setProvider('google-cloud')
-        console.log('Switched to Google Cloud TTS:', switched)
+        try {
+          const switched = await ttsManager.setProvider('google-cloud')
+          console.log('Switched to Google Cloud TTS:', switched)
+        } catch (error) {
+          console.warn('Failed to switch to Google Cloud TTS:', error)
+        }
       }
       
       // Debug logging
