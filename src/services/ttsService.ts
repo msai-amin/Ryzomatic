@@ -22,9 +22,9 @@ class TextToSpeechService {
   private utterance: SpeechSynthesisUtterance | null = null;
   private voices: SpeechSynthesisVoice[] = [];
   private settings: TTSSettings = {
-    rate: 1,
-    pitch: 1,
-    volume: 1,
+    rate: 0.9, // Slightly slower for more natural speech
+    pitch: 1.1, // Slightly higher pitch for more natural sound
+    volume: 0.8, // Slightly lower volume for comfort
     voice: null,
   };
   private isPaused = false;
@@ -55,12 +55,12 @@ class TextToSpeechService {
     if (!this.settings.voice && this.voices.length > 0) {
       // Prefer premium/enhanced voices
       const premiumVoice = this.voices.find(v => 
-        v.lang.startsWith('en') && 
+        v.lang && v.lang.startsWith('en') && 
         (v.name.includes('Premium') || v.name.includes('Enhanced') || v.name.includes('Natural'))
       );
       
       // Or use any English voice
-      const englishVoice = this.voices.find(v => v.lang.startsWith('en'));
+      const englishVoice = this.voices.find(v => v.lang && v.lang.startsWith('en'));
       
       this.settings.voice = premiumVoice || englishVoice || this.voices[0];
     }
@@ -71,7 +71,7 @@ class TextToSpeechService {
   }
 
   getEnglishVoices(): SpeechSynthesisVoice[] {
-    return this.voices.filter(v => v.lang.startsWith('en'));
+    return this.voices.filter(v => v.lang && v.lang.startsWith('en'));
   }
 
   // Get curated natural voices - 3 female and 3 male
@@ -212,6 +212,21 @@ class TextToSpeechService {
   }
 
   speak(text: string, onEnd?: () => void, onWord?: (word: string, charIndex: number) => void) {
+    console.log('TTSService.speak called:', {
+      textLength: text.length,
+      textPreview: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
+      hasOnEnd: !!onEnd,
+      hasOnWord: !!onWord,
+      isSupported: this.isSupported(),
+      voicesCount: this.voices.length,
+      currentVoice: this.settings.voice ? {
+        name: this.settings.voice.name,
+        lang: this.settings.voice.lang,
+        localService: this.settings.voice.localService
+      } : null,
+      settings: this.settings
+    });
+
     // Check if TTS is supported
     if (!this.isSupported()) {
       console.error('TTS not supported in this browser');
@@ -254,10 +269,31 @@ class TextToSpeechService {
     }
 
     this.utterance = new SpeechSynthesisUtterance(text);
+    
+    // Validate utterance creation
+    if (!this.utterance) {
+      console.error('Failed to create SpeechSynthesisUtterance');
+      if (onEnd) onEnd();
+      return;
+    }
+    
+    console.log('SpeechSynthesisUtterance created successfully:', {
+      textLength: this.utterance.text.length,
+      hasVoice: !!this.settings.voice,
+      voiceName: this.settings.voice?.name || 'default'
+    });
+    
     this.utterance.voice = this.settings.voice;
     this.utterance.rate = this.settings.rate;
     this.utterance.pitch = this.settings.pitch;
     this.utterance.volume = this.settings.volume;
+    
+    console.log('Utterance configured:', {
+      voice: this.utterance.voice?.name || 'default',
+      rate: this.utterance.rate,
+      pitch: this.utterance.pitch,
+      volume: this.utterance.volume
+    });
 
     // Event listeners
     this.utterance.onend = () => {
@@ -268,7 +304,35 @@ class TextToSpeechService {
     };
 
     this.utterance.onerror = (event) => {
-      console.error('TTS Error:', event);
+      console.error('TTS Error Details:', {
+        error: event.error,
+        type: event.type,
+        charIndex: event.charIndex,
+        charLength: event.charLength,
+        name: event.name,
+        utterance: {
+          text: this.utterance?.text?.substring(0, 100) + '...',
+          voice: this.utterance?.voice?.name,
+          rate: this.utterance?.rate,
+          pitch: this.utterance?.pitch,
+          volume: this.utterance?.volume
+        },
+        synthStatus: {
+          speaking: this.synth.speaking,
+          pending: this.synth.pending,
+          paused: this.synth.paused
+        },
+        voicesAvailable: this.voices.length,
+        currentVoice: this.settings.voice ? {
+          name: this.settings.voice.name,
+          lang: this.settings.voice.lang,
+          localService: this.settings.voice.localService
+        } : null
+      });
+      
+      // Log the full event object for debugging
+      console.error('Full TTS Error Event:', event);
+      
       this.isPaused = false;
       if (this.onEndCallback) {
         this.onEndCallback();
@@ -285,8 +349,44 @@ class TextToSpeechService {
     }
 
     try {
-      this.synth.speak(this.utterance);
-      this.isPaused = false;
+      console.log('TTSService.speak: Calling synth.speak with utterance:', {
+        text: this.utterance.text.substring(0, 50) + '...',
+        voice: this.utterance.voice?.name || 'default',
+        rate: this.utterance.rate,
+        pitch: this.utterance.pitch,
+        volume: this.utterance.volume,
+        synthSpeaking: this.synth.speaking,
+        synthPending: this.synth.pending,
+        synthPaused: this.synth.paused
+      });
+      
+      // Some browsers require a small delay before speaking
+      if (this.synth.speaking) {
+        console.log('TTS already speaking, stopping first...');
+        this.synth.cancel();
+        // Small delay to ensure cancellation is processed
+        setTimeout(() => {
+          this.synth.speak(this.utterance);
+          this.isPaused = false;
+        }, 100);
+      } else {
+        this.synth.speak(this.utterance);
+        this.isPaused = false;
+      }
+      
+      console.log('TTSService.speak: synth.speak called successfully, checking status:', {
+        speaking: this.synth.speaking,
+        pending: this.synth.pending,
+        paused: this.synth.paused
+      });
+      
+      // Check if speech actually started after a short delay
+      setTimeout(() => {
+        if (!this.synth.speaking && !this.synth.pending) {
+          console.warn('TTS may not have started properly - no speaking or pending state detected');
+        }
+      }, 500);
+      
     } catch (error) {
       console.error('Failed to start speech synthesis:', error);
       if (onEnd) onEnd();

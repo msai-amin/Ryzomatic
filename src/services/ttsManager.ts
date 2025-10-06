@@ -78,8 +78,20 @@ class TTSManager {
       splitIntoSentences: (text) => googleCloudTTSService.splitIntoSentences(text)
     })
 
-    // Set default provider
-    this.currentProvider = this.providers.get('native') || null
+    // Set default provider - prioritize Google Cloud TTS for natural voices
+    const googleCloudProvider = this.providers.get('google-cloud')
+    const nativeProvider = this.providers.get('native')
+    
+    if (googleCloudProvider && googleCloudProvider.isAvailable && googleCloudProvider.isConfigured) {
+      this.currentProvider = googleCloudProvider
+      console.log('TTSManager: Using Google Cloud TTS as default provider for natural voices')
+    } else if (nativeProvider && nativeProvider.isAvailable) {
+      this.currentProvider = nativeProvider
+      console.log('TTSManager: Using Native TTS as fallback provider')
+    } else {
+      this.currentProvider = null
+      console.warn('TTSManager: No TTS providers available')
+    }
   }
 
   getProviders(): TTSProvider[] {
@@ -111,6 +123,10 @@ class TTSManager {
           if (voices.length > 0) {
             // Prefer English voices first, then neural voices
             const englishVoices = voices.filter((voice: any) => {
+              // Check if voice object is valid
+              if (!voice || typeof voice !== 'object') {
+                return false;
+              }
               // Check if languageCode exists and starts with 'en-'
               if (voice.languageCode && voice.languageCode.startsWith('en-')) {
                 return true;
@@ -127,17 +143,17 @@ class TTSManager {
             if (englishVoices.length > 0) {
               // Find the best English voice (prefer neural/studio voices)
               defaultVoice = englishVoices.find((voice: any) => 
-                voice.name && (
+                voice && voice.name && (
                   voice.name.includes('Neural') || 
                   voice.name.includes('Studio')
                 )
               ) || englishVoices.find((voice: any) => 
-                voice.name && voice.name.includes('Wavenet')
+                voice && voice.name && voice.name.includes('Wavenet')
               ) || englishVoices[0]
             } else {
               // Fallback to any neural voice
               defaultVoice = voices.find((voice: any) => 
-                voice.name && (
+                voice && voice.name && (
                   voice.name.includes('Neural') || 
                   voice.name.includes('Wavenet') ||
                   voice.name.includes('Studio')
@@ -169,10 +185,37 @@ class TTSManager {
   }
 
   async speak(text: string, onEnd?: () => void, onWord?: (word: string, charIndex: number) => void): Promise<void> {
+    console.log('TTSManager.speak called:', {
+      textLength: text.length,
+      textPreview: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
+      hasOnEnd: !!onEnd,
+      hasOnWord: !!onWord,
+      currentProvider: this.currentProvider ? {
+        name: this.currentProvider.name,
+        type: this.currentProvider.type,
+        isAvailable: this.currentProvider.isAvailable,
+        isConfigured: this.currentProvider.isConfigured
+      } : null
+    })
+    
     if (!this.currentProvider) {
+      console.error('TTSManager.speak: No TTS provider available')
       throw new Error('No TTS provider available')
     }
-    return await this.currentProvider.speak(text, onEnd, onWord)
+    
+    if (!text || text.trim().length === 0) {
+      console.warn('TTSManager.speak: Empty or whitespace-only text provided')
+      throw new Error('Cannot speak empty text')
+    }
+    
+    console.log('TTSManager.speak: Calling provider.speak...')
+    try {
+      await this.currentProvider.speak(text, onEnd, onWord)
+      console.log('TTSManager.speak: Provider.speak completed successfully')
+    } catch (error) {
+      console.error('TTSManager.speak: Provider.speak failed:', error)
+      throw error
+    }
   }
 
   pause(): void {

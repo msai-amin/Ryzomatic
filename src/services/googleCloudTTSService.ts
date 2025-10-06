@@ -44,10 +44,74 @@ class GoogleCloudTTSService {
     if (typeof window !== 'undefined' && window.AudioContext) {
       this.audioContext = new AudioContext();
     }
+    
+    // Set default voice if configured
+    this.setDefaultVoice();
   }
 
   isConfigured(): boolean {
     return this.apiKey !== null && this.apiKey.length > 0;
+  }
+
+  // Set a default natural voice
+  private async setDefaultVoice(): Promise<void> {
+    if (!this.isConfigured()) {
+      return;
+    }
+
+    try {
+      const voices = await this.getVoices();
+      
+      // Prioritize neural voices for natural sound
+      const neuralVoice = voices.find(v => 
+        v.name && v.name.includes('Neural2') && v.languageCode && v.languageCode.startsWith('en-')
+      );
+      
+      if (neuralVoice) {
+        this.settings.voice = neuralVoice;
+        console.log('Set default Google Cloud TTS voice:', neuralVoice.name);
+        return;
+      }
+      
+      // Fallback to studio voices
+      const studioVoice = voices.find(v => 
+        v.name && v.name.includes('Studio') && v.languageCode && v.languageCode.startsWith('en-')
+      );
+      
+      if (studioVoice) {
+        this.settings.voice = studioVoice;
+        console.log('Set default Google Cloud TTS voice:', studioVoice.name);
+        return;
+      }
+      
+      // Fallback to wavenet voices
+      const wavenetVoice = voices.find(v => 
+        v.name && v.name.includes('Wavenet') && v.languageCode && v.languageCode.startsWith('en-')
+      );
+      
+      if (wavenetVoice) {
+        this.settings.voice = wavenetVoice;
+        console.log('Set default Google Cloud TTS voice:', wavenetVoice.name);
+        return;
+      }
+      
+      // Fallback to any English voice
+      const englishVoice = voices.find(v => v.languageCode && v.languageCode.startsWith('en-'));
+      
+      if (englishVoice) {
+        this.settings.voice = englishVoice;
+        console.log('Set default Google Cloud TTS voice:', englishVoice.name);
+        return;
+      }
+      
+      // Last resort - first available voice
+      if (voices.length > 0) {
+        this.settings.voice = voices[0];
+        console.log('Set default Google Cloud TTS voice:', voices[0].name);
+      }
+    } catch (error) {
+      console.warn('Failed to set default Google Cloud TTS voice:', error);
+    }
   }
 
   async getVoices(): Promise<GoogleCloudVoice[]> {
@@ -75,7 +139,7 @@ class GoogleCloudTTSService {
   async getEnglishVoices(): Promise<GoogleCloudVoice[]> {
     const voices = await this.getVoices();
     return voices.filter(voice => 
-      voice.languageCode.startsWith('en-') && 
+      voice.languageCode && voice.languageCode.startsWith('en-') && 
       (voice.gender === 'FEMALE' || voice.gender === 'MALE')
     );
   }
@@ -216,6 +280,11 @@ class GoogleCloudTTSService {
     try {
       // Stop any current speech
       this.stop();
+
+      // Auto-select a voice if none is selected
+      if (!this.settings.voice) {
+        await this.setDefaultVoice();
+      }
 
       // Synthesize audio
       const audioBuffer = await this.synthesize(text);
