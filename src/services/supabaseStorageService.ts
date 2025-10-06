@@ -84,6 +84,34 @@ class SupabaseStorageService {
     return bytes.buffer;
   }
 
+  // Sanitize text to remove problematic Unicode characters for PostgreSQL
+  private sanitizeTextForPostgreSQL(text: string): string {
+    if (!text) return text;
+    
+    return text
+      // Remove or replace problematic Unicode characters
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
+      .replace(/[\u2000-\u200F\u2028-\u202F\u205F-\u206F]/g, ' ') // Replace various spaces with regular space
+      .replace(/[\uFEFF]/g, '') // Remove zero-width no-break space
+      .replace(/[\uFFFD]/g, '?') // Replace replacement character with question mark
+      // Handle Unicode escape sequences that cause PostgreSQL issues
+      .replace(/\\u[0-9A-Fa-f]{4}/g, '?') // Replace Unicode escape sequences
+      .replace(/\\x[0-9A-Fa-f]{2}/g, '?') // Replace hex escape sequences
+      .replace(/\\[0-7]{1,3}/g, '?') // Replace octal escape sequences
+      .replace(/\\/g, '\\\\') // Escape remaining backslashes
+      .replace(/'/g, "''") // Escape single quotes for SQL
+      .replace(/"/g, '\\"') // Escape double quotes
+      .replace(/\0/g, '') // Remove null bytes
+      .trim();
+  }
+
+  // Sanitize page texts array
+  private sanitizePageTexts(pageTexts: string[]): string[] {
+    if (!pageTexts || !Array.isArray(pageTexts)) return [];
+    
+    return pageTexts.map(text => this.sanitizeTextForPostgreSQL(text));
+  }
+
   // Books Management
   async saveBook(book: SavedBook): Promise<void> {
     this.ensureAuthenticated();
@@ -91,26 +119,67 @@ class SupabaseStorageService {
     try {
       const context = { bookId: book.id, userId: this.currentUserId };
       
-      // Convert file data to base64 if it's an ArrayBuffer
+      // Convert file data to base64 if it's an ArrayBuffer or Blob
       let pdfDataBase64: string | undefined;
-      if (book.type === 'pdf' && book.fileData instanceof ArrayBuffer) {
-        pdfDataBase64 = this.arrayBufferToBase64(book.fileData);
-        logger.info('Converted PDF to base64 for Supabase storage', context, {
-          originalSize: book.fileData.byteLength,
-          base64Size: pdfDataBase64.length
-        });
+      if (book.type === 'pdf' && book.fileData) {
+        try {
+          if (book.fileData instanceof ArrayBuffer) {
+            pdfDataBase64 = this.arrayBufferToBase64(book.fileData);
+            logger.info('Converted PDF ArrayBuffer to base64 for Supabase storage', context, {
+              originalSize: book.fileData.byteLength,
+              base64Size: pdfDataBase64.length
+            });
+          } else if (book.fileData instanceof Blob) {
+            // Convert Blob to ArrayBuffer first, then to base64
+            const arrayBuffer = await book.fileData.arrayBuffer();
+            pdfDataBase64 = this.arrayBufferToBase64(arrayBuffer);
+            logger.info('Converted PDF Blob to base64 for Supabase storage', context, {
+              originalSize: book.fileData.size,
+              arrayBufferSize: arrayBuffer.byteLength,
+              base64Size: pdfDataBase64.length
+            });
+          } else {
+            logger.warn('PDF fileData is neither ArrayBuffer nor Blob', context, undefined, {
+              fileDataType: typeof book.fileData,
+              fileDataConstructor: book.fileData?.constructor?.name
+            });
+          }
+        } catch (error) {
+          logger.error('Error converting PDF data to base64', context, error as Error);
+          throw errorHandler.createError(
+            'Failed to convert PDF data for storage',
+            ErrorType.STORAGE,
+            ErrorSeverity.HIGH,
+            context,
+            { error: error instanceof Error ? error.message : 'Unknown error' }
+          );
+        }
       }
+
+      // Sanitize the book title as well
+      const sanitizedTitle = this.sanitizeTextForPostgreSQL(book.title);
+      const sanitizedFileName = this.sanitizeTextForPostgreSQL(book.fileName);
+      
+      logger.info('Sanitizing book data for Supabase', context, {
+        originalTitle: book.title,
+        sanitizedTitle,
+        originalFileName: book.fileName,
+        sanitizedFileName,
+        pageTextsCount: book.pageTexts?.length || 0,
+        pageTextsSample: book.pageTexts?.[0]?.substring(0, 100) + '...' || 'No page texts'
+      });
 
       const userBook: Omit<UserBook, 'id' | 'created_at' | 'updated_at'> = {
         user_id: this.currentUserId!,
-        title: book.title,
-        file_name: book.fileName,
+        title: sanitizedTitle,
+        file_name: sanitizedFileName,
         file_type: book.type,
-        file_size: book.fileData instanceof ArrayBuffer ? book.fileData.byteLength : 0,
+        file_size: book.fileData instanceof ArrayBuffer ? book.fileData.byteLength : 
+                   book.fileData instanceof Blob ? book.fileData.size : 0,
         total_pages: book.totalPages,
         pdf_data_base64: pdfDataBase64,
-        page_texts: book.pageTexts,
-        text_content: book.type === 'text' ? (book.fileData as string) : undefined,
+        page_texts: this.sanitizePageTexts(book.pageTexts || []),
+        text_content: book.type === 'text' ? this.sanitizeTextForPostgreSQL(book.fileData as string) : undefined,
         tts_metadata: {
           voiceSettings: {},
           lastUsedVoice: null,
@@ -125,6 +194,16 @@ class SupabaseStorageService {
       const { data, error } = await userBooks.create(userBook);
       
       if (error) {
+        logger.error('Supabase save error details', context, error, {
+          errorCode: error.code,
+          errorMessage: error.message,
+          errorDetails: error.details,
+          errorHint: error.hint,
+          bookTitle: sanitizedTitle,
+          bookFileName: sanitizedFileName,
+          pageTextsLength: userBook.page_texts?.length || 0
+        });
+        
         throw errorHandler.createError(
           `Failed to save book to Supabase: ${error.message}`,
           ErrorType.DATABASE,
@@ -195,13 +274,30 @@ class SupabaseStorageService {
         // Convert base64 back to ArrayBuffer for PDF files
         if (book.file_type === 'pdf' && book.pdf_data_base64) {
           try {
+            logger.info('Converting base64 to ArrayBuffer', { bookId: book.id }, {
+              base64Length: book.pdf_data_base64.length,
+              base64Preview: book.pdf_data_base64.substring(0, 50) + '...'
+            });
+            
             savedBook.fileData = this.base64ToArrayBuffer(book.pdf_data_base64);
             savedBook.pdfDataBase64 = book.pdf_data_base64;
+            
+            logger.info('Base64 conversion successful', { bookId: book.id }, {
+              arrayBufferLength: savedBook.fileData.byteLength,
+              isArrayBuffer: savedBook.fileData instanceof ArrayBuffer
+            });
           } catch (error) {
             logger.error('Error converting base64 to ArrayBuffer', { bookId: book.id }, error as Error);
+            // Don't fail completely, just log the error and continue
+            savedBook.pdfDataBase64 = book.pdf_data_base64;
           }
         } else if (book.file_type === 'text' && book.text_content) {
           savedBook.fileData = book.text_content;
+        } else if (book.file_type === 'pdf') {
+          logger.warn('PDF book has no base64 data', { bookId: book.id }, undefined, {
+            hasPdfDataBase64: !!book.pdf_data_base64,
+            hasTextContent: !!book.text_content
+          });
         }
 
         return savedBook;
@@ -372,7 +468,7 @@ class SupabaseStorageService {
         user_id: this.currentUserId!,
         book_id: '', // This should be passed from the calling context
         page_number: note.pageNumber,
-        content: note.content,
+        content: this.sanitizeTextForPostgreSQL(note.content),
         position_x: note.position?.x,
         position_y: note.position?.y
       });
