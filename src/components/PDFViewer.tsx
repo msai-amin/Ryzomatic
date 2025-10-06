@@ -453,7 +453,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         documentId: document.id,
         documentName: document.name,
         documentType: document.type,
-        hasPdfData: !!document.pdfData
+        hasPdfData: !!document.pdfData,
+        fullDocument: document
       })
       
       let pageText = document.pageTexts?.[pageNumber - 1] || ''

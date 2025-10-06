@@ -114,7 +114,13 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
         logger.info('PDF document processed successfully', context, {
           documentId: document.id,
           totalPages,
-          contentLength: content.length
+          contentLength: content.length,
+          pageTextsCount: pageTexts.length,
+          pageTextsPreview: pageTexts.slice(0, 3).map((text, i) => ({
+            page: i + 1,
+            textLength: text.length,
+            textPreview: text.substring(0, 50) + (text.length > 50 ? '...' : '')
+          }))
         });
         
         // Save to library if checkbox is checked

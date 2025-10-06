@@ -226,10 +226,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Actions
   setCurrentDocument: (document) => set({ currentDocument: document }),
   
-  addDocument: (document) => set((state) => ({
-    documents: [...state.documents, document],
-    currentDocument: document
-  })),
+  addDocument: (document) => {
+    console.log('AppStore: Adding document:', {
+      id: document.id,
+      name: document.name,
+      type: document.type,
+      hasPageTexts: !!document.pageTexts,
+      pageTextsLength: document.pageTexts?.length || 0,
+      pageTextsPreview: document.pageTexts?.slice(0, 2).map((text, i) => ({
+        page: i + 1,
+        textLength: text.length,
+        textPreview: text.substring(0, 30) + (text.length > 30 ? '...' : '')
+      })) || []
+    });
+    set((state) => ({
+      documents: [...state.documents, document],
+      currentDocument: document
+    }));
+  },
   
   removeDocument: (id) => set((state) => ({
     documents: state.documents.filter(doc => doc.id !== id),
