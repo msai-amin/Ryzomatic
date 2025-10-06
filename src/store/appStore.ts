@@ -86,7 +86,7 @@ interface AppState {
   isTyping: boolean
   
   // Library refresh
-  libraryRefreshTrigger: 0
+  libraryRefreshTrigger: number
   
   // Actions
   setUser: (user: AuthUser | null) => void
