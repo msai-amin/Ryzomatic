@@ -155,7 +155,14 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         type: doc.type,
         hasPdfData: !!doc.pdfData,
         pdfDataType: doc.pdfData ? doc.pdfData.constructor.name : 'undefined',
-        pdfDataLength: doc.pdfData ? doc.pdfData.byteLength : 0
+        pdfDataLength: doc.pdfData ? doc.pdfData.byteLength : 0,
+        hasPageTexts: !!doc.pageTexts,
+        pageTextsLength: doc.pageTexts?.length || 0,
+        pageTextsPreview: doc.pageTexts?.slice(0, 2).map((text, i) => ({
+          page: i + 1,
+          textLength: text.length,
+          textPreview: text.substring(0, 30) + (text.length > 30 ? '...' : '')
+        })) || []
       });
 
       addDocument(doc);
