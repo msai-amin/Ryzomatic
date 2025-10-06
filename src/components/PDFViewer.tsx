@@ -413,19 +413,32 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       ttsService.pause()
       updateTTS({ isPlaying: false })
     } else {
+      // Debug logging
+      console.log('TTS Debug:', {
+        pageNumber,
+        totalPages: document.totalPages,
+        pageTextsLength: document.pageTexts?.length || 0,
+        pageTexts: document.pageTexts,
+        currentPageText: document.pageTexts?.[pageNumber - 1]
+      })
+      
       const pageText = document.pageTexts?.[pageNumber - 1] || ''
       if (pageText) {
         try {
           await ttsService.speak(pageText, () => {
-          updateTTS({ isPlaying: false })
+            updateTTS({ isPlaying: false })
           })
-      updateTTS({ isPlaying: true })
+          updateTTS({ isPlaying: true })
         } catch (error) {
           console.error('TTS Error:', error)
-    updateTTS({ isPlaying: false })
+          updateTTS({ isPlaying: false })
         }
       } else {
-        console.warn('No text available for TTS on this page')
+        console.warn('No text available for TTS on this page', {
+          pageNumber,
+          pageTextsLength: document.pageTexts?.length || 0,
+          pageTexts: document.pageTexts
+        })
       }
     }
   }, [tts, pageNumber, document.pageTexts, updateTTS])

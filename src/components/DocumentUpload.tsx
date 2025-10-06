@@ -130,6 +130,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
                 savedAt: new Date(),
                 totalPages,
                 fileData: pdfData,
+                pageTexts, // Include pageTexts for TTS functionality
               })
               
               logger.info('Document saved to local library', context, {

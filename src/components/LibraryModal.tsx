@@ -49,6 +49,7 @@ export function LibraryModal({ isOpen, onClose }: LibraryModalProps) {
       uploadedAt: book.savedAt,
       pdfData: book.type === 'pdf' ? book.fileData as ArrayBuffer : undefined,
       totalPages: book.totalPages,
+      pageTexts: book.pageTexts, // Include pageTexts for TTS functionality
     };
     addDocument(doc);
     onClose();

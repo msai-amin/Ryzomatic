@@ -15,6 +15,7 @@ export interface SavedBook {
   lastReadPage?: number;
   totalPages?: number;
   fileData?: ArrayBuffer | string | Blob;
+  pageTexts?: string[]; // Add pageTexts for PDF documents
   notes?: Note[];
   googleDriveId?: string; // Google Drive file ID for sync
   syncedAt?: Date; // Last sync timestamp
