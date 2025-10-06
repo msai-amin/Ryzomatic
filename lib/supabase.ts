@@ -65,6 +65,49 @@ export interface UsageRecord {
   created_at: string;
 }
 
+// User Books interfaces
+export interface UserBook {
+  id: string;
+  user_id: string;
+  title: string;
+  file_name: string;
+  file_type: 'pdf' | 'text';
+  file_size: number;
+  total_pages?: number;
+  pdf_data_base64?: string;
+  page_texts?: string[];
+  text_content?: string;
+  tts_metadata: Record<string, any>;
+  last_read_page: number;
+  reading_progress: number;
+  created_at: string;
+  updated_at: string;
+  last_read_at?: string;
+}
+
+export interface UserNote {
+  id: string;
+  user_id: string;
+  book_id: string;
+  page_number: number;
+  content: string;
+  position_x?: number;
+  position_y?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserAudio {
+  id: string;
+  user_id: string;
+  book_id: string;
+  page_number: number;
+  audio_data_base64: string;
+  duration_seconds?: number;
+  voice_settings: Record<string, any>;
+  created_at: string;
+}
+
 // Auth helpers
 export const auth = {
   async signUp(email: string, password: string, fullName?: string) {
@@ -303,5 +346,169 @@ export const usage = {
 
     return { data, error };
   },
+};
+
+// User Books helpers
+export const userBooks = {
+  async list(userId: string, limit = 50) {
+    const { data, error } = await supabase
+      .from('user_books')
+      .select('*')
+      .eq('user_id', userId)
+      .order('last_read_at', { ascending: false, nullsLast: true })
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    return { data, error };
+  },
+
+  async get(bookId: string) {
+    const { data, error } = await supabase
+      .from('user_books')
+      .select('*')
+      .eq('id', bookId)
+      .single();
+    return { data, error };
+  },
+
+  async create(book: Omit<UserBook, 'id' | 'created_at' | 'updated_at'>) {
+    const { data, error } = await supabase
+      .from('user_books')
+      .insert(book)
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  async update(bookId: string, updates: Partial<UserBook>) {
+    const { data, error } = await supabase
+      .from('user_books')
+      .update(updates)
+      .eq('id', bookId)
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  async delete(bookId: string) {
+    const { error } = await supabase
+      .from('user_books')
+      .delete()
+      .eq('id', bookId);
+    return { error };
+  },
+
+  async updateReadingProgress(bookId: string, pageNumber: number, totalPages: number) {
+    const { data, error } = await supabase.rpc('update_reading_progress', {
+      book_uuid: bookId,
+      page_num: pageNumber,
+      total_pages: totalPages
+    });
+    return { data, error };
+  },
+
+  async getReadingStats(userId: string) {
+    const { data, error } = await supabase.rpc('get_user_reading_stats', {
+      user_uuid: userId
+    });
+    return { data, error };
+  }
+};
+
+// User Notes helpers
+export const userNotes = {
+  async list(userId: string, bookId?: string) {
+    let query = supabase
+      .from('user_notes')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (bookId) {
+      query = query.eq('book_id', bookId);
+    }
+
+    const { data, error } = await query;
+    return { data, error };
+  },
+
+  async get(noteId: string) {
+    const { data, error } = await supabase
+      .from('user_notes')
+      .select('*')
+      .eq('id', noteId)
+      .single();
+    return { data, error };
+  },
+
+  async create(note: Omit<UserNote, 'id' | 'created_at' | 'updated_at'>) {
+    const { data, error } = await supabase
+      .from('user_notes')
+      .insert(note)
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  async update(noteId: string, updates: Partial<UserNote>) {
+    const { data, error } = await supabase
+      .from('user_notes')
+      .update(updates)
+      .eq('id', noteId)
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  async delete(noteId: string) {
+    const { error } = await supabase
+      .from('user_notes')
+      .delete()
+      .eq('id', noteId);
+    return { error };
+  }
+};
+
+// User Audio helpers
+export const userAudio = {
+  async list(userId: string, bookId?: string) {
+    let query = supabase
+      .from('user_audio')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (bookId) {
+      query = query.eq('book_id', bookId);
+    }
+
+    const { data, error } = await query;
+    return { data, error };
+  },
+
+  async get(audioId: string) {
+    const { data, error } = await supabase
+      .from('user_audio')
+      .select('*')
+      .eq('id', audioId)
+      .single();
+    return { data, error };
+  },
+
+  async create(audio: Omit<UserAudio, 'id' | 'created_at'>) {
+    const { data, error } = await supabase
+      .from('user_audio')
+      .insert(audio)
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  async delete(audioId: string) {
+    const { error } = await supabase
+      .from('user_audio')
+      .delete()
+      .eq('id', audioId);
+    return { error };
+  }
 };
 
