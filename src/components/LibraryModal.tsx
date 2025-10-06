@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Book, FileText, Music, Trash2, Download, Upload, HardDrive, Cloud, CloudOff, RefreshCw } from 'lucide-react';
-import { storageService, SavedBook, Note, SavedAudio } from '../services/storageService';
+import { storageService, SavedBook, Note, SavedAudio } from '../services/storageService'
+import { supabaseStorageService } from '../services/supabaseStorageService';
 import { useAppStore } from '../store/appStore';
 // import { googleAuthService } from '../services/googleAuthService';
 
@@ -30,35 +31,76 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
   const loadData = async () => {
     console.log('LibraryModal: Loading data...');
     
-    // Clean up corrupted legacy books first
-    storageService.cleanupCorruptedBooks();
-    
-    const allBooks = storageService.getAllBooks();
-    console.log('LibraryModal: Loaded books from storage:', {
-      count: allBooks.length,
-      books: allBooks.map(book => ({
-        id: book.id,
-        title: book.title,
-        type: book.type,
-        savedAt: book.savedAt,
-        hasFileData: !!book.fileData,
-        hasPdfDataBase64: !!book.pdfDataBase64
-      }))
-    });
-    
-    setBooks(allBooks);
-    setNotes(storageService.getAllNotes());
-    setAudio(await storageService.getAllAudio());
-    setStorageInfo(storageService.getStorageInfo());
-    
-    // Check Google Drive status
-    const isEnabled = await storageService.isGoogleDriveEnabled();
-    setIsGoogleDriveEnabled(isEnabled);
-    
-    const status = await storageService.getSyncStatus();
-    setSyncStatus(status);
-    
-    console.log('LibraryModal: Data loading completed');
+    try {
+      // Try to load from Supabase first (primary storage)
+      const supabaseBooks = await supabaseStorageService.getAllBooks();
+      console.log('LibraryModal: Loaded books from Supabase:', {
+        count: supabaseBooks.length,
+        books: supabaseBooks.map(book => ({
+          id: book.id,
+          title: book.title,
+          type: book.type,
+          savedAt: book.savedAt,
+          hasFileData: !!book.fileData,
+          hasPdfDataBase64: !!book.pdfDataBase64,
+          hasPageTexts: !!book.pageTexts?.length
+        }))
+      });
+      
+      setBooks(supabaseBooks);
+      
+      // Load notes and audio from Supabase
+      const supabaseNotes = await supabaseStorageService.getAllNotes();
+      const supabaseAudio = await supabaseStorageService.getAllAudio();
+      
+      setNotes(supabaseNotes);
+      setAudio(supabaseAudio);
+      
+      // Use Supabase storage info
+      setStorageInfo(supabaseStorageService.getStorageInfo());
+      
+      // Check Google Drive status
+      const isEnabled = await supabaseStorageService.isGoogleDriveEnabled();
+      setIsGoogleDriveEnabled(isEnabled);
+      
+      const status = await supabaseStorageService.getSyncStatus();
+      setSyncStatus(status);
+      
+      console.log('LibraryModal: Data loading completed from Supabase');
+      
+    } catch (error) {
+      console.error('LibraryModal: Error loading from Supabase, falling back to localStorage:', error);
+      
+      // Fallback to localStorage if Supabase fails
+      storageService.cleanupCorruptedBooks();
+      
+      const allBooks = storageService.getAllBooks();
+      console.log('LibraryModal: Loaded books from localStorage (fallback):', {
+        count: allBooks.length,
+        books: allBooks.map(book => ({
+          id: book.id,
+          title: book.title,
+          type: book.type,
+          savedAt: book.savedAt,
+          hasFileData: !!book.fileData,
+          hasPdfDataBase64: !!book.pdfDataBase64
+        }))
+      });
+      
+      setBooks(allBooks);
+      setNotes(storageService.getAllNotes());
+      setAudio(await storageService.getAllAudio());
+      setStorageInfo(storageService.getStorageInfo());
+      
+      // Check Google Drive status
+      const isEnabled = await storageService.isGoogleDriveEnabled();
+      setIsGoogleDriveEnabled(isEnabled);
+      
+      const status = await storageService.getSyncStatus();
+      setSyncStatus(status);
+      
+      console.log('LibraryModal: Data loading completed from localStorage (fallback)');
+    }
   };
 
   const handleOpenBook = (book: SavedBook) => {

@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react'
 import { X, Upload, FileText, AlertCircle, Save, Cloud } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { storageService } from '../services/storageService'
+import { supabaseStorageService } from '../services/supabaseStorageService'
 import { googleIntegrationService } from '../services/googleIntegrationService'
 import { simpleGoogleAuth } from '../services/simpleGoogleAuth'
 import { logger, trackPerformance } from '../services/logger'
@@ -127,7 +128,23 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
         if (saveToLibrary) {
           await trackPerformance('saveToLibrary', async () => {
             try {
-              // Save locally
+              // Save to Supabase (primary storage)
+              await supabaseStorageService.saveBook({
+                id: document.id,
+                title: document.name,
+                fileName: file.name,
+                type: 'pdf',
+                savedAt: new Date(),
+                totalPages,
+                fileData: pdfData,
+                pageTexts, // Include pageTexts for TTS functionality
+              })
+              
+              logger.info('Document saved to Supabase', context, {
+                documentId: document.id
+              });
+              
+              // Also save to localStorage as backup
               await storageService.saveBook({
                 id: document.id,
                 title: document.name,
@@ -139,7 +156,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
                 pageTexts, // Include pageTexts for TTS functionality
               })
               
-              logger.info('Document saved to local library', context, {
+              logger.info('Document saved to local library (backup)', context, {
                 documentId: document.id
               });
               
@@ -192,6 +209,21 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
         if (saveToLibrary) {
           await trackPerformance('saveToLibrary', async () => {
             try {
+              // Save to Supabase (primary storage)
+              await supabaseStorageService.saveBook({
+                id: document.id,
+                title: document.name,
+                fileName: file.name,
+                type: 'text',
+                savedAt: new Date(),
+                fileData: content,
+              })
+              
+              logger.info('Document saved to Supabase', context, {
+                documentId: document.id
+              });
+              
+              // Also save to localStorage as backup
               await storageService.saveBook({
                 id: document.id,
                 title: document.name,
@@ -201,7 +233,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
                 fileData: content,
               })
               
-              logger.info('Document saved to local library', context, {
+              logger.info('Document saved to local library (backup)', context, {
                 documentId: document.id
               });
               

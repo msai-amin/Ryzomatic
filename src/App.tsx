@@ -10,6 +10,7 @@ import { authService, supabase } from './services/supabaseAuthService'
 import { healthMonitor } from './services/healthMonitor'
 import { logger } from './services/logger'
 import { errorHandler } from './services/errorHandler'
+import { supabaseStorageService } from './services/supabaseStorageService'
 
 function App() {
   const { 
@@ -130,6 +131,12 @@ function App() {
       try {
         if (supabase) {
           await checkAuth()
+          
+          // Initialize Supabase storage service if user is already authenticated
+          if (isAuthenticated && user) {
+            supabaseStorageService.setCurrentUser(user.id)
+            logger.info('Supabase storage service initialized on startup', { userId: user.id })
+          }
         } else {
           logger.warn('Supabase not available - skipping auth check', context);
         }
@@ -156,6 +163,11 @@ function App() {
         if (user) {
           // User just signed in (via OAuth or email)
           await checkAuth()
+          
+          // Initialize Supabase storage service with user ID
+          supabaseStorageService.setCurrentUser(user.id)
+          logger.info('Supabase storage service initialized', { userId: user.id })
+          
           setIsAuthModalOpen(false)
         } else {
           // User signed out
