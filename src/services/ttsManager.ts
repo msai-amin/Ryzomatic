@@ -302,13 +302,16 @@ class TTSManager {
     // Create a copy of the voice object
     const voiceWithModel = { ...voice };
     
-    // Only set model for voices that actually require it
+    // Set model for voices that actually require it
     // Studio voices and some specific voice types need the model field
     if (voice.name && voice.name.includes('Studio')) {
       voiceWithModel.model = 'latest';
     } else if (voice.name && voice.name.includes('Journey')) {
       voiceWithModel.model = 'latest';
     } else if (voice.name && voice.name.includes('Polyglot')) {
+      voiceWithModel.model = 'latest';
+    } else if (voice.name === 'Achernar' || voice.name === 'Algenib' || voice.name === 'Fenrir') {
+      // These specific voice names are Studio voices that require model field
       voiceWithModel.model = 'latest';
     }
     // Note: Wavenet, Neural2, Neural, and Standard voices don't need model field

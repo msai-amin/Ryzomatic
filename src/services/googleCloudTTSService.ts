@@ -234,13 +234,16 @@ class GoogleCloudTTSService {
     // Create a copy of the voice object
     const voiceWithModel = { ...voice };
     
-    // Only set model for voices that actually require it
+    // Set model for voices that actually require it
     // Studio voices and some specific voice types need the model field
     if (voice.name.includes('Studio')) {
       voiceWithModel.model = 'latest';
     } else if (voice.name.includes('Journey')) {
       voiceWithModel.model = 'latest';
     } else if (voice.name.includes('Polyglot')) {
+      voiceWithModel.model = 'latest';
+    } else if (voice.name === 'Achernar' || voice.name === 'Algenib' || voice.name === 'Fenrir') {
+      // These specific voice names are Studio voices that require model field
       voiceWithModel.model = 'latest';
     }
     // Note: Wavenet, Neural2, Neural, and Standard voices don't need model field
@@ -320,45 +323,24 @@ class GoogleCloudTTSService {
     });
 
     try {
-      // HARDCODED TEST - Use v1 endpoint with a known working voice
-      const API_ENDPOINT = 'https://texttospeech.googleapis.com/v1/text:synthesize';
+      // Use v1beta1 endpoint for voices with model field, v1 for others
+      const endpoint = voice.model ? 'v1beta1' : 'v1';
+      const url = `https://texttospeech.googleapis.com/${endpoint}/text:synthesize?key=${this.apiKey}`;
       
-      // Hardcode the entire request body for this test
-      const testRequestBody = {
-        "input": {
-          "text": "This is a simple test to see if the API is working."
-        },
-        "voice": {
-          "languageCode": "en-US",
-          "name": "en-US-Wavenet-F"  // A standard WaveNet voice
-        },
-        "audioConfig": {
-          "audioEncoding": "MP3"
-        }
-      };
-      
-      console.log('HARDCODED TEST - TTS API Call Details:', {
-        endpoint: API_ENDPOINT,
-        testRequestBody: testRequestBody,
-        originalVoice: voice.name,
-        originalRequestBody: requestBody
+      console.log('TTS API Call Details:', {
+        voiceName: voice.name,
+        hasModel: !!voice.model,
+        modelValue: voice.model,
+        endpoint: endpoint,
+        url: url
       });
       
-      console.log('DETAILED VOICE MAPPING DEBUG:', {
-        selectedVoiceName: voice.name,
-        selectedVoiceLanguageCode: voice.languageCode,
-        selectedVoiceSsmlGender: voice.ssmlGender,
-        selectedVoiceModel: voice.model,
-        selectedVoiceHasModel: !!voice.model,
-        originalRequestVoiceConfig: requestBody.voice
-      });
-      
-      const response = await fetch(`${API_ENDPOINT}?key=${this.apiKey}`, {
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(testRequestBody)
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
