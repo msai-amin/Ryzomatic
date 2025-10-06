@@ -443,13 +443,25 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           pageText = textContent.items
             .map((item: any) => item.str)
             .join(' ')
-          console.log('On-demand text extraction successful:', pageText.substring(0, 100) + '...')
+            .trim()
+          
+          console.log('On-demand text extraction result:', {
+            success: true,
+            textLength: pageText.length,
+            textPreview: pageText.substring(0, 100) + (pageText.length > 100 ? '...' : ''),
+            isEmpty: pageText.length === 0,
+            isWhitespace: pageText.trim().length === 0
+          })
         } catch (error) {
           console.error('On-demand text extraction failed:', error)
         }
       }
       
-      if (pageText) {
+      if (pageText && pageText.trim().length > 0) {
+        console.log('Starting TTS with text:', {
+          textLength: pageText.length,
+          textPreview: pageText.substring(0, 50) + '...'
+        })
         try {
           await ttsService.speak(pageText, () => {
             updateTTS({ isPlaying: false })
@@ -464,7 +476,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           pageNumber,
           pageTextsLength: document.pageTexts?.length || 0,
           pageTexts: document.pageTexts,
-          hasPdfDoc: !!pdfDocRef.current
+          hasPdfDoc: !!pdfDocRef.current,
+          extractedTextLength: pageText?.length || 0,
+          extractedTextPreview: pageText?.substring(0, 50) || 'N/A'
         })
       }
     }
