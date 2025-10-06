@@ -37,8 +37,8 @@ export interface SavedAudio {
   audioData: ArrayBuffer;
   audioBlob: Blob;
   duration: number;
-  pageRange?: string;
-  voiceName?: string;
+  pageRange: { start: number; end: number };
+  voiceName: string;
   voiceSettings: Record<string, any>;
   createdAt: Date;
 }
@@ -429,7 +429,7 @@ class SupabaseStorageService {
         audioData: this.base64ToArrayBuffer(audio.audio_data_base64),
         audioBlob: new Blob([this.base64ToArrayBuffer(audio.audio_data_base64)]),
         duration: audio.duration_seconds || 0,
-        pageRange: `Page ${audio.page_number}`,
+        pageRange: { start: audio.page_number, end: audio.page_number },
         voiceName: audio.voice_settings?.voiceName || 'Unknown',
         voiceSettings: audio.voice_settings,
         createdAt: new Date(audio.created_at)
@@ -475,7 +475,7 @@ class SupabaseStorageService {
         audioData: this.base64ToArrayBuffer(data.audio_data_base64),
         audioBlob: new Blob([this.base64ToArrayBuffer(data.audio_data_base64)]),
         duration: data.duration_seconds || 0,
-        pageRange: `Page ${data.page_number}`,
+        pageRange: { start: data.page_number, end: data.page_number },
         voiceName: data.voice_settings?.voiceName || 'Unknown',
         voiceSettings: data.voice_settings,
         createdAt: new Date(data.created_at)
