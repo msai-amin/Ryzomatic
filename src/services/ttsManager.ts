@@ -107,11 +107,20 @@ class TTSManager {
       if (providerType === 'google-cloud') {
         try {
           const voices = await provider.getVoices()
+          console.log('Available Google Cloud TTS voices:', voices.slice(0, 3)) // Show first 3 voices
           if (voices.length > 0) {
             // Prefer English voices first, then neural voices
-            const englishVoices = voices.filter((voice: any) => 
-              voice.languageCode && voice.languageCode.startsWith('en-')
-            )
+            const englishVoices = voices.filter((voice: any) => {
+              // Check if languageCode exists and starts with 'en-'
+              if (voice.languageCode && voice.languageCode.startsWith('en-')) {
+                return true;
+              }
+              // Fallback: check if voice name contains English language codes
+              if (voice.name && /en-[A-Z]{2}/.test(voice.name)) {
+                return true;
+              }
+              return false;
+            })
             
             let defaultVoice = null
             
@@ -139,6 +148,7 @@ class TTSManager {
             if (defaultVoice) {
               provider.setVoice(defaultVoice)
               console.log('Set default Google Cloud TTS voice:', defaultVoice.name, `(${defaultVoice.languageCode})`)
+              console.log('Voice object structure:', defaultVoice)
             }
           }
         } catch (error) {

@@ -134,12 +134,25 @@ class GoogleCloudTTSService {
       throw new Error('No voice selected');
     }
 
+    // Ensure we have valid voice properties
+    const voice = this.settings.voice;
+    if (!voice.languageCode) {
+      // Try to extract language code from voice name if not present
+      const nameMatch = voice.name.match(/([a-z]{2}-[A-Z]{2})/);
+      if (nameMatch) {
+        voice.languageCode = nameMatch[1];
+      } else {
+        // Fallback to en-US
+        voice.languageCode = 'en-US';
+      }
+    }
+
     const requestBody = {
       input: { text },
       voice: {
-        languageCode: this.settings.voice.languageCode,
-        name: this.settings.voice.name,
-        ssmlGender: this.settings.voice.ssmlGender
+        languageCode: voice.languageCode,
+        name: voice.name,
+        ssmlGender: voice.ssmlGender || 'NEUTRAL'
       },
       audioConfig: {
         audioEncoding: this.settings.audioEncoding,
