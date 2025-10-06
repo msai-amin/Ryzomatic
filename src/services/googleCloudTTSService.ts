@@ -150,6 +150,13 @@ class GoogleCloudTTSService {
       }
     };
 
+    console.log('Google Cloud TTS Request:', {
+      voice: this.settings.voice,
+      textLength: text.length,
+      textPreview: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
+      audioConfig: requestBody.audioConfig
+    });
+
     try {
       const response = await fetch(
         `https://texttospeech.googleapis.com/v1/text:synthesize?key=${this.apiKey}`,
@@ -163,7 +170,16 @@ class GoogleCloudTTSService {
       );
 
       if (!response.ok) {
-        throw new Error(`TTS synthesis failed: ${response.statusText}`);
+        let errorMessage = `TTS synthesis failed: ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage += ` - ${errorData.error.message || JSON.stringify(errorData.error)}`;
+          }
+        } catch (e) {
+          // Ignore JSON parsing errors
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();

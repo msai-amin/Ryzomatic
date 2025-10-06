@@ -108,18 +108,38 @@ class TTSManager {
         try {
           const voices = await provider.getVoices()
           if (voices.length > 0) {
-            // Find a good default voice (prefer neural voices)
-            const neuralVoice = voices.find((voice: any) => 
-              voice.name && (
-                voice.name.includes('Neural') || 
-                voice.name.includes('Wavenet') ||
-                voice.name.includes('Studio')
-              )
+            // Prefer English voices first, then neural voices
+            const englishVoices = voices.filter((voice: any) => 
+              voice.languageCode && voice.languageCode.startsWith('en-')
             )
             
-            const defaultVoice = neuralVoice || voices[0]
-            provider.setVoice(defaultVoice)
-            console.log('Set default Google Cloud TTS voice:', defaultVoice.name)
+            let defaultVoice = null
+            
+            if (englishVoices.length > 0) {
+              // Find the best English voice (prefer neural/studio voices)
+              defaultVoice = englishVoices.find((voice: any) => 
+                voice.name && (
+                  voice.name.includes('Neural') || 
+                  voice.name.includes('Studio')
+                )
+              ) || englishVoices.find((voice: any) => 
+                voice.name && voice.name.includes('Wavenet')
+              ) || englishVoices[0]
+            } else {
+              // Fallback to any neural voice
+              defaultVoice = voices.find((voice: any) => 
+                voice.name && (
+                  voice.name.includes('Neural') || 
+                  voice.name.includes('Wavenet') ||
+                  voice.name.includes('Studio')
+                )
+              ) || voices[0]
+            }
+            
+            if (defaultVoice) {
+              provider.setVoice(defaultVoice)
+              console.log('Set default Google Cloud TTS voice:', defaultVoice.name, `(${defaultVoice.languageCode})`)
+            }
           }
         } catch (error) {
           console.warn('Failed to set default voice for Google Cloud TTS:', error)
