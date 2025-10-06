@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { useAppStore } from '../store/appStore'
+import { useAppStore, Voice } from '../store/appStore'
 import { ttsManager } from '../services/ttsManager'
+import { TTSVoiceSelector } from './TTSVoiceSelector'
 import { 
   Play, 
   Pause, 
@@ -93,6 +94,46 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     const newVolume = tts.volume > 0 ? 0 : 1
     handleVolumeChange(newVolume)
   }, [tts.volume, handleVolumeChange])
+
+  // Handle voice change
+  const handleVoiceChange = useCallback(async (voice: Voice) => {
+    try {
+      // Update the TTS manager with the new voice
+      const currentProvider = ttsManager.getCurrentProvider()
+      if (currentProvider) {
+        currentProvider.setVoice(voice)
+      }
+      
+      // Update the store
+      updateTTS({ 
+        voice: voice,
+        voiceName: voice.name 
+      })
+      
+      console.log('Voice changed to:', voice.name)
+    } catch (error) {
+      console.error('Error changing voice:', error)
+    }
+  }, [updateTTS])
+
+  // Handle voice preview
+  const handleVoicePreview = useCallback(async () => {
+    try {
+      const currentProvider = ttsManager.getCurrentProvider()
+      if (currentProvider && tts.voice) {
+        // Stop any current speech
+        currentProvider.stop()
+        
+        // Preview the current voice with a sample text
+        const previewText = "Hello! This is how I sound when reading your documents."
+        await currentProvider.speak(previewText, () => {
+          console.log('Voice preview completed')
+        })
+      }
+    } catch (error) {
+      console.error('Error previewing voice:', error)
+    }
+  }, [tts.voice])
 
   // Handle progress bar click
   const handleProgressClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -206,9 +247,44 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           </button>
         </div>
 
+        {/* Current Voice Display */}
+        {tts.voice && (
+          <div className="mt-3 text-center">
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              Current Voice
+            </div>
+            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+              {tts.voice.name}
+            </div>
+          </div>
+        )}
+
         {/* Expanded Controls */}
         {isExpanded && (
           <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            {/* Voice Selection */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                  Voice Selection
+                </label>
+                <button
+                  onClick={handleVoicePreview}
+                  disabled={tts.isPlaying || !tts.voice}
+                  className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="Preview current voice"
+                >
+                  <Play className="w-3 h-3" />
+                  Preview
+                </button>
+              </div>
+              <TTSVoiceSelector
+                currentVoice={tts.voice}
+                onVoiceChange={handleVoiceChange}
+                disabled={tts.isPlaying}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               {/* Speed Control */}
               <div>
