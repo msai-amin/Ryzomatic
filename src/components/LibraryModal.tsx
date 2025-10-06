@@ -62,7 +62,7 @@ export function LibraryModal({ isOpen, onClose }: LibraryModalProps) {
         for (let i = 0; i < binary.length; i++) {
           bytes[i] = binary.charCodeAt(i);
         }
-        book.fileData = bytes.buffer;
+        book.fileData = bytes.buffer as ArrayBuffer;
         console.log('Converted to ArrayBuffer:', {
           byteLength: book.fileData.byteLength,
           constructor: book.fileData.constructor.name
@@ -71,11 +71,11 @@ export function LibraryModal({ isOpen, onClose }: LibraryModalProps) {
         console.log('FileData is not ArrayBuffer, attempting conversion...');
         // If it's a Uint8Array or similar, convert to ArrayBuffer
         if (book.fileData instanceof Uint8Array) {
-          book.fileData = book.fileData.buffer;
+          book.fileData = book.fileData.buffer as ArrayBuffer;
         } else if (Array.isArray(book.fileData)) {
           // If it's an array of numbers, convert to ArrayBuffer
           const bytes = new Uint8Array(book.fileData);
-          book.fileData = bytes.buffer;
+          book.fileData = bytes.buffer as ArrayBuffer;
         }
       }
     }
