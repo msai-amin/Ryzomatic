@@ -361,7 +361,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
   const goToLastPage = useCallback(() => {
     if (numPages) {
-      setPageNumber(numPages)
+    setPageNumber(numPages)
     }
   }, [numPages])
 
@@ -415,15 +415,24 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     } else {
       const pageText = document.pageTexts?.[pageNumber - 1] || ''
       if (pageText) {
-        await ttsService.speak(pageText)
-        updateTTS({ isPlaying: true })
+        try {
+          await ttsService.speak(pageText, () => {
+          updateTTS({ isPlaying: false })
+          })
+      updateTTS({ isPlaying: true })
+        } catch (error) {
+          console.error('TTS Error:', error)
+    updateTTS({ isPlaying: false })
+        }
+      } else {
+        console.warn('No text available for TTS on this page')
       }
     }
   }, [tts, pageNumber, document.pageTexts, updateTTS])
 
   const handleTTSStop = useCallback(() => {
     ttsService.stop()
-    updateTTS({ isPlaying: false })
+        updateTTS({ isPlaying: false })
   }, [updateTTS])
 
   const handleAddNote = useCallback((text: string) => {
@@ -484,8 +493,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             <div className="prose prose-lg prose-amber max-w-none">
               <div className="text-gray-800 leading-relaxed whitespace-pre-wrap font-serif text-lg">
                 {pageText || 'No text available for this page.'}
-              </div>
             </div>
+          </div>
           </div>
         </div>
 
@@ -505,82 +514,82 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         <div className="flex items-center justify-between p-4">
           {/* Left controls */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={goToFirstPage}
-              disabled={pageNumber <= 1}
+                <button
+                  onClick={goToFirstPage}
+                  disabled={pageNumber <= 1}
               className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              title="First Page"
-            >
+                  title="First Page"
+                >
               <ChevronsLeft className="w-5 h-5" />
-            </button>
-            <button
+                </button>
+                <button
               onClick={goToPreviousPage}
-              disabled={pageNumber <= 1}
+                  disabled={pageNumber <= 1}
               className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               title="Previous Page"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                
             <form onSubmit={handlePageInputSubmit} className="flex items-center gap-2">
-              <input
-                type="text"
-                value={pageInputValue}
-                onChange={handlePageInputChange}
+                  <input
+                    type="text"
+                    value={pageInputValue}
+                    onChange={handlePageInputChange}
                 className="w-16 px-2 py-1 text-center border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+                  />
               <span className="text-sm text-gray-600">of {numPages || '?'}</span>
-            </form>
-
-            <button
-              onClick={goToNextPage}
+                </form>
+                
+                <button
+                  onClick={goToNextPage}
               disabled={!numPages || pageNumber >= numPages}
               className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               title="Next Page"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-            <button
-              onClick={goToLastPage}
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={goToLastPage}
               disabled={!numPages || pageNumber >= numPages}
               className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              title="Last Page"
-            >
+                  title="Last Page"
+                >
               <ChevronsRight className="w-5 h-5" />
-            </button>
-          </div>
+                </button>
+              </div>
 
           {/* Center controls */}
           <div className="flex items-center gap-2">
-            <button
+              <button
               onClick={handleZoomOut}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               title="Zoom Out"
             >
               <ZoomOut className="w-5 h-5" />
-            </button>
+              </button>
             <span className="text-sm text-gray-600 min-w-[60px] text-center">
-              {Math.round(scale * 100)}%
+                {Math.round(scale * 100)}%
             </span>
-            <button
+              <button
               onClick={handleZoomIn}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               title="Zoom In"
             >
               <ZoomIn className="w-5 h-5" />
-            </button>
+              </button>
             
             <div className="w-px h-6 bg-gray-300 mx-2" />
             
-            <button
+              <button
               onClick={handleRotate}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               title="Rotate"
             >
               <RotateCw className="w-5 h-5" />
-            </button>
-            
-            <button
+              </button>
+              
+                      <button
               onClick={toggleScrollMode}
               className={`p-2 rounded-lg transition-colors ${
                 pdfViewer.scrollMode === 'continuous' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'
@@ -588,7 +597,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               title="Scroll Mode"
             >
               <Rows className="w-5 h-5" />
-            </button>
+                    </button>
 
             <button
               onClick={(e) => {
@@ -603,7 +612,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             >
               <MousePointer2 className="w-5 h-5" />
             </button>
-
+            
             <button
               onClick={(e) => {
                 e.preventDefault()
@@ -635,7 +644,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               <Highlighter className="w-5 h-5" />
             </button>
 
-            <button
+              <button
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
@@ -647,37 +656,37 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               title="Notes"
             >
               <StickyNote className="w-5 h-5" />
-            </button>
+              </button>
 
-            <button
-              onClick={handleTTSPlay}
+                  <button
+                    onClick={handleTTSPlay}
               className={`p-2 rounded-lg transition-colors ${
                 tts.isPlaying ? 'bg-green-100 text-green-600' : 'hover:bg-gray-100'
               }`}
               title="Text-to-Speech"
             >
               {tts.isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-            </button>
+                  </button>
             
             {tts.isPlaying && (
-              <button
-                onClick={handleTTSStop}
+                  <button
+                    onClick={handleTTSStop}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Stop"
-              >
+                  >
                 <Square className="w-5 h-5" />
-              </button>
+                  </button>
             )}
             
-            <button
+                <button
               onClick={handleDownload}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               title="Download"
             >
               <Download className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+                </button>
+              </div>
+            </div>
 
         {/* Highlight color picker */}
         {showHighlightMenu && (
@@ -694,8 +703,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                 title={color.name}
               />
             ))}
-          </div>
-        )}
+              </div>
+            )}
       </div>
 
       {/* PDF Canvas Container */}
@@ -728,17 +737,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                         pointerEvents: 'auto'
                       }}
                     >
-                      <button
+              <button
                         onClick={() => removeHighlight(highlight.id)}
                         className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
+              >
                         <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
+              </button>
+            </div>
                   ))}
-              </div>
-            ))}
           </div>
+            ))}
+      </div>
         ) : (
           // Single page mode
           <div className="flex justify-center">
@@ -757,16 +766,16 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               {highlights
                 .filter(h => h.pageNumber === pageNumber)
                 .map(highlight => (
-                  <div
-                    key={highlight.id}
+                    <div
+                      key={highlight.id}
                     className="absolute group"
-                    style={{
+                      style={{
                       left: highlight.position.x,
                       top: highlight.position.y,
                       width: highlight.position.width,
                       height: highlight.position.height,
-                      backgroundColor: highlight.color,
-                      opacity: 0.4,
+                        backgroundColor: highlight.color,
+                        opacity: 0.4,
                       pointerEvents: 'auto'
                     }}
                   >
@@ -776,12 +785,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
-                  </div>
-                ))}
-            </div>
+                      </div>
+                    ))}
+                </div>
+        </div>
+      )}
           </div>
-        )}
-      </div>
 
       {/* Context Menu */}
       {contextMenu && (

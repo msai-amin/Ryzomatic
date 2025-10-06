@@ -212,12 +212,46 @@ class TextToSpeechService {
   }
 
   speak(text: string, onEnd?: () => void, onWord?: (word: string, charIndex: number) => void) {
+    // Check if TTS is supported
+    if (!this.isSupported()) {
+      console.error('TTS not supported in this browser');
+      if (onEnd) onEnd();
+      return;
+    }
+
+    // Check if we have text to speak
+    if (!text || text.trim().length === 0) {
+      console.warn('No text to speak');
+      if (onEnd) onEnd();
+      return;
+    }
+
     // Cancel any ongoing speech
     this.stop();
 
     this.currentText = text;
     this.onEndCallback = onEnd || null;
     this.onWordCallback = onWord || null;
+
+    // Ensure voices are loaded
+    if (this.voices.length === 0) {
+      console.warn('No voices available, loading voices...');
+      this.loadVoices();
+      
+      // If still no voices, wait a bit and try again
+      if (this.voices.length === 0) {
+        setTimeout(() => {
+          this.loadVoices();
+          if (this.voices.length === 0) {
+            console.error('No voices available after loading');
+            if (onEnd) onEnd();
+            return;
+          }
+          this.speak(text, onEnd, onWord);
+        }, 1000);
+        return;
+      }
+    }
 
     this.utterance = new SpeechSynthesisUtterance(text);
     this.utterance.voice = this.settings.voice;
@@ -236,6 +270,9 @@ class TextToSpeechService {
     this.utterance.onerror = (event) => {
       console.error('TTS Error:', event);
       this.isPaused = false;
+      if (this.onEndCallback) {
+        this.onEndCallback();
+      }
     };
 
     if (this.onWordCallback) {
@@ -247,8 +284,13 @@ class TextToSpeechService {
       };
     }
 
-    this.synth.speak(this.utterance);
-    this.isPaused = false;
+    try {
+      this.synth.speak(this.utterance);
+      this.isPaused = false;
+    } catch (error) {
+      console.error('Failed to start speech synthesis:', error);
+      if (onEnd) onEnd();
+    }
   }
 
   pause() {
