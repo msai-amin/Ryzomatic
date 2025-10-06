@@ -22,8 +22,8 @@ export interface Note {
   id: string;
   content: string;
   pageNumber: number;
-  bookId?: string;
-  bookName?: string;
+  bookId: string;
+  bookName: string;
   position?: { x: number; y: number };
   createdAt: Date;
   updatedAt: Date;
@@ -33,7 +33,7 @@ export interface SavedAudio {
   id: string;
   bookId: string;
   pageNumber: number;
-  title?: string;
+  title: string;
   audioData: ArrayBuffer;
   audioBlob?: Blob;
   duration: number;
@@ -350,7 +350,7 @@ class SupabaseStorageService {
         content: note.content,
         pageNumber: note.page_number,
         bookId: note.book_id,
-        bookName: '', // Will be populated if needed
+        bookName: 'Unknown Book', // Will be populated if needed
         position: note.position_x && note.position_y ? { x: note.position_x, y: note.position_y } : undefined,
         createdAt: new Date(note.created_at),
         updatedAt: new Date(note.updated_at)
