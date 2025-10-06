@@ -69,24 +69,17 @@ class GoogleCloudTTSService {
         model: v.model
       })));
       
-      // Prioritize voices that work well and don't require a model
-      const standardVoices = voices.filter(v => 
-        v.name && v.languageCode && v.languageCode.startsWith('en-') && 
-        !v.name.includes('Neural2') && !v.name.includes('Studio') && !v.name.includes('Neural')
+      // Since we've already filtered out Studio voices, just prioritize by quality
+      const englishVoices = voices.filter(v => 
+        v.name && v.languageCode && v.languageCode.startsWith('en-')
       );
       
-      // Try to find a good standard voice first (most reliable)
-      let selectedVoice = standardVoices.find(v => v.name.includes('Wavenet')) ||
-                         standardVoices.find(v => v.name.includes('Standard')) ||
-                         standardVoices[0];
-      
-      // If no standard voice found, try Neural2 or Studio voices (they need models)
-      if (!selectedVoice) {
-        selectedVoice = voices.find(v => 
-          v.name && v.languageCode && v.languageCode.startsWith('en-') &&
-          (v.name.includes('Neural2') || v.name.includes('Studio'))
-        );
-      }
+      // Prioritize Wavenet voices (high quality, reliable)
+      let selectedVoice = englishVoices.find(v => v.name.includes('Wavenet')) ||
+                         englishVoices.find(v => v.name.includes('Standard')) ||
+                         englishVoices.find(v => v.name.includes('Neural2')) ||
+                         englishVoices.find(v => v.name.includes('Neural')) ||
+                         englishVoices[0];
       
       if (selectedVoice) {
         // Ensure the selected voice has a model field if required
@@ -166,9 +159,9 @@ class GoogleCloudTTSService {
     }
 
     try {
-      // Use v1beta1 endpoint to get complete voice information including model requirements
+      // Use v1 endpoint since we're only using non-Studio voices
       const response = await fetch(
-        `https://texttospeech.googleapis.com/v1beta1/voices?key=${this.apiKey}`
+        `https://texttospeech.googleapis.com/v1/voices?key=${this.apiKey}`
       );
 
       if (!response.ok) {
@@ -176,7 +169,14 @@ class GoogleCloudTTSService {
       }
 
       const data = await response.json();
-      return data.voices || [];
+      const allVoices: GoogleCloudVoice[] = data.voices || [];
+      
+      // Filter out Studio voices - only keep voices that don't require model field
+      const filteredVoices = this.filterNonStudioVoices(allVoices);
+      
+      console.log(`Filtered voices: ${filteredVoices.length} non-Studio voices available`);
+      
+      return filteredVoices;
     } catch (error) {
       console.error('Error fetching Google Cloud voices:', error);
       throw error;
@@ -222,33 +222,26 @@ class GoogleCloudTTSService {
     this.settings.voice = voiceWithModel;
   }
 
-  // Ensure voice has model field if required
+  // Filter out Studio voices - we only want voices that don't require model field
+  private filterNonStudioVoices(voices: GoogleCloudVoice[]): GoogleCloudVoice[] {
+    return voices.filter(voice => {
+      // Exclude Studio voices and other voices that require model field
+      return !voice.name.includes('Studio') && 
+             !voice.name.includes('Journey') && 
+             !voice.name.includes('Polyglot') &&
+             voice.name !== 'Achernar' && 
+             voice.name !== 'Algenib' && 
+             voice.name !== 'Fenrir';
+    });
+  }
+
+  // Ensure voice has model field if required (should not be needed for non-Studio voices)
   private ensureVoiceHasModel(voice: GoogleCloudVoice): GoogleCloudVoice {
     if (!voice) return voice;
     
-    // If voice already has a model, return as is
-    if (voice.model) {
-      return voice;
-    }
-    
-    // Create a copy of the voice object
-    const voiceWithModel = { ...voice };
-    
-    // Set model for voices that actually require it
-    // Studio voices and some specific voice types need the model field
-    if (voice.name.includes('Studio')) {
-      voiceWithModel.model = 'latest';
-    } else if (voice.name.includes('Journey')) {
-      voiceWithModel.model = 'latest';
-    } else if (voice.name.includes('Polyglot')) {
-      voiceWithModel.model = 'latest';
-    } else if (voice.name === 'Achernar' || voice.name === 'Algenib' || voice.name === 'Fenrir') {
-      // These specific voice names are Studio voices that require model field
-      voiceWithModel.model = 'latest';
-    }
-    // Note: Wavenet, Neural2, Neural, and Standard voices don't need model field
-    
-    return voiceWithModel;
+    // For non-Studio voices, we don't need model field
+    // Just return the voice as-is
+    return voice;
   }
 
   setSpeakingRate(rate: number) {
@@ -323,8 +316,8 @@ class GoogleCloudTTSService {
     });
 
     try {
-      // Use v1beta1 endpoint for voices with model field, v1 for others
-      const endpoint = voice.model ? 'v1beta1' : 'v1';
+      // Since we're only using non-Studio voices, always use v1 endpoint
+      const endpoint = 'v1';
       const url = `https://texttospeech.googleapis.com/${endpoint}/text:synthesize?key=${this.apiKey}`;
       
       console.log('TTS API Call Details:', {

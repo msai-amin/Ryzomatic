@@ -290,33 +290,26 @@ class TTSManager {
     }
   }
 
-  // Ensure Google Cloud voice has model field if required
+  // Filter out Studio voices - we only want voices that don't require model field
+  private filterNonStudioVoices(voices: any[]): any[] {
+    return voices.filter(voice => {
+      // Exclude Studio voices and other voices that require model field
+      return !voice.name.includes('Studio') && 
+             !voice.name.includes('Journey') && 
+             !voice.name.includes('Polyglot') &&
+             voice.name !== 'Achernar' && 
+             voice.name !== 'Algenib' && 
+             voice.name !== 'Fenrir';
+    });
+  }
+
+  // Ensure Google Cloud voice has model field if required (should not be needed for non-Studio voices)
   private ensureGoogleCloudVoiceHasModel(voice: any): any {
     if (!voice) return voice;
     
-    // If voice already has a model, return as is
-    if (voice.model) {
-      return voice;
-    }
-    
-    // Create a copy of the voice object
-    const voiceWithModel = { ...voice };
-    
-    // Set model for voices that actually require it
-    // Studio voices and some specific voice types need the model field
-    if (voice.name && voice.name.includes('Studio')) {
-      voiceWithModel.model = 'latest';
-    } else if (voice.name && voice.name.includes('Journey')) {
-      voiceWithModel.model = 'latest';
-    } else if (voice.name && voice.name.includes('Polyglot')) {
-      voiceWithModel.model = 'latest';
-    } else if (voice.name === 'Achernar' || voice.name === 'Algenib' || voice.name === 'Fenrir') {
-      // These specific voice names are Studio voices that require model field
-      voiceWithModel.model = 'latest';
-    }
-    // Note: Wavenet, Neural2, Neural, and Standard voices don't need model field
-    
-    return voiceWithModel;
+    // For non-Studio voices, we don't need model field
+    // Just return the voice as-is
+    return voice;
   }
 
   cleanText(text: string): string {
