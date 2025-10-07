@@ -21,6 +21,31 @@ export interface GoogleCloudTTSSettings {
   sampleRateHertz: number; // 8000, 16000, 22050, 24000
 }
 
+// Voice name mapping: Display names to official Google API names
+// This allows us to show friendly names to users while sending correct names to API
+const VOICE_NAME_MAPPING: Record<string, string> = {
+  // If a voice name is custom (like "Achird"), map it to an official Google voice
+  'Achird': 'en-US-Wavenet-F',
+  'Achernar': 'en-US-Wavenet-D',
+  'Algenib': 'en-US-Wavenet-C',
+  'Fenrir': 'en-US-Wavenet-A',
+  // Add more custom mappings as needed
+};
+
+// Helper function to get the official API name for a voice
+function getOfficialVoiceName(voiceName: string): string {
+  // If it's a custom name, return the mapped official name
+  if (VOICE_NAME_MAPPING[voiceName]) {
+    return VOICE_NAME_MAPPING[voiceName];
+  }
+  // If it already looks like an official Google voice name, return as-is
+  if (voiceName.match(/^[a-z]{2}-[A-Z]{2}-(Standard|Wavenet|Neural2|Studio|Journey|Polyglot)-[A-Z]$/)) {
+    return voiceName;
+  }
+  // Default fallback to a known working voice
+  return 'en-US-Standard-A';
+}
+
 class GoogleCloudTTSService {
   private apiKey: string | null = null;
   private settings: GoogleCloudTTSSettings = {
@@ -268,35 +293,52 @@ class GoogleCloudTTSService {
   }
 
   async synthesize(text: string): Promise<ArrayBuffer> {
-    // SANITY CHECK - A hardcoded, guaranteed-to-work request
-    // This completely ignores the app's voice selection
+    if (!this.isConfigured()) {
+      throw new Error('Google Cloud TTS API key not configured');
+    }
+
+    if (!this.settings.voice) {
+      throw new Error('No voice selected');
+    }
+
+    const voice = this.settings.voice;
     
-    console.log('🧪 RUNNING TTS SANITY CHECK...');
+    // Get the official API name for the voice
+    const officialVoiceName = getOfficialVoiceName(voice.name);
     
-    const API_ENDPOINT = 'https://texttospeech.googleapis.com/v1/text:synthesize';
-    const apiKey = this.apiKey; // Use the configured API key
+    console.log('Voice Name Mapping:', {
+      displayName: voice.name,
+      officialApiName: officialVoiceName,
+      languageCode: voice.languageCode || 'en-US'
+    });
 
     const requestBody = {
       "input": {
-        "text": "Hello world"
+        "text": text
       },
       "voice": {
-        "languageCode": "en-US",
-        "name": "en-US-Standard-A"  // A basic, official voice name
+        "languageCode": voice.languageCode || "en-US",
+        "name": officialVoiceName  // Use the official API name
       },
       "audioConfig": {
-        "audioEncoding": "MP3"
+        "audioEncoding": this.settings.audioEncoding,
+        "speakingRate": this.settings.speakingRate,
+        "pitch": this.settings.pitch,
+        "volumeGainDb": this.settings.volumeGainDb,
+        "sampleRateHertz": this.settings.sampleRateHertz
       }
     };
 
-    console.log('Sanity Check Request Details:', {
+    const API_ENDPOINT = 'https://texttospeech.googleapis.com/v1/text:synthesize';
+
+    console.log('TTS Request Details:', {
       endpoint: API_ENDPOINT,
-      apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'MISSING',
-      requestBody: requestBody
+      textLength: text.length,
+      voiceConfig: requestBody.voice
     });
 
     try {
-        const response = await fetch(`${API_ENDPOINT}?key=${apiKey}`, {
+        const response = await fetch(`${API_ENDPOINT}?key=${this.apiKey}`, {
             method: 'POST',
             body: JSON.stringify(requestBody),
             headers: {
@@ -306,11 +348,11 @@ class GoogleCloudTTSService {
 
         if (!response.ok) {
             const errorData = await response.json();
-            console.error('❌ TTS Sanity Check FAILED:', JSON.stringify(errorData, null, 2));
-            throw new Error(`Sanity check failed: ${response.statusText}`);
+            console.error('TTS API Error:', JSON.stringify(errorData, null, 2));
+            throw new Error(`TTS synthesis failed: ${response.statusText}`);
         }
 
-        console.log('✅ TTS Sanity Check SUCCEEDED! Audio data received.');
+        console.log('✅ TTS Request SUCCEEDED!');
         const data = await response.json();
         const audioData = data.audioContent;
         
@@ -324,7 +366,7 @@ class GoogleCloudTTSService {
         return bytes.buffer;
         
     } catch (error) {
-        console.error('❌ TTS Sanity Check FAILED with error:', error);
+        console.error('TTS Error:', error);
         throw error;
     }
   }
