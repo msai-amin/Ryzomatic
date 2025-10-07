@@ -268,120 +268,64 @@ class GoogleCloudTTSService {
   }
 
   async synthesize(text: string): Promise<ArrayBuffer> {
-    if (!this.isConfigured()) {
-      throw new Error('Google Cloud TTS API key not configured');
-    }
-
-    if (!this.settings.voice) {
-      throw new Error('No voice selected');
-    }
-
-    // Ensure we have valid voice properties
-    const voice = this.settings.voice;
-    if (!voice.languageCode) {
-      // Try to extract language code from voice name if not present
-      const nameMatch = voice.name.match(/([a-z]{2}-[A-Z]{2})/);
-      if (nameMatch) {
-        voice.languageCode = nameMatch[1];
-      } else {
-        // Fallback to en-US
-        voice.languageCode = 'en-US';
-      }
-    }
-
-    // HARDCODED TEST - Use official Google voice name to prove it works
-    const voiceConfig: any = {
-      languageCode: "en-US",
-      name: "en-US-Standard-C",  // Official Google voice name
-      ssmlGender: "NEUTRAL"
-    };
-
-    console.log('HARDCODED VOICE TEST - Using official Google voice name:', {
-      originalVoiceName: voice.name,
-      hardcodedVoiceName: voiceConfig.name,
-      originalVoiceLanguageCode: voice.languageCode,
-      originalVoiceGender: voice.ssmlGender
-    });
+    // SANITY CHECK - A hardcoded, guaranteed-to-work request
+    // This completely ignores the app's voice selection
+    
+    console.log('🧪 RUNNING TTS SANITY CHECK...');
+    
+    const API_ENDPOINT = 'https://texttospeech.googleapis.com/v1/text:synthesize';
+    const apiKey = this.apiKey; // Use the configured API key
 
     const requestBody = {
-      input: { text },
-      voice: voiceConfig,
-      audioConfig: {
-        audioEncoding: this.settings.audioEncoding,
-        speakingRate: this.settings.speakingRate,
-        pitch: this.settings.pitch,
-        volumeGainDb: this.settings.volumeGainDb,
-        sampleRateHertz: this.settings.sampleRateHertz
+      "input": {
+        "text": "Hello world"
+      },
+      "voice": {
+        "languageCode": "en-US",
+        "name": "en-US-Standard-A"  // A basic, official voice name
+      },
+      "audioConfig": {
+        "audioEncoding": "MP3"
       }
     };
 
-    console.log('Google Cloud TTS Request:', {
-      voice: this.settings.voice,
-      textLength: text.length,
-      textPreview: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
-      audioConfig: requestBody.audioConfig,
-      endpoint: voice.model ? 'v1beta1' : 'v1',
-      hasModel: !!voice.model
+    console.log('Sanity Check Request Details:', {
+      endpoint: API_ENDPOINT,
+      apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'MISSING',
+      requestBody: requestBody
     });
 
     try {
-      // Use v1 endpoint for standard voices (no model field needed)
-      const endpoint = 'v1';
-      const url = `https://texttospeech.googleapis.com/${endpoint}/text:synthesize?key=${this.apiKey}`;
-      
-      console.log('HARDCODED VOICE TEST - TTS API Call Details:', {
-        originalVoiceName: voice.name,
-        hardcodedVoiceName: voiceConfig.name,
-        endpoint: endpoint,
-        url: url
-      });
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (!response.ok) {
-        let errorMessage = `TTS synthesis failed: ${response.statusText}`;
-        try {
-          const errorData = await response.json();
-          if (errorData.error) {
-            errorMessage += ` - ${errorData.error.message || JSON.stringify(errorData.error)}`;
-            
-            // Provide specific guidance for model-related errors
-            if (errorData.error.message && errorData.error.message.includes('model name')) {
-              errorMessage += '\n\nTip: This voice requires a model field. Try selecting a different voice or contact support.';
+        const response = await fetch(`${API_ENDPOINT}?key=${apiKey}`, {
+            method: 'POST',
+            body: JSON.stringify(requestBody),
+            headers: {
+                'Content-Type': 'application/json'
             }
-          }
-        } catch (e) {
-          // Ignore JSON parsing errors
-        }
-        console.error('Google Cloud TTS Error Details:', {
-          status: response.status,
-          statusText: response.statusText,
-          voice: this.settings.voice,
-          requestBody: requestBody
         });
-        throw new Error(errorMessage);
-      }
 
-      const data = await response.json();
-      const audioData = data.audioContent;
-      
-      // Decode base64 audio
-      const binaryString = atob(audioData);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      
-      return bytes.buffer;
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('❌ TTS Sanity Check FAILED:', JSON.stringify(errorData, null, 2));
+            throw new Error(`Sanity check failed: ${response.statusText}`);
+        }
+
+        console.log('✅ TTS Sanity Check SUCCEEDED! Audio data received.');
+        const data = await response.json();
+        const audioData = data.audioContent;
+        
+        // Decode base64 audio
+        const binaryString = atob(audioData);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        return bytes.buffer;
+        
     } catch (error) {
-      console.error('Error synthesizing speech:', error);
-      throw error;
+        console.error('❌ TTS Sanity Check FAILED with error:', error);
+        throw error;
     }
   }
 
