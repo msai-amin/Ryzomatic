@@ -1,0 +1,223 @@
+/**
+ * Academic Reader Pro Theme 1 CSS Variables
+ * Based on Sample-UI-Theme1.jsx
+ * Clean, professional academic interface with color-coded annotation system
+ */
+
+:root {
+  /* Primary Colors */
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-light: #dbeafe;
+  --color-primary-dark: #1e40af;
+  
+  /* Secondary Colors */
+  --color-secondary: #059669;
+  --color-secondary-hover: #047857;
+  --color-secondary-light: #d1fae5;
+  
+  /* Background Colors */
+  --color-background: #f9fafb;
+  --color-background-secondary: #ffffff;
+  --color-background-tertiary: #f3f4f6;
+  
+  /* Surface Colors */
+  --color-surface: #ffffff;
+  --color-surface-hover: #f9fafb;
+  --color-surface-border: #e5e7eb;
+  
+  /* Text Colors */
+  --color-text-primary: #111827;
+  --color-text-secondary: #6b7280;
+  --color-text-tertiary: #9ca3af;
+  --color-text-inverse: #ffffff;
+  
+  /* Status Colors */
+  --color-success: #059669;
+  --color-success-hover: #047857;
+  --color-success-light: #d1fae5;
+  --color-warning: #d97706;
+  --color-error: #dc2626;
+  --color-info: #2563eb;
+  
+  /* Highlight Colors (for annotations) */
+  --color-highlight-yellow: #FFD700;
+  --color-highlight-teal: #4ECDC4;
+  --color-highlight-red: #FF6B6B;
+  --color-highlight-blue: #45B7D1;
+  --color-highlight-green: #96CEB4;
+  
+  /* Highlight Background Colors (with opacity) */
+  --color-highlight-yellow-bg: rgba(255, 215, 0, 0.1);
+  --color-highlight-teal-bg: rgba(78, 205, 196, 0.1);
+  --color-highlight-red-bg: rgba(255, 107, 107, 0.1);
+  --color-highlight-blue-bg: rgba(69, 183, 209, 0.1);
+  --color-highlight-green-bg: rgba(150, 206, 180, 0.1);
+  
+  /* Border Colors */
+  --color-border: #e5e7eb;
+  --color-border-light: #f3f4f6;
+  --color-border-dark: #d1d5db;
+  
+  /* Shadow Colors */
+  --color-shadow: rgba(0, 0, 0, 0.1);
+  --color-shadow-light: rgba(0, 0, 0, 0.05);
+  --color-shadow-dark: rgba(0, 0, 0, 0.15);
+  
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  --spacing-3xl: 4rem;
+  
+  /* Typography */
+  --font-family-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-family-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  --font-size-4xl: 2.25rem;
+  
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+  
+  /* Border Radius */
+  --border-radius-none: 0;
+  --border-radius-sm: 0.125rem;
+  --border-radius-md: 0.375rem;
+  --border-radius-lg: 0.5rem;
+  --border-radius-xl: 0.75rem;
+  --border-radius-full: 9999px;
+  
+  /* Shadows */
+  --shadow-none: none;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  
+  /* Breakpoints */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+  
+  /* Component-specific variables */
+  --header-height: 80px;
+  --sidebar-width: 20rem;
+  --main-content-height: calc(100vh - var(--header-height));
+  --floating-button-size: 3.5rem;
+}
+
+/* Dark mode support (optional) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: #111827;
+    --color-background-secondary: #1f2937;
+    --color-background-tertiary: #374151;
+    --color-surface: #1f2937;
+    --color-surface-hover: #374151;
+    --color-surface-border: #374151;
+    --color-text-primary: #f9fafb;
+    --color-text-secondary: #d1d5db;
+    --color-text-tertiary: #9ca3af;
+    --color-border: #374151;
+    --color-border-light: #4b5563;
+    --color-border-dark: #6b7280;
+  }
+}
+
+/* Utility classes for easy theme application */
+.theme-academic {
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-sans);
+}
+
+.theme-academic .btn-primary {
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: none;
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-weight: var(--font-weight-medium);
+  transition: background-color 0.2s ease;
+}
+
+.theme-academic .btn-primary:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.theme-academic .btn-secondary {
+  background-color: var(--color-secondary);
+  color: var(--color-text-inverse);
+  border: none;
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-weight: var(--font-weight-medium);
+  transition: background-color 0.2s ease;
+}
+
+.theme-academic .btn-secondary:hover {
+  background-color: var(--color-secondary-hover);
+}
+
+.theme-academic .card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-lg);
+}
+
+.theme-academic .highlight-yellow {
+  background-color: var(--color-highlight-yellow-bg);
+  border-left: 4px solid var(--color-highlight-yellow);
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+}
+
+.theme-academic .highlight-teal {
+  background-color: var(--color-highlight-teal-bg);
+  border-left: 4px solid var(--color-highlight-teal);
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+}
+
+.theme-academic .highlight-red {
+  background-color: var(--color-highlight-red-bg);
+  border-left: 4px solid var(--color-highlight-red);
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+}
+
+.theme-academic .highlight-blue {
+  background-color: var(--color-highlight-blue-bg);
+  border-left: 4px solid var(--color-highlight-blue);
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+}
+
+.theme-academic .highlight-green {
+  background-color: var(--color-highlight-green-bg);
+  border-left: 4px solid var(--color-highlight-green);
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+}

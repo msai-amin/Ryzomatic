@@ -27,8 +27,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const [duration, setDuration] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false) // CRITICAL: Prevent multiple simultaneous requests
   const progressRef = useRef<HTMLDivElement>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const lastClickTimeRef = useRef<number>(0) // CRITICAL: Debounce rapid clicks
 
   // Update current time and duration
   useEffect(() => {
@@ -45,11 +47,54 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
   // Handle play/pause
   const handlePlayPause = useCallback(async () => {
+    const now = Date.now()
+    const timeSinceLastClick = now - lastClickTimeRef.current
+    
+    // CRITICAL FIX: Debounce rapid clicks (minimum 500ms between clicks)
+    if (timeSinceLastClick < 500) {
+      console.log('AudioWidget: Click too soon, debouncing...', { timeSinceLastClick })
+      return
+    }
+    
+    lastClickTimeRef.current = now
+    
+    // CRITICAL FIX: Prevent multiple simultaneous requests
+    if (isProcessing) {
+      console.log('AudioWidget: Already processing a request, ignoring...')
+      return
+    }
+    
+    console.log('AudioWidget: handlePlayPause called, current state:', { 
+      isPlaying: tts.isPlaying, 
+      isProcessing 
+    })
+    
     if (tts.isPlaying) {
+      console.log('AudioWidget: Currently playing, pausing...')
       ttsManager.pause()
       updateTTS({ isPlaying: false })
     } else {
+      // CRITICAL FIX: Set processing state to prevent multiple requests
+      setIsProcessing(true)
+      
       try {
+        // CRITICAL FIX: Stop any audio that might be playing before starting new audio
+        console.log('AudioWidget: Starting new audio, stopping any existing audio first...')
+        ttsManager.stop()
+        updateTTS({ isPlaying: false })
+        
+        // Additional safety check: ensure no audio is still playing
+        if (ttsManager.isSpeaking()) {
+          console.warn('AudioWidget: Audio still playing after stop, waiting...')
+          // Wait a bit and try again
+          await new Promise(resolve => setTimeout(resolve, 100))
+          if (ttsManager.isSpeaking()) {
+            console.error('AudioWidget: Audio still playing after stop, aborting new audio')
+            setIsProcessing(false)
+            return
+          }
+        }
+        
         // Get current document text for TTS
         const currentDoc = useAppStore.getState().currentDocument
         const currentPage = useAppStore.getState().pdfViewer.currentPage
@@ -108,15 +153,19 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       } catch (error) {
         console.error('AudioWidget: TTS Error:', error)
         updateTTS({ isPlaying: false })
+      } finally {
+        // CRITICAL: Always reset processing state
+        setIsProcessing(false)
       }
     }
-  }, [tts.isPlaying, updateTTS])
+  }, [tts.isPlaying, updateTTS, isProcessing])
 
   // Handle stop
   const handleStop = useCallback(() => {
     ttsManager.stop()
     updateTTS({ isPlaying: false })
     setCurrentTime(0)
+    setIsProcessing(false) // CRITICAL: Reset processing state
   }, [updateTTS])
 
   // Handle speed change
@@ -278,10 +327,27 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           
           <button
             onClick={handlePlayPause}
-            className="p-3 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors shadow-lg"
-            title={tts.isPlaying ? "Pause" : "Play"}
+            disabled={isProcessing}
+            className={`p-3 rounded-full transition-colors shadow-lg ${
+              isProcessing 
+                ? 'bg-gray-400 cursor-not-allowed' 
+                : 'bg-blue-500 hover:bg-blue-600'
+            } text-white`}
+            title={
+              isProcessing 
+                ? "Processing..." 
+                : tts.isPlaying 
+                  ? "Pause" 
+                  : "Play"
+            }
           >
-            {tts.isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
+            {isProcessing ? (
+              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : tts.isPlaying ? (
+              <Pause className="w-6 h-6" />
+            ) : (
+              <Play className="w-6 h-6" />
+            )}
           </button>
 
           <button

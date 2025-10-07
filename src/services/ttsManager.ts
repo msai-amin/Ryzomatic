@@ -211,6 +211,10 @@ class TTSManager {
       throw new Error('Cannot speak empty text')
     }
     
+    // CRITICAL FIX: Stop any currently playing audio before starting new audio
+    console.log('TTSManager.speak: Stopping any currently playing audio...')
+    this.stop()
+    
     console.log('TTSManager.speak: Calling provider.speak...')
     try {
       await this.currentProvider.speak(text, onEnd, onWord)
@@ -234,9 +238,17 @@ class TTSManager {
   }
 
   stop(): void {
-    if (this.currentProvider) {
-      this.currentProvider.stop()
-    }
+    console.log('TTSManager.stop() called')
+    // Stop all providers to ensure no audio is playing
+    this.providers.forEach((provider, name) => {
+      try {
+        console.log(`TTSManager: Stopping provider ${name}`)
+        provider.stop()
+      } catch (error) {
+        console.warn(`TTSManager: Error stopping provider ${name}:`, error)
+      }
+    })
+    console.log('TTSManager: All providers stopped')
   }
 
   isSpeaking(): boolean {

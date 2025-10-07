@@ -5,6 +5,7 @@ import { DocumentUpload } from './DocumentUpload'
 import { TypographySettings } from './TypographySettings'
 import { LibraryModal } from './LibraryModal'
 import { AuthModal } from './AuthModal'
+import { ThemeSwitcher } from './ThemeSwitcher'
 
 export const Header: React.FC = () => {
   const { 
@@ -74,6 +75,9 @@ export const Header: React.FC = () => {
               <Settings className="w-4 h-4" />
               <span>SETTINGS</span>
             </button>
+
+            {/* Theme Switcher */}
+            <ThemeSwitcher />
 
             {/* Auth Button */}
             {isAuthenticated && user ? (

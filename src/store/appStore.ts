@@ -28,6 +28,11 @@ export interface TypographySettings {
   theme: 'light' | 'dark' | 'sepia'
 }
 
+export interface ThemeSettings {
+  currentTheme: 'default' | 'academic'
+  isDarkMode: boolean
+}
+
 export interface PDFViewerSettings {
   currentPage: number
   zoom: number
@@ -76,6 +81,9 @@ interface AppState {
   // Typography settings
   typography: TypographySettings
   
+  // Theme settings
+  theme: ThemeSettings
+  
   // PDF viewer settings
   pdfViewer: PDFViewerSettings
   
@@ -101,6 +109,7 @@ interface AppState {
   toggleChat: () => void
   setLoading: (loading: boolean) => void
   updateTypography: (settings: Partial<TypographySettings>) => void
+  updateTheme: (settings: Partial<ThemeSettings>) => void
   updatePDFViewer: (settings: Partial<PDFViewerSettings>) => void
   updateTTS: (settings: Partial<TTSSettings>) => void
   addChatMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void
@@ -123,6 +132,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     lineHeight: 1.75,
     maxWidth: 800,
     theme: 'light'
+  },
+  theme: {
+    currentTheme: 'academic',
+    isDarkMode: false
   },
   pdfViewer: {
     currentPage: 1,
@@ -277,6 +290,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   
   updateTypography: (settings) => set((state) => ({
     typography: { ...state.typography, ...settings }
+  })),
+  
+  updateTheme: (settings) => set((state) => ({
+    theme: { ...state.theme, ...settings }
   })),
   
   updatePDFViewer: (settings) => set((state) => ({

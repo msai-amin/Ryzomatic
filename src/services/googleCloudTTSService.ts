@@ -450,13 +450,17 @@ class GoogleCloudTTSService {
   }
 
   stop() {
+    console.log('GoogleCloudTTSService.stop() called')
     if (this.currentAudio) {
+      console.log('GoogleCloudTTSService: Stopping current audio')
       this.currentAudio.stop();
+      this.currentAudio.disconnect();
       this.currentAudio = null;
     }
     this.isPaused = false;
     this.pauseTime = 0;
     this.startTime = 0;
+    console.log('GoogleCloudTTSService: Stop completed')
   }
 
   isSpeaking(): boolean {

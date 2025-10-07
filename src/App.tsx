@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
 import { DocumentViewer } from './components/DocumentViewer'
 import { ChatModal } from './components/ChatModal'
-import { Header } from './components/Header'
 import { AuthModal } from './components/AuthModal'
 import NeoReaderTerminal from './components/NeoReaderTerminal'
-import LandingPage from './components/LandingPage'
+import { ThemeProvider } from '../themes/ThemeProvider'
+import { ThemedApp } from '../themes/ThemedApp'
+import ThemedLandingPage from '../themes/ThemedLandingPage'
 import { useAppStore } from './store/appStore'
 import { authService, supabase } from './services/supabaseAuthService'
 import { healthMonitor } from './services/healthMonitor'
 import { logger } from './services/logger'
 import { errorHandler } from './services/errorHandler'
 import { supabaseStorageService } from './services/supabaseStorageService'
+import { useThemePersistence } from './hooks/useThemePersistence'
 
 function App() {
   const { 
@@ -20,6 +22,9 @@ function App() {
     checkAuth, 
     user 
   } = useAppStore()
+  
+  // Initialize theme persistence
+  useThemePersistence()
   
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
@@ -195,50 +200,85 @@ function App() {
   // Show loading while checking auth
   if (!isInitialized) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading Smart Reader...</p>
+      <ThemeProvider>
+        <div 
+          className="min-h-screen flex items-center justify-center"
+          style={{
+            backgroundColor: 'var(--color-background)',
+            color: 'var(--color-text-primary)',
+          }}
+        >
+          <div className="text-center">
+            <div 
+              className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto"
+              style={{ borderColor: 'var(--color-primary)' }}
+            ></div>
+            <p 
+              className="mt-4"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
+              Loading Academic Reader Pro...
+            </p>
+          </div>
         </div>
-      </div>
+      </ThemeProvider>
     )
   }
 
   // Show Landing Page if requested (check this BEFORE auth check)
   console.log('showLandingPage state:', showLandingPage)
   if (showLandingPage) {
-    console.log('Rendering LandingPage component')
-    return <LandingPage />
+    console.log('Rendering ThemedLandingPage component')
+    return (
+      <ThemeProvider>
+        <ThemedLandingPage />
+      </ThemeProvider>
+    )
   }
 
   // Show auth modal if not authenticated
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-black">
-        <Header />
-        <main className="container mx-auto px-4 py-6">
-          <div className="text-center py-20">
-            <h1 className="text-4xl font-bold text-white mb-4 glow-text">
-              NEO_READER
+      <ThemeProvider>
+        <div 
+          className="min-h-screen flex items-center justify-center"
+          style={{
+            backgroundColor: 'var(--color-background)',
+            color: 'var(--color-text-primary)',
+          }}
+        >
+          <div className="text-center max-w-2xl mx-auto px-6">
+            <h1 
+              className="text-5xl font-bold mb-6"
+              style={{ color: 'var(--color-text-primary)' }}
+            >
+              Academic Reader Pro
             </h1>
-            <p className="text-xl text-green-400 mb-8">
+            <p 
+              className="text-xl mb-8"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
               Your intelligent document reading assistant
             </p>
             <button
               onClick={() => setIsAuthModalOpen(true)}
-              className="bg-green-400 text-black px-8 py-3 rounded-lg text-lg font-semibold hover:bg-green-300 transition-colors"
+              className="px-8 py-4 rounded-lg text-lg font-semibold transition-colors"
+              style={{
+                backgroundColor: 'var(--color-primary)',
+                color: 'var(--color-text-inverse)',
+              }}
             >
               GET STARTED
             </button>
           </div>
-        </main>
-        
-        <AuthModal 
-          isOpen={isAuthModalOpen}
-          onClose={() => setIsAuthModalOpen(false)}
-          onAuthSuccess={handleAuthSuccess}
-        />
-      </div>
+          
+          <AuthModal 
+            isOpen={isAuthModalOpen}
+            onClose={() => setIsAuthModalOpen(false)}
+            onAuthSuccess={handleAuthSuccess}
+          />
+        </div>
+      </ThemeProvider>
     )
   }
 
@@ -253,16 +293,9 @@ function App() {
 
   // Show main app if authenticated
   return (
-    <div className="min-h-screen bg-black">
-      <Header />
-      <main className="container mx-auto px-4 py-6">
-        <DocumentViewer />
-      </main>
-      
-      {isChatOpen && (
-        <ChatModal onClose={() => toggleChat()} />
-      )}
-    </div>
+    <ThemeProvider>
+      <ThemedApp />
+    </ThemeProvider>
   )
 }
 
