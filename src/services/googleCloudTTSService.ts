@@ -289,20 +289,19 @@ class GoogleCloudTTSService {
       }
     }
 
+    // HARDCODED TEST - Use official Google voice name to prove it works
     const voiceConfig: any = {
-      languageCode: voice.languageCode,
-      name: voice.name,
-      ssmlGender: voice.ssmlGender || 'NEUTRAL'
+      languageCode: "en-US",
+      name: "en-US-Standard-C",  // Official Google voice name
+      ssmlGender: "NEUTRAL"
     };
 
-    // Always add model field - the API will tell us if it's not needed
-    // This ensures voices like "Achird" that the API treats as Studio voices work
-    if (voice.model) {
-      voiceConfig.model = voice.model;
-    } else {
-      // Default model for voices that might need it
-      voiceConfig.model = 'gemini-1.0-pro';
-    }
+    console.log('HARDCODED VOICE TEST - Using official Google voice name:', {
+      originalVoiceName: voice.name,
+      hardcodedVoiceName: voiceConfig.name,
+      originalVoiceLanguageCode: voice.languageCode,
+      originalVoiceGender: voice.ssmlGender
+    });
 
     const requestBody = {
       input: { text },
@@ -326,14 +325,13 @@ class GoogleCloudTTSService {
     });
 
     try {
-      // Use v1beta1 endpoint to support model field for voices that require it
-      const endpoint = 'v1beta1';
+      // Use v1 endpoint for standard voices (no model field needed)
+      const endpoint = 'v1';
       const url = `https://texttospeech.googleapis.com/${endpoint}/text:synthesize?key=${this.apiKey}`;
       
-      console.log('TTS API Call Details:', {
-        voiceName: voice.name,
-        hasModel: !!voice.model,
-        modelValue: voice.model,
+      console.log('HARDCODED VOICE TEST - TTS API Call Details:', {
+        originalVoiceName: voice.name,
+        hardcodedVoiceName: voiceConfig.name,
         endpoint: endpoint,
         url: url
       });
