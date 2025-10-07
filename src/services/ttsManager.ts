@@ -303,13 +303,20 @@ class TTSManager {
     });
   }
 
-  // Ensure Google Cloud voice has model field if required (should not be needed for non-Studio voices)
+  // Ensure Google Cloud voice has model field - assign default model for all voices
   private ensureGoogleCloudVoiceHasModel(voice: any): any {
     if (!voice) return voice;
     
-    // For non-Studio voices, we don't need model field
-    // Just return the voice as-is
-    return voice;
+    // Create a copy of the voice object
+    const voiceWithModel = { ...voice };
+    
+    // Always assign a model field - the API will tell us if it's not needed
+    // This ensures voices like "Achird" that the API treats as Studio voices work
+    if (!voiceWithModel.model) {
+      voiceWithModel.model = 'gemini-1.0-pro';
+    }
+    
+    return voiceWithModel;
   }
 
   cleanText(text: string): string {

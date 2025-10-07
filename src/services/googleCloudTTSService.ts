@@ -159,9 +159,9 @@ class GoogleCloudTTSService {
     }
 
     try {
-      // Use v1 endpoint since we're only using non-Studio voices
+      // Use v1beta1 endpoint to get complete voice information including model requirements
       const response = await fetch(
-        `https://texttospeech.googleapis.com/v1/voices?key=${this.apiKey}`
+        `https://texttospeech.googleapis.com/v1beta1/voices?key=${this.apiKey}`
       );
 
       if (!response.ok) {
@@ -235,13 +235,20 @@ class GoogleCloudTTSService {
     });
   }
 
-  // Ensure voice has model field if required (should not be needed for non-Studio voices)
+  // Ensure voice has model field - assign default model for all voices
   private ensureVoiceHasModel(voice: GoogleCloudVoice): GoogleCloudVoice {
     if (!voice) return voice;
     
-    // For non-Studio voices, we don't need model field
-    // Just return the voice as-is
-    return voice;
+    // Create a copy of the voice object
+    const voiceWithModel = { ...voice };
+    
+    // Always assign a model field - the API will tell us if it's not needed
+    // This ensures voices like "Achird" that the API treats as Studio voices work
+    if (!voiceWithModel.model) {
+      voiceWithModel.model = 'gemini-1.0-pro';
+    }
+    
+    return voiceWithModel;
   }
 
   setSpeakingRate(rate: number) {
@@ -288,10 +295,13 @@ class GoogleCloudTTSService {
       ssmlGender: voice.ssmlGender || 'NEUTRAL'
     };
 
-    // Only add model field for voices that actually require it
-    // Studio voices and some specific voice types need the model field
-    if (voice.model && (voice.name.includes('Studio') || voice.name.includes('Journey') || voice.name.includes('Polyglot'))) {
+    // Always add model field - the API will tell us if it's not needed
+    // This ensures voices like "Achird" that the API treats as Studio voices work
+    if (voice.model) {
       voiceConfig.model = voice.model;
+    } else {
+      // Default model for voices that might need it
+      voiceConfig.model = 'gemini-1.0-pro';
     }
 
     const requestBody = {
@@ -316,8 +326,8 @@ class GoogleCloudTTSService {
     });
 
     try {
-      // Since we're only using non-Studio voices, always use v1 endpoint
-      const endpoint = 'v1';
+      // Use v1beta1 endpoint to support model field for voices that require it
+      const endpoint = 'v1beta1';
       const url = `https://texttospeech.googleapis.com/${endpoint}/text:synthesize?key=${this.apiKey}`;
       
       console.log('TTS API Call Details:', {
