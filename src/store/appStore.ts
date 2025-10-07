@@ -134,7 +134,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     theme: 'light'
   },
   theme: {
-    currentTheme: 'academic',
+    currentTheme: 'default',
     isDarkMode: false
   },
   pdfViewer: {
