@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getDownloadUrl } from '../../lib/s3';
+import { getDownloadUrl } from '../../lib/s3.js';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(

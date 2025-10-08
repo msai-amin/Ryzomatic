@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { fileExists } from '../../lib/s3';
+import { fileExists } from '../../lib/s3.js';
 
 /**
  * Check if book exists in S3
