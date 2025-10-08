@@ -80,12 +80,12 @@ const LandingPage: React.FC = () => {
 
   const testimonials: Testimonial[] = [
     {
-      quote: "VStyle transformed how I manage my literature reviews. I can synthesize papers in a fraction of the time, which is invaluable for my research.",
+      quote: "Immersive Reader transformed how I manage my literature reviews. I can synthesize papers in a fraction of the time, which is invaluable for my research.",
       name: "Dr. Eleanor Vance",
       role: "Postdoctoral Fellow, Department of History"
     },
     {
-      quote: "Managing dissertation sources was overwhelming. VStyle's workflow tools helped me organize everything and focus on writing. It's been a lifesaver.",
+      quote: "Managing dissertation sources was overwhelming. Immersive Reader's workflow tools helped me organize everything and focus on writing. It's been a lifesaver.",
       name: "Ben Carter",
       role: "PhD Candidate, Sociology"
     }
@@ -159,11 +159,11 @@ const LandingPage: React.FC = () => {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <a href="#" className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-800">
-              <span className="text-xl font-semibold text-white">V</span>
+              <span className="text-xl font-semibold text-white">IR</span>
             </div>
             <div>
-              <p className="text-lg font-semibold text-slate-900" style={{ fontFamily: "'DM Serif Display', serif" }}>VStyle</p>
-              <p className="text-xs uppercase tracking-widest text-slate-500">ACADEMIA</p>
+              <p className="text-lg font-semibold text-slate-900" style={{ fontFamily: "'DM Serif Display', serif" }}>Immersive Reader</p>
+              <p className="text-xs uppercase tracking-widest text-slate-500">BY VSTYLE</p>
             </div>
           </a>
           
@@ -220,11 +220,11 @@ const LandingPage: React.FC = () => {
           </div>
           
           <h1 className="max-w-4xl text-5xl font-semibold leading-tight text-slate-900 md:text-6xl" style={{ fontFamily: "'DM Serif Display', serif" }}>
-            From Research to Publication, Seamlessly.
+            Reading Reimagined for Academics.
           </h1>
           
           <p className="max-w-2xl text-lg text-slate-600 md:text-xl">
-            VStyle is an integrated workspace for academics. Streamline your literature reviews, manage citations, draft manuscripts, and collaborate with peers—all in one place.
+            Immersive Reader is an intelligent reading platform for academics. Streamline your literature reviews, manage citations, draft manuscripts, and collaborate with peers—all in one immersive workspace.
           </p>
           
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
@@ -257,7 +257,7 @@ const LandingPage: React.FC = () => {
               A Toolkit Engineered for Academic Excellence
             </h2>
             <p className="mx-auto max-w-2xl text-base text-slate-600">
-              VStyle transforms scattered notes and sources into a clear, actionable research workflow.
+              Immersive Reader transforms scattered notes and sources into a clear, actionable research workflow.
             </p>
           </div>
           
@@ -290,7 +290,7 @@ const LandingPage: React.FC = () => {
               Built for Every Academic Role
             </h2>
             <p className="mx-auto max-w-2xl text-base text-slate-600">
-              Whether you're working on a dissertation, preparing a syllabus, or collaborating on a groundbreaking study, VStyle adapts to your workflow.
+              Whether you're working on a dissertation, preparing a syllabus, or collaborating on a groundbreaking study, Immersive Reader adapts to your workflow.
             </p>
           </div>
 
@@ -404,11 +404,11 @@ const LandingPage: React.FC = () => {
         <div className="mx-auto flex max-w-6xl flex-col gap-12 px-6 py-12 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-800">
-              <span className="text-lg font-semibold text-white">V</span>
+              <span className="text-lg font-semibold text-white">IR</span>
             </div>
             <div>
-              <p className="text-base font-semibold text-slate-900" style={{ fontFamily: "'DM Serif Display', serif" }}>VStyle</p>
-              <p className="text-xs uppercase tracking-widest text-slate-500">Academia</p>
+              <p className="text-base font-semibold text-slate-900" style={{ fontFamily: "'DM Serif Display', serif" }}>Immersive Reader</p>
+              <p className="text-xs uppercase tracking-widest text-slate-500">by VStyle</p>
             </div>
           </div>
           
