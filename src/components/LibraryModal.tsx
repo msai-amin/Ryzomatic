@@ -231,10 +231,28 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
     }
   };
 
-  const handleDeleteBook = (id: string) => {
+  const handleDeleteBook = async (id: string) => {
     if (confirm('Are you sure you want to delete this book and all its notes?')) {
-      storageService.deleteBook(id);
-      loadData();
+      try {
+        // Delete from Supabase (primary storage)
+        await supabaseStorageService.deleteBook(id);
+        console.log('Book deleted from Supabase:', id);
+        
+        // Also delete from localStorage as backup
+        try {
+          storageService.deleteBook(id);
+        } catch (localError) {
+          console.warn('Failed to delete from localStorage (non-critical):', localError);
+        }
+        
+        // Reload the library
+        await loadData();
+        
+        alert('Book deleted successfully!');
+      } catch (error) {
+        console.error('Error deleting book:', error);
+        alert(`Failed to delete book: ${error.message}`);
+      }
     }
   };
 
