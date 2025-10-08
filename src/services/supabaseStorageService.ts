@@ -119,6 +119,24 @@ class SupabaseStorageService {
     try {
       const context = { bookId: book.id, userId: this.currentUserId };
       
+      // Size limit to prevent disk I/O issues: 5MB
+      const MAX_PDF_SIZE = 5 * 1024 * 1024; // 5MB
+      const fileSize = book.fileData instanceof ArrayBuffer ? book.fileData.byteLength : 
+                       book.fileData instanceof Blob ? book.fileData.size : 0;
+      
+      if (fileSize > MAX_PDF_SIZE) {
+        logger.warn('PDF exceeds size limit, storing metadata only', context, undefined, {
+          fileSize: fileSize / 1024 / 1024 + 'MB',
+          limit: MAX_PDF_SIZE / 1024 / 1024 + 'MB'
+        });
+        throw errorHandler.createError(
+          `PDF file is too large (${(fileSize / 1024 / 1024).toFixed(2)}MB). Maximum size is ${MAX_PDF_SIZE / 1024 / 1024}MB. Please use a smaller file.`,
+          ErrorType.VALIDATION,
+          ErrorSeverity.MEDIUM,
+          { context, fileSize, limit: MAX_PDF_SIZE }
+        );
+      }
+      
       // Convert file data to base64 if it's an ArrayBuffer or Blob
       let pdfDataBase64: string | undefined;
       if (book.type === 'pdf' && book.fileData) {
@@ -246,6 +264,7 @@ class SupabaseStorageService {
     this.ensureAuthenticated();
     
     try {
+      // Only load metadata, not full PDF data (reduces disk I/O)
       const { data, error } = await userBooks.list(this.currentUserId!);
       
       if (error) {
@@ -266,44 +285,19 @@ class SupabaseStorageService {
           savedAt: new Date(book.created_at),
           lastReadPage: book.last_read_page,
           totalPages: book.total_pages,
-          pageTexts: book.page_texts,
-          notes: [], // Will be loaded separately if needed
+          pageTexts: [], // Not loaded by default to save I/O
+          notes: [],
           syncedAt: new Date(book.updated_at)
         };
 
-        // Convert base64 back to ArrayBuffer for PDF files
-        if (book.file_type === 'pdf' && book.pdf_data_base64) {
-          try {
-            logger.info('Converting base64 to ArrayBuffer', { bookId: book.id }, {
-              base64Length: book.pdf_data_base64.length,
-              base64Preview: book.pdf_data_base64.substring(0, 50) + '...'
-            });
-            
-            savedBook.fileData = this.base64ToArrayBuffer(book.pdf_data_base64);
-            savedBook.pdfDataBase64 = book.pdf_data_base64;
-            
-            logger.info('Base64 conversion successful', { bookId: book.id }, {
-              arrayBufferLength: savedBook.fileData.byteLength,
-              isArrayBuffer: savedBook.fileData instanceof ArrayBuffer
-            });
-          } catch (error) {
-            logger.error('Error converting base64 to ArrayBuffer', { bookId: book.id }, error as Error);
-            // Don't fail completely, just log the error and continue
-            savedBook.pdfDataBase64 = book.pdf_data_base64;
-          }
-        } else if (book.file_type === 'text' && book.text_content) {
-          savedBook.fileData = book.text_content;
-        } else if (book.file_type === 'pdf') {
-          logger.warn('PDF book has no base64 data', { bookId: book.id }, undefined, {
-            hasPdfDataBase64: !!book.pdf_data_base64,
-            hasTextContent: !!book.text_content
-          });
-        }
+        // NOTE: PDF data (pdf_data_base64 and page_texts) are NOT loaded here
+        // to reduce disk I/O. They will be loaded only when opening a specific book.
+        // This prevents the "Disk IO budget consumed" warning from Supabase.
 
         return savedBook;
       });
 
-      logger.info('Books loaded from Supabase', { userId: this.currentUserId }, {
+      logger.info('Books metadata loaded from Supabase (without PDF data)', { userId: this.currentUserId }, {
         count: books.length,
         books: books.map(b => ({ id: b.id, title: b.title, type: b.type }))
       });
