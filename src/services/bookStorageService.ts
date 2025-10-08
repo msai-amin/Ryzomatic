@@ -43,7 +43,7 @@ export class BookStorageService {
   }
 
   /**
-   * Upload book file to S3
+   * Upload book file to S3 using presigned URL
    * Returns S3 key for storage in database
    */
   async uploadBook(
@@ -60,49 +60,59 @@ export class BookStorageService {
     try {
       const s3Key = this.generateBookKey(metadata.userId, metadata.bookId, metadata.fileType);
 
-      logger.info('Uploading book to S3', context, {
+      logger.info('Getting presigned upload URL', context, {
         s3Key,
         fileSize: metadata.fileSize,
         fileType: metadata.fileType
       });
 
-      // Convert to ArrayBuffer for upload
-      const arrayBuffer = await file.arrayBuffer();
-
-      // Call API endpoint to upload to S3
-      const response = await fetch('/api/books/upload-to-s3', {
+      // Step 1: Get presigned URL from API
+      const urlResponse = await fetch('/api/books/get-upload-url', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           s3Key,
-          fileData: Array.from(new Uint8Array(arrayBuffer)),
           contentType: file.type || 'application/pdf',
-          metadata: {
-            userId: metadata.userId,
-            bookId: metadata.bookId,
-            title: metadata.title,
-            fileName: metadata.fileName,
-          }
+          userId: metadata.userId
         })
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Upload failed');
+      if (!urlResponse.ok) {
+        const error = await urlResponse.json();
+        throw new Error(error.message || 'Failed to get upload URL');
       }
 
-      const result = await response.json();
+      const { uploadUrl } = await urlResponse.json();
+
+      logger.info('Got presigned URL, uploading directly to S3', context, {
+        s3Key
+      });
+
+      // Step 2: Upload directly to S3 using presigned URL
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type || 'application/pdf',
+        },
+        body: file
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`S3 upload failed: ${uploadResponse.statusText}`);
+      }
+
+      const url = this.getBookUrl(s3Key);
 
       logger.info('Book uploaded to S3 successfully', context, {
         s3Key,
-        url: result.url
+        url
       });
 
       return {
         s3Key,
-        url: result.url
+        url
       };
 
     } catch (error) {
