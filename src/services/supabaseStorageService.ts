@@ -1,6 +1,7 @@
 import { userBooks, userNotes, userAudio, UserBook, UserNote, UserAudio } from '../../lib/supabase';
 import { logger } from './logger';
 import { errorHandler, ErrorType, ErrorSeverity } from './errorHandler';
+import { bookStorageService } from './bookStorageService';
 
 export interface SavedBook {
   id: string;
@@ -122,10 +123,11 @@ class SupabaseStorageService {
       // Size limit to prevent disk I/O issues: 5MB
       const MAX_PDF_SIZE = 5 * 1024 * 1024; // 5MB
       const fileSize = book.fileData instanceof ArrayBuffer ? book.fileData.byteLength : 
-                       book.fileData instanceof Blob ? book.fileData.size : 0;
+                       book.fileData instanceof Blob ? book.fileData.size : 
+                       typeof book.fileData === 'string' ? book.fileData.length : 0;
       
-      if (fileSize > MAX_PDF_SIZE) {
-        logger.warn('PDF exceeds size limit, storing metadata only', context, undefined, {
+      if (book.type === 'pdf' && fileSize > MAX_PDF_SIZE) {
+        logger.warn('PDF exceeds size limit', context, undefined, {
           fileSize: fileSize / 1024 / 1024 + 'MB',
           limit: MAX_PDF_SIZE / 1024 / 1024 + 'MB'
         });
@@ -137,67 +139,65 @@ class SupabaseStorageService {
         );
       }
       
-      // Convert file data to base64 if it's an ArrayBuffer or Blob
-      let pdfDataBase64: string | undefined;
+      // NEW: Upload file to S3 instead of storing in database
+      let s3Key: string | undefined;
+      
       if (book.type === 'pdf' && book.fileData) {
-        try {
-          if (book.fileData instanceof ArrayBuffer) {
-            pdfDataBase64 = this.arrayBufferToBase64(book.fileData);
-            logger.info('Converted PDF ArrayBuffer to base64 for Supabase storage', context, {
-              originalSize: book.fileData.byteLength,
-              base64Size: pdfDataBase64.length
-            });
-          } else if (book.fileData instanceof Blob) {
-            // Convert Blob to ArrayBuffer first, then to base64
-            const arrayBuffer = await book.fileData.arrayBuffer();
-            pdfDataBase64 = this.arrayBufferToBase64(arrayBuffer);
-            logger.info('Converted PDF Blob to base64 for Supabase storage', context, {
-              originalSize: book.fileData.size,
-              arrayBufferSize: arrayBuffer.byteLength,
-              base64Size: pdfDataBase64.length
-            });
-          } else {
-            logger.warn('PDF fileData is neither ArrayBuffer nor Blob', context, undefined, {
-              fileDataType: typeof book.fileData,
-              fileDataConstructor: book.fileData?.constructor?.name
-            });
-          }
-        } catch (error) {
-          logger.error('Error converting PDF data to base64', context, error as Error);
-          throw errorHandler.createError(
-            'Failed to convert PDF data for storage',
-            ErrorType.STORAGE,
-            ErrorSeverity.HIGH,
-            context,
-            { error: error instanceof Error ? error.message : 'Unknown error' }
-          );
+        logger.info('Uploading PDF to S3', context, {
+          fileSize: fileSize / 1024 / 1024 + 'MB'
+        });
+
+        // Convert to Blob if needed
+        let fileBlob: Blob;
+        if (book.fileData instanceof Blob) {
+          fileBlob = book.fileData;
+        } else if (book.fileData instanceof ArrayBuffer) {
+          fileBlob = new Blob([book.fileData], { type: 'application/pdf' });
+        } else {
+          throw new Error('Unsupported file data format for PDF');
         }
+
+        // Upload to S3
+        const uploadResult = await bookStorageService.uploadBook(fileBlob, {
+          userId: this.currentUserId!,
+          bookId: book.id,
+          title: book.title,
+          fileName: book.fileName,
+          fileType: book.type,
+          fileSize: fileSize,
+          totalPages: book.totalPages
+        });
+
+        s3Key = uploadResult.s3Key;
+        
+        logger.info('PDF uploaded to S3 successfully', context, {
+          s3Key,
+          fileSize: fileSize / 1024 / 1024 + 'MB'
+        });
       }
 
-      // Sanitize the book title as well
+      // Sanitize the book title
       const sanitizedTitle = this.sanitizeTextForPostgreSQL(book.title);
       const sanitizedFileName = this.sanitizeTextForPostgreSQL(book.fileName);
       
-      logger.info('Sanitizing book data for Supabase', context, {
-        originalTitle: book.title,
-        sanitizedTitle,
-        originalFileName: book.fileName,
-        sanitizedFileName,
-        pageTextsCount: book.pageTexts?.length || 0,
-        pageTextsSample: book.pageTexts?.[0]?.substring(0, 100) + '...' || 'No page texts'
+      logger.info('Saving book metadata to database', context, {
+        title: sanitizedTitle,
+        s3Key,
+        hasS3Storage: !!s3Key
       });
 
-      const userBook: Omit<UserBook, 'id' | 'created_at' | 'updated_at'> = {
+      // Create database record with S3 key (no large data)
+      const userBook: Partial<UserBook> = {
         user_id: this.currentUserId!,
         title: sanitizedTitle,
         file_name: sanitizedFileName,
         file_type: book.type,
-        file_size: book.fileData instanceof ArrayBuffer ? book.fileData.byteLength : 
-                   book.fileData instanceof Blob ? book.fileData.size : 0,
+        file_size: fileSize,
         total_pages: book.totalPages,
-        pdf_data_base64: pdfDataBase64,
-        page_texts: this.sanitizePageTexts(book.pageTexts || []),
-        text_content: book.type === 'text' ? this.sanitizeTextForPostgreSQL(book.fileData as string) : undefined,
+        s3_key: s3Key,  // NEW: Store S3 path instead of file data
+        text_content: book.type === 'text' && typeof book.fileData === 'string' 
+          ? this.sanitizeTextForPostgreSQL(book.fileData) 
+          : undefined,
         tts_metadata: {
           voiceSettings: {},
           lastUsedVoice: null,
@@ -209,21 +209,26 @@ class SupabaseStorageService {
           : 0
       };
 
-      const { data, error } = await userBooks.create(userBook);
+      const { data, error } = await userBooks.create(userBook as any);
       
       if (error) {
-        logger.error('Supabase save error details', context, error, {
+        // If database save fails, try to clean up S3 upload
+        if (s3Key) {
+          try {
+            await bookStorageService.deleteBook(s3Key, this.currentUserId!);
+            logger.info('Cleaned up S3 file after database error', context, { s3Key });
+          } catch (cleanupError) {
+            logger.error('Failed to cleanup S3 file', context, cleanupError as Error);
+          }
+        }
+        
+        logger.error('Database save error', context, error, {
           errorCode: error.code,
-          errorMessage: error.message,
-          errorDetails: error.details,
-          errorHint: error.hint,
-          bookTitle: sanitizedTitle,
-          bookFileName: sanitizedFileName,
-          pageTextsLength: userBook.page_texts?.length || 0
+          errorMessage: error.message
         });
         
         throw errorHandler.createError(
-          `Failed to save book to Supabase: ${error.message}`,
+          `Failed to save book: ${error.message}`,
           ErrorType.DATABASE,
           ErrorSeverity.HIGH,
           { context, error: error.message }
@@ -235,7 +240,7 @@ class SupabaseStorageService {
         for (const note of book.notes) {
           const { error: noteError } = await userNotes.create({
             user_id: this.currentUserId!,
-            book_id: data.id, // Use the created book ID
+            book_id: data.id,
             page_number: note.pageNumber,
             content: note.content,
             position_x: note.position?.x,
@@ -247,15 +252,16 @@ class SupabaseStorageService {
         }
       }
 
-      logger.info('Book saved to Supabase successfully', context, {
+      logger.info('Book saved successfully', context, {
         bookId: data.id,
         title: data.title,
         type: data.file_type,
-        hasPageTexts: !!data.page_texts?.length
+        s3Key: data.s3_key,
+        storageType: s3Key ? 'S3' : 'Database'
       });
 
     } catch (error) {
-      logger.error('Error saving book to Supabase', { bookId: book.id }, error as Error);
+      logger.error('Error saving book', { bookId: book.id }, error as Error);
       throw error;
     }
   }
@@ -314,6 +320,8 @@ class SupabaseStorageService {
     this.ensureAuthenticated();
     
     try {
+      const context = { bookId: id, userId: this.currentUserId };
+      
       const { data, error } = await userBooks.get(id);
       
       if (error) {
@@ -321,10 +329,10 @@ class SupabaseStorageService {
           return null; // Book not found
         }
         throw errorHandler.createError(
-          `Failed to load book from Supabase: ${error.message}`,
+          `Failed to load book: ${error.message}`,
           ErrorType.DATABASE,
           ErrorSeverity.HIGH,
-          { context: 'getBook', bookId: id, error: error.message }
+          { context, error: error.message }
         );
       }
 
@@ -336,27 +344,49 @@ class SupabaseStorageService {
         savedAt: new Date(data.created_at),
         lastReadPage: data.last_read_page,
         totalPages: data.total_pages,
-        pageTexts: data.page_texts,
-        notes: [], // Will be loaded separately if needed
+        pageTexts: [],  // Not stored anymore
+        notes: [],
         syncedAt: new Date(data.updated_at)
       };
 
-      // Convert base64 back to ArrayBuffer for PDF files
-      if (data.file_type === 'pdf' && data.pdf_data_base64) {
+      // NEW: Download from S3 if s3_key exists
+      if (data.file_type === 'pdf' && data.s3_key) {
         try {
-          book.fileData = this.base64ToArrayBuffer(data.pdf_data_base64);
-          book.pdfDataBase64 = data.pdf_data_base64;
+          logger.info('Downloading PDF from S3', context, { s3Key: data.s3_key });
+          
+          book.fileData = await bookStorageService.downloadBook(
+            data.s3_key,
+            this.currentUserId!
+          );
+          
+          logger.info('PDF downloaded from S3 successfully', context, {
+            size: book.fileData.byteLength / 1024 / 1024 + 'MB'
+          });
         } catch (error) {
-          logger.error('Error converting base64 to ArrayBuffer', { bookId: id }, error as Error);
+          logger.error('Error downloading PDF from S3', context, error as Error);
+          throw errorHandler.createError(
+            'Failed to download book file. Please try again.',
+            ErrorType.STORAGE,
+            ErrorSeverity.HIGH,
+            context
+          );
         }
       } else if (data.file_type === 'text' && data.text_content) {
         book.fileData = data.text_content;
+      } else if (data.file_type === 'pdf' && !data.s3_key) {
+        logger.error('PDF book has no S3 key', context);
+        throw errorHandler.createError(
+          'Book file not found. Please re-upload the book.',
+          ErrorType.STORAGE,
+          ErrorSeverity.HIGH,
+          context
+        );
       }
 
       return book;
 
     } catch (error) {
-      logger.error('Error loading book from Supabase', { bookId: id }, error as Error);
+      logger.error('Error loading book', { bookId: id }, error as Error);
       throw error;
     }
   }
@@ -370,7 +400,7 @@ class SupabaseStorageService {
       if (updates.title) updateData.title = updates.title;
       if (updates.lastReadPage !== undefined) updateData.last_read_page = updates.lastReadPage;
       if (updates.totalPages !== undefined) updateData.total_pages = updates.totalPages;
-      if (updates.pageTexts) updateData.page_texts = updates.pageTexts;
+      // Note: pageTexts no longer stored in database (moved to S3)
       
       // Update reading progress
       if (updates.lastReadPage && updates.totalPages) {
@@ -400,21 +430,38 @@ class SupabaseStorageService {
     this.ensureAuthenticated();
     
     try {
+      const context = { bookId, userId: this.currentUserId };
+      
+      // First, get book to find S3 key
+      const { data: book } = await userBooks.get(bookId);
+      
+      // Delete from database first
       const { error } = await userBooks.delete(bookId);
       
       if (error) {
         throw errorHandler.createError(
-          `Failed to delete book from Supabase: ${error.message}`,
+          `Failed to delete book: ${error.message}`,
           ErrorType.DATABASE,
           ErrorSeverity.HIGH,
-          { context: 'deleteBook', bookId, error: error.message }
+          { context, error: error.message }
         );
       }
 
-      logger.info('Book deleted from Supabase', { bookId, userId: this.currentUserId });
+      logger.info('Book deleted from database', context);
+
+      // Then delete from S3 if s3_key exists
+      if (book?.s3_key) {
+        try {
+          await bookStorageService.deleteBook(book.s3_key, this.currentUserId!);
+          logger.info('Book file deleted from S3', context, { s3Key: book.s3_key });
+        } catch (s3Error) {
+          // Log but don't fail - database record is already deleted
+          logger.error('Failed to delete file from S3 (non-critical)', context, s3Error as Error);
+        }
+      }
 
     } catch (error) {
-      logger.error('Error deleting book from Supabase', { bookId }, error as Error);
+      logger.error('Error deleting book', { bookId }, error as Error);
       throw error;
     }
   }

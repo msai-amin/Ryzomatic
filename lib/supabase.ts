@@ -71,9 +71,8 @@ export interface UserBook {
   file_type: 'pdf' | 'text';
   file_size: number;
   total_pages?: number;
-  pdf_data_base64?: string;
-  page_texts?: string[];
-  text_content?: string;
+  s3_key?: string;  // NEW: S3 storage path instead of base64 data
+  text_content?: string;  // Only for text files
   tts_metadata: Record<string, any>;
   last_read_page: number;
   reading_progress: number;
