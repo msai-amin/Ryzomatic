@@ -56,7 +56,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Vacuum table to reclaim space
-VACUUM FULL user_books;
-ANALYZE user_books;
+-- Note: VACUUM must be run separately outside transaction block
+-- Run these commands after the migration in a separate query:
+-- VACUUM FULL user_books;
+-- ANALYZE user_books;
 
