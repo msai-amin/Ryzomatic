@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { DocumentViewer } from './components/DocumentViewer'
 import { ChatModal } from './components/ChatModal'
-import { Header } from './components/Header'
+import { ThemedHeader } from '../themes/ThemedHeader'
 import { AuthModal } from './components/AuthModal'
 import NeoReaderTerminal from './components/NeoReaderTerminal'
 import LandingPage from './components/LandingPage'
@@ -11,6 +11,7 @@ import { healthMonitor } from './services/healthMonitor'
 import { logger } from './services/logger'
 import { errorHandler } from './services/errorHandler'
 import { supabaseStorageService } from './services/supabaseStorageService'
+import { useTheme } from '../themes/ThemeProvider'
 
 function App() {
   const { 
@@ -195,10 +196,23 @@ function App() {
   // Show loading while checking auth
   if (!isInitialized) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div 
+        className="min-h-screen flex items-center justify-center"
+        style={{
+          backgroundColor: 'var(--color-background)',
+        }}
+      >
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading Smart Reader...</p>
+          <div 
+            className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto"
+            style={{ borderColor: 'var(--color-primary)' }}
+          ></div>
+          <p 
+            className="mt-4"
+            style={{ color: 'var(--color-text-secondary)' }}
+          >
+            Loading Academic Reader Pro...
+          </p>
         </div>
       </div>
     )
@@ -214,19 +228,34 @@ function App() {
   // Show auth modal if not authenticated
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-black">
-        <Header />
+      <div 
+        className="min-h-screen"
+        style={{
+          backgroundColor: 'var(--color-background)',
+        }}
+      >
+        <ThemedHeader />
         <main className="container mx-auto px-4 py-6">
           <div className="text-center py-20">
-            <h1 className="text-4xl font-bold text-white mb-4 glow-text">
-              NEO_READER
+            <h1 
+              className="text-4xl font-bold mb-4"
+              style={{ color: 'var(--color-text-primary)' }}
+            >
+              Academic Reader Pro
             </h1>
-            <p className="text-xl text-green-400 mb-8">
+            <p 
+              className="text-xl mb-8"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
               Your intelligent document reading assistant
             </p>
             <button
               onClick={() => setIsAuthModalOpen(true)}
-              className="bg-green-400 text-black px-8 py-3 rounded-lg text-lg font-semibold hover:bg-green-300 transition-colors"
+              className="px-8 py-3 rounded-lg text-lg font-semibold transition-colors"
+              style={{
+                backgroundColor: 'var(--color-primary)',
+                color: 'var(--color-text-inverse)',
+              }}
             >
               GET STARTED
             </button>
@@ -253,8 +282,15 @@ function App() {
 
   // Show main app if authenticated
   return (
-    <div className="min-h-screen bg-black">
-      <Header />
+    <div 
+      className="min-h-screen"
+      style={{
+        backgroundColor: 'var(--color-background)',
+        color: 'var(--color-text-primary)',
+        fontFamily: 'var(--font-family-sans)',
+      }}
+    >
+      <ThemedHeader />
       <main className="container mx-auto px-4 py-6">
         <DocumentViewer />
       </main>

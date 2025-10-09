@@ -236,14 +236,34 @@ const LandingPage: React.FC = () => {
             </button>
           </div>
           
-          <div className="relative mt-8 w-full max-w-5xl rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-xl shadow-slate-200/50 backdrop-blur-lg">
-            {/* Placeholder for screenshot/demo */}
-            <div className="aspect-video w-full rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-6xl mb-4">📚</div>
-                <span className="text-slate-500 text-lg font-medium">Product Demo</span>
-                <p className="text-slate-400 text-sm mt-2">Your academic workspace awaits</p>
-              </div>
+          <div className="relative mt-8 w-full max-w-4xl">
+            {/* Product Demo Video - Seamless Integration */}
+            <div className="w-full rounded-2xl overflow-hidden shadow-2xl" style={{ backgroundColor: '#f8f9fa' }}>
+              <video
+                className="w-full h-auto"
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                style={{
+                  display: 'block',
+                  maxWidth: '100%',
+                  height: 'auto',
+                  mixBlendMode: 'multiply',
+                  opacity: 0.95,
+                }}
+              >
+                <source src="/videos/product-demo.mp4" type="video/mp4" />
+                {/* Fallback for browsers that don't support video */}
+                <div className="flex items-center justify-center h-full" style={{ minHeight: '400px' }}>
+                  <div className="text-center">
+                    <div className="text-6xl mb-4">📚</div>
+                    <span className="text-slate-500 text-lg font-medium">Product Demo</span>
+                    <p className="text-slate-400 text-sm mt-2">Your academic workspace awaits</p>
+                  </div>
+                </div>
+              </video>
             </div>
           </div>
         </div>

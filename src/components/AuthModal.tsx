@@ -97,20 +97,20 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
-      <div className="bg-black border border-green-400 rounded-lg shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b border-green-400">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}>
+      <div className="rounded-lg shadow-xl w-full max-w-md" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+        <div className="flex items-center justify-between p-6" style={{ borderBottom: '1px solid var(--color-border)' }}>
           <div className="flex items-center space-x-3">
-            <div className="bg-white text-black px-3 py-1 border border-gray-300 font-bold text-sm">
-              VStyle
-            </div>
-            <h2 className="text-xl font-semibold text-white">
-              {isSignUp ? 'CREATE_ACCOUNT' : 'AUTHENTICATE'}
+            <h2 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+              {isSignUp ? 'Create Account' : 'Sign In'}
             </h2>
           </div>
           <button
             onClick={handleClose}
-            className="text-green-400 hover:text-green-300 transition-colors"
+            className="transition-colors"
+            style={{ color: 'var(--color-text-secondary)' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-primary)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
           >
             <X className="w-6 h-6" />
           </button>
@@ -118,25 +118,31 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
 
         <div className="p-6">
           {error && (
-            <div className="mb-4 p-3 bg-red-900 border border-red-500 rounded-md">
-              <p className="text-sm text-red-300">{error}</p>
+            <div className="mb-4 p-3 rounded-md" style={{ backgroundColor: 'var(--color-error-light, rgba(220, 38, 38, 0.1))', border: '1px solid var(--color-error)' }}>
+              <p className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>
             </div>
           )}
 
           <form onSubmit={handleEmailAuth} className="space-y-4">
             {isSignUp && (
               <div>
-                <label className="block text-sm font-medium text-green-400 mb-1">
-                  FULL_NAME
+                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--color-text-primary)' }}>
+                  Full Name
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400 w-5 h-5" />
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" style={{ color: 'var(--color-text-secondary)' }} />
                   <input
                     type="text"
                     name="fullName"
                     value={formData.fullName}
                     onChange={handleInputChange}
-                    className="w-full pl-10 pr-3 py-2 bg-black border border-green-400 rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent"
+                    className="w-full pl-10 pr-3 py-2 rounded-md focus:outline-none focus:ring-2"
+                    style={{
+                      backgroundColor: 'var(--color-background)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      borderRadius: 'var(--border-radius-md)',
+                    }}
                     placeholder="Enter your full name"
                     required={isSignUp}
                   />
@@ -145,17 +151,23 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-green-400 mb-1">
-                EMAIL_ADDRESS
+              <label className="block text-sm font-medium mb-1" style={{ color: 'var(--color-text-primary)' }}>
+                Email Address
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400 w-5 h-5" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" style={{ color: 'var(--color-text-secondary)' }} />
                 <input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className="w-full pl-10 pr-3 py-2 bg-black border border-green-400 rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent"
+                  className="w-full pl-10 pr-3 py-2 rounded-md focus:outline-none focus:ring-2"
+                  style={{
+                    backgroundColor: 'var(--color-background)',
+                    border: '1px solid var(--color-border)',
+                    color: 'var(--color-text-primary)',
+                    borderRadius: 'var(--border-radius-md)',
+                  }}
                   placeholder="Enter your email"
                   required
                 />
@@ -163,24 +175,31 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-green-400 mb-1">
-                PASSWORD
+              <label className="block text-sm font-medium mb-1" style={{ color: 'var(--color-text-primary)' }}>
+                Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400 w-5 h-5" />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" style={{ color: 'var(--color-text-secondary)' }} />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className="w-full pl-10 pr-10 py-2 bg-black border border-green-400 rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent"
+                  className="w-full pl-10 pr-10 py-2 rounded-md focus:outline-none focus:ring-2"
+                  style={{
+                    backgroundColor: 'var(--color-background)',
+                    border: '1px solid var(--color-border)',
+                    color: 'var(--color-text-primary)',
+                    borderRadius: 'var(--border-radius-md)',
+                  }}
                   placeholder="Enter your password"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-400 hover:text-green-300"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 transition-colors"
+                  style={{ color: 'var(--color-text-secondary)' }}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -189,17 +208,23 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
 
             {isSignUp && (
               <div>
-                <label className="block text-sm font-medium text-green-400 mb-1">
-                  CONFIRM_PASSWORD
+                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--color-text-primary)' }}>
+                  Confirm Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400 w-5 h-5" />
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" style={{ color: 'var(--color-text-secondary)' }} />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
-                    className="w-full pl-10 pr-3 py-2 bg-black border border-green-400 rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent"
+                    className="w-full pl-10 pr-3 py-2 rounded-md focus:outline-none focus:ring-2"
+                    style={{
+                      backgroundColor: 'var(--color-background)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      borderRadius: 'var(--border-radius-md)',
+                    }}
                     placeholder="Confirm your password"
                     required={isSignUp}
                   />
@@ -210,26 +235,37 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-green-400 text-black py-2 px-4 rounded-md hover:bg-green-300 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold"
+              className="w-full py-2 px-4 rounded-md focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold"
+              style={{
+                backgroundColor: 'var(--color-primary)',
+                color: 'var(--color-text-inverse)',
+                borderRadius: 'var(--border-radius-md)',
+              }}
             >
-              {isLoading ? 'PROCESSING...' : (isSignUp ? 'CREATE_ACCOUNT' : 'AUTHENTICATE')}
+              {isLoading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Sign In')}
             </button>
           </form>
 
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-green-400" />
+                <div className="w-full" style={{ borderTop: '1px solid var(--color-border)' }} />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-black text-green-400">OR CONTINUE WITH</span>
+                <span className="px-2" style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-text-secondary)' }}>Or continue with</span>
               </div>
             </div>
 
             <button
               onClick={handleGoogleAuth}
               disabled={isLoading}
-              className="mt-4 w-full flex items-center justify-center px-4 py-2 border border-green-400 rounded-md shadow-sm bg-black text-sm font-medium text-white hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="mt-4 w-full flex items-center justify-center px-4 py-2 rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              style={{
+                border: '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-surface)',
+                color: 'var(--color-text-primary)',
+                borderRadius: 'var(--border-radius-md)',
+              }}
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path
@@ -249,18 +285,19 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              CONTINUE WITH GOOGLE
+              Continue with Google
             </button>
           </div>
 
           <div className="mt-6 text-center">
             <button
               onClick={() => setIsSignUp(!isSignUp)}
-              className="text-sm text-green-400 hover:text-green-300 focus:outline-none focus:underline"
+              className="text-sm focus:outline-none focus:underline"
+              style={{ color: 'var(--color-primary)' }}
             >
               {isSignUp 
-                ? 'ALREADY HAVE AN ACCOUNT? SIGN IN' 
-                : "DON'T HAVE AN ACCOUNT? SIGN UP"
+                ? 'Already have an account? Sign In' 
+                : "Don't have an account? Sign Up"
               }
             </button>
           </div>

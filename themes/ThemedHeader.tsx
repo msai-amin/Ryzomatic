@@ -112,7 +112,7 @@ export const ThemedHeader: React.FC = () => {
                 }}
               >
                 <Upload className="w-4 h-4" />
-                <span>New Note</span>
+                <span>New Material</span>
               </button>
             </>
           )}

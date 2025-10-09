@@ -262,29 +262,43 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0
 
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 ${className}`}>
+    <div 
+      className={`rounded-lg shadow-lg ${className}`}
+      style={{
+        backgroundColor: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        boxShadow: 'var(--shadow-lg)',
+      }}
+    >
       {/* Main Controls */}
       <div className="p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">
-            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
               Audio Player
             </h3>
-            <div className={`w-2 h-2 rounded-full ${
-              tts.isPlaying ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
-            }`} />
+            <div 
+              className={`w-2 h-2 rounded-full ${tts.isPlaying ? 'animate-pulse' : ''}`}
+              style={{ backgroundColor: tts.isPlaying ? 'var(--color-success)' : 'var(--color-text-tertiary)' }}
+            />
           </div>
           <div className="flex items-center space-x-1">
             <button
               onClick={() => setShowSettings(!showSettings)}
-              className="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              className="p-1 transition-colors"
+              style={{ color: 'var(--color-text-secondary)' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-primary)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
               title="Settings"
             >
               <Settings className="w-4 h-4" />
             </button>
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              className="p-1 transition-colors"
+              style={{ color: 'var(--color-text-secondary)' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-primary)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
               title={isExpanded ? "Collapse" : "Expand"}
             >
               {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -296,20 +310,28 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         <div className="mb-3">
           <div
             ref={progressRef}
-            className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full cursor-pointer relative"
+            className="w-full h-2 rounded-full cursor-pointer relative"
+            style={{ backgroundColor: 'var(--color-border)' }}
             onClick={handleProgressClick}
             onMouseDown={handleProgressMouseDown}
           >
             <div
-              className="h-full bg-blue-500 rounded-full transition-all duration-200"
-              style={{ width: `${progressPercentage}%` }}
+              className="h-full rounded-full transition-all duration-200"
+              style={{ 
+                width: `${progressPercentage}%`,
+                backgroundColor: 'var(--color-primary)'
+              }}
             />
             <div
-              className="absolute top-0 w-4 h-4 bg-blue-500 rounded-full transform -translate-y-1 cursor-pointer hover:scale-110 transition-transform"
-              style={{ left: `${progressPercentage}%`, marginLeft: '-8px' }}
+              className="absolute top-0 w-4 h-4 rounded-full transform -translate-y-1 cursor-pointer hover:scale-110 transition-transform"
+              style={{ 
+                left: `${progressPercentage}%`, 
+                marginLeft: '-8px',
+                backgroundColor: 'var(--color-primary)'
+              }}
             />
           </div>
-          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+          <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
             <span>{formatTime(currentTime)}</span>
             <span>{formatTime(duration)}</span>
           </div>
@@ -319,7 +341,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         <div className="flex items-center justify-center space-x-4">
           <button
             onClick={handleStop}
-            className="p-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+            className="p-2 rounded-full transition-colors"
+            style={{ color: 'var(--color-text-primary)' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             title="Stop"
           >
             <Square className="w-5 h-5" />
@@ -328,11 +353,19 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           <button
             onClick={handlePlayPause}
             disabled={isProcessing}
-            className={`p-3 rounded-full transition-colors shadow-lg ${
-              isProcessing 
-                ? 'bg-gray-400 cursor-not-allowed' 
-                : 'bg-blue-500 hover:bg-blue-600'
-            } text-white`}
+            className="p-3 rounded-full transition-colors shadow-lg"
+            style={{
+              backgroundColor: isProcessing ? 'var(--color-text-tertiary)' : 'var(--color-primary)',
+              color: 'var(--color-text-inverse)',
+              cursor: isProcessing ? 'not-allowed' : 'pointer',
+              boxShadow: 'var(--shadow-lg)'
+            }}
+            onMouseEnter={(e) => {
+              if (!isProcessing) e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'
+            }}
+            onMouseLeave={(e) => {
+              if (!isProcessing) e.currentTarget.style.backgroundColor = 'var(--color-primary)'
+            }}
             title={
               isProcessing 
                 ? "Processing..." 
@@ -342,7 +375,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             }
           >
             {isProcessing ? (
-              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-text-inverse)' }} />
             ) : tts.isPlaying ? (
               <Pause className="w-6 h-6" />
             ) : (
@@ -352,7 +385,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
           <button
             onClick={handleMuteToggle}
-            className="p-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+            className="p-2 rounded-full transition-colors"
+            style={{ color: 'var(--color-text-primary)' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             title={tts.volume > 0 ? "Mute" : "Unmute"}
           >
             {tts.volume > 0 ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
@@ -362,10 +398,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         {/* Current Voice Display */}
         {tts.voice && (
           <div className="mt-3 text-center">
-            <div className="text-xs text-gray-500 dark:text-gray-400">
+            <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
               Current Voice
             </div>
-            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+            <div className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
               {tts.voice.name}
             </div>
           </div>
@@ -373,17 +409,27 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
         {/* Expanded Controls */}
         {isExpanded && (
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
             {/* Voice Selection */}
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
                   Voice Selection
                 </label>
                 <button
                   onClick={handleVoicePreview}
                   disabled={tts.isPlaying || !tts.voice}
-                  className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  style={{
+                    backgroundColor: 'var(--color-primary-light)',
+                    color: 'var(--color-primary)',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!tts.isPlaying && tts.voice) e.currentTarget.style.opacity = '0.8'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = '1'
+                  }}
                   title="Preview current voice"
                 >
                   <Play className="w-3 h-3" />
@@ -400,7 +446,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             <div className="grid grid-cols-2 gap-4">
               {/* Speed Control */}
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                <label className="block text-xs font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>
                   Speed: {tts.rate.toFixed(1)}x
                 </label>
                 <input
@@ -410,9 +456,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                   step="0.1"
                   value={tts.rate}
                   onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
-                  className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                  className="w-full h-2 rounded-lg appearance-none cursor-pointer slider"
+                  style={{ backgroundColor: 'var(--color-border)' }}
                 />
-                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--color-text-tertiary)' }}>
                   <span>0.5x</span>
                   <span>2.0x</span>
                 </div>
@@ -420,7 +467,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
               {/* Volume Control */}
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                <label className="block text-xs font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>
                   Volume: {Math.round(tts.volume * 100)}%
                 </label>
                 <input
@@ -430,9 +477,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                   step="0.1"
                   value={tts.volume}
                   onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                  className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                  className="w-full h-2 rounded-lg appearance-none cursor-pointer slider"
+                  style={{ backgroundColor: 'var(--color-border)' }}
                 />
-                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--color-text-tertiary)' }}>
                   <span>0%</span>
                   <span>100%</span>
                 </div>
@@ -442,18 +490,20 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             {/* Status Indicators */}
             <div className="mt-4 grid grid-cols-2 gap-4 text-xs">
               <div className="flex items-center space-x-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  tts.isPlaying ? 'bg-green-500' : 'bg-gray-400'
-                }`} />
-                <span className="text-gray-600 dark:text-gray-400">
+                <div 
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: tts.isPlaying ? 'var(--color-success)' : 'var(--color-text-tertiary)' }}
+                />
+                <span style={{ color: 'var(--color-text-secondary)' }}>
                   {tts.isPlaying ? 'Playing' : 'Stopped'}
                 </span>
               </div>
               <div className="flex items-center space-x-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  tts.volume > 0 ? 'bg-blue-500' : 'bg-red-500'
-                }`} />
-                <span className="text-gray-600 dark:text-gray-400">
+                <div 
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: tts.volume > 0 ? 'var(--color-primary)' : 'var(--color-error)' }}
+                />
+                <span style={{ color: 'var(--color-text-secondary)' }}>
                   {tts.volume > 0 ? 'Unmuted' : 'Muted'}
                 </span>
               </div>
@@ -463,10 +513,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
         {/* Settings Panel */}
         {showSettings && (
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                <label className="block text-xs font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>
                   Pitch: {tts.pitch.toFixed(1)}
                 </label>
                 <input
@@ -479,7 +529,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                     updateTTS({ pitch: parseFloat(e.target.value) })
                     ttsManager.setPitch(parseFloat(e.target.value))
                   }}
-                  className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                  className="w-full h-2 rounded-lg appearance-none cursor-pointer slider"
+                  style={{ backgroundColor: 'var(--color-border)' }}
                 />
               </div>
               
@@ -489,9 +540,12 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                   id="highlightWords"
                   checked={tts.highlightCurrentWord}
                   onChange={(e) => updateTTS({ highlightCurrentWord: e.target.checked })}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                  className="w-4 h-4 rounded focus:ring-2"
+                  style={{ 
+                    accentColor: 'var(--color-primary)',
+                  }}
                 />
-                <label htmlFor="highlightWords" className="text-xs text-gray-600 dark:text-gray-400">
+                <label htmlFor="highlightWords" className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
                   Highlight current word
                 </label>
               </div>

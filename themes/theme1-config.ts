@@ -139,40 +139,40 @@ export const theme1Config: ThemeConfig = {
   description: 'Clean, professional academic interface with color-coded annotation system',
   
   colors: {
-    // Primary Colors (Blue theme)
-    primary: '#2563eb', // blue-600
-    primaryHover: '#1d4ed8', // blue-700
-    primaryLight: '#dbeafe', // blue-100
-    primaryDark: '#1e40af', // blue-800
+    // Primary Colors (Gray theme for black/gray/white UI)
+    primary: '#6b7280', // gray-500
+    primaryHover: '#4b5563', // gray-600
+    primaryLight: '#d1d5db', // gray-300
+    primaryDark: '#374151', // gray-700
     
-    // Secondary Colors (Green for TTS)
-    secondary: '#059669', // emerald-600
-    secondaryHover: '#047857', // emerald-700
-    secondaryLight: '#d1fae5', // emerald-100
+    // Secondary Colors (Lighter gray for accents)
+    secondary: '#9ca3af', // gray-400
+    secondaryHover: '#6b7280', // gray-500
+    secondaryLight: '#e5e7eb', // gray-200
     
-    // Background Colors
-    background: '#f9fafb', // gray-50
-    backgroundSecondary: '#ffffff', // white
-    backgroundTertiary: '#f3f4f6', // gray-100
+    // Background Colors (Dark theme)
+    background: '#000000', // black
+    backgroundSecondary: '#111827', // gray-900
+    backgroundTertiary: '#1f2937', // gray-800
     
-    // Surface Colors
-    surface: '#ffffff', // white
-    surfaceHover: '#f9fafb', // gray-50
-    surfaceBorder: '#e5e7eb', // gray-200
+    // Surface Colors (Dark surfaces)
+    surface: '#111827', // gray-900
+    surfaceHover: '#1f2937', // gray-800
+    surfaceBorder: '#374151', // gray-700
     
-    // Text Colors
-    textPrimary: '#111827', // gray-900
-    textSecondary: '#6b7280', // gray-500
-    textTertiary: '#9ca3af', // gray-400
-    textInverse: '#ffffff', // white
+    // Text Colors (Light text on dark background)
+    textPrimary: '#f9fafb', // gray-50 (light text)
+    textSecondary: '#d1d5db', // gray-300 (lighter gray text)
+    textTertiary: '#9ca3af', // gray-400 (medium gray text)
+    textInverse: '#111827', // gray-900 (dark text for light backgrounds)
     
     // Status Colors
-    success: '#059669', // emerald-600
-    successHover: '#047857', // emerald-700
-    successLight: '#d1fae5', // emerald-100
-    warning: '#d97706', // amber-600
-    error: '#dc2626', // red-600
-    info: '#2563eb', // blue-600
+    success: '#9ca3af', // gray-400
+    successHover: '#6b7280', // gray-500
+    successLight: '#374151', // gray-700
+    warning: '#d1d5db', // gray-300
+    error: '#f87171', // red-400 (lighter for visibility on dark)
+    info: '#9ca3af', // gray-400
     
     // Highlight Colors (for annotations)
     highlight: {
@@ -183,15 +183,15 @@ export const theme1Config: ThemeConfig = {
       green: '#96CEB4', // Mint Green
     },
     
-    // Border Colors
-    border: '#e5e7eb', // gray-200
-    borderLight: '#f3f4f6', // gray-100
-    borderDark: '#d1d5db', // gray-300
+    // Border Colors (Subtle borders on dark background)
+    border: '#374151', // gray-700
+    borderLight: '#1f2937', // gray-800
+    borderDark: '#4b5563', // gray-600
     
-    // Shadow Colors
-    shadow: 'rgba(0, 0, 0, 0.1)',
-    shadowLight: 'rgba(0, 0, 0, 0.05)',
-    shadowDark: 'rgba(0, 0, 0, 0.15)',
+    // Shadow Colors (Subtle shadows on dark background)
+    shadow: 'rgba(0, 0, 0, 0.5)',
+    shadowLight: 'rgba(0, 0, 0, 0.3)',
+    shadowDark: 'rgba(0, 0, 0, 0.7)',
   },
   
   spacing: {

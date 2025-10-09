@@ -58,35 +58,38 @@ export const ChatModal: React.FC<ChatModalProps> = ({ onClose }) => {
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content max-w-4xl">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}>
+      <div className="rounded-lg shadow-xl w-full max-w-4xl flex flex-col" style={{ backgroundColor: 'var(--color-surface)', maxHeight: '80vh' }}>
+        <div className="flex items-center justify-between p-6" style={{ borderBottom: '1px solid var(--color-border)' }}>
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-              <Bot className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--color-primary)' }}>
+              <Bot className="w-5 h-5" style={{ color: 'var(--color-text-inverse)' }} />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">AI Assistant</h2>
-              <p className="text-sm text-gray-600">
+              <h2 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>AI Assistant</h2>
+              <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
                 {currentDocument ? `Ask about "${currentDocument.name}"` : 'Ask me anything'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="transition-colors"
+            style={{ color: 'var(--color-text-secondary)' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-primary)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
           >
             <X className="w-6 h-6" />
           </button>
         </div>
 
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col overflow-hidden">
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4 max-h-96">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {chatMessages.length === 0 ? (
               <div className="text-center py-8">
-                <Bot className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">
+                <Bot className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--color-text-tertiary)' }} />
+                <p style={{ color: 'var(--color-text-secondary)' }}>
                   {currentDocument 
                     ? `Ask me anything about "${currentDocument.name}"`
                     : 'Start a conversation with the AI assistant'
@@ -100,12 +103,12 @@ export const ChatModal: React.FC<ChatModalProps> = ({ onClose }) => {
             )}
             
             {isTyping && (
-              <div className="flex items-center space-x-2 text-gray-500">
+              <div className="flex items-center space-x-2" style={{ color: 'var(--color-text-secondary)' }}>
                 <Bot className="w-5 h-5" />
                 <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'var(--color-text-tertiary)' }}></div>
+                  <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'var(--color-text-tertiary)', animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'var(--color-text-tertiary)', animationDelay: '0.2s' }}></div>
                 </div>
                 <span className="text-sm">AI is thinking...</span>
               </div>
@@ -114,7 +117,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({ onClose }) => {
           </div>
 
           {/* Input */}
-          <div className="p-6 border-t border-gray-200">
+          <div className="p-6" style={{ borderTop: '1px solid var(--color-border)' }}>
             <div className="flex space-x-3">
               <input
                 ref={inputRef}
@@ -123,13 +126,24 @@ export const ChatModal: React.FC<ChatModalProps> = ({ onClose }) => {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder={currentDocument ? `Ask about "${currentDocument.name}"...` : 'Ask me anything...'}
-                className="flex-1 input-field"
+                className="flex-1 px-4 py-2 rounded-md focus:outline-none focus:ring-2"
+                style={{
+                  backgroundColor: 'var(--color-background)',
+                  border: '1px solid var(--color-border)',
+                  color: 'var(--color-text-primary)',
+                  borderRadius: 'var(--border-radius-md)',
+                }}
                 disabled={isTyping}
               />
               <button
                 onClick={handleSendMessage}
                 disabled={!inputValue.trim() || isTyping}
-                className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center space-x-2 px-4 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                style={{
+                  backgroundColor: 'var(--color-primary)',
+                  color: 'var(--color-text-inverse)',
+                  borderRadius: 'var(--border-radius-md)',
+                }}
               >
                 {isTyping ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

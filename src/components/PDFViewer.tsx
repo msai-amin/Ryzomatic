@@ -671,16 +671,19 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-gray-50">
+    <div className="flex-1 flex flex-col h-full" style={{ backgroundColor: 'var(--color-background)' }}>
       {/* PDF Controls */}
-      <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+      <div className="sticky top-0 z-50 shadow-sm" style={{ backgroundColor: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)' }}>
         <div className="flex items-center justify-between p-4">
           {/* Left controls */}
           <div className="flex items-center gap-2">
                 <button
                   onClick={goToFirstPage}
                   disabled={pageNumber <= 1}
-              className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   title="First Page"
                 >
               <ChevronsLeft className="w-5 h-5" />
@@ -688,7 +691,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                 <button
               onClick={goToPreviousPage}
                   disabled={pageNumber <= 1}
-              className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               title="Previous Page"
                 >
                   <ChevronLeft className="w-5 h-5" />
@@ -699,15 +705,24 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                     type="text"
                     value={pageInputValue}
                     onChange={handlePageInputChange}
-                className="w-16 px-2 py-1 text-center border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-16 px-2 py-1 text-center rounded-lg focus:outline-none focus:ring-2"
+                    style={{ 
+                      backgroundColor: 'var(--color-background)', 
+                      border: '1px solid var(--color-border)', 
+                      color: 'var(--color-text-primary)',
+                      borderRadius: 'var(--border-radius-md)'
+                    }}
                   />
-              <span className="text-sm text-gray-600">of {numPages || '?'}</span>
+              <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>of {numPages || '?'}</span>
                 </form>
                 
                 <button
                   onClick={goToNextPage}
               disabled={!numPages || pageNumber >= numPages}
-              className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               title="Next Page"
                 >
                   <ChevronRight className="w-5 h-5" />
@@ -715,7 +730,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                 <button
                   onClick={goToLastPage}
               disabled={!numPages || pageNumber >= numPages}
-              className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   title="Last Page"
                 >
               <ChevronsRight className="w-5 h-5" />
@@ -726,27 +744,36 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           <div className="flex items-center gap-2">
               <button
               onClick={handleZoomOut}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 rounded-lg transition-colors"
+                  style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               title="Zoom Out"
             >
               <ZoomOut className="w-5 h-5" />
               </button>
-            <span className="text-sm text-gray-600 min-w-[60px] text-center">
+            <span className="text-sm min-w-[60px] text-center" style={{ color: 'var(--color-text-secondary)' }}>
                 {Math.round(scale * 100)}%
             </span>
               <button
               onClick={handleZoomIn}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 rounded-lg transition-colors"
+                  style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               title="Zoom In"
             >
               <ZoomIn className="w-5 h-5" />
               </button>
             
-            <div className="w-px h-6 bg-gray-300 mx-2" />
+            <div className="w-px h-6 mx-2" style={{ backgroundColor: 'var(--color-border)' }} />
             
               <button
               onClick={handleRotate}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 rounded-lg transition-colors"
+                  style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               title="Rotate"
             >
               <RotateCw className="w-5 h-5" />
@@ -754,9 +781,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               
                       <button
               onClick={toggleScrollMode}
-              className={`p-2 rounded-lg transition-colors ${
-                pdfViewer.scrollMode === 'continuous' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'
-              }`}
+              className="p-2 rounded-lg transition-colors"
+                  style={{
+                    backgroundColor: pdfViewer.scrollMode === 'continuous' ? 'var(--color-primary-light)' : 'transparent',
+                    color: pdfViewer.scrollMode === 'continuous' ? 'var(--color-primary)' : 'var(--color-text-primary)'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (pdfViewer.scrollMode !== 'continuous') e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                  }}
+                  onMouseLeave={(e) => {
+                    if (pdfViewer.scrollMode !== 'continuous') e.currentTarget.style.backgroundColor = 'transparent'
+                  }}
               title="Scroll Mode"
             >
               <Rows className="w-5 h-5" />
@@ -768,9 +803,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                 e.stopPropagation()
                 setSelectionMode(!selectionMode)
               }}
-              className={`p-2 rounded-lg transition-colors ${
-                selectionMode ? 'bg-purple-100 text-purple-600' : 'hover:bg-gray-100'
-              }`}
+              className="p-2 rounded-lg transition-colors"
+                  style={{
+                    backgroundColor: selectionMode ? 'var(--color-primary-light)' : 'transparent',
+                    color: selectionMode ? 'var(--color-primary)' : 'var(--color-text-primary)'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!selectionMode) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!selectionMode) e.currentTarget.style.backgroundColor = 'transparent'
+                  }}
               title="Selection Mode"
             >
               <MousePointer2 className="w-5 h-5" />
@@ -782,9 +825,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                 e.stopPropagation()
                 toggleReadingMode()
               }}
-              className={`p-2 rounded-lg transition-colors ${
-                pdfViewer.readingMode ? 'bg-amber-100 text-amber-600' : 'hover:bg-gray-100'
-              }`}
+              className="p-2 rounded-lg transition-colors"
+                  style={{
+                    backgroundColor: pdfViewer.readingMode ? 'var(--color-primary-light)' : 'transparent',
+                    color: pdfViewer.readingMode ? 'var(--color-primary)' : 'var(--color-text-primary)'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!pdfViewer.readingMode) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!pdfViewer.readingMode) e.currentTarget.style.backgroundColor = 'transparent'
+                  }}
               title="Reading Mode (M)"
             >
               <BookOpen className="w-5 h-5" />
@@ -799,9 +850,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                 e.stopPropagation()
                 setShowHighlightMenu(!showHighlightMenu)
               }}
-              className={`p-2 rounded-lg transition-colors ${
-                showHighlightMenu ? 'bg-yellow-100 text-yellow-600' : 'hover:bg-gray-100'
-              }`}
+              className="p-2 rounded-lg transition-colors"
+                  style={{
+                    backgroundColor: showHighlightMenu ? 'var(--color-primary-light)' : 'transparent',
+                    color: showHighlightMenu ? 'var(--color-primary)' : 'var(--color-text-primary)'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!showHighlightMenu) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!showHighlightMenu) e.currentTarget.style.backgroundColor = 'transparent'
+                  }}
               title="Highlight (H)"
             >
               <Highlighter className="w-5 h-5" />
@@ -813,9 +872,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                 e.stopPropagation()
                 setShowNotesPanel(!showNotesPanel)
               }}
-              className={`p-2 rounded-lg transition-colors ${
-                showNotesPanel ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'
-              }`}
+              className="p-2 rounded-lg transition-colors"
+                  style={{
+                    backgroundColor: showNotesPanel ? 'var(--color-primary-light)' : 'transparent',
+                    color: showNotesPanel ? 'var(--color-primary)' : 'var(--color-text-primary)'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!showNotesPanel) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!showNotesPanel) e.currentTarget.style.backgroundColor = 'transparent'
+                  }}
               title="Notes"
             >
               <StickyNote className="w-5 h-5" />
@@ -831,9 +898,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                       });
                       handleTTSPlay();
                     }}
-              className={`p-2 rounded-lg transition-colors ${
-                tts.isPlaying ? 'bg-green-100 text-green-600' : 'hover:bg-gray-100'
-              }`}
+              className="p-2 rounded-lg transition-colors"
+                    style={{
+                      backgroundColor: tts.isPlaying ? 'var(--color-primary-light)' : 'transparent',
+                      color: tts.isPlaying ? 'var(--color-primary)' : 'var(--color-text-primary)'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!tts.isPlaying) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!tts.isPlaying) e.currentTarget.style.backgroundColor = 'transparent'
+                    }}
               title="Text-to-Speech"
             >
               {tts.isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
@@ -842,7 +917,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             {tts.isPlaying && (
                   <button
                     onClick={handleTTSStop}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 rounded-lg transition-colors"
+                    style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 title="Stop"
                   >
                 <Square className="w-5 h-5" />
@@ -851,7 +929,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
                 <button
               onClick={() => setShowVoiceSelector(true)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 rounded-lg transition-colors"
+                  style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               title="Select Voice"
                 >
               <Volume2 className="w-5 h-5" />
@@ -859,7 +940,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             
                 <button
               onClick={handleDownload}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 rounded-lg transition-colors"
+                  style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               title="Download"
             >
               <Download className="w-5 h-5" />
@@ -870,15 +954,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         {/* Highlight color picker */}
         {showHighlightMenu && (
           <div className="px-4 pb-4 flex items-center gap-2">
-            <span className="text-sm text-gray-600">Highlight color:</span>
+            <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Highlight color:</span>
             {highlightColors.map((color) => (
               <button
                 key={color.value}
                 onClick={() => setSelectedColor(color.value)}
-                className={`w-8 h-8 rounded-full border-2 transition-all ${
-                  selectedColor === color.value ? 'border-gray-800 scale-110' : 'border-gray-300'
-                }`}
-                style={{ backgroundColor: color.value }}
+                className="w-8 h-8 rounded-full border-2 transition-all"
+                style={{ 
+                  backgroundColor: color.value,
+                  borderColor: selectedColor === color.value ? 'var(--color-text-primary)' : 'var(--color-border)',
+                  transform: selectedColor === color.value ? 'scale(1.1)' : 'scale(1)'
+                }}
                 title={color.name}
               />
             ))}
@@ -887,7 +973,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       </div>
 
       {/* PDF Canvas Container */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-auto bg-gray-100 p-8">
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto p-8" style={{ backgroundColor: 'var(--color-background-secondary)' }}>
         {pdfViewer.scrollMode === 'continuous' ? (
           // Continuous scroll mode - render all pages
           <div className="flex flex-col items-center gap-4">
@@ -974,12 +1060,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       {/* Context Menu */}
       {contextMenu && (
         <div
-          className="fixed bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+          className="fixed rounded-lg shadow-lg py-2 z-50"
+          style={{ 
+            left: contextMenu.x, 
+            top: contextMenu.y,
+            backgroundColor: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            boxShadow: 'var(--shadow-lg)'
+          }}
         >
           <button
             onClick={() => handleAddNote(contextMenu.text)}
-            className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left flex items-center gap-2 transition-colors"
+            style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           >
             <StickyNote className="w-4 h-4" />
             Add to Notes

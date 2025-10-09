@@ -16,37 +16,50 @@ export const DocumentViewer: React.FC = () => {
   }
 
   // Use text viewer for text documents
-  const getThemeClasses = () => {
+  const getThemeStyles = () => {
     switch (typography.theme) {
       case 'dark':
-        return 'bg-gray-900 text-gray-100'
+        return {
+          backgroundColor: '#1f2937',
+          color: '#f3f4f6'
+        }
       case 'sepia':
-        return 'bg-amber-50 text-amber-900'
+        return {
+          backgroundColor: '#fef3c7',
+          color: '#78350f'
+        }
       default:
-        return 'bg-white text-gray-900'
+        return {
+          backgroundColor: 'var(--color-surface)',
+          color: 'var(--color-text-primary)'
+        }
     }
   }
 
   const getFontFamily = () => {
     switch (typography.fontFamily) {
       case 'serif':
-        return 'font-serif'
+        return 'var(--font-family-serif)'
       case 'mono':
-        return 'font-mono'
+        return 'var(--font-family-mono)'
       default:
-        return 'font-sans'
+        return 'var(--font-family-sans)'
     }
   }
 
   return (
     <div className="flex justify-center">
       <div 
-        className={`${getThemeClasses()} ${getFontFamily()} rounded-xl shadow-lg p-8 transition-all duration-300`}
+        className="rounded-xl p-8 transition-all duration-300"
         style={{
+          ...getThemeStyles(),
+          fontFamily: getFontFamily(),
           fontSize: `${typography.fontSize}px`,
           lineHeight: typography.lineHeight,
           maxWidth: `${typography.maxWidth}px`,
-          width: '100%'
+          width: '100%',
+          boxShadow: 'var(--shadow-lg)',
+          borderRadius: 'var(--border-radius-lg)',
         }}
       >
         <div className="prose prose-lg max-w-none">
