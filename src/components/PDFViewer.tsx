@@ -80,6 +80,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const pdfDocRef = useRef<any>(null)
   const renderTaskRef = useRef<any>(null)
   const pageCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map())
+  const pageTextLayerRefs = useRef<Map<number, HTMLDivElement>>(new Map())
 
   const highlightColors = [
     { name: 'Yellow', value: '#FFFF00' },
@@ -175,24 +176,54 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         await renderTaskRef.current.promise
         renderTaskRef.current = null
 
-        // Render text layer for selection
-        if (textLayerRef.current) {
-          textLayerRef.current.innerHTML = ''
-          const textContent = await page.getTextContent()
-          
-          // Render text layer manually
-          const textLayer = textLayerRef.current
-          textContent.items.forEach((item: any) => {
-            const div = window.document.createElement('div')
-            div.textContent = item.str
-            div.style.position = 'absolute'
-            div.style.left = `${item.transform[4]}px`
-            div.style.top = `${item.transform[5]}px`
-            div.style.fontSize = `${item.height}px`
-            div.style.fontFamily = item.fontName
-            textLayer.appendChild(div)
-          })
-        }
+          // Render text layer for selection using the SAME viewport
+          if (textLayerRef.current) {
+            textLayerRef.current.innerHTML = ''
+            const textContent = await page.getTextContent()
+            
+            // Manual text layer rendering with proper viewport synchronization
+            const textLayerFrag = window.document.createDocumentFragment()
+            const textDivs: HTMLSpanElement[] = []
+            
+            textContent.items.forEach((item: any, index: number) => {
+              const tx = item.transform
+              
+              // Transform PDF coordinates to viewport coordinates
+              const x = tx[4]
+              const y = tx[5]
+              const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
+              
+              
+              const span = window.document.createElement('span')
+              span.textContent = item.str
+              span.style.position = 'absolute'
+              span.style.left = `${x}px`
+              span.style.top = `${viewport.height - y - fontHeight}px`
+              span.style.fontSize = `${fontHeight}px`
+              span.style.fontFamily = 'sans-serif'
+              span.style.lineHeight = '1'
+              span.style.whiteSpace = 'pre'
+              span.style.height = `${fontHeight}px`
+              
+              // Use actual width from PDF if available, otherwise calculate
+              if (item.width > 0) {
+                span.style.width = `${item.width}px`
+                span.style.overflow = 'hidden'
+              } else {
+                // Fallback width calculation
+                span.style.width = 'auto'
+              }
+              
+              // Don't use scaleX transform as it can cause alignment issues
+              // Instead rely on the actual width and font settings
+              span.style.transformOrigin = '0% 0%'
+              
+              textDivs.push(span)
+              textLayerFrag.appendChild(span)
+            })
+            
+            textLayerRef.current.appendChild(textLayerFrag)
+          }
       } catch (error: any) {
         if (error?.name !== 'RenderingCancelledException') {
           console.error('Error rendering page:', error)
@@ -206,10 +237,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   // Render all pages (continuous scroll mode)
   useEffect(() => {
     if (pdfViewer.scrollMode !== 'continuous' || !pdfDocRef.current || !numPages) return
+    
 
     const renderAllPages = async () => {
       for (let pageNum = 1; pageNum <= numPages; pageNum++) {
         const canvas = pageCanvasRefs.current.get(pageNum)
+        const textLayerDiv = pageTextLayerRefs.current.get(pageNum)
         if (!canvas) continue
 
         try {
@@ -229,6 +262,53 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           }
 
           await page.render(renderContext).promise
+          
+          // Render text layer for selection using the SAME viewport
+          if (textLayerDiv) {
+            textLayerDiv.innerHTML = ''
+            const textContent = await page.getTextContent()
+            
+            // Manual text layer rendering with proper viewport synchronization
+            const textLayerFrag = window.document.createDocumentFragment()
+            
+            textContent.items.forEach((item: any, index: number) => {
+              const tx = item.transform
+              
+              // Transform PDF coordinates to viewport coordinates
+              const x = tx[4]
+              const y = tx[5]
+              const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
+              
+              
+              const span = window.document.createElement('span')
+              span.textContent = item.str
+              span.style.position = 'absolute'
+              span.style.left = `${x}px`
+              span.style.top = `${viewport.height - y - fontHeight}px`
+              span.style.fontSize = `${fontHeight}px`
+              span.style.fontFamily = 'sans-serif'
+              span.style.lineHeight = '1'
+              span.style.whiteSpace = 'pre'
+              span.style.height = `${fontHeight}px`
+              
+              // Use actual width from PDF if available, otherwise calculate
+              if (item.width > 0) {
+                span.style.width = `${item.width}px`
+                span.style.overflow = 'hidden'
+              } else {
+                // Fallback width calculation
+                span.style.width = 'auto'
+              }
+              
+              // Don't use scaleX transform as it can cause alignment issues
+              // Instead rely on the actual width and font settings
+              span.style.transformOrigin = '0% 0%'
+              
+              textLayerFrag.appendChild(span)
+            })
+            
+            textLayerDiv.appendChild(textLayerFrag)
+          }
         } catch (error) {
           console.error(`Error rendering page ${pageNum}:`, error)
         }
@@ -992,6 +1072,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                   }}
                   className="block"
                 />
+                <div
+                  ref={(el) => {
+                    if (el) pageTextLayerRefs.current.set(pageNum, el)
+                  }}
+                  className="textLayer"
+                />
                 {/* Render highlights for this page */}
                 {highlights
                   .filter(h => h.pageNumber === pageNum)
@@ -1027,11 +1113,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               <canvas ref={canvasRef} className="block" />
               <div
                 ref={textLayerRef}
-                className="absolute top-0 left-0 right-0 bottom-0 overflow-hidden"
-                style={{
-                  opacity: 0.2,
-                  lineHeight: 1.0
-                }}
+                className="textLayer"
               />
               
               {/* Render highlights */}

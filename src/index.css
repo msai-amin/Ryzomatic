@@ -1,6 +1,62 @@
+/* PDF.js Text Layer Styles */
+@import 'pdfjs-dist/web/pdf_viewer.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom text layer styles for PDF selection - with CSS resets */
+.textLayer {
+  position: absolute !important;
+  text-align: initial !important;
+  inset: 0px !important;
+  overflow: hidden !important;
+  opacity: 1 !important;
+  line-height: 1 !important;
+  -webkit-text-size-adjust: none !important;
+  text-size-adjust: none !important;
+  forced-color-adjust: none !important;
+  transform-origin: 0% 0% !important;
+  caret-color: transparent !important;
+  z-index: 2 !important;
+  pointer-events: auto !important;
+  /* Reset any global styles that might interfere */
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  box-sizing: content-box !important;
+}
+
+.textLayer > span {
+  position: absolute !important;
+  white-space: pre !important;
+  color: transparent !important;
+  transform-origin: 0% 0% !important;
+  line-height: 1 !important;
+  font-family: sans-serif !important;
+  /* Let pdf.js handle font specifics */
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  box-sizing: content-box !important;
+  cursor: text !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+}
+
+.textLayer > span::selection {
+  background: rgba(0, 100, 255, 0.4) !important;
+  color: transparent !important;
+}
+
+.textLayer > span::-moz-selection {
+  background: rgba(0, 100, 255, 0.4) !important;
+  color: transparent !important;
+}
+
+
 
 @layer base {
   html {
