@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
-import * as pdfjsLib from 'pdfjs-dist'
+// PDF.js will be imported dynamically to avoid ES module issues
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -32,8 +32,7 @@ import { AudioWidget } from './AudioWidget'
 import { VoiceSelector } from './VoiceSelector'
 import { storageService } from '../services/storageService'
 
-// Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
+// PDF.js will be imported dynamically
 
 interface Highlight {
   id: string
@@ -78,8 +77,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const textLayerRef = useRef<HTMLDivElement>(null)
   const pageContainerRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
-  const renderTaskRef = useRef<pdfjsLib.RenderTask | null>(null)
+  const pdfDocRef = useRef<any>(null)
+  const renderTaskRef = useRef<any>(null)
   const pageCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map())
 
   const highlightColors = [
@@ -95,6 +94,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       if (!document.pdfData) return
 
       try {
+        // Dynamic import of PDF.js to avoid ES module issues with Vite
+        const pdfjsLib = await import('pdfjs-dist')
+        
+        // Set up PDF.js worker - with safety check
+        if (pdfjsLib && 'GlobalWorkerOptions' in pdfjsLib) {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
+        }
+
         let pdfData: ArrayBuffer | Uint8Array
 
         if (document.pdfData instanceof Blob) {

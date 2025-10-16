@@ -47,6 +47,20 @@ export const DocumentViewer: React.FC = () => {
     }
   }
 
+  // Clean the document content by removing unwanted elements
+  const cleanContent = (content: string) => {
+    // Remove the "Page X Text (Footnotes Hidden)" header
+    let cleaned = content.replace(/Page \d+ Text.*?\(Footnotes Hidden\)/g, '')
+    
+    // Remove any HTML-like elements that might contain the unwanted content
+    cleaned = cleaned.replace(/<div[^>]*style="[^"]*font-size:\s*12px[^"]*"[^>]*>.*?<\/div>/gs, '')
+    
+    // Remove the specific div with max-h-96 and the research paper content
+    cleaned = cleaned.replace(/<div[^>]*class="max-h-96[^"]*"[^>]*>.*?<\/div>/gs, '')
+    
+    return cleaned.trim()
+  }
+
   return (
     <div className="flex justify-center">
       <div 
@@ -64,7 +78,7 @@ export const DocumentViewer: React.FC = () => {
       >
         <div className="prose prose-lg max-w-none">
           <pre className="whitespace-pre-wrap font-inherit leading-inherit">
-            {currentDocument.content}
+            {cleanContent(currentDocument.content)}
           </pre>
         </div>
       </div>

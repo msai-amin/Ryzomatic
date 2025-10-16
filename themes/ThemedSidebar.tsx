@@ -64,21 +64,29 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
             {mockDocuments.map((doc) => (
               <div
                 key={doc.id}
-                className={`p-3 rounded-lg border transition-colors cursor-pointer ${
-                  doc.isActive ? 'border-blue-200 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
-                }`}
+                className="p-3 rounded-lg border transition-colors cursor-pointer"
                 style={{
                   backgroundColor: doc.isActive ? 'var(--color-primary-light)' : 'var(--color-surface)',
                   borderColor: doc.isActive ? 'var(--color-primary)' : 'var(--color-border)',
+                }}
+                onMouseEnter={(e) => {
+                  if (!doc.isActive) {
+                    e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!doc.isActive) {
+                    e.currentTarget.style.backgroundColor = 'var(--color-surface)'
+                  }
                 }}
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center space-x-2">
                     <FileText className="w-4 h-4" style={{ color: 'var(--color-text-secondary)' }} />
                     <h3 
-                      className="font-medium text-sm"
+                      className={`text-sm ${doc.isActive ? 'font-semibold' : 'font-medium'}`}
                       style={{ 
-                        color: doc.isActive ? 'var(--color-primary-dark)' : 'var(--color-text-primary)' 
+                        color: doc.isActive ? '#000000' : 'var(--color-text-primary)' 
                       }}
                     >
                       {doc.name}
@@ -99,19 +107,19 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
                 
                 <div className="flex items-center justify-between text-xs">
                   <div className="flex items-center space-x-2">
-                    <Clock className="w-3 h-3" style={{ color: 'var(--color-text-tertiary)' }} />
-                    <span style={{ color: 'var(--color-text-secondary)' }}>
+                    <Clock className="w-3 h-3" style={{ color: doc.isActive ? '#4b5563' : 'var(--color-text-tertiary)' }} />
+                    <span style={{ color: doc.isActive ? '#374151' : 'var(--color-text-secondary)' }}>
                       {doc.progress}% complete
                     </span>
                   </div>
-                  <span style={{ color: 'var(--color-text-tertiary)' }}>
+                  <span style={{ color: doc.isActive ? '#4b5563' : 'var(--color-text-tertiary)' }}>
                     {doc.readingTime} reading
                   </span>
                 </div>
                 
                 {/* Progress Bar */}
                 <div 
-                  className="w-full bg-gray-200 rounded-full h-1.5 mt-2"
+                  className="w-full rounded-full h-1.5 mt-2"
                   style={{ backgroundColor: 'var(--color-border-light)' }}
                 >
                   <div

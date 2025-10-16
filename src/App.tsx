@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { DocumentViewer } from './components/DocumentViewer'
 import { ChatModal } from './components/ChatModal'
 import { ThemedHeader } from '../themes/ThemedHeader'
+import { ThemedApp } from '../themes/ThemedApp'
 import { AuthModal } from './components/AuthModal'
 import NeoReaderTerminal from './components/NeoReaderTerminal'
 import LandingPage from './components/LandingPage'
@@ -11,7 +12,7 @@ import { healthMonitor } from './services/healthMonitor'
 import { logger } from './services/logger'
 import { errorHandler } from './services/errorHandler'
 import { supabaseStorageService } from './services/supabaseStorageService'
-import { useTheme } from '../themes/ThemeProvider'
+import { ThemeProvider } from '../themes/ThemeProvider'
 
 function App() {
   const { 
@@ -280,25 +281,11 @@ function App() {
   }
 
 
-  // Show main app if authenticated
+  // Show main app if authenticated - use ThemedApp for consistent production/development UI
   return (
-    <div 
-      className="min-h-screen"
-      style={{
-        backgroundColor: 'var(--color-background)',
-        color: 'var(--color-text-primary)',
-        fontFamily: 'var(--font-family-sans)',
-      }}
-    >
-      <ThemedHeader />
-      <main className="container mx-auto px-4 py-6">
-        <DocumentViewer />
-      </main>
-      
-      {isChatOpen && (
-        <ChatModal onClose={() => toggleChat()} />
-      )}
-    </div>
+    <ThemeProvider>
+      <ThemedApp />
+    </ThemeProvider>
   )
 }
 
