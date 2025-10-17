@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Play, Pause, RotateCcw, Settings, X, Coffee, BookOpen, Clock } from 'lucide-react'
+import { TomatoIcon } from './TomatoIcon'
 import { Tooltip } from './Tooltip'
 
 interface PomodoroSettings {
@@ -221,9 +222,9 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ onClose }) => {
         }}
         onClick={() => setIsMinimized(false)}
       >
-        <Tooltip content="Open Pomodoro Timer" position="left">
+        <Tooltip content="Open Pomodoro Timer 🍅" position="left">
           <div className="flex items-center space-x-2">
-            <Clock className="w-5 h-5" />
+            <TomatoIcon size={20} className="w-5 h-5" />
             <span className="font-mono font-bold text-sm">{formatTime(timeLeft)}</span>
           </div>
         </Tooltip>
@@ -246,7 +247,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ onClose }) => {
           className="font-semibold text-lg flex items-center space-x-2"
           style={{ color: 'var(--color-text-primary)' }}
         >
-          <Clock className="w-5 h-5" style={{ color: getModeColor() }} />
+          <TomatoIcon size={20} className="w-5 h-5" style={{ color: '#ef4444' }} />
           <span>Pomodoro Timer</span>
         </h3>
         <div className="flex items-center space-x-2">

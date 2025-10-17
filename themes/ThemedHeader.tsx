@@ -1,11 +1,12 @@
 import React from 'react'
-import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut, Menu, Clock } from 'lucide-react'
+import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut, Menu } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { DocumentUpload } from '../src/components/DocumentUpload'
 import { TypographySettings } from '../src/components/TypographySettings'
 import { LibraryModal } from '../src/components/LibraryModal'
 import { AuthModal } from '../src/components/AuthModal'
 import { PomodoroTimer } from '../src/components/PomodoroTimer'
+import { TomatoIcon } from '../src/components/TomatoIcon'
 import { Tooltip } from '../src/components/Tooltip'
 import { useTheme } from './ThemeProvider'
 
@@ -193,17 +194,17 @@ export const ThemedHeader: React.FC = () => {
             </Tooltip>
           )}
           
-          <Tooltip content="Pomodoro Timer - Stay Focused" position="bottom">
+          <Tooltip content="Pomodoro Timer - Stay Focused 🍅" position="bottom">
             <button
               onClick={() => setShowPomodoro(!showPomodoro)}
               className="p-2 rounded-lg transition-colors"
               style={{
                 backgroundColor: showPomodoro ? 'var(--color-primary-light)' : 'transparent',
-                color: showPomodoro ? 'var(--color-primary)' : 'var(--color-text-primary)',
+                color: showPomodoro ? '#dc2626' : '#ef4444', // Tomato red color
                 border: showPomodoro ? '2px solid var(--color-primary)' : 'none',
               }}
             >
-              <Clock className="w-5 h-5" />
+              <TomatoIcon size={20} className="w-5 h-5" />
             </button>
           </Tooltip>
 
