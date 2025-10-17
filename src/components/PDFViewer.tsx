@@ -204,11 +204,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         console.log('✅ Canvas rendered successfully')
 
           // Render text layer for selection using the SAME viewport
+          // CRITICAL: This text layer must be perfectly aligned with the canvas
+          // Any changes to positioning, sizing, or transforms will break selection accuracy
           if (textLayerRef.current) {
             textLayerRef.current.innerHTML = ''
             const textContent = await page.getTextContent()
             
             // Manual text layer rendering with proper viewport synchronization
+            // These settings have been fine-tuned for perfect alignment
             const textLayerFrag = window.document.createDocumentFragment()
             const textDivs: HTMLSpanElement[] = []
             
@@ -314,11 +317,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           await page.render(renderContext).promise
           
           // Render text layer for selection using the SAME viewport
+          // CRITICAL: This text layer must be perfectly aligned with the canvas
+          // Any changes to positioning, sizing, or transforms will break selection accuracy
           if (textLayerDiv) {
             textLayerDiv.innerHTML = ''
             const textContent = await page.getTextContent()
             
             // Manual text layer rendering with proper viewport synchronization
+            // These settings have been fine-tuned for perfect alignment
             const textLayerFrag = window.document.createDocumentFragment()
             
             textContent.items.forEach((item: any, index: number) => {
