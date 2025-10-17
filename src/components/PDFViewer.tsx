@@ -203,59 +203,70 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         
         console.log('✅ Canvas rendered successfully')
 
-          // Render text layer using manual approach with better coordinate handling
-            if (textLayerRef.current) {
-              textLayerRef.current.innerHTML = ''
-              const textContent = await page.getTextContent()
+          // Render text layer for selection using the SAME viewport
+          if (textLayerRef.current) {
+            textLayerRef.current.innerHTML = ''
+            const textContent = await page.getTextContent()
+            
+            // Manual text layer rendering with proper viewport synchronization
+            const textLayerFrag = window.document.createDocumentFragment()
+            const textDivs: HTMLSpanElement[] = []
+            
+            textContent.items.forEach((item: any, index: number) => {
+              const tx = item.transform
               
-              // Set up text layer container
-              const textLayerDiv = textLayerRef.current
-              textLayerDiv.style.position = 'absolute'
-              textLayerDiv.style.left = '0px'
-              textLayerDiv.style.top = '0px'
-              textLayerDiv.style.right = '0px'
-              textLayerDiv.style.bottom = '0px'
-              textLayerDiv.style.overflow = 'hidden'
-              textLayerDiv.style.opacity = '0.2'
-              textLayerDiv.style.lineHeight = '1.0'
+              // Transform PDF coordinates to viewport coordinates
+              // For better alignment, we need to account for the full transformation matrix
+              const x = tx[4]
+              const y = tx[5]
+              const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
+              const fontWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1]))
               
-              // Create text layer with proper coordinate transformation
-              const textLayerFrag = window.document.createDocumentFragment()
+              const span = window.document.createElement('span')
+              span.textContent = item.str
+              span.style.position = 'absolute'
+              span.style.left = `${x}px`
+              span.style.top = `${viewport.height - y - fontHeight}px`
+              span.style.fontSize = `${fontHeight}px`
+              span.style.fontFamily = 'sans-serif'
+              span.style.lineHeight = '1'
+              span.style.whiteSpace = 'pre'
+              // Make height match the actual text height more precisely
+              span.style.height = `${fontHeight}px`
+              span.style.maxHeight = `${fontHeight}px`
+              span.style.overflow = 'hidden'
               
-              textContent.items.forEach((item: any) => {
-                const tx = item.transform
-                
-                // Get the text item's bounding box in PDF coordinates
-                const x = tx[4]
-                const y = tx[5]
-                const fontSize = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
-                
-                // Create span element
-                const span = window.document.createElement('span')
-                span.textContent = item.str
-                span.style.position = 'absolute'
-                span.style.left = `${x}px`
-                span.style.top = `${viewport.height - y - fontSize}px`
-                span.style.fontSize = `${fontSize}px`
-                span.style.fontFamily = 'sans-serif'
-                span.style.lineHeight = '1'
-                span.style.whiteSpace = 'pre'
-                span.style.height = `${fontSize}px`
-                span.style.width = item.width ? `${item.width}px` : 'auto'
-                span.style.color = 'transparent'
-                span.style.cursor = 'text'
-                span.style.userSelect = 'text'
+              // Calculate width more precisely using PDF metrics
+              let spanWidth = item.width
+              
+              // If no width provided, calculate based on font metrics
+              if (!spanWidth || spanWidth <= 0) {
+                // Use more conservative character width estimation
+                spanWidth = item.str.length * fontHeight * 0.5
+              }
+              
+              // Apply horizontal scaling to match PDF character spacing
+              const scaleX = fontWidth / fontHeight
+              if (Math.abs(scaleX - 1) > 0.01) {
+                span.style.transform = `scaleX(${scaleX})`
                 span.style.transformOrigin = '0% 0%'
-                
-                // Apply the transformation matrix from PDF.js
-                span.style.transform = `matrix(${tx[0]}, ${tx[1]}, ${tx[2]}, ${tx[3]}, 0, 0)`
-                
-                textLayerFrag.appendChild(span)
-              })
+                // Adjust width to account for scaling
+                span.style.width = `${spanWidth / scaleX}px`
+              } else {
+                span.style.width = `${spanWidth}px`
+              }
               
-              textLayerDiv.appendChild(textLayerFrag)
-              console.log('📝 Text layer rendered with improved coordinate handling')
-            }
+              // Ensure proper text selection behavior
+              span.style.userSelect = 'text'
+              span.style.cursor = 'text'
+              
+              textDivs.push(span)
+              textLayerFrag.appendChild(span)
+            })
+            
+            textLayerRef.current.appendChild(textLayerFrag)
+            console.log('📝 Text layer rendered with improved alignment')
+          }
           
           // Mark page as rendered
           console.log('🎉 Setting pageRendered to true')
@@ -302,58 +313,67 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
           await page.render(renderContext).promise
           
-          // Render text layer using manual approach with better coordinate handling
-            if (textLayerDiv) {
-              textLayerDiv.innerHTML = ''
-              const textContent = await page.getTextContent()
+          // Render text layer for selection using the SAME viewport
+          if (textLayerDiv) {
+            textLayerDiv.innerHTML = ''
+            const textContent = await page.getTextContent()
+            
+            // Manual text layer rendering with proper viewport synchronization
+            const textLayerFrag = window.document.createDocumentFragment()
+            
+            textContent.items.forEach((item: any, index: number) => {
+              const tx = item.transform
               
-              // Set up text layer container
-              textLayerDiv.style.position = 'absolute'
-              textLayerDiv.style.left = '0px'
-              textLayerDiv.style.top = '0px'
-              textLayerDiv.style.right = '0px'
-              textLayerDiv.style.bottom = '0px'
-              textLayerDiv.style.overflow = 'hidden'
-              textLayerDiv.style.opacity = '0.2'
-              textLayerDiv.style.lineHeight = '1.0'
+              // Transform PDF coordinates to viewport coordinates
+              // For better alignment, we need to account for the full transformation matrix
+              const x = tx[4]
+              const y = tx[5]
+              const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
+              const fontWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1]))
               
-              // Create text layer with proper coordinate transformation
-              const textLayerFrag = window.document.createDocumentFragment()
+              const span = window.document.createElement('span')
+              span.textContent = item.str
+              span.style.position = 'absolute'
+              span.style.left = `${x}px`
+              span.style.top = `${viewport.height - y - fontHeight}px`
+              span.style.fontSize = `${fontHeight}px`
+              span.style.fontFamily = 'sans-serif'
+              span.style.lineHeight = '1'
+              span.style.whiteSpace = 'pre'
+              // Make height match the actual text height more precisely
+              span.style.height = `${fontHeight}px`
+              span.style.maxHeight = `${fontHeight}px`
+              span.style.overflow = 'hidden'
               
-              textContent.items.forEach((item: any) => {
-                const tx = item.transform
-                
-                // Get the text item's bounding box in PDF coordinates
-                const x = tx[4]
-                const y = tx[5]
-                const fontSize = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
-                
-                // Create span element
-                const span = window.document.createElement('span')
-                span.textContent = item.str
-                span.style.position = 'absolute'
-                span.style.left = `${x}px`
-                span.style.top = `${viewport.height - y - fontSize}px`
-                span.style.fontSize = `${fontSize}px`
-                span.style.fontFamily = 'sans-serif'
-                span.style.lineHeight = '1'
-                span.style.whiteSpace = 'pre'
-                span.style.height = `${fontSize}px`
-                span.style.width = item.width ? `${item.width}px` : 'auto'
-                span.style.color = 'transparent'
-                span.style.cursor = 'text'
-                span.style.userSelect = 'text'
+              // Calculate width more precisely using PDF metrics
+              let spanWidth = item.width
+              
+              // If no width provided, calculate based on font metrics
+              if (!spanWidth || spanWidth <= 0) {
+                // Use more conservative character width estimation
+                spanWidth = item.str.length * fontHeight * 0.5
+              }
+              
+              // Apply horizontal scaling to match PDF character spacing
+              const scaleX = fontWidth / fontHeight
+              if (Math.abs(scaleX - 1) > 0.01) {
+                span.style.transform = `scaleX(${scaleX})`
                 span.style.transformOrigin = '0% 0%'
-                
-                // Apply the transformation matrix from PDF.js
-                span.style.transform = `matrix(${tx[0]}, ${tx[1]}, ${tx[2]}, ${tx[3]}, 0, 0)`
-                
-                textLayerFrag.appendChild(span)
-              })
+                // Adjust width to account for scaling
+                span.style.width = `${spanWidth / scaleX}px`
+              } else {
+                span.style.width = `${spanWidth}px`
+              }
               
-              textLayerDiv.appendChild(textLayerFrag)
-              console.log(`📝 Text layer rendered for page ${pageNum} with improved coordinate handling`)
-            }
+              // Ensure proper text selection behavior
+              span.style.userSelect = 'text'
+              span.style.cursor = 'text'
+              
+              textLayerFrag.appendChild(span)
+            })
+            
+            textLayerDiv.appendChild(textLayerFrag)
+          }
         } catch (error) {
           console.error(`Error rendering page ${pageNum}:`, error)
         }

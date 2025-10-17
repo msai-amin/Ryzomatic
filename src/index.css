@@ -1,10 +1,9 @@
+/* PDF.js Text Layer Styles */
 @import 'pdfjs-dist/web/pdf_viewer.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* PDF.js Text Layer Styles */
 
 /* Custom text layer styles for PDF selection - with CSS resets */
 .textLayer {
@@ -26,6 +25,11 @@
   padding: 0 !important;
   border: none !important;
   box-sizing: content-box !important;
+  /* Ensure proper alignment with canvas */
+  left: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .textLayer > span {
@@ -45,6 +49,14 @@
   -webkit-user-select: text !important;
   -moz-user-select: text !important;
   -ms-user-select: text !important;
+  /* Ensure proper text rendering */
+  font-smooth: always !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  /* Better alignment for two-column layouts */
+  text-rendering: optimizeLegibility !important;
+  /* Ensure spans don't interfere with each other */
+  isolation: isolate !important;
 }
 
 .textLayer > span::selection {
@@ -55,6 +67,52 @@
 .textLayer > span::-moz-selection {
   background: rgba(0, 100, 255, 0.4) !important;
   color: transparent !important;
+}
+
+/* Additional styles for better two-column PDF alignment */
+.textLayer {
+  /* Ensure the text layer perfectly overlays the canvas */
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  /* Prevent any layout shifts */
+  contain: layout style paint !important;
+}
+
+/* Improve text selection accuracy for two-column layouts */
+.textLayer > span {
+  /* Better positioning for complex layouts */
+  will-change: transform !important;
+  /* Ensure proper stacking order */
+  z-index: 1 !important;
+  /* Better text selection behavior */
+  -webkit-touch-callout: default !important;
+  -webkit-user-drag: none !important;
+  -khtml-user-drag: none !important;
+  -moz-user-drag: none !important;
+  -o-user-drag: none !important;
+  user-drag: none !important;
+  /* Ensure precise height matching */
+  display: inline-block !important;
+  vertical-align: baseline !important;
+  /* Prevent text from extending beyond bounds */
+  text-overflow: clip !important;
+}
+
+/* Ensure proper text selection highlighting */
+.textLayer > span::selection {
+  background: rgba(0, 100, 255, 0.4) !important;
+  color: transparent !important;
+  /* Better visibility for two-column text */
+  border-radius: 2px !important;
+}
+
+.textLayer > span::-moz-selection {
+  background: rgba(0, 100, 255, 0.4) !important;
+  color: transparent !important;
+  border-radius: 2px !important;
 }
 
 
