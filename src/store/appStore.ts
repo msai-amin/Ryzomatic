@@ -101,6 +101,9 @@ interface AppState {
   activePomodoroSessionId: string | null
   activePomodoroBookId: string | null
   pomodoroStartTime: number | null
+  pomodoroTimeLeft: number | null
+  pomodoroIsRunning: boolean
+  pomodoroMode: 'work' | 'shortBreak' | 'longBreak'
   
   // Actions
   setUser: (user: AuthUser | null) => void
@@ -122,6 +125,7 @@ interface AppState {
   setTyping: (typing: boolean) => void
   refreshLibrary: () => void
   setPomodoroSession: (sessionId: string | null, bookId: string | null, startTime: number | null) => void
+  updatePomodoroTimer: (timeLeft: number | null, isRunning: boolean, mode: 'work' | 'shortBreak' | 'longBreak') => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -173,6 +177,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   activePomodoroSessionId: null,
   activePomodoroBookId: null,
   pomodoroStartTime: null,
+  pomodoroTimeLeft: null,
+  pomodoroIsRunning: false,
+  pomodoroMode: 'work',
   
   // Authentication actions
   setUser: (user) => set({ user }),
@@ -335,6 +342,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     activePomodoroSessionId: sessionId,
     activePomodoroBookId: bookId,
     pomodoroStartTime: startTime
+  }),
+  
+  updatePomodoroTimer: (timeLeft, isRunning, mode) => set({
+    pomodoroTimeLeft: timeLeft,
+    pomodoroIsRunning: isRunning,
+    pomodoroMode: mode
   })
 }))
 

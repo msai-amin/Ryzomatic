@@ -16,7 +16,9 @@ export const ThemedHeader: React.FC = () => {
     isAuthenticated, 
     user, 
     logout,
-    libraryRefreshTrigger
+    libraryRefreshTrigger,
+    pomodoroIsRunning,
+    pomodoroTimeLeft
   } = useAppStore()
   const [showUpload, setShowUpload] = React.useState(false)
   const [showSettings, setShowSettings] = React.useState(false)
@@ -214,17 +216,20 @@ export const ThemedHeader: React.FC = () => {
             </Tooltip>
           )}
           
-          <Tooltip content="Pomodoro Timer - Stay Focused" position="bottom">
+          <Tooltip content={pomodoroIsRunning ? `Timer Running: ${Math.floor((pomodoroTimeLeft || 0) / 60)}:${String((pomodoroTimeLeft || 0) % 60).padStart(2, '0')}` : "Pomodoro Timer - Stay Focused"} position="bottom">
             <button
               ref={pomodoroButtonRef}
               onClick={() => setShowPomodoro(!showPomodoro)}
-              className="p-2 rounded-lg transition-colors text-2xl leading-none"
+              className="p-2 rounded-lg transition-colors text-2xl leading-none relative"
               style={{
                 backgroundColor: showPomodoro ? 'var(--color-primary-light)' : 'transparent',
                 border: showPomodoro ? '2px solid var(--color-primary)' : 'none',
               }}
             >
               🍅
+              {pomodoroIsRunning && !showPomodoro && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+              )}
             </button>
           </Tooltip>
 

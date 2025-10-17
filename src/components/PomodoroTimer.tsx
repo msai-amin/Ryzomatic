@@ -23,7 +23,16 @@ interface PomodoroTimerProps {
 }
 
 export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, documentName, onClose }) => {
-  const { user, activePomodoroSessionId, setPomodoroSession } = useAppStore()
+  const { 
+    user, 
+    activePomodoroSessionId, 
+    pomodoroTimeLeft,
+    pomodoroIsRunning,
+    pomodoroMode,
+    setPomodoroSession,
+    updatePomodoroTimer
+  } = useAppStore()
+  
   const [settings, setSettings] = useState<PomodoroSettings>({
     workDuration: 25,
     shortBreakDuration: 5,
@@ -34,9 +43,10 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
     notificationsEnabled: true,
   })
 
-  const [mode, setMode] = useState<TimerMode>('work')
-  const [timeLeft, setTimeLeft] = useState(settings.workDuration * 60) // in seconds
-  const [isRunning, setIsRunning] = useState(false)
+  // Use global state or initialize from settings
+  const [mode, setMode] = useState<TimerMode>(pomodoroMode || 'work')
+  const [timeLeft, setTimeLeft] = useState(pomodoroTimeLeft || settings.workDuration * 60)
+  const [isRunning, setIsRunning] = useState(pomodoroIsRunning || false)
   const [completedSessions, setCompletedSessions] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
@@ -74,6 +84,24 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
       }
     }
   }, [])
+
+  // Sync local state with global state on mount
+  useEffect(() => {
+    if (pomodoroTimeLeft !== null) {
+      setTimeLeft(pomodoroTimeLeft)
+    }
+    if (pomodoroIsRunning !== undefined) {
+      setIsRunning(pomodoroIsRunning)
+    }
+    if (pomodoroMode) {
+      setMode(pomodoroMode)
+    }
+  }, [])
+
+  // Update global state whenever local state changes
+  useEffect(() => {
+    updatePomodoroTimer(timeLeft, isRunning, mode)
+  }, [timeLeft, isRunning, mode])
 
   // Timer countdown logic
   useEffect(() => {
