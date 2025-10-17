@@ -812,7 +812,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-4xl mx-auto px-8 py-12">
             <div className="prose prose-lg prose-amber max-w-none">
-              <div className="text-gray-800 leading-relaxed whitespace-pre-wrap font-serif text-lg">
+              <div className="text-gray-800 leading-relaxed whitespace-pre-wrap font-sans text-lg">
                 {pageText || 'No text available for this page.'}
             </div>
           </div>

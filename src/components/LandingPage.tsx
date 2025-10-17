@@ -162,7 +162,7 @@ const LandingPage: React.FC = () => {
               <span className="text-xl font-semibold text-white">IR</span>
             </div>
             <div>
-              <p className="text-lg font-semibold text-slate-900" style={{ fontFamily: "'DM Serif Display', serif" }}>Immersive Reader</p>
+              <p className="text-lg font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>Immersive Reader</p>
               <p className="text-xs uppercase tracking-widest text-slate-500">BY VSTYLE</p>
             </div>
           </a>
@@ -219,7 +219,7 @@ const LandingPage: React.FC = () => {
             <span>For Researchers, by Researchers</span>
           </div>
           
-          <h1 className="max-w-4xl text-5xl font-semibold leading-tight text-slate-900 md:text-6xl" style={{ fontFamily: "'DM Serif Display', serif" }}>
+          <h1 className="max-w-4xl text-5xl font-semibold leading-tight text-slate-900 md:text-6xl" style={{ fontFamily: "'Inter', sans-serif" }}>
             Reading Reimagined for Academics.
           </h1>
           
@@ -273,7 +273,7 @@ const LandingPage: React.FC = () => {
       <section id="features" className="bg-slate-50 border-y border-slate-200">
         <div className="mx-auto max-w-6xl px-6 py-24">
           <div className="flex flex-col gap-6 text-center">
-            <h2 className="text-4xl font-semibold text-slate-900" style={{ fontFamily: "'DM Serif Display', serif" }}>
+            <h2 className="text-4xl font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
               A Toolkit Engineered for Academic Excellence
             </h2>
             <p className="mx-auto max-w-2xl text-base text-slate-600">
@@ -290,7 +290,7 @@ const LandingPage: React.FC = () => {
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition group-hover:bg-slate-800 group-hover:text-white text-2xl">
                   {feature.icon}
                 </div>
-                <h3 className="mt-6 text-2xl font-semibold text-slate-900" style={{ fontFamily: "'DM Serif Display', serif" }}>
+                <h3 className="mt-6 text-2xl font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
                   {feature.title}
                 </h3>
                 <p className="mt-4 text-sm text-slate-600">
@@ -306,7 +306,7 @@ const LandingPage: React.FC = () => {
       <section id="use-cases" className="bg-white">
         <div className="mx-auto max-w-6xl px-6 py-24">
           <div className="flex flex-col gap-6 text-center">
-            <h2 className="text-4xl font-semibold text-slate-900" style={{ fontFamily: "'DM Serif Display', serif" }}>
+            <h2 className="text-4xl font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
               Built for Every Academic Role
             </h2>
             <p className="mx-auto max-w-2xl text-base text-slate-600">
@@ -323,7 +323,7 @@ const LandingPage: React.FC = () => {
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-700 shadow-sm text-2xl">
                   {useCase.icon}
                 </div>
-                <h3 className="text-xl font-semibold text-slate-900" style={{ fontFamily: "'DM Serif Display', serif" }}>
+                <h3 className="text-xl font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
                   {useCase.name}
                 </h3>
                 <p className="text-sm text-slate-600">{useCase.description}</p>
@@ -337,7 +337,7 @@ const LandingPage: React.FC = () => {
       <section id="testimonials" className="bg-slate-50 border-y border-slate-200">
         <div className="mx-auto max-w-6xl px-6 py-24">
           <div className="flex flex-col gap-6 text-center">
-            <h2 className="text-4xl font-semibold text-slate-900" style={{ fontFamily: "'DM Serif Display', serif" }}>
+            <h2 className="text-4xl font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
               Trusted by Academics at Leading Institutions
             </h2>
           </div>
@@ -364,7 +364,7 @@ const LandingPage: React.FC = () => {
       <section id="pricing" className="bg-white">
         <div className="mx-auto max-w-6xl px-6 py-24">
           <div className="flex flex-col gap-6 text-center">
-            <h2 className="text-4xl font-semibold text-slate-900" style={{ fontFamily: "'DM Serif Display', serif" }}>
+            <h2 className="text-4xl font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
               Clear Pricing for the Academic Community
             </h2>
             <p className="mx-auto max-w-xl text-base text-slate-600">
@@ -390,7 +390,7 @@ const LandingPage: React.FC = () => {
                 
                 <div className="flex-grow">
                   <p className="text-sm font-semibold uppercase tracking-widest text-slate-500">{tier.name}</p>
-                  <h3 className="mt-4 text-4xl font-semibold text-slate-900" style={{ fontFamily: "'DM Serif Display', serif" }}>
+                  <h3 className="mt-4 text-4xl font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
                     {tier.price}
                   </h3>
                   <p className="mt-1 text-sm text-slate-500">per {tier.period}</p>
@@ -427,7 +427,7 @@ const LandingPage: React.FC = () => {
               <span className="text-lg font-semibold text-white">IR</span>
             </div>
             <div>
-              <p className="text-base font-semibold text-slate-900" style={{ fontFamily: "'DM Serif Display', serif" }}>Immersive Reader</p>
+              <p className="text-base font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>Immersive Reader</p>
               <p className="text-xs uppercase tracking-widest text-slate-500">by VStyle</p>
             </div>
           </div>
