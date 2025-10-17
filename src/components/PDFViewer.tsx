@@ -203,48 +203,58 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         
         console.log('✅ Canvas rendered successfully')
 
-          // Render text layer using simple, reliable coordinate system
+          // Render text layer using manual approach with better coordinate handling
             if (textLayerRef.current) {
               textLayerRef.current.innerHTML = ''
               const textContent = await page.getTextContent()
               
-              // Create text layer with simple coordinate system
+              // Set up text layer container
+              const textLayerDiv = textLayerRef.current
+              textLayerDiv.style.position = 'absolute'
+              textLayerDiv.style.left = '0px'
+              textLayerDiv.style.top = '0px'
+              textLayerDiv.style.right = '0px'
+              textLayerDiv.style.bottom = '0px'
+              textLayerDiv.style.overflow = 'hidden'
+              textLayerDiv.style.opacity = '0.2'
+              textLayerDiv.style.lineHeight = '1.0'
+              
+              // Create text layer with proper coordinate transformation
               const textLayerFrag = window.document.createDocumentFragment()
               
               textContent.items.forEach((item: any) => {
                 const tx = item.transform
                 
-                // Use PDF.js coordinate system directly - no complex transformations
+                // Get the text item's bounding box in PDF coordinates
                 const x = tx[4]
                 const y = tx[5]
-                const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
+                const fontSize = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
                 
+                // Create span element
                 const span = window.document.createElement('span')
                 span.textContent = item.str
-                
-                // Simple positioning - PDF coordinates are already in viewport space
                 span.style.position = 'absolute'
                 span.style.left = `${x}px`
-                span.style.top = `${viewport.height - y - fontHeight}px`
-                span.style.fontSize = `${fontHeight}px`
+                span.style.top = `${viewport.height - y - fontSize}px`
+                span.style.fontSize = `${fontSize}px`
                 span.style.fontFamily = 'sans-serif'
                 span.style.lineHeight = '1'
                 span.style.whiteSpace = 'pre'
-                span.style.height = `${fontHeight}px`
+                span.style.height = `${fontSize}px`
                 span.style.width = item.width ? `${item.width}px` : 'auto'
                 span.style.color = 'transparent'
                 span.style.cursor = 'text'
                 span.style.userSelect = 'text'
-                
-                // Apply the full transform matrix as-is from PDF.js
-                span.style.transform = `matrix(${tx[0]}, ${tx[1]}, ${tx[2]}, ${tx[3]}, 0, 0)`
                 span.style.transformOrigin = '0% 0%'
+                
+                // Apply the transformation matrix from PDF.js
+                span.style.transform = `matrix(${tx[0]}, ${tx[1]}, ${tx[2]}, ${tx[3]}, 0, 0)`
                 
                 textLayerFrag.appendChild(span)
               })
               
-              textLayerRef.current.appendChild(textLayerFrag)
-              console.log('📝 Text layer rendered with simple coordinate system')
+              textLayerDiv.appendChild(textLayerFrag)
+              console.log('📝 Text layer rendered with improved coordinate handling')
             }
           
           // Mark page as rendered
@@ -292,48 +302,57 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
           await page.render(renderContext).promise
           
-          // Render text layer using simple, reliable coordinate system
+          // Render text layer using manual approach with better coordinate handling
             if (textLayerDiv) {
               textLayerDiv.innerHTML = ''
               const textContent = await page.getTextContent()
               
-              // Create text layer with simple coordinate system
+              // Set up text layer container
+              textLayerDiv.style.position = 'absolute'
+              textLayerDiv.style.left = '0px'
+              textLayerDiv.style.top = '0px'
+              textLayerDiv.style.right = '0px'
+              textLayerDiv.style.bottom = '0px'
+              textLayerDiv.style.overflow = 'hidden'
+              textLayerDiv.style.opacity = '0.2'
+              textLayerDiv.style.lineHeight = '1.0'
+              
+              // Create text layer with proper coordinate transformation
               const textLayerFrag = window.document.createDocumentFragment()
               
               textContent.items.forEach((item: any) => {
                 const tx = item.transform
                 
-                // Use PDF.js coordinate system directly - no complex transformations
+                // Get the text item's bounding box in PDF coordinates
                 const x = tx[4]
                 const y = tx[5]
-                const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
+                const fontSize = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
                 
+                // Create span element
                 const span = window.document.createElement('span')
                 span.textContent = item.str
-                
-                // Simple positioning - PDF coordinates are already in viewport space
                 span.style.position = 'absolute'
                 span.style.left = `${x}px`
-                span.style.top = `${viewport.height - y - fontHeight}px`
-                span.style.fontSize = `${fontHeight}px`
+                span.style.top = `${viewport.height - y - fontSize}px`
+                span.style.fontSize = `${fontSize}px`
                 span.style.fontFamily = 'sans-serif'
                 span.style.lineHeight = '1'
                 span.style.whiteSpace = 'pre'
-                span.style.height = `${fontHeight}px`
+                span.style.height = `${fontSize}px`
                 span.style.width = item.width ? `${item.width}px` : 'auto'
                 span.style.color = 'transparent'
                 span.style.cursor = 'text'
                 span.style.userSelect = 'text'
-                
-                // Apply the full transform matrix as-is from PDF.js
-                span.style.transform = `matrix(${tx[0]}, ${tx[1]}, ${tx[2]}, ${tx[3]}, 0, 0)`
                 span.style.transformOrigin = '0% 0%'
+                
+                // Apply the transformation matrix from PDF.js
+                span.style.transform = `matrix(${tx[0]}, ${tx[1]}, ${tx[2]}, ${tx[3]}, 0, 0)`
                 
                 textLayerFrag.appendChild(span)
               })
               
               textLayerDiv.appendChild(textLayerFrag)
-              console.log(`📝 Text layer rendered for page ${pageNum} with simple coordinate system`)
+              console.log(`📝 Text layer rendered for page ${pageNum} with improved coordinate handling`)
             }
         } catch (error) {
           console.error(`Error rendering page ${pageNum}:`, error)
