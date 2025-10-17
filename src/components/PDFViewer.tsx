@@ -204,51 +204,53 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         console.log('✅ Canvas rendered successfully')
 
           // Render text layer for selection using the SAME viewport
-          if (textLayerRef.current) {
-            textLayerRef.current.innerHTML = ''
-            const textContent = await page.getTextContent()
-            
-            // Manual text layer rendering with proper viewport synchronization
-            const textLayerFrag = window.document.createDocumentFragment()
-            const textDivs: HTMLSpanElement[] = []
-            
-            textContent.items.forEach((item: any, index: number) => {
-              const tx = item.transform
+            if (textLayerRef.current) {
+              textLayerRef.current.innerHTML = ''
+              const textContent = await page.getTextContent()
               
-              // Transform PDF coordinates to viewport coordinates with better precision
-              const x = tx[4]
-              const y = tx[5]
-              const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
+              // Manual text layer rendering with proper viewport synchronization
+              const textLayerFrag = window.document.createDocumentFragment()
+              const textDivs: HTMLSpanElement[] = []
               
-              // Calculate the actual text width from the transform matrix
-              const textWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1]))
+              textContent.items.forEach((item: any, index: number) => {
+                const tx = item.transform
+                
+                // Transform PDF coordinates to viewport coordinates
+                const x = tx[4]
+                const y = tx[5]
+                const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
+                
+                const span = window.document.createElement('span')
+                span.textContent = item.str
+                span.style.position = 'absolute'
+                span.style.left = `${x}px`
+                span.style.top = `${viewport.height - y - fontHeight}px`
+                span.style.fontSize = `${fontHeight}px`
+                span.style.fontFamily = 'sans-serif'
+                span.style.lineHeight = '1'
+                span.style.whiteSpace = 'pre'
+                span.style.height = `${fontHeight}px`
+                
+                // Use actual width from PDF if available, otherwise calculate
+                if (item.width > 0) {
+                  span.style.width = `${item.width}px`
+                  span.style.overflow = 'hidden'
+                } else {
+                  // Fallback width calculation
+                  span.style.width = 'auto'
+                }
+                
+                // Apply the transform matrix for pixel-perfect alignment
+                span.style.transform = `matrix(${tx[0]}, ${tx[1]}, ${tx[2]}, ${tx[3]}, 0, 0)`
+                span.style.transformOrigin = '0% 0%'
+                
+                textDivs.push(span)
+                textLayerFrag.appendChild(span)
+              })
               
-              const span = window.document.createElement('span')
-              span.textContent = item.str
-              span.style.position = 'absolute'
-              span.style.left = `${x}px`
-              span.style.top = `${viewport.height - y - fontHeight}px`
-              span.style.fontSize = `${fontHeight}px`
-              span.style.fontFamily = 'sans-serif'
-              span.style.lineHeight = '1'
-              span.style.whiteSpace = 'pre'
-              span.style.height = `${fontHeight}px`
-              span.style.width = `${textWidth}px`
-              span.style.overflow = 'hidden'
-              span.style.transformOrigin = '0% 0%'
-              
-              // Ensure pixel-perfect alignment for two-column layouts
-              span.style.transform = `matrix(${tx[0]}, ${tx[1]}, ${tx[2]}, ${tx[3]}, 0, 0)`
-              span.style.contain = 'layout style'
-              span.style.backfaceVisibility = 'hidden'
-              
-              textDivs.push(span)
-              textLayerFrag.appendChild(span)
-            })
-            
-            textLayerRef.current.appendChild(textLayerFrag)
-            console.log('📝 Text layer rendered')
-          }
+              textLayerRef.current.appendChild(textLayerFrag)
+              console.log('📝 Text layer rendered')
+            }
           
           // Mark page as rendered
           console.log('🎉 Setting pageRendered to true')
@@ -296,48 +298,50 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           await page.render(renderContext).promise
           
           // Render text layer for selection using the SAME viewport
-          if (textLayerDiv) {
-            textLayerDiv.innerHTML = ''
-            const textContent = await page.getTextContent()
-            
-            // Manual text layer rendering with proper viewport synchronization
-            const textLayerFrag = window.document.createDocumentFragment()
-            
-            textContent.items.forEach((item: any, index: number) => {
-              const tx = item.transform
+            if (textLayerDiv) {
+              textLayerDiv.innerHTML = ''
+              const textContent = await page.getTextContent()
               
-              // Transform PDF coordinates to viewport coordinates with better precision
-              const x = tx[4]
-              const y = tx[5]
-              const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
+              // Manual text layer rendering with proper viewport synchronization
+              const textLayerFrag = window.document.createDocumentFragment()
               
-              // Calculate the actual text width from the transform matrix
-              const textWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1]))
+              textContent.items.forEach((item: any, index: number) => {
+                const tx = item.transform
+                
+                // Transform PDF coordinates to viewport coordinates
+                const x = tx[4]
+                const y = tx[5]
+                const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
+                
+                const span = window.document.createElement('span')
+                span.textContent = item.str
+                span.style.position = 'absolute'
+                span.style.left = `${x}px`
+                span.style.top = `${viewport.height - y - fontHeight}px`
+                span.style.fontSize = `${fontHeight}px`
+                span.style.fontFamily = 'sans-serif'
+                span.style.lineHeight = '1'
+                span.style.whiteSpace = 'pre'
+                span.style.height = `${fontHeight}px`
+                
+                // Use actual width from PDF if available, otherwise calculate
+                if (item.width > 0) {
+                  span.style.width = `${item.width}px`
+                  span.style.overflow = 'hidden'
+                } else {
+                  // Fallback width calculation
+                  span.style.width = 'auto'
+                }
+                
+                // Apply the transform matrix for pixel-perfect alignment
+                span.style.transform = `matrix(${tx[0]}, ${tx[1]}, ${tx[2]}, ${tx[3]}, 0, 0)`
+                span.style.transformOrigin = '0% 0%'
+                
+                textLayerFrag.appendChild(span)
+              })
               
-              const span = window.document.createElement('span')
-              span.textContent = item.str
-              span.style.position = 'absolute'
-              span.style.left = `${x}px`
-              span.style.top = `${viewport.height - y - fontHeight}px`
-              span.style.fontSize = `${fontHeight}px`
-              span.style.fontFamily = 'sans-serif'
-              span.style.lineHeight = '1'
-              span.style.whiteSpace = 'pre'
-              span.style.height = `${fontHeight}px`
-              span.style.width = `${textWidth}px`
-              span.style.overflow = 'hidden'
-              span.style.transformOrigin = '0% 0%'
-              
-              // Ensure pixel-perfect alignment for two-column layouts
-              span.style.transform = `matrix(${tx[0]}, ${tx[1]}, ${tx[2]}, ${tx[3]}, 0, 0)`
-              span.style.contain = 'layout style'
-              span.style.backfaceVisibility = 'hidden'
-              
-              textLayerFrag.appendChild(span)
-            })
-            
-            textLayerDiv.appendChild(textLayerFrag)
-          }
+              textLayerDiv.appendChild(textLayerFrag)
+            }
         } catch (error) {
           console.error(`Error rendering page ${pageNum}:`, error)
         }
