@@ -216,7 +216,13 @@ export const AnnotationColorPicker: React.FC<{
               className="w-6 h-6 rounded-full border-2 border-gray-200"
               style={{ backgroundColor: item.color }}
             />
-            <span className="text-sm text-gray-700">{item.name}</span>
+            <span 
+              className={`text-sm font-medium ${
+                selectedColor === item.color ? 'text-gray-900' : 'text-gray-800'
+              }`}
+            >
+              {item.name}
+            </span>
           </div>
         ))}
       </div>
