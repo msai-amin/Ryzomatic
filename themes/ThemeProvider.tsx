@@ -218,8 +218,11 @@ export const AnnotationColorPicker: React.FC<{
             />
             <span 
               className={`text-sm font-semibold ${
-                selectedColor === item.color ? 'text-gray-900' : 'text-gray-900'
+                selectedColor === item.color ? 'text-gray-900' : 'text-white'
               }`}
+              style={{
+                color: selectedColor === item.color ? '#111827' : '#ffffff'
+              }}
             >
               {item.name}
             </span>
