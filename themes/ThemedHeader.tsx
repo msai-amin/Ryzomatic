@@ -6,7 +6,6 @@ import { TypographySettings } from '../src/components/TypographySettings'
 import { LibraryModal } from '../src/components/LibraryModal'
 import { AuthModal } from '../src/components/AuthModal'
 import { PomodoroTimer } from '../src/components/PomodoroTimer'
-import { TomatoIcon } from '../src/components/TomatoIcon'
 import { Tooltip } from '../src/components/Tooltip'
 import { useTheme } from './ThemeProvider'
 
@@ -194,17 +193,16 @@ export const ThemedHeader: React.FC = () => {
             </Tooltip>
           )}
           
-          <Tooltip content="Pomodoro Timer - Stay Focused 🍅" position="bottom">
+          <Tooltip content="Pomodoro Timer - Stay Focused" position="bottom">
             <button
               onClick={() => setShowPomodoro(!showPomodoro)}
-              className="p-1.5 rounded-lg transition-colors"
+              className="p-2 rounded-lg transition-colors text-2xl leading-none"
               style={{
                 backgroundColor: showPomodoro ? 'var(--color-primary-light)' : 'transparent',
-                color: showPomodoro ? '#dc2626' : '#ef4444', // Tomato red color
                 border: showPomodoro ? '2px solid var(--color-primary)' : 'none',
               }}
             >
-              <TomatoIcon size={24} className="w-6 h-6" />
+              🍅
             </button>
           </Tooltip>
 
