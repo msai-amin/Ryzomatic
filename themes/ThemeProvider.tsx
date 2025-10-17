@@ -217,8 +217,8 @@ export const AnnotationColorPicker: React.FC<{
               style={{ backgroundColor: item.color }}
             />
             <span 
-              className={`text-sm font-medium ${
-                selectedColor === item.color ? 'text-gray-900' : 'text-gray-800'
+              className={`text-sm font-semibold ${
+                selectedColor === item.color ? 'text-gray-900' : 'text-gray-900'
               }`}
             >
               {item.name}

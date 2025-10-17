@@ -41,19 +41,26 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
     },
   ]
 
-  // Load Pomodoro stats for mock documents
+  // Load Pomodoro stats for real documents (skip mock data with non-UUID IDs)
   useEffect(() => {
     const loadStats = async () => {
       if (!user) return
       
+      // Only load stats for real documents with valid UUID format
+      // Mock documents with IDs like "1", "2", "3" will be skipped
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      
       const stats: { [key: string]: { timeMinutes: number, sessions: number } } = {}
       
       for (const doc of mockDocuments) {
-        const bookStats = await pomodoroService.getBookStats(doc.id)
-        if (bookStats) {
-          stats[doc.id] = {
-            timeMinutes: Math.round(bookStats.total_time_minutes),
-            sessions: bookStats.total_sessions
+        // Only fetch stats for valid UUIDs
+        if (uuidRegex.test(doc.id)) {
+          const bookStats = await pomodoroService.getBookStats(doc.id)
+          if (bookStats) {
+            stats[doc.id] = {
+              timeMinutes: Math.round(bookStats.total_time_minutes),
+              sessions: bookStats.total_sessions
+            }
           }
         }
       }
