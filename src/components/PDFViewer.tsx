@@ -72,6 +72,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const [selectedTextForNote, setSelectedTextForNote] = useState<string>('')
   const [selectionMode, setSelectionMode] = useState(false)
   const [showVoiceSelector, setShowVoiceSelector] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [pageRendered, setPageRendered] = useState(false)
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const textLayerRef = useRef<HTMLDivElement>(null)
@@ -93,6 +95,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   useEffect(() => {
     const loadPDF = async () => {
       if (!document.pdfData) return
+
+      setIsLoading(true)
+      setPageRendered(false)
 
       try {
         // Dynamic import of PDF.js to avoid ES module issues with Vite
@@ -122,6 +127,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         
         pdfDocRef.current = pdf
         setNumPages(pdf.numPages)
+        setIsLoading(false)
         console.log('✅ PDF loaded successfully:', pdf.numPages, 'pages')
         console.log('PDF Document Info:', {
           numPages: pdf.numPages,
@@ -131,6 +137,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         })
       } catch (error) {
         console.error('Error loading PDF:', error)
+        setIsLoading(false)
       }
     }
 
@@ -148,11 +155,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     if (pdfViewer.scrollMode === 'continuous') return
 
     const renderPage = async () => {
-      if (!pdfDocRef.current || !canvasRef.current) return
+      if (!pdfDocRef.current || !canvasRef.current) {
+        console.log('⏭️ Skipping render - missing refs:', {
+          hasPdfDoc: !!pdfDocRef.current,
+          hasCanvas: !!canvasRef.current
+        })
+        return
+      }
+
+      console.log('🎨 Starting page render:', pageNumber)
+      setPageRendered(false) // Reset rendered state when starting new page
 
       try {
         // Cancel any ongoing render task
         if (renderTaskRef.current) {
+          console.log('🚫 Cancelling previous render task')
           renderTaskRef.current.cancel()
         }
 
@@ -160,12 +177,20 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         const canvas = canvasRef.current
         const context = canvas.getContext('2d')
         
-        if (!context) return
+        if (!context) {
+          console.log('❌ No canvas context available')
+          return
+        }
 
         const viewport = page.getViewport({ scale, rotation })
         
         canvas.height = viewport.height
         canvas.width = viewport.width
+
+        console.log('📐 Canvas dimensions set:', {
+          width: canvas.width,
+          height: canvas.height
+        })
 
         const renderContext = {
           canvasContext: context,
@@ -175,6 +200,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         renderTaskRef.current = page.render(renderContext)
         await renderTaskRef.current.promise
         renderTaskRef.current = null
+        
+        console.log('✅ Canvas rendered successfully')
 
           // Render text layer for selection using the SAME viewport
           if (textLayerRef.current) {
@@ -188,11 +215,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             textContent.items.forEach((item: any, index: number) => {
               const tx = item.transform
               
-              // Transform PDF coordinates to viewport coordinates
+              // Transform PDF coordinates to viewport coordinates with better precision
               const x = tx[4]
               const y = tx[5]
               const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
               
+              // Calculate the actual text width from the transform matrix
+              const textWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1]))
               
               const span = window.document.createElement('span')
               span.textContent = item.str
@@ -204,35 +233,38 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               span.style.lineHeight = '1'
               span.style.whiteSpace = 'pre'
               span.style.height = `${fontHeight}px`
-              
-              // Use actual width from PDF if available, otherwise calculate
-              if (item.width > 0) {
-                span.style.width = `${item.width}px`
-                span.style.overflow = 'hidden'
-              } else {
-                // Fallback width calculation
-                span.style.width = 'auto'
-              }
-              
-              // Don't use scaleX transform as it can cause alignment issues
-              // Instead rely on the actual width and font settings
+              span.style.width = `${textWidth}px`
+              span.style.overflow = 'hidden'
               span.style.transformOrigin = '0% 0%'
+              
+              // Ensure pixel-perfect alignment for two-column layouts
+              span.style.transform = `matrix(${tx[0]}, ${tx[1]}, ${tx[2]}, ${tx[3]}, 0, 0)`
+              span.style.contain = 'layout style'
+              span.style.backfaceVisibility = 'hidden'
               
               textDivs.push(span)
               textLayerFrag.appendChild(span)
             })
             
             textLayerRef.current.appendChild(textLayerFrag)
+            console.log('📝 Text layer rendered')
           }
+          
+          // Mark page as rendered
+          console.log('🎉 Setting pageRendered to true')
+          setPageRendered(true)
       } catch (error: any) {
         if (error?.name !== 'RenderingCancelledException') {
-          console.error('Error rendering page:', error)
+          console.error('❌ Error rendering page:', error)
+        } else {
+          console.log('🚫 Render cancelled (normal during page change)')
         }
+        setPageRendered(true) // Still mark as "done" even if error
       }
     }
 
     renderPage()
-  }, [pageNumber, scale, rotation, pdfViewer.scrollMode])
+  }, [pageNumber, scale, rotation, pdfViewer.scrollMode, numPages])
 
   // Render all pages (continuous scroll mode)
   useEffect(() => {
@@ -274,11 +306,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             textContent.items.forEach((item: any, index: number) => {
               const tx = item.transform
               
-              // Transform PDF coordinates to viewport coordinates
+              // Transform PDF coordinates to viewport coordinates with better precision
               const x = tx[4]
               const y = tx[5]
               const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
               
+              // Calculate the actual text width from the transform matrix
+              const textWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1]))
               
               const span = window.document.createElement('span')
               span.textContent = item.str
@@ -290,19 +324,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               span.style.lineHeight = '1'
               span.style.whiteSpace = 'pre'
               span.style.height = `${fontHeight}px`
-              
-              // Use actual width from PDF if available, otherwise calculate
-              if (item.width > 0) {
-                span.style.width = `${item.width}px`
-                span.style.overflow = 'hidden'
-              } else {
-                // Fallback width calculation
-                span.style.width = 'auto'
-              }
-              
-              // Don't use scaleX transform as it can cause alignment issues
-              // Instead rely on the actual width and font settings
+              span.style.width = `${textWidth}px`
+              span.style.overflow = 'hidden'
               span.style.transformOrigin = '0% 0%'
+              
+              // Ensure pixel-perfect alignment for two-column layouts
+              span.style.transform = `matrix(${tx[0]}, ${tx[1]}, ${tx[2]}, ${tx[3]}, 0, 0)`
+              span.style.contain = 'layout style'
+              span.style.backfaceVisibility = 'hidden'
               
               textLayerFrag.appendChild(span)
             })
@@ -1064,56 +1093,96 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         {pdfViewer.scrollMode === 'continuous' ? (
           // Continuous scroll mode - render all pages
           <div className="flex flex-col items-center gap-4">
-            {numPages && Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
-              <div key={pageNum} className="relative bg-white shadow-2xl" data-page-number={pageNum}>
-                <canvas
-                  ref={(el) => {
-                    if (el) pageCanvasRefs.current.set(pageNum, el)
-                  }}
-                  className="block"
-                />
-                <div
-                  ref={(el) => {
-                    if (el) pageTextLayerRefs.current.set(pageNum, el)
-                  }}
-                  className="textLayer"
-                />
-                {/* Render highlights for this page */}
-                {highlights
-                  .filter(h => h.pageNumber === pageNum)
-                  .map(highlight => (
-                    <div
-                      key={highlight.id}
-                      className="absolute group"
-                      style={{
-                        left: highlight.position.x,
-                        top: highlight.position.y,
-                        width: highlight.position.width,
-                        height: highlight.position.height,
-                        backgroundColor: highlight.color,
-                        opacity: 0.4,
-                        pointerEvents: 'auto'
-                      }}
-                    >
-              <button
-                        onClick={() => removeHighlight(highlight.id)}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                        <Trash2 className="w-3 h-3" />
-              </button>
+            {isLoading ? (
+              // Loading state for continuous mode
+              <div className="relative bg-white shadow-2xl p-20">
+                <div className="text-center">
+                  <div 
+                    className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4"
+                    style={{ borderColor: 'var(--color-primary)' }}
+                  ></div>
+                  <p style={{ color: 'var(--color-text-secondary)' }}>
+                    Loading PDF...
+                  </p>
+                </div>
+              </div>
+            ) : (
+              numPages && Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
+                <div key={pageNum} className="relative bg-white shadow-2xl" data-page-number={pageNum} style={{ minHeight: '600px', minWidth: '400px' }}>
+                  <canvas
+                    ref={(el) => {
+                      if (el) pageCanvasRefs.current.set(pageNum, el)
+                    }}
+                    className="block"
+                  />
+                  <div
+                    ref={(el) => {
+                      if (el) pageTextLayerRefs.current.set(pageNum, el)
+                    }}
+                    className="textLayer"
+                  />
+                  {/* Render highlights for this page */}
+                  {highlights
+                    .filter(h => h.pageNumber === pageNum)
+                    .map(highlight => (
+                      <div
+                        key={highlight.id}
+                        className="absolute group"
+                        style={{
+                          left: highlight.position.x,
+                          top: highlight.position.y,
+                          width: highlight.position.width,
+                          height: highlight.position.height,
+                          backgroundColor: highlight.color,
+                          opacity: 0.4,
+                          pointerEvents: 'auto'
+                        }}
+                      >
+                <button
+                          onClick={() => removeHighlight(highlight.id)}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                          <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+                    ))}
             </div>
-                  ))}
-          </div>
-            ))}
+              ))
+            )}
       </div>
         ) : (
           // Single page mode
           <div className="flex justify-center">
-            <div ref={pageContainerRef} className="relative bg-white shadow-2xl">
-              <canvas ref={canvasRef} className="block" />
+            <div ref={pageContainerRef} className="relative bg-white shadow-2xl" style={{ minHeight: '600px', minWidth: '400px' }}>
+              {/* Loading indicator */}
+              {(() => {
+                const shouldShowLoading = isLoading || !pageRendered;
+                console.log('🔍 Loading indicator check:', {
+                  isLoading,
+                  pageRendered,
+                  shouldShowLoading,
+                  numPages
+                });
+                return shouldShowLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
+                    <div className="text-center">
+                      <div 
+                        className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4"
+                        style={{ borderColor: 'var(--color-primary)' }}
+                      ></div>
+                      <p style={{ color: 'var(--color-text-secondary)' }}>
+                        {isLoading ? 'Loading PDF...' : 'Rendering page...'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+              
+              <canvas ref={canvasRef} className="block" style={{ opacity: pageRendered ? 1 : 0 }} />
               <div
                 ref={textLayerRef}
                 className="textLayer"
+                style={{ opacity: pageRendered ? 1 : 0 }}
               />
               
               {/* Render highlights */}

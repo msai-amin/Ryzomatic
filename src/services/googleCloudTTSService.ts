@@ -306,10 +306,24 @@ class GoogleCloudTTSService {
     // Get the official API name for the voice
     const officialVoiceName = getOfficialVoiceName(voice.name);
     
+    // Extract language code from voice name if not available
+    // Voice names follow pattern: {languageCode}-{voiceType}-{voiceId}
+    // Example: en-AU-Neural2-A has language code en-AU
+    let languageCode = voice.languageCode;
+    if (!languageCode) {
+      // Extract from voice name (e.g., "en-AU-Neural2-A" -> "en-AU")
+      const match = officialVoiceName.match(/^([a-z]{2}-[A-Z]{2})/);
+      if (match) {
+        languageCode = match[1];
+      } else {
+        languageCode = "en-US"; // Fallback
+      }
+    }
+    
     console.log('Voice Name Mapping:', {
       displayName: voice.name,
       officialApiName: officialVoiceName,
-      languageCode: voice.languageCode || 'en-US'
+      languageCode: languageCode
     });
 
     const requestBody = {
@@ -317,7 +331,7 @@ class GoogleCloudTTSService {
         "text": text
       },
       "voice": {
-        "languageCode": voice.languageCode || "en-US",
+        "languageCode": languageCode,
         "name": officialVoiceName  // Use the official API name
       },
       "audioConfig": {
