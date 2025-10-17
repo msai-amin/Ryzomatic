@@ -233,7 +233,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ onClose }) => {
 
   return (
     <div
-      className="fixed bottom-4 right-24 z-50 rounded-xl shadow-2xl p-6"
+      className="rounded-xl shadow-2xl p-6"
       style={{
         backgroundColor: 'var(--color-surface)',
         border: `2px solid ${getModeColor()}`,

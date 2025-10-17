@@ -6,13 +6,11 @@ import { ThemedSidebar } from './ThemedSidebar'
 import { ThemedMainContent } from './ThemedMainContent'
 import { DocumentViewer } from '../src/components/DocumentViewer'
 import { ChatModal } from '../src/components/ChatModal'
-import { PomodoroTimer } from '../src/components/PomodoroTimer'
 import { Tooltip } from '../src/components/Tooltip'
 import { useAppStore } from '../src/store/appStore'
 
 const ThemedAppContent: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
-  const [showPomodoro, setShowPomodoro] = useState(false)
   const { currentTheme } = useTheme()
   const { isChatOpen, toggleChat } = useAppStore()
 
@@ -47,13 +45,8 @@ const ThemedAppContent: React.FC = () => {
         <ChatModal onClose={() => toggleChat()} />
       )}
 
-      {/* Pomodoro Timer */}
-      {showPomodoro && (
-        <PomodoroTimer onClose={() => setShowPomodoro(false)} />
-      )}
-
-      {/* Floating Action Button */}
-      <Tooltip content="Toggle Pomodoro Timer" position="left">
+      {/* Floating Action Button - Reserved for future quick actions */}
+      <Tooltip content="Quick Actions (Coming Soon)" position="left">
         <button
           className="fixed shadow-lg transition-colors"
           style={{
@@ -77,7 +70,9 @@ const ThemedAppContent: React.FC = () => {
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'var(--color-primary)'
           }}
-          onClick={() => setShowPomodoro(!showPomodoro)}
+          onClick={() => {
+            console.log('Quick actions - coming soon')
+          }}
         >
           <Plus className="w-6 h-6" />
         </button>

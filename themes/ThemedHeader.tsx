@@ -1,10 +1,11 @@
 import React from 'react'
-import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut, Menu } from 'lucide-react'
+import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut, Menu, Clock } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { DocumentUpload } from '../src/components/DocumentUpload'
 import { TypographySettings } from '../src/components/TypographySettings'
 import { LibraryModal } from '../src/components/LibraryModal'
 import { AuthModal } from '../src/components/AuthModal'
+import { PomodoroTimer } from '../src/components/PomodoroTimer'
 import { Tooltip } from '../src/components/Tooltip'
 import { useTheme } from './ThemeProvider'
 
@@ -21,6 +22,7 @@ export const ThemedHeader: React.FC = () => {
   const [showSettings, setShowSettings] = React.useState(false)
   const [showLibrary, setShowLibrary] = React.useState(false)
   const [showAuth, setShowAuth] = React.useState(false)
+  const [showPomodoro, setShowPomodoro] = React.useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true)
 
   const { currentTheme } = useTheme()
@@ -191,6 +193,20 @@ export const ThemedHeader: React.FC = () => {
             </Tooltip>
           )}
           
+          <Tooltip content="Pomodoro Timer - Stay Focused" position="bottom">
+            <button
+              onClick={() => setShowPomodoro(!showPomodoro)}
+              className="p-2 rounded-lg transition-colors"
+              style={{
+                backgroundColor: showPomodoro ? 'var(--color-primary-light)' : 'transparent',
+                color: showPomodoro ? 'var(--color-primary)' : 'var(--color-text-primary)',
+                border: showPomodoro ? '2px solid var(--color-primary)' : 'none',
+              }}
+            >
+              <Clock className="w-5 h-5" />
+            </button>
+          </Tooltip>
+
           <Tooltip content="Text-to-Speech & AI Assistant" position="bottom">
             <button
               onClick={toggleChat}
@@ -209,6 +225,13 @@ export const ThemedHeader: React.FC = () => {
           </Tooltip>
         </div>
       </div>
+
+      {/* Pomodoro Timer - Positioned in top right for easy access */}
+      {showPomodoro && (
+        <div className="absolute top-16 right-4 z-50">
+          <PomodoroTimer onClose={() => setShowPomodoro(false)} />
+        </div>
+      )}
 
       {/* Modals */}
       {showAuth && (
