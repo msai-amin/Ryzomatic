@@ -6,6 +6,7 @@ import { ThemedSidebar } from './ThemedSidebar'
 import { ThemedMainContent } from './ThemedMainContent'
 import { DocumentViewer } from '../src/components/DocumentViewer'
 import { ChatModal } from '../src/components/ChatModal'
+import { Tooltip } from '../src/components/Tooltip'
 import { useAppStore } from '../src/store/appStore'
 
 const ThemedAppContent: React.FC = () => {
@@ -45,35 +46,37 @@ const ThemedAppContent: React.FC = () => {
       )}
 
       {/* Floating Action Button */}
-      <button
-        className="fixed shadow-lg transition-colors"
-        style={{
-          bottom: 'var(--spacing-lg)',
-          right: 'var(--spacing-lg)',
-          width: 'var(--floating-button-size)',
-          height: 'var(--floating-button-size)',
-          borderRadius: '50%',
-          backgroundColor: 'var(--color-primary)',
-          color: 'var(--color-text-inverse)',
-          boxShadow: 'var(--shadow-lg)',
-          border: 'none',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'var(--color-primary)'
-        }}
-        onClick={() => {
-          console.log('Floating action button clicked')
-        }}
-      >
-        <Plus className="w-6 h-6" />
-      </button>
+      <Tooltip content="Quick Actions" position="left">
+        <button
+          className="fixed shadow-lg transition-colors"
+          style={{
+            bottom: 'var(--spacing-lg)',
+            right: 'var(--spacing-lg)',
+            width: 'var(--floating-button-size)',
+            height: 'var(--floating-button-size)',
+            borderRadius: '50%',
+            backgroundColor: 'var(--color-primary)',
+            color: 'var(--color-text-inverse)',
+            boxShadow: 'var(--shadow-lg)',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-primary)'
+          }}
+          onClick={() => {
+            console.log('Floating action button clicked')
+          }}
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      </Tooltip>
 
       {/* Theme Switcher (for development/testing) */}
       <div 

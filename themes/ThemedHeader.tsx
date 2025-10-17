@@ -5,6 +5,7 @@ import { DocumentUpload } from '../src/components/DocumentUpload'
 import { TypographySettings } from '../src/components/TypographySettings'
 import { LibraryModal } from '../src/components/LibraryModal'
 import { AuthModal } from '../src/components/AuthModal'
+import { Tooltip } from '../src/components/Tooltip'
 import { useTheme } from './ThemeProvider'
 
 export const ThemedHeader: React.FC = () => {
@@ -41,15 +42,17 @@ export const ThemedHeader: React.FC = () => {
       <div className="flex items-center justify-between h-full">
         {/* Logo and Title */}
         <div className="flex items-center space-x-4">
-          <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            style={{
-              color: 'var(--color-text-primary)',
-            }}
-          >
-            <Menu className="w-5 h-5" />
-          </button>
+          <Tooltip content="Toggle Sidebar" position="bottom">
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              style={{
+                color: 'var(--color-text-primary)',
+              }}
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          </Tooltip>
           
           <div 
             className="px-3 py-1 font-bold text-sm rounded-lg"
@@ -76,118 +79,134 @@ export const ThemedHeader: React.FC = () => {
         {/* Actions */}
         <div className="flex items-center space-x-3">
           {/* Search Button */}
-          <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </button>
+          <Tooltip content="Search Documents" position="bottom">
+            <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
+          </Tooltip>
 
           {/* Show Library and Upload only when user is signed in */}
           {user && (
             <>
-              <button
-                onClick={() => setShowLibrary(true)}
-                className="btn-secondary flex items-center space-x-2"
-                style={{
-                  backgroundColor: 'var(--color-surface)',
-                  color: 'var(--color-text-primary)',
-                  border: '1px solid var(--color-border)',
-                  padding: 'var(--spacing-sm) var(--spacing-md)',
-                  borderRadius: 'var(--border-radius-lg)',
-                }}
-              >
-                <Library className="w-4 h-4" />
-                <span>Library</span>
-              </button>
+              <Tooltip content="View Library" position="bottom">
+                <button
+                  onClick={() => setShowLibrary(true)}
+                  className="btn-secondary flex items-center space-x-2"
+                  style={{
+                    backgroundColor: 'var(--color-surface)',
+                    color: 'var(--color-text-primary)',
+                    border: '1px solid var(--color-border)',
+                    padding: 'var(--spacing-sm) var(--spacing-md)',
+                    borderRadius: 'var(--border-radius-lg)',
+                  }}
+                >
+                  <Library className="w-4 h-4" />
+                  <span>Library</span>
+                </button>
+              </Tooltip>
 
-              <button
-                onClick={() => setShowUpload(true)}
-                className="btn-primary flex items-center space-x-2"
-                style={{
-                  backgroundColor: 'var(--color-primary)',
-                  color: 'var(--color-text-inverse)',
-                  border: 'none',
-                  padding: 'var(--spacing-sm) var(--spacing-md)',
-                  borderRadius: 'var(--border-radius-lg)',
-                }}
-              >
-                <Upload className="w-4 h-4" />
-                <span>New Material</span>
-              </button>
+              <Tooltip content="Upload New Document" position="bottom">
+                <button
+                  onClick={() => setShowUpload(true)}
+                  className="btn-primary flex items-center space-x-2"
+                  style={{
+                    backgroundColor: 'var(--color-primary)',
+                    color: 'var(--color-text-inverse)',
+                    border: 'none',
+                    padding: 'var(--spacing-sm) var(--spacing-md)',
+                    borderRadius: 'var(--border-radius-lg)',
+                  }}
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>New Material</span>
+                </button>
+              </Tooltip>
             </>
           )}
           
-          <button
-            onClick={() => setShowSettings(true)}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            style={{ color: 'var(--color-text-primary)' }}
-          >
-            <Settings className="w-5 h-5" />
-          </button>
+          <Tooltip content="Reading Settings" position="bottom">
+            <button
+              onClick={() => setShowSettings(true)}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              style={{ color: 'var(--color-text-primary)' }}
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+          </Tooltip>
 
           {/* Auth Button */}
           {isAuthenticated && user ? (
             <div className="flex items-center space-x-4">
-              <div 
-                className="flex items-center space-x-2"
-                style={{ color: 'var(--color-text-secondary)' }}
-              >
-                <User className="w-4 h-4" />
-                <span className="text-sm font-medium">
-                  {user.full_name || user.email}
-                </span>
-                <span 
-                  className="text-xs px-2 py-1 rounded-full"
+              <Tooltip content={`Signed in as ${user.full_name || user.email}`} position="bottom">
+                <div 
+                  className="flex items-center space-x-2"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                >
+                  <User className="w-4 h-4" />
+                  <span className="text-sm font-medium">
+                    {user.full_name || user.email}
+                  </span>
+                  <span 
+                    className="text-xs px-2 py-1 rounded-full"
+                    style={{
+                      backgroundColor: 'var(--color-primary-light)',
+                      color: 'var(--color-primary-dark)',
+                    }}
+                  >
+                    {user.tier?.toUpperCase()}
+                  </span>
+                </div>
+              </Tooltip>
+              <Tooltip content="Sign Out" position="bottom">
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center space-x-2 px-3 py-1 rounded-lg transition-colors"
                   style={{
-                    backgroundColor: 'var(--color-primary-light)',
-                    color: 'var(--color-primary-dark)',
+                    backgroundColor: 'var(--color-surface)',
+                    color: 'var(--color-error)',
+                    border: '1px solid var(--color-error)',
                   }}
                 >
-                  {user.tier?.toUpperCase()}
-                </span>
-              </div>
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout</span>
+                </button>
+              </Tooltip>
+            </div>
+          ) : (
+            <Tooltip content="Sign in to access all features" position="bottom">
               <button
-                onClick={handleLogout}
+                onClick={() => setShowAuth(true)}
                 className="flex items-center space-x-2 px-3 py-1 rounded-lg transition-colors"
                 style={{
                   backgroundColor: 'var(--color-surface)',
-                  color: 'var(--color-error)',
-                  border: '1px solid var(--color-error)',
+                  color: 'var(--color-text-primary)',
+                  border: '1px solid var(--color-border)',
                 }}
               >
-                <LogOut className="w-4 h-4" />
-                <span>Logout</span>
+                <User className="w-4 h-4" />
+                <span>Sign In</span>
               </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowAuth(true)}
-              className="flex items-center space-x-2 px-3 py-1 rounded-lg transition-colors"
-              style={{
-                backgroundColor: 'var(--color-surface)',
-                color: 'var(--color-text-primary)',
-                border: '1px solid var(--color-border)',
-              }}
-            >
-              <User className="w-4 h-4" />
-              <span>Sign In</span>
-            </button>
+            </Tooltip>
           )}
           
-          <button
-            onClick={toggleChat}
-            className="btn-primary flex items-center space-x-2"
-            style={{
-              backgroundColor: 'var(--color-secondary)',
-              color: 'var(--color-text-inverse)',
-              border: 'none',
-              padding: 'var(--spacing-sm) var(--spacing-md)',
-              borderRadius: 'var(--border-radius-lg)',
-            }}
-          >
-            <MessageCircle className="w-4 h-4" />
-            <span>TTS</span>
-          </button>
+          <Tooltip content="Text-to-Speech & AI Assistant" position="bottom">
+            <button
+              onClick={toggleChat}
+              className="btn-primary flex items-center space-x-2"
+              style={{
+                backgroundColor: 'var(--color-secondary)',
+                color: 'var(--color-text-inverse)',
+                border: 'none',
+                padding: 'var(--spacing-sm) var(--spacing-md)',
+                borderRadius: 'var(--border-radius-lg)',
+              }}
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>TTS</span>
+            </button>
+          </Tooltip>
         </div>
       </div>
 

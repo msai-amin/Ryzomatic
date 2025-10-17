@@ -1,6 +1,7 @@
 import React from 'react'
 import { FileText, Clock, BookOpen, Tag } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
+import { Tooltip } from '../src/components/Tooltip'
 import { useTheme, AnnotationColorPicker } from './ThemeProvider'
 
 interface ThemedSidebarProps {
@@ -82,7 +83,9 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center space-x-2">
-                    <FileText className="w-4 h-4" style={{ color: 'var(--color-text-secondary)' }} />
+                    <Tooltip content={doc.isActive ? "Currently Active" : "Click to Open"} position="right">
+                      <FileText className="w-4 h-4" style={{ color: 'var(--color-text-secondary)' }} />
+                    </Tooltip>
                     <h3 
                       className={`text-sm ${doc.isActive ? 'font-semibold' : 'font-medium'}`}
                       style={{ 
@@ -107,14 +110,18 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
                 
                 <div className="flex items-center justify-between text-xs">
                   <div className="flex items-center space-x-2">
-                    <Clock className="w-3 h-3" style={{ color: doc.isActive ? '#4b5563' : 'var(--color-text-tertiary)' }} />
+                    <Tooltip content="Reading Progress" position="right">
+                      <Clock className="w-3 h-3" style={{ color: doc.isActive ? '#4b5563' : 'var(--color-text-tertiary)' }} />
+                    </Tooltip>
                     <span style={{ color: doc.isActive ? '#374151' : 'var(--color-text-secondary)' }}>
                       {doc.progress}% complete
                     </span>
                   </div>
-                  <span style={{ color: doc.isActive ? '#4b5563' : 'var(--color-text-tertiary)' }}>
-                    {doc.readingTime} reading
-                  </span>
+                  <Tooltip content="Estimated Reading Time" position="left">
+                    <span style={{ color: doc.isActive ? '#4b5563' : 'var(--color-text-tertiary)' }}>
+                      {doc.readingTime} reading
+                    </span>
+                  </Tooltip>
                 </div>
                 
                 {/* Progress Bar */}

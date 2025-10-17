@@ -1,5 +1,6 @@
 import React from 'react'
 import { useAppStore } from '../src/store/appStore'
+import { Tooltip } from '../src/components/Tooltip'
 import { useTheme } from './ThemeProvider'
 
 interface ThemedMainContentProps {
@@ -44,15 +45,17 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
             >
               Research Notes
             </h2>
-            <button 
-              className="text-sm px-3 py-1 rounded-full"
-              style={{
-                backgroundColor: 'var(--color-primary)',
-                color: 'var(--color-text-inverse)',
-              }}
-            >
-              + New Note
-            </button>
+            <Tooltip content="Create New Note" position="left">
+              <button 
+                className="text-sm px-3 py-1 rounded-full"
+                style={{
+                  backgroundColor: 'var(--color-primary)',
+                  color: 'var(--color-text-inverse)',
+                }}
+              >
+                + New Note
+              </button>
+            </Tooltip>
           </div>
 
           {/* Color Legend */}
@@ -90,24 +93,30 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
               Quick Actions
             </h3>
             <div className="space-y-2">
-              <button 
-                className="w-full text-left text-sm p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                style={{ color: 'var(--color-text-primary)' }}
-              >
-                Export Notes
-              </button>
-              <button 
-                className="w-full text-left text-sm p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                style={{ color: 'var(--color-text-primary)' }}
-              >
-                Generate Summary
-              </button>
-              <button 
-                className="w-full text-left text-sm p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                style={{ color: 'var(--color-text-primary)' }}
-              >
-                Create Citation
-              </button>
+              <Tooltip content="Export all your notes to a file" position="left">
+                <button 
+                  className="w-full text-left text-sm p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  Export Notes
+                </button>
+              </Tooltip>
+              <Tooltip content="AI-generated summary of this document" position="left">
+                <button 
+                  className="w-full text-left text-sm p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  Generate Summary
+                </button>
+              </Tooltip>
+              <Tooltip content="Generate citation in multiple formats" position="left">
+                <button 
+                  className="w-full text-left text-sm p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  Create Citation
+                </button>
+              </Tooltip>
             </div>
           </div>
         </div>
