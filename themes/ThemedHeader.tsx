@@ -24,12 +24,33 @@ export const ThemedHeader: React.FC = () => {
   const [showAuth, setShowAuth] = React.useState(false)
   const [showPomodoro, setShowPomodoro] = React.useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true)
+  
+  const pomodoroRef = React.useRef<HTMLDivElement>(null)
+  const pomodoroButtonRef = React.useRef<HTMLButtonElement>(null)
 
   const { currentTheme } = useTheme()
 
   const handleLogout = async () => {
     await logout()
   }
+
+  // Close Pomodoro menu when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showPomodoro && 
+          pomodoroRef.current && 
+          pomodoroButtonRef.current &&
+          !pomodoroRef.current.contains(event.target as Node) &&
+          !pomodoroButtonRef.current.contains(event.target as Node)) {
+        setShowPomodoro(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showPomodoro])
 
   return (
     <header 
@@ -195,6 +216,7 @@ export const ThemedHeader: React.FC = () => {
           
           <Tooltip content="Pomodoro Timer - Stay Focused" position="bottom">
             <button
+              ref={pomodoroButtonRef}
               onClick={() => setShowPomodoro(!showPomodoro)}
               className="p-2 rounded-lg transition-colors text-2xl leading-none"
               style={{
@@ -227,7 +249,7 @@ export const ThemedHeader: React.FC = () => {
 
       {/* Pomodoro Timer - Positioned in top right for easy access */}
       {showPomodoro && (
-        <div className="absolute top-16 right-4 z-50">
+        <div ref={pomodoroRef} className="absolute top-16 right-4 z-50">
           <PomodoroTimer 
             documentId={currentDocument?.id || null}
             documentName={currentDocument?.name || undefined}

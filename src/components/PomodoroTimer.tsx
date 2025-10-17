@@ -253,29 +253,25 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
     requestNotificationPermission()
   }, [])
 
-  // Auto-save session when document changes or component unmounts
-  useEffect(() => {
-    return () => {
-      // Cleanup: save active session when unmounting
-      if (user && activePomodoroSessionId && isRunning) {
-        const duration = settings.workDuration * 60 - timeLeft
-        pomodoroService.stopCurrentSession(false).then(() => {
-          setPomodoroSession(null, null, null)
-        })
-      }
-    }
-  }, [])
-
-  // Handle document change - pause and save current session
+  // Handle document change - pause and save current session (only when document actually changes)
+  const previousDocumentIdRef = useRef<string | null>(null)
+  
   useEffect(() => {
     const handleDocumentChange = async () => {
-      if (user && activePomodoroSessionId && isRunning) {
+      // Only act if document ID actually changed (not on initial mount)
+      if (previousDocumentIdRef.current !== null && 
+          previousDocumentIdRef.current !== documentId &&
+          user && activePomodoroSessionId && isRunning) {
         // Document changed while timer running - auto-save
+        console.log('Document changed, auto-saving Pomodoro session')
         const duration = settings.workDuration * 60 - timeLeft
         await pomodoroService.stopCurrentSession(false)
         setPomodoroSession(null, null, null)
         setIsRunning(false)
       }
+      
+      // Update the ref to current document
+      previousDocumentIdRef.current = documentId || null
     }
 
     handleDocumentChange()
