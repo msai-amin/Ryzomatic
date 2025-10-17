@@ -228,7 +228,11 @@ export const ThemedHeader: React.FC = () => {
       {/* Pomodoro Timer - Positioned in top right for easy access */}
       {showPomodoro && (
         <div className="absolute top-16 right-4 z-50">
-          <PomodoroTimer onClose={() => setShowPomodoro(false)} />
+          <PomodoroTimer 
+            documentId={currentDocument?.id || null}
+            documentName={currentDocument?.name || undefined}
+            onClose={() => setShowPomodoro(false)} 
+          />
         </div>
       )}
 

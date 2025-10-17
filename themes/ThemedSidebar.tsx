@@ -1,7 +1,8 @@
-import React from 'react'
-import { FileText, Clock, BookOpen, Tag } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { FileText, Clock, BookOpen, Tag, Timer } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
+import { pomodoroService } from '../src/services/pomodoroService'
 import { useTheme, AnnotationColorPicker } from './ThemeProvider'
 
 interface ThemedSidebarProps {
@@ -10,9 +11,10 @@ interface ThemedSidebarProps {
 }
 
 export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }) => {
-  const { currentDocument } = useAppStore()
+  const { currentDocument, user } = useAppStore()
   const { annotationColors } = useTheme()
   const [currentHighlightColor, setCurrentHighlightColor] = React.useState('#FFD700')
+  const [pomodoroStats, setPomodoroStats] = useState<{ [key: string]: { timeMinutes: number, sessions: number } }>({})
 
   // Mock data for demonstration
   const mockDocuments = [
@@ -38,6 +40,29 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
       isActive: false,
     },
   ]
+
+  // Load Pomodoro stats for mock documents
+  useEffect(() => {
+    const loadStats = async () => {
+      if (!user) return
+      
+      const stats: { [key: string]: { timeMinutes: number, sessions: number } } = {}
+      
+      for (const doc of mockDocuments) {
+        const bookStats = await pomodoroService.getBookStats(doc.id)
+        if (bookStats) {
+          stats[doc.id] = {
+            timeMinutes: Math.round(bookStats.total_time_minutes),
+            sessions: bookStats.total_sessions
+          }
+        }
+      }
+      
+      setPomodoroStats(stats)
+    }
+    
+    loadStats()
+  }, [user])
 
   if (!isOpen) return null
 
@@ -123,6 +148,21 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
                     </span>
                   </Tooltip>
                 </div>
+                
+                {/* Pomodoro Time Display */}
+                {pomodoroStats[doc.id] && pomodoroStats[doc.id].timeMinutes > 0 && (
+                  <div className="flex items-center space-x-2 text-xs mt-2">
+                    <Tooltip content="Time Spent (Pomodoro)" position="right">
+                      <Timer className="w-3 h-3" style={{ color: '#ef4444' }} />
+                    </Tooltip>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>
+                      {pomodoroStats[doc.id].timeMinutes} min
+                    </span>
+                    <span style={{ color: 'var(--color-text-tertiary)' }}>
+                      ({pomodoroStats[doc.id].sessions} sessions)
+                    </span>
+                  </div>
+                )}
                 
                 {/* Progress Bar */}
                 <div 

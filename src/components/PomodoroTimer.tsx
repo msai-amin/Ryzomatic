@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Play, Pause, RotateCcw, Settings, X, Coffee, BookOpen, Clock } from 'lucide-react'
 import { Tooltip } from './Tooltip'
+import { useAppStore } from '../store/appStore'
+import { pomodoroService } from '../services/pomodoroService'
 
 interface PomodoroSettings {
   workDuration: number // in minutes
@@ -15,10 +17,13 @@ interface PomodoroSettings {
 type TimerMode = 'work' | 'shortBreak' | 'longBreak'
 
 interface PomodoroTimerProps {
+  documentId?: string | null
+  documentName?: string
   onClose?: () => void
 }
 
-export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ onClose }) => {
+export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, documentName, onClose }) => {
+  const { user, activePomodoroSessionId, setPomodoroSession } = useAppStore()
   const [settings, setSettings] = useState<PomodoroSettings>({
     workDuration: 25,
     shortBreakDuration: 5,
@@ -95,8 +100,15 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ onClose }) => {
     }
   }, [isRunning, timeLeft])
 
-  const handleTimerComplete = () => {
+  const handleTimerComplete = async () => {
     setIsRunning(false)
+    
+    // Save completed session to database
+    if (user && activePomodoroSessionId && mode === 'work') {
+      const duration = settings.workDuration * 60
+      await pomodoroService.stopCurrentSession(true) // Mark as completed
+      setPomodoroSession(null, null, null)
+    }
     
     // Play notification sound
     if (settings.notificationsEnabled && notificationSoundRef.current) {
@@ -134,11 +146,34 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ onClose }) => {
     }
   }
 
-  const toggleTimer = () => {
-    setIsRunning(!isRunning)
+  const toggleTimer = async () => {
+    if (!isRunning) {
+      // Starting timer - create session if user is authenticated and document is available
+      if (user && documentId && mode === 'work') {
+        const session = await pomodoroService.startSession(user.id, documentId, mode)
+        if (session) {
+          setPomodoroSession(session.id, session.bookId, Date.now())
+        }
+      }
+      setIsRunning(true)
+    } else {
+      // Pausing timer - save current session
+      if (user && activePomodoroSessionId) {
+        const duration = settings.workDuration * 60 - timeLeft
+        await pomodoroService.stopCurrentSession(false) // Mark as incomplete pause
+        setPomodoroSession(null, null, null)
+      }
+      setIsRunning(false)
+    }
   }
 
-  const resetTimer = () => {
+  const resetTimer = async () => {
+    // Stop active session if running
+    if (user && activePomodoroSessionId && isRunning) {
+      await pomodoroService.stopCurrentSession(false) // Mark as incomplete
+      setPomodoroSession(null, null, null)
+    }
+    
     setIsRunning(false)
     const duration = mode === 'work' 
       ? settings.workDuration 
@@ -148,7 +183,14 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ onClose }) => {
     setTimeLeft(duration * 60)
   }
 
-  const switchMode = (newMode: TimerMode) => {
+  const switchMode = async (newMode: TimerMode) => {
+    // Stop active session if switching modes
+    if (user && activePomodoroSessionId && isRunning) {
+      const duration = settings.workDuration * 60 - timeLeft
+      await pomodoroService.stopCurrentSession(false) // Mark as incomplete
+      setPomodoroSession(null, null, null)
+    }
+    
     setIsRunning(false)
     setMode(newMode)
     const duration = newMode === 'work' 
@@ -210,6 +252,34 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ onClose }) => {
   useEffect(() => {
     requestNotificationPermission()
   }, [])
+
+  // Auto-save session when document changes or component unmounts
+  useEffect(() => {
+    return () => {
+      // Cleanup: save active session when unmounting
+      if (user && activePomodoroSessionId && isRunning) {
+        const duration = settings.workDuration * 60 - timeLeft
+        pomodoroService.stopCurrentSession(false).then(() => {
+          setPomodoroSession(null, null, null)
+        })
+      }
+    }
+  }, [])
+
+  // Handle document change - pause and save current session
+  useEffect(() => {
+    const handleDocumentChange = async () => {
+      if (user && activePomodoroSessionId && isRunning) {
+        // Document changed while timer running - auto-save
+        const duration = settings.workDuration * 60 - timeLeft
+        await pomodoroService.stopCurrentSession(false)
+        setPomodoroSession(null, null, null)
+        setIsRunning(false)
+      }
+    }
+
+    handleDocumentChange()
+  }, [documentId])
 
   if (isMinimized) {
     return (
@@ -392,20 +462,35 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ onClose }) => {
           </div>
 
           {/* Stats */}
-          <div className="flex items-center justify-between text-sm pt-4 border-t"
-            style={{ borderColor: 'var(--color-border)' }}
-          >
-            <div style={{ color: 'var(--color-text-secondary)' }}>
-              <span className="font-medium">Sessions:</span>{' '}
-              <span className="font-bold" style={{ color: getModeColor() }}>
-                {completedSessions}
-              </span>
-            </div>
-            <div style={{ color: 'var(--color-text-secondary)' }}>
-              <span className="font-medium">Until long break:</span>{' '}
-              <span className="font-bold" style={{ color: getModeColor() }}>
-                {settings.sessionsUntilLongBreak - (completedSessions % settings.sessionsUntilLongBreak)}
-              </span>
+          <div className="space-y-2">
+            {/* Current Document Info */}
+            {documentName && (
+              <div className="text-xs p-2 rounded" style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-text-secondary)' }}>
+                <div className="flex items-center space-x-1 mb-1">
+                  <BookOpen className="w-3 h-3" />
+                  <span className="font-medium">Tracking:</span>
+                </div>
+                <div className="truncate" style={{ color: 'var(--color-text-primary)' }}>
+                  {documentName}
+                </div>
+              </div>
+            )}
+            
+            <div className="flex items-center justify-between text-sm pt-2 border-t"
+              style={{ borderColor: 'var(--color-border)' }}
+            >
+              <div style={{ color: 'var(--color-text-secondary)' }}>
+                <span className="font-medium">Sessions:</span>{' '}
+                <span className="font-bold" style={{ color: getModeColor() }}>
+                  {completedSessions}
+                </span>
+              </div>
+              <div style={{ color: 'var(--color-text-secondary)' }}>
+                <span className="font-medium">Until long break:</span>{' '}
+                <span className="font-bold" style={{ color: getModeColor() }}>
+                  {settings.sessionsUntilLongBreak - (completedSessions % settings.sessionsUntilLongBreak)}
+                </span>
+              </div>
             </div>
           </div>
         </>

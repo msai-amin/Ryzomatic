@@ -97,6 +97,11 @@ interface AppState {
   // Library refresh
   libraryRefreshTrigger: number
   
+  // Pomodoro state
+  activePomodoroSessionId: string | null
+  activePomodoroBookId: string | null
+  pomodoroStartTime: number | null
+  
   // Actions
   setUser: (user: AuthUser | null) => void
   setAuthenticated: (authenticated: boolean) => void
@@ -116,6 +121,7 @@ interface AppState {
   clearChat: () => void
   setTyping: (typing: boolean) => void
   refreshLibrary: () => void
+  setPomodoroSession: (sessionId: string | null, bookId: string | null, startTime: number | null) => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -162,6 +168,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   chatMessages: [],
   isTyping: false,
   libraryRefreshTrigger: 0,
+  
+  // Pomodoro state
+  activePomodoroSessionId: null,
+  activePomodoroBookId: null,
+  pomodoroStartTime: null,
   
   // Authentication actions
   setUser: (user) => set({ user }),
@@ -316,9 +327,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   
   setTyping: (typing) => set({ isTyping: typing }),
   
-  refreshLibrary: () => set((state) => ({
-    libraryRefreshTrigger: state.libraryRefreshTrigger + 1
-  }))
+  refreshLibrary: () => set((state) => ({ 
+    libraryRefreshTrigger: state.libraryRefreshTrigger + 1 
+  })),
+  
+  setPomodoroSession: (sessionId, bookId, startTime) => set({
+    activePomodoroSessionId: sessionId,
+    activePomodoroBookId: bookId,
+    pomodoroStartTime: startTime
+  })
 }))
 
 

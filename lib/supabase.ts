@@ -508,3 +508,149 @@ export const userAudio = {
   }
 };
 
+// Pomodoro Sessions helpers
+export interface PomodoroSession {
+  id: string
+  user_id: string
+  book_id: string
+  started_at: string
+  ended_at?: string
+  duration_seconds?: number
+  mode: 'work' | 'shortBreak' | 'longBreak'
+  completed: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface PomodoroBookStats {
+  total_sessions: number
+  total_time_seconds: number
+  total_time_minutes: number
+  total_time_hours: number
+  average_session_minutes: number
+  completed_sessions: number
+  work_sessions: number
+  break_sessions: number
+  last_session_at: string
+}
+
+export const pomodoroSessions = {
+  async startSession(userId: string, bookId: string, mode: 'work' | 'shortBreak' | 'longBreak') {
+    // First, check for and close any active sessions
+    const { data: activeSessions } = await supabase
+      .from('pomodoro_sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .is('ended_at', null);
+
+    // Auto-complete any active sessions
+    if (activeSessions && activeSessions.length > 0) {
+      for (const session of activeSessions) {
+        const duration = Math.floor((Date.now() - new Date(session.started_at).getTime()) / 1000);
+        await supabase
+          .from('pomodoro_sessions')
+          .update({
+            ended_at: new Date().toISOString(),
+            duration_seconds: duration,
+            completed: false
+          })
+          .eq('id', session.id);
+      }
+    }
+
+    // Create new session
+    const { data, error } = await supabase
+      .from('pomodoro_sessions')
+      .insert({
+        user_id: userId,
+        book_id: bookId,
+        mode,
+        started_at: new Date().toISOString(),
+        completed: false
+      })
+      .select()
+      .single();
+    
+    return { data, error };
+  },
+
+  async stopSession(sessionId: string, durationSeconds: number, completed: boolean = true) {
+    const { data, error } = await supabase
+      .from('pomodoro_sessions')
+      .update({
+        ended_at: new Date().toISOString(),
+        duration_seconds: durationSeconds,
+        completed
+      })
+      .eq('id', sessionId)
+      .select()
+      .single();
+    
+    return { data, error };
+  },
+
+  async getActiveSession(userId: string) {
+    const { data, error } = await supabase.rpc('get_active_pomodoro_session', {
+      user_uuid: userId
+    });
+    
+    return { data: data?.[0] || null, error };
+  },
+
+  async getBookStats(bookId: string) {
+    const { data, error } = await supabase.rpc('get_pomodoro_stats_by_book', {
+      book_uuid: bookId
+    });
+    
+    return { data: data?.[0] || null, error };
+  },
+
+  async getDailyStats(userId: string, daysBack: number = 7) {
+    const { data, error } = await supabase.rpc('get_daily_pomodoro_stats', {
+      user_uuid: userId,
+      days_back: daysBack
+    });
+    
+    return { data, error };
+  },
+
+  async getTimePatterns(userId: string, daysBack: number = 30) {
+    const { data, error } = await supabase.rpc('get_time_of_day_patterns', {
+      user_uuid: userId,
+      days_back: daysBack
+    });
+    
+    return { data, error };
+  },
+
+  async getWeeklySummary(userId: string) {
+    const { data, error } = await supabase.rpc('get_weekly_pomodoro_summary', {
+      user_uuid: userId
+    });
+    
+    return { data, error };
+  },
+
+  async list(userId: string, bookId?: string, limit: number = 50) {
+    let query = supabase
+      .from('pomodoro_sessions')
+      .select(`
+        *,
+        user_books (
+          title,
+          file_name
+        )
+      `)
+      .eq('user_id', userId)
+      .order('started_at', { ascending: false })
+      .limit(limit);
+
+    if (bookId) {
+      query = query.eq('book_id', bookId);
+    }
+
+    const { data, error } = await query;
+    return { data, error };
+  }
+};
+
