@@ -197,14 +197,14 @@ export const ThemedHeader: React.FC = () => {
           <Tooltip content="Pomodoro Timer - Stay Focused 🍅" position="bottom">
             <button
               onClick={() => setShowPomodoro(!showPomodoro)}
-              className="p-2 rounded-lg transition-colors"
+              className="p-1.5 rounded-lg transition-colors"
               style={{
                 backgroundColor: showPomodoro ? 'var(--color-primary-light)' : 'transparent',
                 color: showPomodoro ? '#dc2626' : '#ef4444', // Tomato red color
                 border: showPomodoro ? '2px solid var(--color-primary)' : 'none',
               }}
             >
-              <TomatoIcon size={20} className="w-5 h-5" />
+              <TomatoIcon size={24} className="w-6 h-6" />
             </button>
           </Tooltip>
 
