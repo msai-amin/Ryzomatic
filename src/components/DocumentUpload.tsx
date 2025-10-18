@@ -8,6 +8,8 @@ import { simpleGoogleAuth } from '../services/simpleGoogleAuth'
 import { logger, trackPerformance } from '../services/logger'
 import { errorHandler, ErrorType, ErrorSeverity } from '../services/errorHandler'
 import { validatePDFFile, validateFile } from '../services/validation'
+import { OCRConsentDialog } from './OCRConsentDialog'
+import { calculateOCRCredits } from '../../lib/gpt5nano'
 // PDF.js will be imported dynamically to avoid ES module issues
 
 interface DocumentUploadProps {
@@ -17,8 +19,11 @@ interface DocumentUploadProps {
 export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
   const { addDocument, setLoading, refreshLibrary } = useAppStore()
   const [dragActive, setDragActive] = useState(false)
+  const [showOCRDialog, setShowOCRDialog] = useState(false)
+  const [ocrPendingData, setOcrPendingData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [saveToLibrary, setSaveToLibrary] = useState(true)
+  const [userProfile, setUserProfile] = useState<any>({ tier: 'free', credits: 0, ocr_count_monthly: 0 })
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -93,12 +98,14 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
       }
 
       if (file.type === 'application/pdf') {
-        const { content, pdfData, totalPages, pageTexts } = await trackPerformance(
+        const pdfResult = await trackPerformance(
           'extractPDFData',
           () => extractPDFData(file),
           context,
           { fileName: file.name, fileSize: file.size }
         );
+
+        const { content, pdfData, totalPages, pageTexts, needsOCR, ocrStatus } = pdfResult;
 
         const document = {
           id: crypto.randomUUID(),
@@ -108,9 +115,23 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
           uploadedAt: new Date(),
           pdfData,
           totalPages,
-          pageTexts
+          pageTexts,
+          needsOCR,
+          ocrStatus: ocrStatus as 'not_needed' | 'pending' | 'processing' | 'completed' | 'failed' | 'user_declined'
         }
         
+        // Check if we should show OCR dialog (auto-approve if session setting is enabled)
+        const autoApproveOCR = sessionStorage.getItem('ocr_auto_approve') === 'true';
+        
+        if (needsOCR && !autoApproveOCR) {
+          // Store document data and show OCR consent dialog
+          setOcrPendingData({ document, file, saveToLibrary });
+          setShowOCRDialog(true);
+          setLoading(false);
+          return; // Wait for user consent
+        }
+        
+        // Either OCR not needed or auto-approved
         addDocument(document)
         
         logger.info('PDF document processed successfully', context, {
@@ -276,6 +297,89 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
     }
   }
 
+  // Handle OCR consent approval
+  const handleOCRApprove = async () => {
+    if (!ocrPendingData) return;
+
+    const { document, file, saveToLibrary: shouldSave } = ocrPendingData;
+    
+    try {
+      setShowOCRDialog(false);
+      setLoading(true);
+
+      // Add document with OCR status set to 'pending'
+      addDocument(document);
+
+      // Save to library if needed
+      if (shouldSave) {
+        await supabaseStorageService.saveBook({
+          id: document.id,
+          title: document.name,
+          fileName: file.name,
+          type: 'pdf',
+          fileData: document.pdfData,
+          totalPages: document.totalPages,
+          pageTexts: document.pageTexts,
+          savedAt: new Date()
+        });
+        
+        refreshLibrary();
+      }
+
+      // Call OCR API endpoint
+      // This will be polled in PDFViewer component
+      setOcrPendingData(null);
+      onClose();
+    } catch (error) {
+      logger.error('OCR approval failed', { component: 'DocumentUpload' }, error as Error);
+      setError('Failed to process OCR request');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle OCR consent decline
+  const handleOCRDecline = async () => {
+    if (!ocrPendingData) return;
+
+    const { document, file, saveToLibrary: shouldSave } = ocrPendingData;
+
+    try {
+      setShowOCRDialog(false);
+      setLoading(true);
+
+      // Update document status to 'user_declined'
+      document.ocrStatus = 'user_declined';
+      
+      // Add document anyway (with limited text)
+      addDocument(document);
+
+      // Save to library if needed
+      if (shouldSave) {
+        await supabaseStorageService.saveBook({
+          id: document.id,
+          title: document.name,
+          fileName: file.name,
+          type: 'pdf',
+          fileData: document.pdfData,
+          totalPages: document.totalPages,
+          pageTexts: document.pageTexts,
+          savedAt: new Date()
+        });
+        
+        refreshLibrary();
+      }
+
+      setOcrPendingData(null);
+      onClose();
+    } catch (error) {
+      logger.error('OCR decline failed', { component: 'DocumentUpload' }, error as Error);
+      setError('Failed to save document');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const extractPDFData = async (file: File) => {
     const context = {
       component: 'DocumentUpload',
@@ -355,12 +459,26 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
         extractedTextLength: fullText.length
       });
       
+      // Detect if OCR is needed (scanned/non-searchable PDF)
+      const avgTextPerPage = fullText.length / pdf.numPages;
+      const textDensity = avgTextPerPage / 500; // Assuming ~500 chars is normal per page
+      const needsOCR = fullText.length < 100 || textDensity < 0.1;
+      
+      logger.info('OCR detection results', context, {
+        extractedTextLength: fullText.length,
+        avgTextPerPage,
+        textDensity,
+        needsOCR
+      });
+      
       // Store the blob directly - PDFViewer will convert to blob URL
       return {
         content: fullText.trim() || 'PDF loaded successfully. Text extraction may be limited for some PDFs.',
         pdfData: fileBlob,
         totalPages: pdf.numPages,
-        pageTexts
+        pageTexts,
+        needsOCR,
+        ocrStatus: needsOCR ? 'pending' : 'not_needed'
       }
     } catch (error) {
       logger.error('PDF data extraction failed', context, error as Error);
@@ -519,6 +637,25 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
           </div>
         </div>
       </div>
+      
+      {/* OCR Consent Dialog */}
+      {showOCRDialog && ocrPendingData && (
+        <OCRConsentDialog
+          isOpen={showOCRDialog}
+          onClose={() => {
+            setShowOCRDialog(false);
+            setOcrPendingData(null);
+            onClose();
+          }}
+          onApprove={handleOCRApprove}
+          onDecline={handleOCRDecline}
+          pageCount={ocrPendingData.document?.totalPages || 0}
+          estimatedCredits={calculateOCRCredits(ocrPendingData.document?.totalPages || 0, userProfile.tier)}
+          userTier={userProfile.tier}
+          remainingOCRs={userProfile.ocr_count_monthly || 0}
+          userCredits={userProfile.credits || 0}
+        />
+      )}
     </div>
   )
 }

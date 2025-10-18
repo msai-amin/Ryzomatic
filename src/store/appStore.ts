@@ -11,6 +11,17 @@ export interface Document {
   pdfData?: ArrayBuffer | string | Blob // Support ArrayBuffer, blob URL, and Blob
   totalPages?: number
   pageTexts?: string[]
+  // OCR properties
+  needsOCR?: boolean
+  ocrStatus?: 'not_needed' | 'pending' | 'processing' | 'completed' | 'failed' | 'user_declined'
+  ocrMetadata?: {
+    completedAt?: string
+    tokensUsed?: number
+    processingTime?: number
+    confidence?: number
+    pagesProcessed?: number
+    error?: string
+  }
 }
 
 export interface ChatMessage {
@@ -63,6 +74,7 @@ export interface TTSSettings {
   voiceName: string | null
   voice: Voice | null
   highlightCurrentWord: boolean
+  currentWordIndex: number | null
 }
 
 interface AppState {
@@ -153,7 +165,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     scale: 1.0,
     rotation: 0,
     viewMode: 'pdf',
-    scrollMode: 'single',
+    scrollMode: 'continuous', // Default to scrolling mode for better UX
     showPageNumbers: true,
     showProgress: true,
     readingMode: false
@@ -161,13 +173,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   tts: {
     isEnabled: false,
     isPlaying: false,
-    provider: 'google-cloud', // Default to Google Cloud TTS for natural voices
+    provider: 'native', // Use native TTS for development (supports word boundaries and progress tracking)
     rate: 0.9, // Slightly slower for more natural speech
     pitch: 1.1, // Slightly higher pitch for more natural sound
     volume: 0.8, // Slightly lower volume for comfort
     voiceName: null,
     voice: null,
-    highlightCurrentWord: true
+    highlightCurrentWord: true,
+    currentWordIndex: null
   },
   chatMessages: [],
   isTyping: false,

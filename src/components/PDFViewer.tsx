@@ -16,8 +16,6 @@ import {
   Highlighter,
   Trash2,
   Rows,
-  Square,
-  Play,
   Pause,
   Volume2,
   StickyNote,
@@ -31,6 +29,7 @@ import { NotesPanel } from './NotesPanel'
 import { AudioWidget } from './AudioWidget'
 import { VoiceSelector } from './VoiceSelector'
 import { storageService } from '../services/storageService'
+import { OCRBanner, OCRStatusBadge } from './OCRStatusBadge'
 
 // PDF.js will be imported dynamically
 
@@ -74,6 +73,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const [showVoiceSelector, setShowVoiceSelector] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [pageRendered, setPageRendered] = useState(false)
+  const [ocrStatus, setOcrStatus] = useState(document.ocrStatus || 'not_needed')
+  const [ocrError, setOcrError] = useState<string | undefined>()
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const textLayerRef = useRef<HTMLDivElement>(null)
@@ -429,11 +430,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           break
         case 'm':
         case 'M':
-          toggleReadingMode()
+          // Toggle reading mode - don't stop TTS
+          updatePDFViewer({ readingMode: !pdfViewer.readingMode })
           break
         case 'Escape':
           if (showNotesPanel) {
             setShowNotesPanel(false)
+          } else if (pdfViewer.readingMode) {
+            // Exit reading mode with Escape key - don't stop TTS
+            updatePDFViewer({ readingMode: false })
           }
           break
       }
@@ -441,7 +446,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [pageNumber, numPages, scale, rotation, showHighlightMenu, showNotesPanel])
+  }, [pageNumber, numPages, scale, rotation, showHighlightMenu, showNotesPanel, pdfViewer.readingMode, updatePDFViewer])
 
   // Text selection for highlighting and notes
   useEffect(() => {
@@ -517,25 +522,45 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
   const goToPreviousPage = useCallback(() => {
     if (pageNumber > 1) {
+      // Stop TTS when changing pages
+      if (tts.isPlaying) {
+        ttsManager.stop();
+        updateTTS({ isPlaying: false, currentWordIndex: null });
+      }
       setPageNumber(pageNumber - 1)
     }
-  }, [pageNumber])
+  }, [pageNumber, tts.isPlaying, updateTTS])
 
   const goToNextPage = useCallback(() => {
     if (numPages && pageNumber < numPages) {
+      // Stop TTS when changing pages
+      if (tts.isPlaying) {
+        ttsManager.stop();
+        updateTTS({ isPlaying: false, currentWordIndex: null });
+      }
       setPageNumber(pageNumber + 1)
     }
-  }, [pageNumber, numPages])
+  }, [pageNumber, numPages, tts.isPlaying, updateTTS])
 
   const goToFirstPage = useCallback(() => {
+    // Stop TTS when changing pages
+    if (tts.isPlaying) {
+      ttsManager.stop();
+      updateTTS({ isPlaying: false, currentWordIndex: null });
+    }
     setPageNumber(1)
-  }, [])
+  }, [tts.isPlaying, updateTTS])
 
   const goToLastPage = useCallback(() => {
     if (numPages) {
-    setPageNumber(numPages)
+      // Stop TTS when changing pages
+      if (tts.isPlaying) {
+        ttsManager.stop();
+        updateTTS({ isPlaying: false, currentWordIndex: null });
+      }
+      setPageNumber(numPages)
     }
-  }, [numPages])
+  }, [numPages, tts.isPlaying, updateTTS])
 
   const handleZoomIn = useCallback(() => {
     setScale(Math.min(scale + 0.1, 3))
@@ -557,6 +582,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     e.preventDefault()
     const page = parseInt(pageInputValue, 10)
     if (page >= 1 && numPages && page <= numPages) {
+      // Stop TTS when manually jumping to a different page
+      if (page !== pageNumber && tts.isPlaying) {
+        ttsManager.stop();
+        updateTTS({ isPlaying: false, currentWordIndex: null });
+      }
       setPageNumber(page)
     } else {
       setPageInputValue(String(pageNumber))
@@ -573,172 +603,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const toggleScrollMode = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    
+    // Don't stop TTS when switching scroll modes - let it continue playing
     updatePDFViewer({ scrollMode: pdfViewer.scrollMode === 'single' ? 'continuous' : 'single' })
   }, [pdfViewer.scrollMode, updatePDFViewer])
 
   const toggleReadingMode = useCallback(() => {
+    // Don't stop TTS when switching to/from reading mode - let it continue
     updatePDFViewer({ readingMode: !pdfViewer.readingMode })
   }, [pdfViewer.readingMode, updatePDFViewer])
 
-  const handleTTSPlay = useCallback(async () => {
-    console.log('PDFViewer: handleTTSPlay called', {
-      isPlaying: tts.isPlaying,
-      hasDocument: !!document,
-      documentType: document?.type,
-      hasPageTexts: !!document?.pageTexts,
-      pageTextsLength: document?.pageTexts?.length || 0
-    });
-    
-    if (tts.isPlaying) {
-      console.log('PDFViewer: TTS is playing, stopping...');
-      // For Google Cloud TTS, we can't truly pause, so we stop instead
-      ttsManager.stop()
-      updateTTS({ isPlaying: false })
-    } else {
-      console.log('PDFViewer: TTS is not playing, starting...');
-      // Debug TTS provider info
-      const providers = ttsManager.getProviders()
-      const availableProviders = ttsManager.getAvailableProviders()
-      const configuredProviders = ttsManager.getConfiguredProviders()
-      const currentProvider = ttsManager.getCurrentProvider()
-      
-      console.log('TTS Provider Info:', {
-        allProviders: providers.map(p => ({ name: p.name, type: p.type, available: p.isAvailable, configured: p.isConfigured })),
-        availableProviders: availableProviders.map(p => ({ name: p.name, type: p.type })),
-        configuredProviders: configuredProviders.map(p => ({ name: p.name, type: p.type })),
-        currentProvider: currentProvider ? { name: currentProvider.name, type: currentProvider.type } : null
-      })
-      
-      // Try to switch to Google Cloud TTS if available and configured
-      if (configuredProviders.some(p => p.type === 'google-cloud')) {
-        try {
-          const switched = await ttsManager.setProvider('google-cloud')
-          console.log('Switched to Google Cloud TTS:', switched)
-        } catch (error) {
-          console.warn('Failed to switch to Google Cloud TTS:', error)
-        }
-      }
-      
-      // Debug logging
-      console.log('TTS Debug:', {
-        pageNumber,
-        totalPages: document.totalPages,
-        pageTextsLength: document.pageTexts?.length || 0,
-        pageTexts: document.pageTexts,
-        currentPageText: document.pageTexts?.[pageNumber - 1],
-        documentId: document.id,
-        documentName: document.name,
-        documentType: document.type,
-        hasPdfData: !!document.pdfData,
-        fullDocument: document
-      })
-      
-      let pageText = document.pageTexts?.[pageNumber - 1] || ''
-      
-      // If no pageTexts available, try to extract text on-demand
-      if (!pageText && document.type === 'pdf' && pdfDocRef.current) {
-        console.log('No pageTexts available, attempting on-demand text extraction...')
-        try {
-          const page = await pdfDocRef.current.getPage(pageNumber)
-          const textContent = await page.getTextContent()
-          pageText = textContent.items
-            .map((item: any) => item.str)
-            .join(' ')
-            .trim()
-          
-          console.log('On-demand text extraction result:', {
-            success: true,
-            textLength: pageText.length,
-            textPreview: pageText.substring(0, 100) + (pageText.length > 100 ? '...' : ''),
-            isEmpty: pageText.length === 0,
-            isWhitespace: pageText.trim().length === 0
-          })
-          
-          // If we successfully extracted text, update the document in the store
-          if (pageText && pageText.trim().length > 0) {
-            console.log('Updating document with extracted pageText...')
-            const { updateDocument } = useAppStore.getState()
-            const updatedPageTexts = [...(document.pageTexts || [])]
-            updatedPageTexts[pageNumber - 1] = pageText
-            
-            updateDocument({
-              ...document,
-              pageTexts: updatedPageTexts
-            })
-            
-            console.log('Document updated with pageTexts:', {
-              pageNumber,
-              totalPageTexts: updatedPageTexts.length,
-              currentPageTextLength: pageText.length
-            })
-          }
-        } catch (error) {
-          console.error('On-demand text extraction failed:', error)
-        }
-      }
-      
-      if (pageText && pageText.trim().length > 0) {
-        console.log('Starting TTS with text:', {
-          textLength: pageText.length,
-          textPreview: pageText.substring(0, 50) + '...'
-        })
-        
-        // Try TTS with error handling and fallback
-        try {
-          console.log('PDFViewer: About to call ttsManager.speak with text:', {
-            textLength: pageText.length,
-            textPreview: pageText.substring(0, 50) + '...',
-            currentProvider: ttsManager.getCurrentProvider()?.name,
-            isPlaying: tts.isPlaying
-          });
-          
-          await ttsManager.speak(pageText, () => {
-            console.log('PDFViewer: TTS onEnd callback triggered');
-      updateTTS({ isPlaying: false })
-          })
-          
-          console.log('PDFViewer: ttsManager.speak completed, updating TTS state to playing');
-      updateTTS({ isPlaying: true })
-        } catch (error) {
-          console.error('PDFViewer: TTS Error:', error)
-          
-          // If native TTS fails and Google Cloud TTS is available, try switching
-          if (currentProvider?.type === 'native' && configuredProviders.some(p => p.type === 'google-cloud')) {
-            console.log('Native TTS failed, attempting to switch to Google Cloud TTS...')
-            try {
-              const switched = await ttsManager.setProvider('google-cloud')
-              if (switched) {
-                console.log('Successfully switched to Google Cloud TTS, retrying...')
-                await ttsManager.speak(pageText, () => {
-          updateTTS({ isPlaying: false })
-                })
-      updateTTS({ isPlaying: true })
-                return
-              }
-            } catch (fallbackError) {
-              console.error('Google Cloud TTS fallback also failed:', fallbackError)
-            }
-          }
-          
-        updateTTS({ isPlaying: false })
-        }
-      } else {
-        console.warn('No text available for TTS on this page', {
-          pageNumber,
-          pageTextsLength: document.pageTexts?.length || 0,
-          pageTexts: document.pageTexts,
-          hasPdfDoc: !!pdfDocRef.current,
-          extractedTextLength: pageText?.length || 0,
-          extractedTextPreview: pageText?.substring(0, 50) || 'N/A'
-        })
-      }
-    }
-  }, [tts, pageNumber, document.pageTexts, updateTTS])
 
-  const handleTTSStop = useCallback(() => {
-    ttsManager.stop()
-        updateTTS({ isPlaying: false })
-  }, [updateTTS])
 
   const handleAddNote = useCallback((text: string) => {
     setSelectedTextForNote(text)
@@ -778,7 +653,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             <div className="flex items-center gap-4">
               <button
                 onClick={toggleReadingMode}
-                className="flex items-center gap-2 px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg transition-colors font-medium shadow-sm"
+                title="Exit Reading Mode (Press M or Escape)"
               >
                 <Eye className="w-4 h-4" />
                 <span>Exit Reading Mode</span>
@@ -814,16 +690,51 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           <div className="max-w-4xl mx-auto px-8 py-12">
             <div className="prose prose-lg prose-amber max-w-none">
               <div className="text-gray-800 leading-relaxed whitespace-pre-wrap font-sans text-lg">
-                {pageText || 'No text available for this page.'}
+                {pageText ? (
+                  (() => {
+                    const words = pageText.split(/\s+/).filter(w => w.trim().length > 0);
+                    
+                    // Debug: Log highlighting state periodically
+                    if (tts.isPlaying && tts.currentWordIndex !== null && tts.currentWordIndex < 5) {
+                      console.log('Reading mode highlighting:', {
+                        highlightEnabled: tts.highlightCurrentWord,
+                        currentWordIndex: tts.currentWordIndex,
+                        totalWords: words.length,
+                        currentWord: words[tts.currentWordIndex],
+                        isPlaying: tts.isPlaying
+                      });
+                    }
+                    
+                    return words.map((word, index) => (
+                      <span
+                        key={index}
+                        className={
+                          tts.highlightCurrentWord && tts.currentWordIndex === index
+                            ? 'bg-amber-200'
+                            : 'bg-transparent'
+                        }
+                      >
+                        {word}{' '}
+                      </span>
+                    ));
+                  })()
+                ) : (
+                  'No text available for this page.'
+                )}
             </div>
           </div>
           </div>
         </div>
 
         {/* Reading Mode Active Indicator */}
-        <div className="fixed bottom-4 right-4 bg-amber-500 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+        <div className="fixed bottom-4 left-4 bg-amber-500 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
           <BookOpen className="w-4 h-4" />
           <span className="text-sm font-medium">Reading Mode Active</span>
+        </div>
+
+        {/* Audio Widget - also shown in reading mode */}
+        <div className="fixed bottom-4 right-4 z-40">
+          <AudioWidget />
         </div>
       </div>
     )
@@ -831,6 +742,24 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
   return (
     <div className="flex-1 flex flex-col h-full" style={{ backgroundColor: 'var(--color-background)' }}>
+      {/* OCR Status Banner */}
+      {ocrStatus !== 'not_needed' && (
+        <div className="p-4" style={{ backgroundColor: 'var(--color-background)' }}>
+          <OCRBanner
+            status={ocrStatus as any}
+            onRetry={() => {
+              // TODO: Implement retry logic
+              console.log('Retry OCR');
+            }}
+            onStartOCR={() => {
+              // TODO: Implement start OCR logic
+              console.log('Start OCR');
+            }}
+            errorMessage={ocrError}
+          />
+        </div>
+      )}
+      
       {/* PDF Controls */}
       <div className="sticky top-0 z-50 shadow-sm" style={{ backgroundColor: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)' }}>
         <div className="flex items-center justify-between p-4">
@@ -938,23 +867,31 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               <RotateCw className="w-5 h-5" />
               </button>
               
-                      <button
-              onClick={toggleScrollMode}
-              className="p-2 rounded-lg transition-colors"
-                  style={{
-                    backgroundColor: pdfViewer.scrollMode === 'continuous' ? 'var(--color-primary-light)' : 'transparent',
-                    color: pdfViewer.scrollMode === 'continuous' ? 'var(--color-primary)' : 'var(--color-text-primary)'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (pdfViewer.scrollMode !== 'continuous') e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                  }}
-                  onMouseLeave={(e) => {
-                    if (pdfViewer.scrollMode !== 'continuous') e.currentTarget.style.backgroundColor = 'transparent'
-                  }}
-              title="Scroll Mode"
-            >
-              <Rows className="w-5 h-5" />
-                    </button>
+            {/* Scroll Mode Switch */}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ backgroundColor: 'var(--color-surface-hover)', border: '1px solid var(--color-border)' }}>
+              <button
+                onClick={toggleScrollMode}
+                className={`px-3 py-1 rounded text-sm font-medium transition-all ${pdfViewer.scrollMode === 'single' ? 'shadow-sm' : ''}`}
+                style={{
+                  backgroundColor: pdfViewer.scrollMode === 'single' ? 'var(--color-primary)' : 'transparent',
+                  color: pdfViewer.scrollMode === 'single' ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)'
+                }}
+                title="Single Page Mode"
+              >
+                One Page
+              </button>
+              <button
+                onClick={toggleScrollMode}
+                className={`px-3 py-1 rounded text-sm font-medium transition-all ${pdfViewer.scrollMode === 'continuous' ? 'shadow-sm' : ''}`}
+                style={{
+                  backgroundColor: pdfViewer.scrollMode === 'continuous' ? 'var(--color-primary)' : 'transparent',
+                  color: pdfViewer.scrollMode === 'continuous' ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)'
+                }}
+                title="Continuous Scrolling Mode"
+              >
+                Scrolling
+              </button>
+            </div>
 
             <button
               onClick={(e) => {
@@ -1047,44 +984,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               <StickyNote className="w-5 h-5" />
             </button>
 
-              <button
-                    onClick={(e) => {
-                      console.log('TTS Button clicked!', {
-                        event: e,
-                        target: e.target,
-                        currentTarget: e.currentTarget,
-                        isPlaying: tts.isPlaying
-                      });
-                      handleTTSPlay();
-                    }}
-              className="p-2 rounded-lg transition-colors"
-                    style={{
-                      backgroundColor: tts.isPlaying ? 'var(--color-primary-light)' : 'transparent',
-                      color: tts.isPlaying ? 'var(--color-primary)' : 'var(--color-text-primary)'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!tts.isPlaying) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!tts.isPlaying) e.currentTarget.style.backgroundColor = 'transparent'
-                    }}
-              title={tts.isPlaying ? "Stop" : "Play Text-to-Speech"}
-            >
-              {tts.isPlaying ? <Square className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-              </button>
-
-            {tts.isPlaying && (
-                  <button
-                    onClick={handleTTSStop}
-                className="p-2 rounded-lg transition-colors"
-                    style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                title="Stop"
-                  >
-                <Square className="w-5 h-5" />
-                  </button>
-            )}
 
                 <button
               onClick={() => setShowVoiceSelector(true)}
