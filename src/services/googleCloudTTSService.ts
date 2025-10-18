@@ -395,14 +395,57 @@ class GoogleCloudTTSService {
         await this.setDefaultVoice();
       }
 
-      // Synthesize audio
-      const audioBuffer = await this.synthesize(text);
+      // Check if text exceeds Google Cloud TTS limit (5000 characters)
+      const MAX_TEXT_LENGTH = 4500; // Use 4500 to be safe (5000 is the limit)
       
-      // Play audio
-      await this.playAudio(audioBuffer, onEnd, onWord);
+      if (text.length <= MAX_TEXT_LENGTH) {
+        // Text is short enough, synthesize directly
+        const audioBuffer = await this.synthesize(text);
+        await this.playAudio(audioBuffer, onEnd, onWord);
+      } else {
+        // Text is too long, split into chunks and play sequentially
+        console.log(`Text too long (${text.length} chars), splitting into chunks...`);
+        await this.speakInChunks(text, MAX_TEXT_LENGTH, onEnd, onWord);
+      }
     } catch (error) {
       console.error('Error speaking text:', error);
       throw error;
+    }
+  }
+
+  private async speakInChunks(text: string, maxLength: number, onEnd?: () => void, onWord?: (word: string, charIndex: number) => void): Promise<void> {
+    // Split text into sentences first
+    const sentences = this.splitIntoSentences(text);
+    const chunks: string[] = [];
+    let currentChunk = '';
+
+    for (const sentence of sentences) {
+      // If adding this sentence would exceed the limit, start a new chunk
+      if (currentChunk.length + sentence.length > maxLength && currentChunk.length > 0) {
+        chunks.push(currentChunk.trim());
+        currentChunk = sentence;
+      } else {
+        currentChunk += (currentChunk ? ' ' : '') + sentence;
+      }
+    }
+
+    // Add the last chunk if it has content
+    if (currentChunk.trim().length > 0) {
+      chunks.push(currentChunk.trim());
+    }
+
+    console.log(`Split text into ${chunks.length} chunks`);
+
+    // Play each chunk sequentially
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      console.log(`Playing chunk ${i + 1}/${chunks.length} (${chunk.length} chars)`);
+      
+      const audioBuffer = await this.synthesize(chunk);
+      
+      // Only call onEnd for the last chunk
+      const isLastChunk = i === chunks.length - 1;
+      await this.playAudio(audioBuffer, isLastChunk ? onEnd : undefined, onWord);
     }
   }
 
