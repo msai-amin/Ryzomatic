@@ -30,7 +30,11 @@ const ThemedAppContent: React.FC = () => {
       }}
     >
       {/* Header */}
-      <ThemedHeader onUploadClick={() => setShowUpload(true)} />
+      <ThemedHeader 
+        onUploadClick={() => setShowUpload(true)} 
+        isSidebarOpen={isSidebarOpen}
+        onSidebarToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+      />
 
       {/* Main Layout */}
       <div className="flex">

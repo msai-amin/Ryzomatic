@@ -200,28 +200,29 @@ export const AnnotationColorPicker: React.FC<{
 
   return (
     <div className="space-y-2">
-      <h3 className="text-lg font-semibold text-gray-900">Color Coding System</h3>
+      <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>Color Coding System</h3>
       <div className="space-y-2">
         {annotationColors.map((item) => (
           <div
             key={item.value}
-            className={`flex items-center space-x-3 p-2 rounded-lg cursor-pointer transition-colors ${
-              selectedColor === item.color
-                ? 'bg-blue-50 border-2 border-blue-200'
-                : 'hover:bg-gray-50'
-            }`}
+            className="flex items-center space-x-3 p-2 rounded-lg cursor-pointer transition-colors"
+            style={{
+              backgroundColor: selectedColor === item.color ? 'rgba(156, 163, 175, 0.2)' : 'transparent',
+              border: selectedColor === item.color ? '2px solid var(--color-primary)' : '2px solid transparent',
+            }}
             onClick={() => onColorSelect(item.color)}
           >
             <div
-              className="w-6 h-6 rounded-full border-2 border-gray-200"
-              style={{ backgroundColor: item.color }}
+              className="w-6 h-6 rounded-full"
+              style={{ 
+                backgroundColor: item.color,
+                border: '2px solid var(--color-border)'
+              }}
             />
             <span 
-              className={`text-sm font-semibold ${
-                selectedColor === item.color ? 'text-gray-900' : 'text-white'
-              }`}
+              className="text-sm font-semibold"
               style={{
-                color: selectedColor === item.color ? '#111827' : '#ffffff'
+                color: 'var(--color-text-primary)'
               }}
             >
               {item.name}

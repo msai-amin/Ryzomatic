@@ -10,9 +10,11 @@ import { useTheme } from './ThemeProvider'
 
 interface ThemedHeaderProps {
   onUploadClick: () => void
+  isSidebarOpen: boolean
+  onSidebarToggle: () => void
 }
 
-export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick }) => {
+export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSidebarOpen, onSidebarToggle }) => {
   const { 
     toggleChat, 
     currentDocument, 
@@ -27,7 +29,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick }) => 
   const [showLibrary, setShowLibrary] = React.useState(false)
   const [showAuth, setShowAuth] = React.useState(false)
   const [showPomodoro, setShowPomodoro] = React.useState(false)
-  const [isSidebarOpen, setIsSidebarOpen] = React.useState(true)
   
   const pomodoroRef = React.useRef<HTMLDivElement>(null)
   const pomodoroButtonRef = React.useRef<HTMLButtonElement>(null)
@@ -72,7 +73,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick }) => 
         <div className="flex items-center space-x-4">
           <Tooltip content="Toggle Sidebar" position="bottom">
             <button 
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              onClick={onSidebarToggle}
               className="p-2 rounded-lg transition-colors"
               style={{
                 color: 'var(--color-text-primary)',

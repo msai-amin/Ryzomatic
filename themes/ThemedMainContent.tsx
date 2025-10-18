@@ -72,7 +72,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                 <div key={index} className="flex items-center space-x-2">
                   <div 
                     className="w-4 h-4 rounded-full"
-                    style={{ backgroundColor: color.value }}
+                    style={{ backgroundColor: color.color }}
                   />
                   <span 
                     className="text-xs"
