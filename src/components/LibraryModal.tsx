@@ -357,11 +357,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose}></div>
-
-        <div className="inline-block w-full max-w-4xl my-8 overflow-hidden text-left align-middle transition-all transform bg-white rounded-lg shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 pb-8 px-4 overflow-y-auto" style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}>
+      <div className="w-full max-w-4xl my-auto overflow-hidden text-left align-middle transition-all transform rounded-lg shadow-xl animate-scale-in" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">📚 My Library</h2>
@@ -621,7 +618,6 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
               </label>
             </div>
           </div>
-        </div>
       </div>
     </div>
   );

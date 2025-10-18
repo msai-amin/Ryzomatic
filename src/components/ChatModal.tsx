@@ -58,8 +58,8 @@ export const ChatModal: React.FC<ChatModalProps> = ({ onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}>
-      <div className="rounded-lg shadow-xl w-full max-w-4xl flex flex-col animate-scale-in" style={{ backgroundColor: 'var(--color-surface)', maxHeight: '80vh' }}>
+    <div className="fixed inset-0 flex items-start justify-center z-50 pt-20 pb-8 px-4 overflow-y-auto" style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}>
+      <div className="rounded-lg shadow-xl w-full max-w-4xl flex flex-col animate-scale-in my-auto" style={{ backgroundColor: 'var(--color-surface)', maxHeight: '80vh' }}>
         <div className="flex items-center justify-between p-6" style={{ borderBottom: '1px solid var(--color-border)' }}>
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--color-primary)' }}>

@@ -450,14 +450,15 @@
   }
   
   .modal-overlay {
-    @apply fixed inset-0 flex items-center justify-center z-50;
+    @apply fixed inset-0 flex items-start justify-center z-50 pt-20 pb-8 px-4 overflow-y-auto;
     background-color: rgba(0, 0, 0, 0.6);
   }
   
   .modal-content {
-    @apply rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden;
+    @apply rounded-xl shadow-xl max-w-2xl w-full mx-4 my-auto;
     background-color: var(--color-surface);
     border: 1px solid var(--color-border);
+    max-height: calc(100vh - 160px); /* Account for pt-20 + pb-8 */
   }
 
 /* NeoReader Terminal Styles */
