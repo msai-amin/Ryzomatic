@@ -493,13 +493,17 @@ class GoogleCloudTTSService {
       this.pauseTime = this.audioContext.currentTime - this.startTime;
       this.currentAudio.stop();
       this.isPaused = true;
+      console.log('GoogleCloudTTSService: Paused at time:', this.pauseTime);
     }
   }
 
   resume() {
     if (this.isPaused && this.audioContext) {
-      // Note: Resume is complex with Google Cloud TTS as we need to
-      // re-synthesize from the pause point. For now, we'll restart.
+      console.log('GoogleCloudTTSService: Resume requested, but Google Cloud TTS does not support true pause/resume');
+      console.log('GoogleCloudTTSService: For now, we will stop and require user to restart');
+      // For Google Cloud TTS, we can't truly resume from pause point
+      // The best we can do is stop and let the user restart
+      this.stop();
       this.isPaused = false;
       this.pauseTime = 0;
       this.startTime = 0;

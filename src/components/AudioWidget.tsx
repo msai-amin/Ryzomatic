@@ -70,8 +70,9 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     })
     
     if (tts.isPlaying) {
-      console.log('AudioWidget: Currently playing, pausing...')
-      ttsManager.pause()
+      console.log('AudioWidget: Currently playing, stopping...')
+      // For Google Cloud TTS, we can't truly pause, so we stop instead
+      ttsManager.stop()
       updateTTS({ isPlaying: false })
     } else {
       // CRITICAL FIX: Set processing state to prevent multiple requests
@@ -278,7 +279,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               Audio Player
             </h3>
             <div 
-              className={`w-2 h-2 rounded-full ${tts.isPlaying ? 'animate-pulse' : ''}`}
+              className={`w-2 h-2 rounded-full ${tts.isPlaying ? 'animate-pulse-slow' : ''}`}
               style={{ backgroundColor: tts.isPlaying ? 'var(--color-success)' : 'var(--color-text-tertiary)' }}
             />
           </div>
@@ -370,14 +371,14 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               isProcessing 
                 ? "Processing..." 
                 : tts.isPlaying 
-                  ? "Pause" 
+                  ? "Stop" 
                   : "Play"
             }
           >
             {isProcessing ? (
               <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-text-inverse)' }} />
             ) : tts.isPlaying ? (
-              <Pause className="w-6 h-6" />
+              <Square className="w-6 h-6" />
             ) : (
               <Play className="w-6 h-6" />
             )}
