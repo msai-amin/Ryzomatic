@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { FileText, Clock, BookOpen, Tag, Timer } from 'lucide-react'
+import { FileText, Clock, BookOpen, Tag, Timer, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
 import { pomodoroService } from '../src/services/pomodoroService'
@@ -71,21 +71,53 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
     loadStats()
   }, [user])
 
-  if (!isOpen) return null
-
   return (
-    <aside 
-      className="overflow-y-auto"
-      style={{
-        width: 'var(--sidebar-width)',
-        backgroundColor: 'var(--color-surface)',
-        borderRight: '1px solid var(--color-border)',
-        height: 'var(--main-content-height)',
-      }}
-    >
-      <div className="p-4">
-        {/* Document Library Section */}
-        <div className="mb-6">
+    <>
+      {/* Toggle Button (visible when sidebar is closed) */}
+      {!isOpen && (
+        <button
+          onClick={onToggle}
+          className="fixed top-20 left-4 z-50 p-2 rounded-lg shadow-lg transition-all duration-300 hover:scale-110"
+          style={{
+            backgroundColor: 'var(--color-primary)',
+            color: 'var(--color-text-inverse)',
+          }}
+          aria-label="Open sidebar"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      )}
+
+      <aside 
+        className="overflow-y-auto transition-transform duration-300 ease-in-out sticky top-0"
+        style={{
+          width: 'var(--sidebar-width)',
+          backgroundColor: 'var(--color-surface)',
+          borderRight: '1px solid var(--color-border)',
+          height: '100vh',
+          transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
+          marginLeft: isOpen ? '0' : 'calc(-1 * var(--sidebar-width))',
+          zIndex: 40,
+        }}
+      >
+        <div className="p-4">
+          {/* Close Button */}
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={onToggle}
+              className="p-2 rounded-lg transition-colors hover:bg-opacity-80"
+              style={{
+                backgroundColor: 'var(--color-surface-hover)',
+                color: 'var(--color-text-primary)',
+              }}
+              aria-label="Close sidebar"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Document Library Section */}
+          <div className="mb-6">
           <h2 
             className="text-lg font-semibold mb-4"
             style={{ color: 'var(--color-text-primary)' }}
@@ -325,7 +357,8 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
             </div>
           </div>
         </div>
-      </div>
-    </aside>
+        </div>
+      </aside>
+    </>
   )
 }

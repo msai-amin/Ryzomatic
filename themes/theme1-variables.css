@@ -5,40 +5,40 @@
  */
 
 :root {
-  /* Primary Colors */
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-light: #dbeafe;
-  --color-primary-dark: #1e40af;
+  /* Primary Colors (Gray theme for black/gray/white UI) */
+  --color-primary: #6b7280;
+  --color-primary-hover: #4b5563;
+  --color-primary-light: #d1d5db;
+  --color-primary-dark: #374151;
   
-  /* Secondary Colors */
-  --color-secondary: #059669;
-  --color-secondary-hover: #047857;
-  --color-secondary-light: #d1fae5;
+  /* Secondary Colors (Lighter gray for accents) */
+  --color-secondary: #9ca3af;
+  --color-secondary-hover: #6b7280;
+  --color-secondary-light: #e5e7eb;
   
-  /* Background Colors */
-  --color-background: #f9fafb;
-  --color-background-secondary: #ffffff;
-  --color-background-tertiary: #f3f4f6;
+  /* Background Colors (Dark theme) */
+  --color-background: #000000;
+  --color-background-secondary: #111827;
+  --color-background-tertiary: #1f2937;
   
-  /* Surface Colors */
-  --color-surface: #ffffff;
-  --color-surface-hover: #f9fafb;
-  --color-surface-border: #e5e7eb;
+  /* Surface Colors (Dark surfaces) */
+  --color-surface: #111827;
+  --color-surface-hover: #1f2937;
+  --color-surface-border: #374151;
   
-  /* Text Colors */
-  --color-text-primary: #111827;
-  --color-text-secondary: #6b7280;
+  /* Text Colors (Light text on dark background) */
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #d1d5db;
   --color-text-tertiary: #9ca3af;
-  --color-text-inverse: #ffffff;
+  --color-text-inverse: #111827;
   
   /* Status Colors */
-  --color-success: #059669;
-  --color-success-hover: #047857;
-  --color-success-light: #d1fae5;
-  --color-warning: #d97706;
-  --color-error: #dc2626;
-  --color-info: #2563eb;
+  --color-success: #9ca3af;
+  --color-success-hover: #6b7280;
+  --color-success-light: #374151;
+  --color-warning: #d1d5db;
+  --color-error: #f87171;
+  --color-info: #9ca3af;
   
   /* Highlight Colors (for annotations) */
   --color-highlight-yellow: #FFD700;
@@ -54,15 +54,15 @@
   --color-highlight-blue-bg: rgba(69, 183, 209, 0.1);
   --color-highlight-green-bg: rgba(150, 206, 180, 0.1);
   
-  /* Border Colors */
-  --color-border: #e5e7eb;
-  --color-border-light: #f3f4f6;
-  --color-border-dark: #d1d5db;
+  /* Border Colors (Subtle borders on dark background) */
+  --color-border: #374151;
+  --color-border-light: #1f2937;
+  --color-border-dark: #4b5563;
   
-  /* Shadow Colors */
-  --color-shadow: rgba(0, 0, 0, 0.1);
-  --color-shadow-light: rgba(0, 0, 0, 0.05);
-  --color-shadow-dark: rgba(0, 0, 0, 0.15);
+  /* Shadow Colors (Subtle shadows on dark background) */
+  --color-shadow: rgba(0, 0, 0, 0.5);
+  --color-shadow-light: rgba(0, 0, 0, 0.3);
+  --color-shadow-dark: rgba(0, 0, 0, 0.7);
   
   /* Spacing */
   --spacing-xs: 0.25rem;
@@ -126,23 +126,8 @@
   --floating-button-size: 3.5rem;
 }
 
-/* Dark mode support (optional) */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: #111827;
-    --color-background-secondary: #1f2937;
-    --color-background-tertiary: #374151;
-    --color-surface: #1f2937;
-    --color-surface-hover: #374151;
-    --color-surface-border: #374151;
-    --color-text-primary: #f9fafb;
-    --color-text-secondary: #d1d5db;
-    --color-text-tertiary: #9ca3af;
-    --color-border: #374151;
-    --color-border-light: #4b5563;
-    --color-border-dark: #6b7280;
-  }
-}
+/* Dark mode is now the default theme
+ * Light mode can be added as a media query or class toggle if needed */
 
 /* Utility classes for easy theme application */
 .theme-academic {
