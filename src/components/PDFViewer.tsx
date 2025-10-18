@@ -590,8 +590,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     });
     
     if (tts.isPlaying) {
-      console.log('PDFViewer: TTS is playing, pausing...');
-      ttsManager.pause()
+      console.log('PDFViewer: TTS is playing, stopping...');
+      // For Google Cloud TTS, we can't truly pause, so we stop instead
+      ttsManager.stop()
       updateTTS({ isPlaying: false })
     } else {
       console.log('PDFViewer: TTS is not playing, starting...');
@@ -1067,9 +1068,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                     onMouseLeave={(e) => {
                       if (!tts.isPlaying) e.currentTarget.style.backgroundColor = 'transparent'
                     }}
-              title="Text-to-Speech"
+              title={tts.isPlaying ? "Stop" : "Play Text-to-Speech"}
             >
-              {tts.isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+              {tts.isPlaying ? <Square className="w-5 h-5" /> : <Play className="w-5 h-5" />}
               </button>
 
             {tts.isPlaying && (
