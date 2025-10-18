@@ -17,4 +17,4 @@ export { ThemedSidebar } from './ThemedSidebar'
 export { ThemedMainContent } from './ThemedMainContent'
 
 // CSS Variables (for direct import)
-import './theme1-variables.css'
+import '../src/themes/theme1-variables.css'

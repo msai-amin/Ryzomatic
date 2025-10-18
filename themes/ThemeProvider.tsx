@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { theme1Config, ThemeConfig, annotationColors } from './theme1-config';
-import './theme1-variables.css';
+import '../src/themes/theme1-variables.css';
 
 interface ThemeContextType {
   currentTheme: ThemeConfig;
