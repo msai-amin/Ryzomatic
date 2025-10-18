@@ -1,17 +1,11 @@
 import OpenAI from 'openai';
+import { OCR_LIMITS, calculateOCRCredits as calcCredits } from '../src/utils/ocrUtils';
 
-// Initialize OpenAI client for GPT-5 Nano
+// Initialize OpenAI client for GPT-5 Nano (SERVER-SIDE ONLY)
+// This file should only be imported in API routes, never in browser code
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
 });
-
-// OCR tier limits configuration
-export const OCR_LIMITS = {
-  free: { monthlyOCR: 5, creditsPerOCR: 1, maxPages: 20 },
-  pro: { monthlyOCR: 100, creditsPerOCR: 1, maxPages: 50 },
-  premium: { monthlyOCR: 500, creditsPerOCR: 1, maxPages: 100 },
-  enterprise: { monthlyOCR: Infinity, creditsPerOCR: 0, maxPages: Infinity },
-};
 
 interface OCROptions {
   extractTables?: boolean;
@@ -36,21 +30,15 @@ interface OCRResult {
 export class GPT5NanoService {
   /**
    * Calculate OCR credit cost based on page count
+   * (Delegates to shared utility)
    */
   static calculateOCRCredits(pageCount: number, tier: string = 'free'): number {
-    const tierConfig = OCR_LIMITS[tier as keyof typeof OCR_LIMITS] || OCR_LIMITS.free;
-    
-    if (tier === 'enterprise') return 0;
-    
-    // Credit calculation based on page ranges
-    if (pageCount <= 20) return 1;
-    if (pageCount <= 50) return 2;
-    if (pageCount <= 100) return 3;
-    return Math.ceil(pageCount / 50); // 1 credit per 50 pages
+    return calcCredits(pageCount, tier);
   }
 
   /**
    * Check if user can perform OCR based on tier limits
+   * Note: This is duplicated here for server-side use, but client can use ocrUtils
    */
   static canPerformOCR(
     currentCount: number, 
@@ -223,25 +211,16 @@ export class GPT5NanoService {
 
   /**
    * Estimate OCR cost for a document
+   * (Delegates to shared utility for consistency)
    */
   static estimateOCRCost(pageCount: number, tier: string = 'free'): {
     credits: number;
     estimatedTokens: number;
     estimatedCostUSD: number;
   } {
-    const credits = this.calculateOCRCredits(pageCount, tier);
-    const estimatedTokens = pageCount * 2000; // ~2000 tokens per page
-    
-    // GPT-5 Nano pricing: $0.05/1M input, $0.40/1M output
-    const inputCost = (estimatedTokens / 1_000_000) * 0.05;
-    const outputCost = (estimatedTokens / 1_000_000) * 0.40;
-    const estimatedCostUSD = inputCost + outputCost;
-
-    return {
-      credits,
-      estimatedTokens,
-      estimatedCostUSD,
-    };
+    // Import from shared utils to ensure consistency
+    const { estimateOCRCost } = require('../src/utils/ocrUtils');
+    return estimateOCRCost(pageCount, tier);
   }
 
   /**

@@ -9,7 +9,7 @@ import { logger, trackPerformance } from '../services/logger'
 import { errorHandler, ErrorType, ErrorSeverity } from '../services/errorHandler'
 import { validatePDFFile, validateFile } from '../services/validation'
 import { OCRConsentDialog } from './OCRConsentDialog'
-import { calculateOCRCredits } from '../../lib/gpt5nano'
+import { calculateOCRCredits } from '../utils/ocrUtils'
 // PDF.js will be imported dynamically to avoid ES module issues
 
 interface DocumentUploadProps {

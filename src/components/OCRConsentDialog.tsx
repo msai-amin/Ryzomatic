@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, AlertTriangle, Sparkles, CheckCircle, Info } from 'lucide-react';
-import { OCR_LIMITS } from '../../lib/gpt5nano';
+import { OCR_LIMITS } from '../utils/ocrUtils';
 
 interface OCRConsentDialogProps {
   isOpen: boolean;
