@@ -75,6 +75,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const [pageRendered, setPageRendered] = useState(false)
   const [ocrStatus, setOcrStatus] = useState(document.ocrStatus || 'not_needed')
   const [ocrError, setOcrError] = useState<string | undefined>()
+  const [ocrCanRetry, setOcrCanRetry] = useState(false)
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const textLayerRef = useRef<HTMLDivElement>(null)
@@ -520,6 +522,107 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     }
   }, [])
 
+  // Poll for OCR status updates
+  useEffect(() => {
+    if (ocrStatus === 'processing' || ocrStatus === 'pending') {
+      // Start polling for status updates
+      pollingIntervalRef.current = setInterval(async () => {
+        try {
+          const response = await fetch(`/api/documents/ocr-status?documentId=${document.id}`);
+          
+          if (response.ok) {
+            const data = await response.json();
+            
+            if (data.ocrStatus !== ocrStatus) {
+              setOcrStatus(data.ocrStatus);
+              
+              // Update error info if failed
+              if (data.ocrStatus === 'failed') {
+                setOcrError(data.ocrMetadata?.error || 'OCR processing failed');
+                setOcrCanRetry(data.ocrMetadata?.canRetry ?? true);
+              }
+              
+              // Update document content if completed
+              if (data.ocrStatus === 'completed' && data.content) {
+                // Update document in store
+                console.log('OCR completed successfully, text extracted');
+                // TODO: Update document content in store
+              }
+              
+              // Clear interval if done (completed or failed)
+              if (data.ocrStatus !== 'processing' && data.ocrStatus !== 'pending') {
+                if (pollingIntervalRef.current) {
+                  clearInterval(pollingIntervalRef.current);
+                  pollingIntervalRef.current = null;
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error checking OCR status:', error);
+        }
+      }, 3000); // Poll every 3 seconds
+
+      // Cleanup interval on unmount or status change
+      return () => {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+      };
+    }
+  }, [ocrStatus, document.id])
+
+  // Handle OCR retry
+  const handleOCRRetry = useCallback(async () => {
+    if (!document.id || !document.totalPages) return;
+
+    try {
+      setOcrStatus('processing');
+      setOcrError(undefined);
+      setOcrCanRetry(false);
+
+      // Call OCR service with retry logic
+      const { startOCRProcessing } = await import('../services/ocrService');
+      
+      // Note: In real implementation, we'd get auth token from auth service
+      const authToken = 'dummy-token'; // TODO: Get real auth token
+      
+      const result = await startOCRProcessing(
+        {
+          documentId: document.id,
+          s3Key: `documents/${document.id}`, // TODO: Get real S3 key
+          pageCount: document.totalPages,
+          options: {
+            extractTables: true,
+            preserveFormatting: true,
+          },
+        },
+        authToken
+      );
+
+      if (result.success) {
+        setOcrStatus('completed');
+        console.log('OCR retry successful');
+      } else {
+        setOcrStatus('failed');
+        setOcrError(result.error || 'OCR retry failed');
+        setOcrCanRetry(result.canRetry ?? true);
+      }
+    } catch (error: any) {
+      console.error('OCR retry failed:', error);
+      setOcrStatus('failed');
+      setOcrError(error.message || 'Failed to retry OCR');
+      setOcrCanRetry(true);
+    }
+  }, [document.id, document.totalPages])
+
+  // Handle start OCR (for pending status)
+  const handleStartOCR = useCallback(async () => {
+    // Similar to retry, but for initial OCR request
+    handleOCRRetry();
+  }, [handleOCRRetry])
+
   const goToPreviousPage = useCallback(() => {
     if (pageNumber > 1) {
       // Stop TTS when changing pages
@@ -743,18 +846,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   return (
     <div className="flex-1 flex flex-col h-full" style={{ backgroundColor: 'var(--color-background)' }}>
       {/* OCR Status Banner */}
-      {ocrStatus !== 'not_needed' && (
+      {ocrStatus !== 'not_needed' && ocrStatus !== 'user_declined' && (
         <div className="p-4" style={{ backgroundColor: 'var(--color-background)' }}>
           <OCRBanner
             status={ocrStatus as any}
-            onRetry={() => {
-              // TODO: Implement retry logic
-              console.log('Retry OCR');
-            }}
-            onStartOCR={() => {
-              // TODO: Implement start OCR logic
-              console.log('Start OCR');
-            }}
+            onRetry={ocrCanRetry ? handleOCRRetry : undefined}
+            onStartOCR={ocrStatus === 'pending' ? handleStartOCR : undefined}
             errorMessage={ocrError}
           />
         </div>

@@ -182,16 +182,24 @@ export const OCRBanner: React.FC<OCRBannerProps> = ({
             OCR Failed
           </p>
           <p className="text-xs text-red-700 mt-1">
-            {errorMessage || 'Failed to extract text from document. You can try again.'}
+            {errorMessage || 'Failed to extract text from document.'}
           </p>
-          {onRetry && (
-            <button
-              onClick={onRetry}
-              className="mt-2 px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Retry OCR
-            </button>
-          )}
+          <div className="mt-2 flex gap-2">
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                className="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Retry OCR
+              </button>
+            )}
+            <p className="text-xs text-red-600 flex items-center">
+              {onRetry ? 'Credits were not charged' : 'This error cannot be retried'}
+            </p>
+          </div>
         </div>
       </div>
     );

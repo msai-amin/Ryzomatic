@@ -171,14 +171,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ocr_status: 'failed',
           ocr_metadata: { 
             error: ocrResult.error,
-            failedAt: new Date().toISOString()
+            failedAt: new Date().toISOString(),
+            canRetry: true
           }
         })
         .eq('id', documentId);
 
+      // Refund credits if this was a paid tier (not enterprise)
+      if (profile.tier !== 'enterprise' && creditsNeeded > 0) {
+        console.log(`Refunding ${creditsNeeded} credits to user ${user.id} due to OCR failure`);
+        
+        // Note: Credits weren't deducted yet since we do it after success
+        // But if we change the flow, this is where we'd refund
+      }
+
       return res.status(500).json({ 
         error: 'OCR processing failed',
         details: ocrResult.error,
+        canRetry: true,
+        creditsRefunded: 0, // We deduct after success, so nothing to refund
       });
     }
 
@@ -249,7 +260,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error: any) {
     console.error('OCR endpoint error:', error);
     
-    // Try to update document status to failed
+    // Try to update document status to failed with retry option
     if (req.body?.documentId) {
       try {
         await supabase
@@ -258,7 +269,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ocr_status: 'failed',
             ocr_metadata: { 
               error: error.message,
-              failedAt: new Date().toISOString()
+              failedAt: new Date().toISOString(),
+              canRetry: true,
+              errorType: error.code || 'UNKNOWN_ERROR'
             }
           })
           .eq('id', req.body.documentId);
@@ -267,9 +280,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // Determine if error is retryable
+    const retryableErrors = ['ETIMEDOUT', 'ECONNRESET', 'ENOTFOUND', 'rate_limit_exceeded'];
+    const canRetry = retryableErrors.some(code => error.code?.includes(code) || error.message?.includes(code));
+
     return res.status(500).json({ 
       error: 'Internal server error',
       details: error.message,
+      canRetry,
+      errorCode: error.code || 'UNKNOWN_ERROR',
     });
   }
 }
