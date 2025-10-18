@@ -7,9 +7,10 @@ export const useKeyboardShortcuts = () => {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Check if user is typing in an input field
-      const isInputFocused = document.activeElement?.tagName === 'INPUT' || 
-                            document.activeElement?.tagName === 'TEXTAREA' ||
-                            document.activeElement?.contentEditable === 'true'
+      const activeElement = document.activeElement as HTMLElement
+      const isInputFocused = activeElement?.tagName === 'INPUT' || 
+                            activeElement?.tagName === 'TEXTAREA' ||
+                            activeElement?.contentEditable === 'true'
 
       // Don't trigger shortcuts when typing in inputs
       if (isInputFocused) return

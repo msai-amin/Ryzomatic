@@ -235,7 +235,11 @@ function App() {
           backgroundColor: 'var(--color-background)',
         }}
       >
-        <ThemedHeader />
+        <ThemedHeader 
+          onUploadClick={() => {}} 
+          isSidebarOpen={true}
+          onSidebarToggle={() => {}}
+        />
         <main className="container mx-auto px-4 py-6">
           <div className="text-center py-20">
             <h1 
