@@ -219,18 +219,18 @@ const LandingPage: React.FC = () => {
             <span>For Researchers, by Researchers</span>
           </div>
           
-          <h1 className="max-w-4xl text-5xl font-semibold leading-tight text-slate-900 md:text-6xl" style={{ fontFamily: "'Inter', sans-serif" }}>
+          <h1 className="max-w-4xl text-heading-1 text-slate-900 md:text-6xl" style={{ fontFamily: "'Inter', sans-serif" }}>
             Reading Reimagined for Academics.
           </h1>
           
-          <p className="max-w-2xl text-lg text-slate-600 md:text-xl">
+          <p className="max-w-2xl text-body text-slate-600 md:text-xl">
             Immersive Reader is an intelligent reading platform for academics. Streamline your literature reviews, manage citations, draft manuscripts, and collaborate with peers—all in one immersive workspace.
           </p>
           
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
             <button 
               onClick={handleGetStarted}
-              className="rounded-full bg-slate-800 px-8 py-3 font-semibold text-white shadow-lg shadow-slate-800/30 transition hover:bg-slate-700"
+              className="rounded-full bg-slate-800 px-8 py-4 font-semibold text-white shadow-lg shadow-slate-800/30 transition hover:bg-slate-700 text-button"
             >
               Start Your Free Trial
             </button>
@@ -273,10 +273,10 @@ const LandingPage: React.FC = () => {
       <section id="features" className="bg-slate-50 border-y border-slate-200">
         <div className="mx-auto max-w-6xl px-6 py-24">
           <div className="flex flex-col gap-6 text-center">
-            <h2 className="text-4xl font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
+            <h2 className="text-heading-2 text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
               A Toolkit Engineered for Academic Excellence
             </h2>
-            <p className="mx-auto max-w-2xl text-base text-slate-600">
+            <p className="mx-auto max-w-2xl text-body text-slate-600">
               Immersive Reader transforms scattered notes and sources into a clear, actionable research workflow.
             </p>
           </div>
@@ -290,10 +290,10 @@ const LandingPage: React.FC = () => {
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition group-hover:bg-slate-800 group-hover:text-white text-2xl">
                   {feature.icon}
                 </div>
-                <h3 className="mt-6 text-2xl font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
+                <h3 className="mt-6 text-heading-3 text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
                   {feature.title}
                 </h3>
-                <p className="mt-4 text-sm text-slate-600">
+                <p className="mt-4 text-caption text-slate-600">
                   {feature.description}
                 </p>
               </div>

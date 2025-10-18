@@ -59,15 +59,15 @@ export const ChatModal: React.FC<ChatModalProps> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}>
-      <div className="rounded-lg shadow-xl w-full max-w-4xl flex flex-col" style={{ backgroundColor: 'var(--color-surface)', maxHeight: '80vh' }}>
+      <div className="rounded-lg shadow-xl w-full max-w-4xl flex flex-col animate-scale-in" style={{ backgroundColor: 'var(--color-surface)', maxHeight: '80vh' }}>
         <div className="flex items-center justify-between p-6" style={{ borderBottom: '1px solid var(--color-border)' }}>
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--color-primary)' }}>
               <Bot className="w-5 h-5" style={{ color: 'var(--color-text-inverse)' }} />
             </div>
             <div>
-              <h2 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>AI Assistant</h2>
-              <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+              <h2 className="text-heading-3" style={{ color: 'var(--color-text-primary)' }}>AI Assistant</h2>
+              <p className="text-caption" style={{ color: 'var(--color-text-secondary)' }}>
                 {currentDocument ? `Ask about "${currentDocument.name}"` : 'Ask me anything'}
               </p>
             </div>
@@ -78,6 +78,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({ onClose }) => {
             style={{ color: 'var(--color-text-secondary)' }}
             onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-primary)'}
             onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
+            aria-label="Close AI Assistant"
           >
             <X className="w-6 h-6" />
           </button>
@@ -85,7 +86,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({ onClose }) => {
 
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
             {chatMessages.length === 0 ? (
               <div className="text-center py-8">
                 <Bot className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--color-text-tertiary)' }} />

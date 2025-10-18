@@ -78,6 +78,16 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
     }
   };
 
+  const getPasswordStrength = (password: string) => {
+    if (password.length === 0) return { strength: 0, label: '', color: '' };
+    if (password.length < 6) return { strength: 1, label: 'Weak', color: 'var(--color-error)' };
+    if (password.length < 8) return { strength: 2, label: 'Fair', color: 'var(--color-warning)' };
+    if (password.length < 12) return { strength: 3, label: 'Good', color: 'var(--color-info)' };
+    return { strength: 4, label: 'Strong', color: 'var(--color-success)' };
+  };
+
+  const passwordStrength = getPasswordStrength(formData.password);
+
   const resetForm = () => {
     setFormData({
       email: '',
@@ -118,7 +128,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
 
         <div className="p-6">
           {error && (
-            <div className="mb-4 p-3 rounded-md" style={{ backgroundColor: 'var(--color-error-light, rgba(220, 38, 38, 0.1))', border: '1px solid var(--color-error)' }}>
+            <div className="mb-4 p-3 rounded-md" style={{ backgroundColor: 'rgba(248, 113, 113, 0.1)', border: '1px solid var(--color-error)' }}>
               <p className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>
             </div>
           )}
@@ -200,10 +210,30 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 transition-colors"
                   style={{ color: 'var(--color-text-secondary)' }}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+              {/* Password Strength Indicator */}
+              {isSignUp && formData.password && (
+                <div className="mt-2">
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                      <div
+                        className="h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${(passwordStrength.strength / 4) * 100}%`,
+                          backgroundColor: passwordStrength.color,
+                        }}
+                      />
+                    </div>
+                    <span className="text-xs" style={{ color: passwordStrength.color }}>
+                      {passwordStrength.label}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {isSignUp && (
@@ -235,13 +265,16 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-2 px-4 rounded-md focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold"
+              className="w-full py-2 px-4 rounded-md focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold flex items-center justify-center"
               style={{
                 backgroundColor: 'var(--color-primary)',
                 color: 'var(--color-text-inverse)',
                 borderRadius: 'var(--border-radius-md)',
               }}
             >
+              {isLoading && (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              )}
               {isLoading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Sign In')}
             </button>
           </form>
@@ -267,6 +300,9 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                 borderRadius: 'var(--border-radius-md)',
               }}
             >
+              {isLoading && (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+              )}
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path
                   fill="#4285F4"

@@ -92,7 +92,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
         className="overflow-y-auto transition-transform duration-300 ease-in-out sticky top-0"
         style={{
           width: 'var(--sidebar-width)',
-          backgroundColor: 'var(--color-surface)',
+          background: 'linear-gradient(180deg, var(--color-surface) 0%, rgba(17, 24, 39, 0.98) 100%)',
           borderRight: '1px solid var(--color-border)',
           height: '100vh',
           transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
@@ -125,7 +125,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
             Document Library
           </h2>
           
-          <div className="space-y-2">
+          <div className="space-y-3">
             {mockDocuments.map((doc) => (
               <div
                 key={doc.id}

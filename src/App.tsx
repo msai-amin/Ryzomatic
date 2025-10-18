@@ -284,6 +284,7 @@ function App() {
   // Show main app if authenticated - use ThemedApp for consistent production/development UI
   return (
     <ThemeProvider>
+      <a href="#main-content" className="skip-link">Skip to main content</a>
       <ThemedApp />
     </ThemeProvider>
   )

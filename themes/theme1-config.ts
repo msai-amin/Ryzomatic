@@ -37,8 +37,11 @@ export interface ThemeColors {
   successHover: string;
   successLight: string;
   warning: string;
+  warningHover: string;
   error: string;
+  errorHover: string;
   info: string;
+  infoHover: string;
   
   // Highlight Colors (for annotations)
   highlight: {
@@ -140,8 +143,8 @@ export const theme1Config: ThemeConfig = {
   
   colors: {
     // Primary Colors (Gray theme for black/gray/white UI)
-    primary: '#6b7280', // gray-500
-    primaryHover: '#4b5563', // gray-600
+    primary: '#9ca3af', // gray-400 (improved contrast)
+    primaryHover: '#6b7280', // gray-500
     primaryLight: '#d1d5db', // gray-300
     primaryDark: '#374151', // gray-700
     
@@ -167,12 +170,15 @@ export const theme1Config: ThemeConfig = {
     textInverse: '#111827', // gray-900 (dark text for light backgrounds)
     
     // Status Colors
-    success: '#9ca3af', // gray-400
-    successHover: '#6b7280', // gray-500
-    successLight: '#374151', // gray-700
-    warning: '#d1d5db', // gray-300
+    success: '#10b981', // green-500 (semantic clarity)
+    successHover: '#059669', // green-600
+    successLight: '#064e3b', // green-900
+    warning: '#f59e0b', // amber-500
+    warningHover: '#d97706', // amber-600
     error: '#f87171', // red-400 (lighter for visibility on dark)
-    info: '#9ca3af', // gray-400
+    errorHover: '#ef4444', // red-500
+    info: '#3b82f6', // blue-500
+    infoHover: '#2563eb', // blue-600
     
     // Highlight Colors (for annotations)
     highlight: {
@@ -184,9 +190,9 @@ export const theme1Config: ThemeConfig = {
     },
     
     // Border Colors (Subtle borders on dark background)
-    border: '#374151', // gray-700
+    border: '#4b5563', // gray-600 (improved visibility)
     borderLight: '#1f2937', // gray-800
-    borderDark: '#4b5563', // gray-600
+    borderDark: '#6b7280', // gray-500
     
     // Shadow Colors (Subtle shadows on dark background)
     shadow: 'rgba(0, 0, 0, 0.5)',
@@ -227,8 +233,8 @@ export const theme1Config: ThemeConfig = {
       bold: 700,
     },
     lineHeight: {
-      tight: 1.25,
-      normal: 1.5,
+      tight: 1.2,
+      normal: 1.6,
       relaxed: 1.75,
     },
   },

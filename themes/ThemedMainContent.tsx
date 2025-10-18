@@ -13,6 +13,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
 
   return (
     <div 
+      id="main-content"
       className="flex-1 flex"
       style={{
         backgroundColor: 'var(--color-background)',
@@ -21,7 +22,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
     >
       {/* Main Content Area */}
       <div 
-        className="flex-1 p-6 overflow-y-auto"
+        className="flex-1 p-8 overflow-y-auto"
         style={{
           backgroundColor: 'var(--color-background)',
         }}
@@ -32,7 +33,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
       {/* Notes Panel - Only show if there's a current document */}
       {currentDocument && (
         <div 
-          className="w-80 p-6 overflow-y-auto"
+          className="w-80 p-8 overflow-y-auto"
           style={{
             backgroundColor: 'var(--color-surface)',
             borderLeft: '1px solid var(--color-border)',

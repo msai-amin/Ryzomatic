@@ -414,12 +414,16 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Upload Document</h2>
+      <div className="modal-content animate-scale-in">
+        <div className="flex items-center justify-between p-6" style={{ borderBottom: '1px solid var(--color-border)' }}>
+          <h2 className="text-heading-3" style={{ color: 'var(--color-text-primary)' }}>Upload Document</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="transition-colors"
+            style={{ color: 'var(--color-text-secondary)' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-primary)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
+            aria-label="Close Upload Dialog"
           >
             <X className="w-6 h-6" />
           </button>
@@ -427,21 +431,21 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
 
         <div className="p-6">
           <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              dragActive
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-300 hover:border-gray-400'
-            }`}
+            className="border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300"
+            style={{
+              borderColor: dragActive ? 'var(--color-primary)' : 'var(--color-border)',
+              backgroundColor: dragActive ? 'rgba(156, 163, 175, 0.1)' : 'transparent',
+            }}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
             onDrop={handleDrop}
           >
-            <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-lg font-medium text-gray-900 mb-2">
+            <Upload className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--color-text-tertiary)' }} />
+            <p className="text-heading-3 mb-2" style={{ color: 'var(--color-text-primary)' }}>
               Drop your document here
             </p>
-            <p className="text-gray-600 mb-4">
+            <p className="text-body mb-4" style={{ color: 'var(--color-text-secondary)' }}>
               or click to browse files
             </p>
             <input
@@ -453,7 +457,13 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
             />
             <label
               htmlFor="file-upload"
-              className="btn-primary cursor-pointer inline-flex items-center space-x-2"
+              className="btn-primary cursor-pointer inline-flex items-center space-x-2 text-button"
+              style={{
+                backgroundColor: 'var(--color-primary)',
+                color: 'var(--color-text-inverse)',
+                padding: 'var(--spacing-sm) var(--spacing-md)',
+                borderRadius: 'var(--border-radius-lg)',
+              }}
             >
               <FileText className="w-4 h-4" />
               <span>Choose File</span>
@@ -461,19 +471,25 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
           </div>
 
           {error && (
-            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2">
-              <AlertCircle className="w-5 h-5 text-red-600" />
-              <span className="text-red-800">{error}</span>
+            <div 
+              className="mt-4 p-4 rounded-lg flex items-center space-x-2"
+              style={{
+                backgroundColor: 'rgba(248, 113, 113, 0.1)',
+                border: '1px solid var(--color-error)',
+              }}
+            >
+              <AlertCircle className="w-5 h-5" style={{ color: 'var(--color-error)' }} />
+              <span style={{ color: 'var(--color-error)' }}>{error}</span>
             </div>
           )}
 
-          <div className="mt-6 text-sm text-gray-600">
-            <p className="font-medium mb-2">Supported formats:</p>
-            <ul className="space-y-1">
+          <div className="mt-6" style={{ color: 'var(--color-text-secondary)' }}>
+            <p className="text-caption font-medium mb-2">Supported formats:</p>
+            <ul className="space-y-1 text-caption">
               <li>• Text files (.txt)</li>
               <li>• PDF documents (.pdf)</li>
             </ul>
-            <p className="mt-3 text-xs text-gray-500">
+            <p className="mt-3 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
               Note: For PDFs, text extraction is attempted first. If the advanced PDF viewer has issues, 
               the app will automatically fall back to text-only view.
             </p>
@@ -486,9 +502,17 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
               id="save-to-library"
               checked={saveToLibrary}
               onChange={(e) => setSaveToLibrary(e.target.checked)}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              className="w-4 h-4 rounded focus:ring-2"
+              style={{
+                accentColor: 'var(--color-primary)',
+                borderColor: 'var(--color-border)',
+              }}
             />
-            <label htmlFor="save-to-library" className="ml-2 text-sm text-gray-700 flex items-center gap-1">
+            <label 
+              htmlFor="save-to-library" 
+              className="ml-2 text-caption flex items-center gap-1"
+              style={{ color: 'var(--color-text-primary)' }}
+            >
               <Save className="w-4 h-4" />
               Save to Library {simpleGoogleAuth.isSignedIn() && <span className="flex items-center gap-1">& <Cloud className="w-4 h-4" /> Google Drive</span>}
             </label>

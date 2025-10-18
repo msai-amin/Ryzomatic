@@ -1,7 +1,6 @@
 import React from 'react'
 import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut, Menu } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
-import { DocumentUpload } from '../src/components/DocumentUpload'
 import { TypographySettings } from '../src/components/TypographySettings'
 import { LibraryModal } from '../src/components/LibraryModal'
 import { AuthModal } from '../src/components/AuthModal'
@@ -9,7 +8,11 @@ import { PomodoroTimer } from '../src/components/PomodoroTimer'
 import { Tooltip } from '../src/components/Tooltip'
 import { useTheme } from './ThemeProvider'
 
-export const ThemedHeader: React.FC = () => {
+interface ThemedHeaderProps {
+  onUploadClick: () => void
+}
+
+export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick }) => {
   const { 
     toggleChat, 
     currentDocument, 
@@ -20,7 +23,6 @@ export const ThemedHeader: React.FC = () => {
     pomodoroIsRunning,
     pomodoroTimeLeft
   } = useAppStore()
-  const [showUpload, setShowUpload] = React.useState(false)
   const [showSettings, setShowSettings] = React.useState(false)
   const [showLibrary, setShowLibrary] = React.useState(false)
   const [showAuth, setShowAuth] = React.useState(false)
@@ -58,10 +60,11 @@ export const ThemedHeader: React.FC = () => {
     <header 
       className="sticky top-0 z-40"
       style={{
-        backgroundColor: 'var(--color-surface)',
+        background: 'linear-gradient(180deg, var(--color-surface) 0%, rgba(17, 24, 39, 0.95) 100%)',
         borderBottom: '1px solid var(--color-border)',
         height: 'var(--header-height)',
         padding: 'var(--spacing-md) var(--spacing-lg)',
+        backdropFilter: 'blur(8px)',
       }}
     >
       <div className="flex items-center justify-between h-full">
@@ -70,10 +73,13 @@ export const ThemedHeader: React.FC = () => {
           <Tooltip content="Toggle Sidebar" position="bottom">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              className="p-2 rounded-lg transition-colors"
               style={{
                 color: 'var(--color-text-primary)',
               }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              aria-label={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -102,15 +108,30 @@ export const ThemedHeader: React.FC = () => {
         )}
 
         {/* Actions */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2">
           {/* Search Button */}
           <Tooltip content="Search Documents" position="bottom">
-            <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+            <button 
+              className="p-2 rounded-lg transition-colors"
+              style={{
+                color: 'var(--color-text-primary)',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              aria-label="Search Documents"
+            >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </button>
           </Tooltip>
+
+          {/* Visual Separator */}
+          <div 
+            className="w-px h-6"
+            style={{ backgroundColor: 'var(--color-border)' }}
+            aria-hidden="true"
+          />
 
           {/* Show Library and Upload only when user is signed in */}
           {user && (
@@ -126,6 +147,7 @@ export const ThemedHeader: React.FC = () => {
                     padding: 'var(--spacing-sm) var(--spacing-md)',
                     borderRadius: 'var(--border-radius-lg)',
                   }}
+                  aria-label="View Library"
                 >
                   <Library className="w-4 h-4" />
                   <span>Library</span>
@@ -134,7 +156,7 @@ export const ThemedHeader: React.FC = () => {
 
               <Tooltip content="Upload New Document" position="bottom">
                 <button
-                  onClick={() => setShowUpload(true)}
+                  onClick={onUploadClick}
                   className="btn-primary flex items-center space-x-2"
                   style={{
                     backgroundColor: 'var(--color-primary)',
@@ -143,23 +165,41 @@ export const ThemedHeader: React.FC = () => {
                     padding: 'var(--spacing-sm) var(--spacing-md)',
                     borderRadius: 'var(--border-radius-lg)',
                   }}
+                  aria-label="Upload New Document"
                 >
                   <Upload className="w-4 h-4" />
                   <span>New Material</span>
                 </button>
               </Tooltip>
+
+              {/* Visual Separator */}
+              <div 
+                className="w-px h-6"
+                style={{ backgroundColor: 'var(--color-border)' }}
+                aria-hidden="true"
+              />
             </>
           )}
           
           <Tooltip content="Reading Settings" position="bottom">
             <button
               onClick={() => setShowSettings(true)}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              className="p-2 rounded-lg transition-colors"
               style={{ color: 'var(--color-text-primary)' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              aria-label="Reading Settings"
             >
               <Settings className="w-5 h-5" />
             </button>
           </Tooltip>
+
+          {/* Visual Separator */}
+          <div 
+            className="w-px h-6"
+            style={{ backgroundColor: 'var(--color-border)' }}
+            aria-hidden="true"
+          />
 
           {/* Auth Button */}
           {isAuthenticated && user ? (
@@ -193,6 +233,7 @@ export const ThemedHeader: React.FC = () => {
                     color: 'var(--color-error)',
                     border: '1px solid var(--color-error)',
                   }}
+                  aria-label="Sign Out"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Logout</span>
@@ -209,6 +250,7 @@ export const ThemedHeader: React.FC = () => {
                   color: 'var(--color-text-primary)',
                   border: '1px solid var(--color-border)',
                 }}
+                aria-label="Sign In"
               >
                 <User className="w-4 h-4" />
                 <span>Sign In</span>
@@ -220,11 +262,14 @@ export const ThemedHeader: React.FC = () => {
             <button
               ref={pomodoroButtonRef}
               onClick={() => setShowPomodoro(!showPomodoro)}
-              className="p-2 rounded-lg transition-colors text-2xl leading-none relative"
+              className={`p-2 rounded-lg transition-all duration-300 text-2xl leading-none relative ${
+                pomodoroIsRunning ? 'animate-pulse-slow' : ''
+              }`}
               style={{
                 backgroundColor: showPomodoro ? 'var(--color-primary-light)' : 'transparent',
                 border: showPomodoro ? '2px solid var(--color-primary)' : 'none',
               }}
+              aria-label={pomodoroIsRunning ? `Pomodoro Timer Running: ${Math.floor((pomodoroTimeLeft || 0) / 60)}:${String((pomodoroTimeLeft || 0) % 60).padStart(2, '0')}` : "Open Pomodoro Timer"}
             >
               🍅
               {pomodoroIsRunning && !showPomodoro && (
@@ -244,6 +289,7 @@ export const ThemedHeader: React.FC = () => {
                 padding: 'var(--spacing-sm) var(--spacing-md)',
                 borderRadius: 'var(--border-radius-lg)',
               }}
+              aria-label="Open Text-to-Speech & AI Assistant"
             >
               <MessageCircle className="w-4 h-4" />
               <span>TTS</span>
@@ -280,10 +326,6 @@ export const ThemedHeader: React.FC = () => {
         />
       )}
 
-      {showUpload && (
-        <DocumentUpload onClose={() => setShowUpload(false)} />
-      )}
-      
       {showSettings && (
         <TypographySettings onClose={() => setShowSettings(false)} />
       )}

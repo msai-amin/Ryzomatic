@@ -6,13 +6,19 @@ import { ThemedSidebar } from './ThemedSidebar'
 import { ThemedMainContent } from './ThemedMainContent'
 import { DocumentViewer } from '../src/components/DocumentViewer'
 import { ChatModal } from '../src/components/ChatModal'
+import { DocumentUpload } from '../src/components/DocumentUpload'
 import { Tooltip } from '../src/components/Tooltip'
 import { useAppStore } from '../src/store/appStore'
+import { useKeyboardShortcuts } from '../src/hooks/useKeyboardShortcuts'
 
 const ThemedAppContent: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [showUpload, setShowUpload] = useState(false)
   const { currentTheme } = useTheme()
   const { isChatOpen, toggleChat } = useAppStore()
+  
+  // Enable keyboard shortcuts
+  useKeyboardShortcuts()
 
   return (
     <div 
@@ -24,7 +30,7 @@ const ThemedAppContent: React.FC = () => {
       }}
     >
       {/* Header */}
-      <ThemedHeader />
+      <ThemedHeader onUploadClick={() => setShowUpload(true)} />
 
       {/* Main Layout */}
       <div className="flex">
@@ -45,17 +51,22 @@ const ThemedAppContent: React.FC = () => {
         <ChatModal onClose={() => toggleChat()} />
       )}
 
+      {/* Upload Modal */}
+      {showUpload && (
+        <DocumentUpload onClose={() => setShowUpload(false)} />
+      )}
+
       {/* Floating Action Button - Reserved for future quick actions */}
       <Tooltip content="Quick Actions (Coming Soon)" position="left">
         <button
-          className="fixed shadow-lg transition-colors"
+          className="fixed shadow-lg transition-all duration-300 hover:scale-110"
           style={{
             bottom: 'var(--spacing-lg)',
             right: 'var(--spacing-lg)',
             width: 'var(--floating-button-size)',
             height: 'var(--floating-button-size)',
             borderRadius: '50%',
-            backgroundColor: 'var(--color-primary)',
+            background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)',
             color: 'var(--color-text-inverse)',
             boxShadow: 'var(--shadow-lg)',
             border: 'none',
@@ -65,14 +76,17 @@ const ThemedAppContent: React.FC = () => {
             justifyContent: 'center',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'
+            e.currentTarget.style.background = 'linear-gradient(135deg, var(--color-primary-hover) 0%, var(--color-primary-dark) 100%)'
+            e.currentTarget.style.boxShadow = 'var(--shadow-xl)'
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--color-primary)'
+            e.currentTarget.style.background = 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)'
+            e.currentTarget.style.boxShadow = 'var(--shadow-lg)'
           }}
           onClick={() => {
             console.log('Quick actions - coming soon')
           }}
+          aria-label="Quick Actions"
         >
           <Plus className="w-6 h-6" />
         </button>
