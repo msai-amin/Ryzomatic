@@ -37,6 +37,10 @@ export interface TypographySettings {
   lineHeight: number
   maxWidth: number
   theme: 'light' | 'dark' | 'sepia'
+  textAlign: 'left' | 'justify' | 'center'
+  spacingMultiplier: number
+  focusMode: boolean
+  readingGuide: boolean
 }
 
 export interface ThemeSettings {
@@ -153,7 +157,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     fontSize: 18,
     lineHeight: 1.75,
     maxWidth: 800,
-    theme: 'light'
+    theme: 'light',
+    textAlign: 'left',
+    spacingMultiplier: 1.0,
+    focusMode: false,
+    readingGuide: false
   },
   theme: {
     currentTheme: 'default',

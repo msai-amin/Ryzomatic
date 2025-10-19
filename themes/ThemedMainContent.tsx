@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
 import { useTheme } from './ThemeProvider'
+import { ChevronRight, ChevronLeft } from 'lucide-react'
 
 interface ThemedMainContentProps {
   children?: React.ReactNode
@@ -10,6 +11,7 @@ interface ThemedMainContentProps {
 export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }) => {
   const { currentDocument } = useAppStore()
   const { annotationColors } = useTheme()
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true)
 
   return (
     <div 
@@ -22,7 +24,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
     >
       {/* Main Content Area */}
       <div 
-        className="flex-1 p-8 overflow-y-auto"
+        className="flex-1 p-8 overflow-y-auto relative"
         style={{
           backgroundColor: 'var(--color-background)',
         }}
@@ -30,15 +32,40 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
         {children}
       </div>
 
-      {/* Notes Panel - Only show if there's a current document */}
+      {/* Right Sidebar - Only show if there's a current document */}
       {currentDocument && (
         <div 
-          className="w-80 p-8 overflow-y-auto"
+          className="transition-all duration-300 ease-in-out overflow-y-auto relative"
           style={{
+            width: isRightSidebarOpen ? '320px' : '0px',
             backgroundColor: 'var(--color-surface)',
-            borderLeft: '1px solid var(--color-border)',
+            borderLeft: isRightSidebarOpen ? '1px solid var(--color-border)' : 'none',
           }}
         >
+          {/* Toggle Button */}
+          <button
+            onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+            className="absolute -left-10 top-4 p-2 rounded-l-lg shadow-md hover:shadow-lg transition-all z-10"
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRight: 'none',
+              color: 'var(--color-text-primary)',
+            }}
+            title={isRightSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+          >
+            {isRightSidebarOpen ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+
+          {/* Sidebar Content */}
+          <div 
+            className="p-8"
+            style={{
+              opacity: isRightSidebarOpen ? 1 : 0,
+              transition: 'opacity 0.3s ease-in-out',
+              visibility: isRightSidebarOpen ? 'visible' : 'hidden',
+            }}
+          >
           <div className="flex items-center justify-between mb-6">
             <h2 
               className="text-lg font-semibold"
@@ -119,6 +146,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                 </button>
               </Tooltip>
             </div>
+          </div>
           </div>
         </div>
       )}

@@ -32,6 +32,21 @@ class TextToSpeechService {
   private onEndCallback: (() => void) | null = null;
   private onWordCallback: ((word: string, charIndex: number) => void) | null = null;
   
+  // Progress tracking
+  private startTime: number = 0;
+  private currentCharIndex: number = 0;
+  private totalTextLength: number = 0;
+  private estimatedDuration: number = 0;
+  private playbackStartTime: number = 0; // Actual wall-clock start time
+  private pausedTime: number = 0; // Time when paused (to calculate elapsed time on resume)
+  private totalPauseDuration: number = 0; // Total time spent paused
+  private lastValidCharIndex: number = 0; // Track if word boundaries are working
+  
+  // Time-based word tracking (for when browser word boundaries are broken)
+  private words: string[] = [];
+  private wordUpdateInterval: number | null = null;
+  private millisecondsPerWord: number = 0;
+  
   // Recording support
   private isRecording = false;
   private mediaRecorder: MediaRecorder | null = null;
@@ -247,6 +262,30 @@ class TextToSpeechService {
     this.currentText = text;
     this.onEndCallback = onEnd || null;
     this.onWordCallback = onWord || null;
+    
+    // Initialize progress tracking
+    this.totalTextLength = text.length;
+    this.currentCharIndex = 0;
+    this.lastValidCharIndex = 0;
+    this.startTime = Date.now();
+    this.playbackStartTime = 0; // Will be set when audio actually starts
+    this.pausedTime = 0;
+    this.totalPauseDuration = 0;
+    
+    // Split text into words for time-based highlighting
+    this.words = text.split(/\s+/).filter(word => word.trim().length > 0);
+    
+    // Estimate duration: average speaking rate is ~150 words per minute
+    // Adjust based on the configured rate setting
+    const wordCount = this.words.length;
+    const baseWordsPerMinute = 150;
+    const adjustedWordsPerMinute = baseWordsPerMinute * this.settings.rate;
+    this.estimatedDuration = (wordCount / adjustedWordsPerMinute) * 60 * 1000; // in milliseconds
+    
+    // Calculate milliseconds per word for time-based word tracking
+    this.millisecondsPerWord = this.estimatedDuration / wordCount;
+    
+    console.log(`TTS Progress initialized: ${wordCount} words, ${(this.estimatedDuration / 1000).toFixed(1)}s duration, ${this.millisecondsPerWord.toFixed(0)}ms per word`);
 
     // Ensure voices are loaded
     if (this.voices.length === 0) {
@@ -296,57 +335,102 @@ class TextToSpeechService {
     });
 
     // Event listeners
+    this.utterance.onstart = () => {
+      this.playbackStartTime = Date.now();
+      console.log('TTS playback started at:', this.playbackStartTime);
+      
+      // Start time-based word tracking interval
+      this.startWordTracking();
+    };
+    
     this.utterance.onend = () => {
       this.isPaused = false;
+      this.playbackStartTime = 0;
+      this.stopWordTracking();
       if (this.onEndCallback) {
         this.onEndCallback();
       }
     };
 
     this.utterance.onerror = (event) => {
-      console.error('TTS Error Details:', {
-        error: event.error,
-        type: event.type,
-        charIndex: event.charIndex,
-        charLength: event.charLength,
-        name: event.name,
-        utterance: {
-          text: this.utterance?.text?.substring(0, 100) + '...',
-          voice: this.utterance?.voice?.name,
-          rate: this.utterance?.rate,
-          pitch: this.utterance?.pitch,
-          volume: this.utterance?.volume
-        },
-        synthStatus: {
-          speaking: this.synth.speaking,
-          pending: this.synth.pending,
-          paused: this.synth.paused
-        },
-        voicesAvailable: this.voices.length,
-        currentVoice: this.settings.voice ? {
-          name: this.settings.voice.name,
-          lang: this.settings.voice.lang,
-          localService: this.settings.voice.localService
-        } : null
-      });
-      
-      // Log the full event object for debugging
-      console.error('Full TTS Error Event:', event);
+      // Only log real errors, not interruptions from user actions
+      if (event.error !== 'interrupted' && event.error !== 'canceled') {
+        console.error('TTS Error Details:', {
+          error: event.error,
+          type: event.type,
+          charIndex: event.charIndex,
+          charLength: event.charLength,
+          name: event.name,
+          utterance: {
+            text: this.utterance?.text?.substring(0, 100) + '...',
+            voice: this.utterance?.voice?.name,
+            rate: this.utterance?.rate,
+            pitch: this.utterance?.pitch,
+            volume: this.utterance?.volume
+          },
+          synthStatus: {
+            speaking: this.synth.speaking,
+            pending: this.synth.pending,
+            paused: this.synth.paused
+          },
+          voicesAvailable: this.voices.length,
+          currentVoice: this.settings.voice ? {
+            name: this.settings.voice.name,
+            lang: this.settings.voice.lang,
+            localService: this.settings.voice.localService
+          } : null
+        });
+        
+        // Log the full event object for debugging
+        console.error('Full TTS Error Event:', event);
+      } else {
+        console.log('TTS interrupted/canceled (this is normal when user stops playback)');
+      }
       
       this.isPaused = false;
+      this.currentCharIndex = 0;
+      this.playbackStartTime = 0;
+      this.stopWordTracking();
       if (this.onEndCallback) {
         this.onEndCallback();
       }
     };
 
-    if (this.onWordCallback) {
-      this.utterance.onboundary = (event) => {
-        if (event.name === 'word') {
-          const word = text.slice(event.charIndex, event.charIndex + event.charLength);
-          this.onWordCallback!(word, event.charIndex);
+    // Always track progress via word boundaries
+    this.utterance.onboundary = (event) => {
+      if (event.name === 'word') {
+        const word = text.slice(event.charIndex, event.charIndex + (event.charLength || 0));
+        
+        // Detect if word boundaries are working properly
+        // If charIndex is advancing, use it. If it's stuck at 0 or returning the full text, ignore it.
+        const isValidBoundary = event.charIndex > this.lastValidCharIndex || 
+                                (event.charIndex > 0 && event.charLength && event.charLength < 100);
+        
+        if (isValidBoundary) {
+          this.currentCharIndex = event.charIndex;
+          this.lastValidCharIndex = event.charIndex;
+          
+          // Debug: Log first few VALID word boundaries
+          if (this.currentCharIndex < 200) {
+            console.log('Valid word boundary:', { 
+              word: word.substring(0, 50), 
+              charIndex: event.charIndex, 
+              charLength: event.charLength
+            });
+          }
+          
+          // Call word callback if provided
+          if (this.onWordCallback) {
+            this.onWordCallback(word, event.charIndex);
+          }
+        } else {
+          // Word boundaries are broken - we'll use time-based fallback
+          if (event.charIndex === 0 && event.charLength === this.totalTextLength) {
+            console.warn('Word boundaries broken: browser returned entire text as one word. Using time-based progress fallback.');
+          }
         }
-      };
-    }
+      }
+    };
 
     try {
       console.log('TTSService.speak: Calling synth.speak with utterance:', {
@@ -395,15 +479,29 @@ class TextToSpeechService {
 
   pause() {
     if (this.synth.speaking && !this.isPaused) {
+      console.log('TTSService: Pausing playback');
+      this.pausedTime = Date.now(); // Record when we paused
       this.synth.pause();
       this.isPaused = true;
+      this.stopWordTracking(); // Pause word tracking
     }
   }
 
   resume() {
     if (this.isPaused) {
+      console.log('TTSService: Resuming playback');
+      
+      // Calculate how long we were paused and adjust start time
+      if (this.pausedTime > 0) {
+        const pauseDuration = Date.now() - this.pausedTime;
+        this.totalPauseDuration += pauseDuration;
+        console.log(`TTSService: Was paused for ${(pauseDuration / 1000).toFixed(1)}s, total pause time: ${(this.totalPauseDuration / 1000).toFixed(1)}s`);
+      }
+      
       this.synth.resume();
       this.isPaused = false;
+      this.pausedTime = 0;
+      this.startWordTracking(); // Resume word tracking
     }
   }
 
@@ -411,6 +509,13 @@ class TextToSpeechService {
     this.synth.cancel();
     this.isPaused = false;
     this.utterance = null;
+    this.currentCharIndex = 0;
+    this.lastValidCharIndex = 0;
+    this.startTime = 0;
+    this.playbackStartTime = 0;
+    this.pausedTime = 0;
+    this.totalPauseDuration = 0;
+    this.stopWordTracking();
   }
 
   isSpeaking(): boolean {
@@ -425,14 +530,157 @@ class TextToSpeechService {
     return 'speechSynthesis' in window;
   }
 
+  // Get current progress (0 to 1)
+  getProgress(): number {
+    if (!this.isSpeaking() && !this.isPaused) {
+      return 0;
+    }
+    
+    if (this.totalTextLength === 0 || this.estimatedDuration === 0) {
+      return 0;
+    }
+    
+    // If word boundaries are working (charIndex is advancing), use them
+    if (this.lastValidCharIndex > 0) {
+      const progress = Math.min(this.currentCharIndex / this.totalTextLength, 1);
+      return progress;
+    }
+    
+    // Fallback: Use time-based estimation if word boundaries are broken
+    if (this.playbackStartTime > 0) {
+      let elapsedTime: number;
+      
+      if (this.isPaused && this.pausedTime > 0) {
+        // If paused, calculate elapsed time up to pause point
+        elapsedTime = this.pausedTime - this.playbackStartTime - this.totalPauseDuration;
+      } else {
+        // If playing, calculate current elapsed time minus any pause duration
+        elapsedTime = Date.now() - this.playbackStartTime - this.totalPauseDuration;
+      }
+      
+      const progress = Math.min(Math.max(elapsedTime / this.estimatedDuration, 0), 1);
+      
+      // Debug: Log occasionally
+      if (Math.random() < 0.02) { // 2% chance
+        console.log(`📈 getProgress (time-based): elapsed=${(elapsedTime / 1000).toFixed(1)}s, paused=${(this.totalPauseDuration / 1000).toFixed(1)}s, estimated=${(this.estimatedDuration / 1000).toFixed(1)}s, progress=${(progress * 100).toFixed(1)}%`);
+      }
+      
+      return progress;
+    }
+    
+    return 0;
+  }
+
+  // Get current time in seconds
+  getCurrentTime(): number {
+    if (!this.isSpeaking() && !this.isPaused) {
+      return 0;
+    }
+    
+    const progress = this.getProgress();
+    const currentTime = (progress * this.estimatedDuration) / 1000;
+    
+    // Debug: Log occasionally to see actual values
+    if (Math.random() < 0.01) { // 1% chance to log
+      console.log(`⏱️ getCurrentTime: progress=${(progress * 100).toFixed(1)}%, time=${currentTime.toFixed(1)}s, duration=${this.getDuration().toFixed(1)}s`);
+    }
+    
+    return currentTime;
+  }
+
+  // Get total duration in seconds
+  getDuration(): number {
+    return this.estimatedDuration / 1000;
+  }
+
+  // Start time-based word tracking for highlighting
+  private startWordTracking(): void {
+    // Clear any existing interval
+    this.stopWordTracking();
+    
+    // Only start if we have words and a callback
+    if (this.words.length === 0 || !this.onWordCallback) {
+      return;
+    }
+    
+    console.log(`🎯 Starting time-based word tracking: ${this.words.length} words @ ${this.millisecondsPerWord.toFixed(0)}ms per word`);
+    
+    // Update word index based on elapsed time
+    let intervalCount = 0;
+    this.wordUpdateInterval = window.setInterval(() => {
+      if (!this.playbackStartTime || !this.isSpeaking()) {
+        if (intervalCount < 3) {
+          console.log(`⚠️ Word tracking interval skipped: playbackStartTime=${this.playbackStartTime}, isSpeaking=${this.isSpeaking()}`);
+          intervalCount++;
+        }
+        return;
+      }
+      
+      // Calculate elapsed time accounting for pauses
+      const elapsedTime = Date.now() - this.playbackStartTime - this.totalPauseDuration;
+      const currentWordIndex = Math.floor(elapsedTime / this.millisecondsPerWord);
+      
+      // Make sure we don't exceed the array bounds
+      if (currentWordIndex >= 0 && currentWordIndex < this.words.length) {
+        const word = this.words[currentWordIndex];
+        
+        // Calculate approximate character index for this word
+        // Sum up the lengths of all previous words plus spaces
+        let charIndex = 0;
+        for (let i = 0; i < currentWordIndex; i++) {
+          charIndex += this.words[i].length + 1; // +1 for space
+        }
+        
+        // Debug: Log first few words with explicit values
+        if (currentWordIndex < 10) {
+          console.log(`Time-based word #${currentWordIndex}: "${word.substring(0, 20)}" at ${(elapsedTime / 1000).toFixed(1)}s (charIndex: ${charIndex})`);
+        }
+        
+        // Call the word callback to update the UI
+        this.onWordCallback(word, charIndex);
+      }
+    }, 100); // Update every 100ms for smooth highlighting
+  }
+
+  // Stop time-based word tracking
+  private stopWordTracking(): void {
+    if (this.wordUpdateInterval !== null) {
+      clearInterval(this.wordUpdateInterval);
+      this.wordUpdateInterval = null;
+      console.log('Stopped time-based word tracking');
+    }
+  }
+
+  // Insert natural pauses at paragraph breaks for better speech flow
+  insertPausesForBreaks(text: string): string {
+    // For browsers that don't support SSML, we'll use punctuation to create pauses
+    // Replace different break levels with appropriate pauses
+    
+    // Section breaks (\n\n\n) -> long pause (period + comma)
+    let processedText = text.replace(/\n\n\n/g, '... ')
+    
+    // Paragraph breaks (\n\n) -> medium pause (period)
+    processedText = processedText.replace(/\n\n/g, '. ')
+    
+    // Line breaks (\n) -> short pause (comma)
+    processedText = processedText.replace(/\n/g, ', ')
+    
+    return processedText
+  }
+
   // Clean text for better TTS pronunciation
   cleanText(text: string): string {
-    return text
+    // First insert pauses for breaks
+    let cleaned = this.insertPausesForBreaks(text)
+    
+    // Then normalize
+    cleaned = cleaned
       .replace(/\s+/g, ' ') // Normalize whitespace
       .replace(/([.!?])\s*([A-Z])/g, '$1 $2') // Add space after punctuation
-      .replace(/\n+/g, '. ') // Replace newlines with periods
       .replace(/\s+([.!?,;:])/g, '$1') // Remove space before punctuation
-      .trim();
+      .trim()
+    
+    return cleaned
   }
 
   // Split long text into sentences for better control

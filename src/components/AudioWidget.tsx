@@ -29,15 +29,31 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const [showSettings, setShowSettings] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false) // CRITICAL: Prevent multiple simultaneous requests
   const progressRef = useRef<HTMLDivElement>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
   const lastClickTimeRef = useRef<number>(0) // CRITICAL: Debounce rapid clicks
 
-  // Update current time and duration
+  // Update current time and duration from TTS manager
   useEffect(() => {
+    let logCount = 0; // Only log first few times for debugging
+    
     const updateTime = () => {
-      if (audioRef.current) {
-        setCurrentTime(audioRef.current.currentTime)
-        setDuration(audioRef.current.duration || 0)
+      // Update time when playing OR paused (to show current position)
+      if (tts.isPlaying || ttsManager.isPausedState()) {
+        const time = ttsManager.getCurrentTime()
+        const dur = ttsManager.getDuration()
+        const progress = ttsManager.getProgress()
+        
+        // Debug: Log first few updates with explicit values
+        if (logCount < 5) {
+          console.log(`AudioWidget progress update: time=${time.toFixed(1)}s, duration=${dur.toFixed(1)}s, progress=${(progress * 100).toFixed(1)}%`);
+          logCount++;
+        }
+        
+        setCurrentTime(time)
+        setDuration(dur)
+      } else if (!ttsManager.isPausedState()) {
+        // Only reset if not paused
+        setCurrentTime(0)
+        setDuration(0)
       }
     }
 
@@ -70,10 +86,15 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     })
     
     if (tts.isPlaying) {
-      console.log('AudioWidget: Currently playing, stopping...')
-      // For Google Cloud TTS, we can't truly pause, so we stop instead
-      ttsManager.stop()
+      console.log('AudioWidget: Currently playing, pausing...')
+      // Pause the current playback
+      ttsManager.pause()
       updateTTS({ isPlaying: false })
+    } else if (ttsManager.isPausedState()) {
+      console.log('AudioWidget: Resuming from pause...')
+      // Resume from pause
+      ttsManager.resume()
+      updateTTS({ isPlaying: true })
     } else {
       // CRITICAL FIX: Set processing state to prevent multiple requests
       setIsProcessing(true)
@@ -141,10 +162,25 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           }
           
           if (text.trim()) {
-            await ttsManager.speak(text, () => {
-              updateTTS({ isPlaying: false })
-            })
-            updateTTS({ isPlaying: true })
+            await ttsManager.speak(
+              text,
+              () => {
+                updateTTS({ isPlaying: false, currentWordIndex: null });
+              },
+              (word, charIndex) => {
+                // Find word index from charIndex
+                const words = text.slice(0, charIndex + 1).split(/\s+/);
+                const wordIndex = words.length - 1;
+                
+                // Debug: Log word updates with explicit values
+                if (wordIndex < 10) {
+                  console.log(`AudioWidget updating wordIndex=${wordIndex}, word="${word.substring(0, 20)}", charIndex=${charIndex}`);
+                }
+                
+                updateTTS({ currentWordIndex: wordIndex });
+              }
+            );
+            updateTTS({ isPlaying: true });
           } else {
             console.warn('AudioWidget: No text available for TTS in any page')
           }
@@ -163,9 +199,11 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
   // Handle stop
   const handleStop = useCallback(() => {
+    console.log('AudioWidget: Stop button clicked')
     ttsManager.stop()
-    updateTTS({ isPlaying: false })
+    updateTTS({ isPlaying: false, currentWordIndex: null })
     setCurrentTime(0)
+    setDuration(0)
     setIsProcessing(false) // CRITICAL: Reset processing state
   }, [updateTTS])
 
@@ -231,26 +269,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     }
   }, [tts.voice])
 
-  // Handle progress bar click
-  const handleProgressClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!progressRef.current) return
-    
-    const rect = progressRef.current.getBoundingClientRect()
-    const clickX = e.clientX - rect.left
-    const percentage = clickX / rect.width
-    const newTime = percentage * duration
-    
-    if (audioRef.current) {
-      audioRef.current.currentTime = newTime
-      setCurrentTime(newTime)
-    }
-  }, [duration])
-
-  // Handle progress bar drag
-  const handleProgressMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    setIsDragging(true)
-    handleProgressClick(e)
-  }, [handleProgressClick])
+  // Note: Progress bar is read-only for TTS
+  // TTS doesn't support seeking to arbitrary positions
 
   // Format time display
   const formatTime = (time: number) => {
@@ -261,6 +281,17 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
   // Get progress percentage
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0
+  
+  // Debug: Log progress bar state when playing
+  useEffect(() => {
+    if (tts.isPlaying) {
+      const debugTimer = setTimeout(() => {
+        console.log(`📊 Progress bar state: currentTime=${currentTime.toFixed(1)}s, duration=${duration.toFixed(1)}s, percentage=${progressPercentage.toFixed(1)}%`);
+      }, 2000); // Log after 2 seconds of playback
+      
+      return () => clearTimeout(debugTimer);
+    }
+  }, [tts.isPlaying, currentTime, duration, progressPercentage]);
 
   return (
     <div 
@@ -280,7 +311,13 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             </h3>
             <div 
               className={`w-2 h-2 rounded-full ${tts.isPlaying ? 'animate-pulse-slow' : ''}`}
-              style={{ backgroundColor: tts.isPlaying ? 'var(--color-success)' : 'var(--color-text-tertiary)' }}
+              style={{ 
+                backgroundColor: tts.isPlaying 
+                  ? 'var(--color-success)' 
+                  : ttsManager.isPausedState() 
+                    ? 'var(--color-warning)' 
+                    : 'var(--color-text-tertiary)' 
+              }}
             />
           </div>
           <div className="flex items-center space-x-1">
@@ -307,14 +344,12 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           </div>
         </div>
 
-        {/* Progress Bar */}
+        {/* Progress Bar (Read-only) */}
         <div className="mb-3">
           <div
             ref={progressRef}
-            className="w-full h-2 rounded-full cursor-pointer relative"
+            className="w-full h-2 rounded-full relative"
             style={{ backgroundColor: 'var(--color-border)' }}
-            onClick={handleProgressClick}
-            onMouseDown={handleProgressMouseDown}
           >
             <div
               className="h-full rounded-full transition-all duration-200"
@@ -324,7 +359,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               }}
             />
             <div
-              className="absolute top-0 w-4 h-4 rounded-full transform -translate-y-1 cursor-pointer hover:scale-110 transition-transform"
+              className="absolute top-0 w-4 h-4 rounded-full transform -translate-y-1 transition-transform"
               style={{ 
                 left: `${progressPercentage}%`, 
                 marginLeft: '-8px',
@@ -334,6 +369,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           </div>
           <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
             <span>{formatTime(currentTime)}</span>
+            <span className="text-xs opacity-70">{progressPercentage.toFixed(0)}%</span>
             <span>{formatTime(duration)}</span>
           </div>
         </div>
@@ -371,14 +407,16 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               isProcessing 
                 ? "Processing..." 
                 : tts.isPlaying 
-                  ? "Stop" 
-                  : "Play"
+                  ? "Pause" 
+                  : ttsManager.isPausedState()
+                    ? "Resume"
+                    : "Play"
             }
           >
             {isProcessing ? (
               <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-text-inverse)' }} />
             ) : tts.isPlaying ? (
-              <Square className="w-6 h-6" />
+              <Pause className="w-6 h-6" />
             ) : (
               <Play className="w-6 h-6" />
             )}
@@ -493,10 +531,16 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               <div className="flex items-center space-x-2">
                 <div 
                   className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: tts.isPlaying ? 'var(--color-success)' : 'var(--color-text-tertiary)' }}
+                  style={{ 
+                    backgroundColor: tts.isPlaying 
+                      ? 'var(--color-success)' 
+                      : ttsManager.isPausedState() 
+                        ? 'var(--color-warning)' 
+                        : 'var(--color-text-tertiary)' 
+                  }}
                 />
                 <span style={{ color: 'var(--color-text-secondary)' }}>
-                  {tts.isPlaying ? 'Playing' : 'Stopped'}
+                  {tts.isPlaying ? 'Playing' : ttsManager.isPausedState() ? 'Paused' : 'Stopped'}
                 </span>
               </div>
               <div className="flex items-center space-x-2">

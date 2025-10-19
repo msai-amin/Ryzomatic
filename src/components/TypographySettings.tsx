@@ -1,5 +1,5 @@
 import React from 'react'
-import { X, Type, Palette } from 'lucide-react'
+import { X, Type, Palette, AlignLeft, AlignJustify, AlignCenter, Space, Eye, Crosshair } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 
 interface TypographySettingsProps {
@@ -27,6 +27,22 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
 
   const handleThemeChange = (theme: 'light' | 'dark' | 'sepia') => {
     updateTypography({ theme })
+  }
+
+  const handleTextAlignChange = (textAlign: 'left' | 'justify' | 'center') => {
+    updateTypography({ textAlign })
+  }
+
+  const handleSpacingMultiplierChange = (spacingMultiplier: number) => {
+    updateTypography({ spacingMultiplier })
+  }
+
+  const handleFocusModeChange = (focusMode: boolean) => {
+    updateTypography({ focusMode })
+  }
+
+  const handleReadingGuideChange = (readingGuide: boolean) => {
+    updateTypography({ readingGuide })
   }
 
   return (
@@ -145,6 +161,92 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
                   <div className="text-sm">{label}</div>
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Text Alignment */}
+          <div>
+            <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 mb-3">
+              <AlignLeft className="w-4 h-4" />
+              <span>Text Alignment</span>
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { value: 'left', label: 'Left', Icon: AlignLeft },
+                { value: 'justify', label: 'Justify', Icon: AlignJustify },
+                { value: 'center', label: 'Center', Icon: AlignCenter }
+              ].map(({ value, label, Icon }) => (
+                <button
+                  key={value}
+                  onClick={() => handleTextAlignChange(value as any)}
+                  className={`p-3 rounded-lg border text-center transition-colors ${
+                    typography.textAlign === value
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <Icon className="w-5 h-5 mx-auto mb-1" />
+                  <div className="text-sm">{label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Spacing Multiplier */}
+          <div>
+            <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 mb-3">
+              <Space className="w-4 h-4" />
+              <span>Spacing: {typography.spacingMultiplier.toFixed(1)}x</span>
+            </label>
+            <input
+              type="range"
+              min="0.5"
+              max="2.0"
+              step="0.1"
+              value={typography.spacingMultiplier}
+              onChange={(e) => handleSpacingMultiplierChange(Number(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            />
+            <div className="flex justify-between text-xs mt-1 text-gray-500">
+              <span>Compact (0.5x)</span>
+              <span>Normal (1x)</span>
+              <span>Spacious (2x)</span>
+            </div>
+          </div>
+
+          {/* Reading Enhancements */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Reading Enhancements
+            </label>
+            <div className="space-y-3">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={typography.focusMode}
+                  onChange={(e) => handleFocusModeChange(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <div className="flex items-center space-x-2">
+                  <Eye className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm text-gray-700">Focus Mode</span>
+                </div>
+                <span className="text-xs text-gray-500 ml-auto">Dim surrounding text</span>
+              </label>
+              
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={typography.readingGuide}
+                  onChange={(e) => handleReadingGuideChange(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <div className="flex items-center space-x-2">
+                  <Crosshair className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm text-gray-700">Reading Guide</span>
+                </div>
+                <span className="text-xs text-gray-500 ml-auto">Highlight current paragraph</span>
+              </label>
             </div>
           </div>
         </div>

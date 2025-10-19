@@ -10,6 +10,7 @@ import { errorHandler, ErrorType, ErrorSeverity } from '../services/errorHandler
 import { validatePDFFile, validateFile } from '../services/validation'
 import { OCRConsentDialog } from './OCRConsentDialog'
 import { calculateOCRCredits } from '../utils/ocrUtils'
+import { extractStructuredText } from '../utils/pdfTextExtractor'
 // PDF.js will be imported dynamically to avoid ES module issues
 
 interface DocumentUploadProps {
@@ -430,16 +431,14 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
       let successfulPages = 0
       let failedPages = 0
       
-      // Extract text from each page
+      // Extract text from each page with proper structure
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         try {
           const page = await pdf.getPage(pageNum)
           const textContent = await page.getTextContent()
           
-          // Combine all text items from the page
-          const pageText = textContent.items
-            .map((item: any) => item.str)
-            .join(' ')
+          // Use structured extraction to maintain reading order and paragraph breaks
+          const pageText = extractStructuredText(textContent.items)
           
           pageTexts.push(pageText)
           fullText += pageText + '\n\n'

@@ -25,6 +25,9 @@ export interface TTSProvider {
   setVoice: (voice: any) => void
   cleanText: (text: string) => string
   splitIntoSentences: (text: string) => string[]
+  getProgress?: () => number
+  getCurrentTime?: () => number
+  getDuration?: () => number
 }
 
 class TTSManager {
@@ -54,7 +57,10 @@ class TTSManager {
       setVolume: (volume) => ttsService.setVolume(volume),
       setVoice: (voice) => ttsService.setVoice(voice),
       cleanText: (text) => ttsService.cleanText(text),
-      splitIntoSentences: (text) => ttsService.splitIntoSentences(text)
+      splitIntoSentences: (text) => ttsService.splitIntoSentences(text),
+      getProgress: () => ttsService.getProgress(),
+      getCurrentTime: () => ttsService.getCurrentTime(),
+      getDuration: () => ttsService.getDuration()
     })
 
     // Google Cloud TTS Provider
@@ -75,19 +81,22 @@ class TTSManager {
       setVolume: (volume) => googleCloudTTSService.setVolumeGain(volume),
       setVoice: (voice) => googleCloudTTSService.setVoice(voice),
       cleanText: (text) => googleCloudTTSService.cleanText(text),
-      splitIntoSentences: (text) => googleCloudTTSService.splitIntoSentences(text)
+      splitIntoSentences: (text) => googleCloudTTSService.splitIntoSentences(text),
+      getProgress: () => googleCloudTTSService.getProgress(),
+      getCurrentTime: () => googleCloudTTSService.getCurrentTime(),
+      getDuration: () => googleCloudTTSService.getDuration()
     })
 
-    // Set default provider - prioritize Google Cloud TTS for natural voices
-    const googleCloudProvider = this.providers.get('google-cloud')
+    // Set default provider - prioritize Native TTS for word boundaries and progress tracking
     const nativeProvider = this.providers.get('native')
+    const googleCloudProvider = this.providers.get('google-cloud')
     
-    if (googleCloudProvider && googleCloudProvider.isAvailable && googleCloudProvider.isConfigured) {
-      this.currentProvider = googleCloudProvider
-      console.log('TTSManager: Using Google Cloud TTS as default provider for natural voices')
-    } else if (nativeProvider && nativeProvider.isAvailable) {
+    if (nativeProvider && nativeProvider.isAvailable) {
       this.currentProvider = nativeProvider
-      console.log('TTSManager: Using Native TTS as fallback provider')
+      console.log('TTSManager: Using Native TTS as default provider (supports word boundaries and progress)')
+    } else if (googleCloudProvider && googleCloudProvider.isAvailable && googleCloudProvider.isConfigured) {
+      this.currentProvider = googleCloudProvider
+      console.log('TTSManager: Using Google Cloud TTS as fallback provider')
     } else {
       this.currentProvider = null
       console.warn('TTSManager: No TTS providers available')
@@ -375,6 +384,30 @@ class TTSManager {
       return googleCloudTTSService.getEstimatedCost(text)
     }
     return 0 // Native TTS is free
+  }
+
+  // Get current progress (0 to 1)
+  getProgress(): number {
+    if (this.currentProvider && this.currentProvider.getProgress) {
+      return this.currentProvider.getProgress()
+    }
+    return 0
+  }
+
+  // Get current time in seconds
+  getCurrentTime(): number {
+    if (this.currentProvider && this.currentProvider.getCurrentTime) {
+      return this.currentProvider.getCurrentTime()
+    }
+    return 0
+  }
+
+  // Get total duration in seconds
+  getDuration(): number {
+    if (this.currentProvider && this.currentProvider.getDuration) {
+      return this.currentProvider.getDuration()
+    }
+    return 0
   }
 }
 

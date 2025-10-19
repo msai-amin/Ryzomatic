@@ -20,7 +20,8 @@ import {
   Volume2,
   StickyNote,
   BookOpen,
-  MousePointer2
+  MousePointer2,
+  Type
 } from 'lucide-react'
 import { useAppStore, Document as DocumentType } from '../store/appStore'
 import { ttsManager } from '../services/ttsManager'
@@ -28,10 +29,134 @@ import { TTSControls } from './TTSControls'
 import { NotesPanel } from './NotesPanel'
 import { AudioWidget } from './AudioWidget'
 import { VoiceSelector } from './VoiceSelector'
+import { TypographySettings } from './TypographySettings'
 import { storageService } from '../services/storageService'
 import { OCRBanner, OCRStatusBadge } from './OCRStatusBadge'
 
 // PDF.js will be imported dynamically
+
+// Text segment interface for structured rendering in READING MODE ONLY
+interface TextSegment {
+  type: 'word' | 'break' | 'table' | 'formula'
+  content: string
+  breakLevel?: number // 1=space, 2=line, 3=paragraph, 4=section
+  wordIndex?: number
+  paragraphIndex?: number
+  tableData?: string[] // For table rows
+}
+
+// Parse text to preserve paragraph structure - USED ONLY IN READING MODE
+function parseTextWithBreaks(text: string): TextSegment[] {
+  const segments: TextSegment[] = []
+  let wordIndex = 0
+  let paragraphIndex = 0
+  
+  // First, extract tables and formulas
+  const tableRegex = /```table\n([\s\S]*?)\n```/g
+  const formulaRegex = /`([^`]+)`/g
+  
+  let processedText = text
+  const tables: { index: number, content: string[] }[] = []
+  const formulas: { index: number, content: string }[] = []
+  
+  // Extract tables
+  let tableMatch
+  while ((tableMatch = tableRegex.exec(text)) !== null) {
+    const tableContent = tableMatch[1].split('\n').filter(row => row.trim().length > 0)
+    const placeholder = `__TABLE_${tables.length}__`
+    tables.push({ index: tableMatch.index, content: tableContent })
+    processedText = processedText.replace(tableMatch[0], placeholder)
+  }
+  
+  // Extract formulas (but not tables)
+  let formulaMatch
+  const tempText = processedText
+  while ((formulaMatch = formulaRegex.exec(tempText)) !== null) {
+    // Skip if it's a table placeholder
+    if (!formulaMatch[1].startsWith('__TABLE_')) {
+      const placeholder = `__FORMULA_${formulas.length}__`
+      formulas.push({ index: formulaMatch.index, content: formulaMatch[1] })
+      processedText = processedText.replace(formulaMatch[0], placeholder)
+    }
+  }
+  
+  // Split by section breaks first (\n\n\n)
+  const sections = processedText.split(/\n\n\n/)
+  
+  sections.forEach((section, sectionIdx) => {
+    if (sectionIdx > 0) {
+      segments.push({ type: 'break', content: '', breakLevel: 4 }) // Section break
+    }
+    
+    // Split by paragraph breaks (\n\n)
+    const paragraphs = section.split(/\n\n/)
+    
+    paragraphs.forEach((paragraph, paraIdx) => {
+      if (paraIdx > 0) {
+        segments.push({ type: 'break', content: '', breakLevel: 3 }) // Paragraph break
+        paragraphIndex++
+      }
+      
+      // Split by line breaks (\n)
+      const lines = paragraph.split(/\n/)
+      
+      lines.forEach((line, lineIdx) => {
+        if (lineIdx > 0) {
+          segments.push({ type: 'break', content: '', breakLevel: 2 }) // Line break
+        }
+        
+        // Split into words
+        const words = line.split(/\s+/).filter(w => w.trim().length > 0)
+        
+        words.forEach((word, idx) => {
+          // Check if this word is a table placeholder
+          if (word.startsWith('__TABLE_')) {
+            const tableIdx = parseInt(word.match(/__TABLE_(\d+)__/)?.[1] || '0')
+            const table = tables[tableIdx]
+            if (table) {
+              segments.push({
+                type: 'table',
+                content: '',
+                tableData: table.content,
+                wordIndex: wordIndex++,
+                paragraphIndex
+              })
+            }
+          }
+          // Check if this word is a formula placeholder
+          else if (word.startsWith('__FORMULA_')) {
+            const formulaIdx = parseInt(word.match(/__FORMULA_(\d+)__/)?.[1] || '0')
+            const formula = formulas[formulaIdx]
+            if (formula) {
+              segments.push({
+                type: 'formula',
+                content: formula.content,
+                wordIndex: wordIndex++,
+                paragraphIndex
+              })
+            }
+          }
+          // Regular word
+          else {
+            segments.push({ 
+              type: 'word', 
+              content: word, 
+              wordIndex: wordIndex++,
+              paragraphIndex 
+            })
+          }
+          
+          // Add space between words (except last word in line)
+          if (idx < words.length - 1) {
+            segments.push({ type: 'break', content: ' ', breakLevel: 1 })
+          }
+        })
+      })
+    })
+  })
+  
+  return segments
+}
 
 interface Highlight {
   id: string
@@ -51,7 +176,7 @@ interface PDFViewerProps {
 }
 
 export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
-  const { pdfViewer, tts, updatePDFViewer, updateTTS } = useAppStore()
+  const { pdfViewer, tts, typography, updatePDFViewer, updateTTS, updateTypography, setCurrentDocument } = useAppStore()
   
   const [pageNumber, setPageNumber] = useState(1)
   const [numPages, setNumPages] = useState<number | null>(null)
@@ -71,11 +196,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const [selectedTextForNote, setSelectedTextForNote] = useState<string>('')
   const [selectionMode, setSelectionMode] = useState(false)
   const [showVoiceSelector, setShowVoiceSelector] = useState(false)
+  const [showTypographySettings, setShowTypographySettings] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [pageRendered, setPageRendered] = useState(false)
   const [ocrStatus, setOcrStatus] = useState(document.ocrStatus || 'not_needed')
   const [ocrError, setOcrError] = useState<string | undefined>()
   const [ocrCanRetry, setOcrCanRetry] = useState(false)
+  const [currentParagraphIndex, setCurrentParagraphIndex] = useState<number>(0)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editingPageNum, setEditingPageNum] = useState<number | null>(null)
+  const [editedTexts, setEditedTexts] = useState<{ [pageNum: number]: string }>({})
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -435,12 +566,61 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           // Toggle reading mode - don't stop TTS
           updatePDFViewer({ readingMode: !pdfViewer.readingMode })
           break
+        case 'j':
+        case 'J':
+          // Toggle text justification - ONLY in reading mode
+          if (pdfViewer.readingMode) {
+            updateTypography({ textAlign: typography.textAlign === 'justify' ? 'left' : 'justify' })
+          }
+          break
+        case 'f':
+        case 'F':
+          // Toggle focus mode - ONLY in reading mode
+          if (pdfViewer.readingMode) {
+            updateTypography({ focusMode: !typography.focusMode })
+          }
+          break
+        case 'g':
+        case 'G':
+          // Toggle reading guide - ONLY in reading mode
+          if (pdfViewer.readingMode) {
+            updateTypography({ readingGuide: !typography.readingGuide })
+          }
+          break
+        case 'e':
+        case 'E':
+          // Toggle edit mode - ONLY in reading mode
+          if (pdfViewer.readingMode && !isEditing) {
+            // Initialize edited texts with current page texts
+            const initialTexts: { [pageNum: number]: string } = {}
+            document.pageTexts?.forEach((text, index) => {
+              initialTexts[index + 1] = text
+            })
+            setEditedTexts(initialTexts)
+            setIsEditing(true)
+            setHasUnsavedChanges(false)
+          }
+          break
         case 'Escape':
           if (showNotesPanel) {
             setShowNotesPanel(false)
+          } else if (isEditing) {
+            // Cancel editing
+            setIsEditing(false)
+            setEditingPageNum(null)
+            setEditedTexts({})
+            setHasUnsavedChanges(false)
           } else if (pdfViewer.readingMode) {
             // Exit reading mode with Escape key - don't stop TTS
             updatePDFViewer({ readingMode: false })
+          }
+          break
+        case 's':
+        case 'S':
+          // Save edited text - ONLY in reading mode when editing
+          if (pdfViewer.readingMode && isEditing && e.ctrlKey) {
+            e.preventDefault()
+            handleSaveEditedText()
           }
           break
       }
@@ -448,7 +628,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [pageNumber, numPages, scale, rotation, showHighlightMenu, showNotesPanel, pdfViewer.readingMode, updatePDFViewer])
+  }, [pageNumber, numPages, scale, rotation, showHighlightMenu, showNotesPanel, pdfViewer.readingMode, updatePDFViewer, typography.textAlign, typography.focusMode, typography.readingGuide, updateTypography, isEditing])
 
   // Text selection for highlighting and notes
   useEffect(() => {
@@ -574,6 +754,55 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   }, [ocrStatus, document.id])
 
   // Handle OCR retry
+  // Handle saving edited text
+  const handleSaveEditedText = useCallback(async () => {
+    if (!document.id || Object.keys(editedTexts).length === 0) return
+
+    try {
+      // Update all edited page texts
+      const updatedPageTexts = [...(document.pageTexts || [])]
+      Object.entries(editedTexts).forEach(([pageNumStr, text]) => {
+        const pageIndex = parseInt(pageNumStr) - 1
+        if (pageIndex >= 0 && pageIndex < updatedPageTexts.length) {
+          updatedPageTexts[pageIndex] = text.trim()
+        }
+      })
+      
+      // Create updated document
+      const updatedDocument = {
+        ...document,
+        pageTexts: updatedPageTexts
+      }
+      
+      // Update the document in the store
+      setCurrentDocument(updatedDocument)
+      
+      // Save to storage using saveBook
+      await storageService.saveBook({
+        id: document.id,
+        title: document.name,
+        fileName: document.name,
+        type: 'pdf',
+        savedAt: new Date(),
+        lastReadPage: pageNumber,
+        totalPages: document.totalPages,
+        pageTexts: updatedPageTexts,
+        notes: [],
+        googleDriveId: undefined,
+        syncedAt: undefined
+      })
+      
+      setIsEditing(false)
+      setEditingPageNum(null)
+      setEditedTexts({})
+      setHasUnsavedChanges(false)
+      
+      console.log('✅ All edited pages saved successfully')
+    } catch (error) {
+      console.error('❌ Error saving edited text:', error)
+    }
+  }, [document, editedTexts, pageNumber, setCurrentDocument])
+
   const handleOCRRetry = useCallback(async () => {
     if (!document.id || !document.totalPages) return;
 
@@ -746,41 +975,314 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   }, [updateTTS])
 
   if (pdfViewer.readingMode) {
-    const pageText = document.pageTexts?.[pageNumber - 1] || ''
+    // Get theme-based styles
+    const getThemeStyles = () => {
+      switch (typography.theme) {
+        case 'dark':
+          return {
+            background: 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900',
+            text: 'text-gray-100',
+            headerBg: 'bg-gray-800/90',
+            headerBorder: 'border-gray-700',
+            buttonBg: 'bg-gray-700',
+            buttonHover: 'hover:bg-gray-600',
+            buttonText: 'text-gray-100',
+            indicatorBg: 'bg-gray-700',
+            highlightBg: 'bg-blue-900/50',
+            progressBg: 'bg-blue-500'
+          }
+        case 'sepia':
+          return {
+            background: 'bg-gradient-to-br from-amber-50 via-yellow-50 to-amber-100',
+            text: 'text-amber-900',
+            headerBg: 'bg-amber-100/90',
+            headerBorder: 'border-amber-300',
+            buttonBg: 'bg-amber-200',
+            buttonHover: 'hover:bg-amber-300',
+            buttonText: 'text-amber-900',
+            indicatorBg: 'bg-amber-600',
+            highlightBg: 'bg-amber-300',
+            progressBg: 'bg-amber-500'
+          }
+        default: // light
+          return {
+            background: 'bg-gradient-to-br from-amber-50 via-white to-orange-50',
+            text: 'text-gray-800',
+            headerBg: 'bg-white/90',
+            headerBorder: 'border-amber-200',
+            buttonBg: 'bg-amber-100',
+            buttonHover: 'hover:bg-amber-200',
+            buttonText: 'text-amber-900',
+            indicatorBg: 'bg-amber-500',
+            highlightBg: 'bg-amber-200',
+            progressBg: 'bg-amber-500'
+          }
+      }
+    }
+
+    const getFontFamily = () => {
+      switch (typography.fontFamily) {
+        case 'serif':
+          return 'font-serif'
+        case 'mono':
+          return 'font-mono'
+        default:
+          return 'font-sans'
+      }
+    }
+
+    const themeStyles = getThemeStyles()
+    const fontClass = getFontFamily()
+
+    // Calculate progress percentage
+    const progressPercentage = numPages ? (pageNumber / numPages) * 100 : 0
+
+    // Render page content with structured paragraphs and word highlighting
+    const renderPageContent = (pageNum: number) => {
+      const pageText = document.pageTexts?.[pageNum - 1] || ''
+      const currentPageText = isEditing && editedTexts[pageNum] ? editedTexts[pageNum] : pageText
+      
+      if (!currentPageText) {
+        return (
+          <div className={`text-center py-8 ${themeStyles.text} opacity-50`}>
+            No text available for page {pageNum}.
+          </div>
+        )
+      }
+
+      const segments = parseTextWithBreaks(currentPageText)
+      const totalWords = segments.filter(s => s.type === 'word').length
+      const wordsRead = tts.currentWordIndex !== null ? tts.currentWordIndex + 1 : 0
+      
+      // Calculate spacing based on multiplier
+      const baseSpacing = {
+        line: 0.5,
+        paragraph: 1.0,
+        section: 2.0
+      }
+      
+      const spacing = {
+        line: baseSpacing.line * typography.spacingMultiplier,
+        paragraph: baseSpacing.paragraph * typography.spacingMultiplier,
+        section: baseSpacing.section * typography.spacingMultiplier
+      }
+      
+      return (
+        <div>
+          {/* Word count indicator */}
+          <div className={`text-xs ${themeStyles.text} opacity-50 mb-4 text-center`}>
+            {wordsRead} / {totalWords} words {wordsRead > 0 && `(${Math.round((wordsRead / totalWords) * 100)}%)`}
+          </div>
+          
+          <div 
+            className={`${themeStyles.text} ${fontClass}`}
+            style={{
+              fontSize: `${typography.fontSize}px`,
+              lineHeight: typography.lineHeight,
+              textAlign: typography.textAlign,
+              hyphens: typography.textAlign === 'justify' ? 'auto' : 'none'
+            }}
+          >
+            {segments.map((segment, index) => {
+              if (segment.type === 'break') {
+                // Render breaks as spacing
+                if (segment.breakLevel === 1) {
+                  // Space between words
+                  return <span key={`break-${index}`}> </span>
+                } else if (segment.breakLevel === 2) {
+                  // Line break
+                  return <div key={`break-${index}`} style={{ marginTop: `${spacing.line}em` }} />
+                } else if (segment.breakLevel === 3) {
+                  // Paragraph break
+                  return <div key={`break-${index}`} style={{ marginTop: `${spacing.paragraph}em` }} />
+                } else if (segment.breakLevel === 4) {
+                  // Section break with optional separator
+                  return (
+                    <div key={`break-${index}`} style={{ marginTop: `${spacing.section}em`, marginBottom: `${spacing.section}em` }}>
+                      <div className={`border-t ${themeStyles.text} opacity-20 my-4`} />
+                    </div>
+                  )
+                }
+              } else if (segment.type === 'table') {
+                // Render table
+                return (
+                  <div key={`table-${index}`} className="my-4 overflow-x-auto">
+                    <table className={`min-w-full border-collapse border ${themeStyles.text} opacity-90`}>
+                      <tbody>
+                        {segment.tableData?.map((row, rowIdx) => {
+                          const cells = row.split('\t')
+                          return (
+                            <tr key={rowIdx} className="border-b">
+                              {cells.map((cell, cellIdx) => (
+                                <td 
+                                  key={cellIdx} 
+                                  className="border px-3 py-2 text-sm"
+                                  style={{ fontFamily: 'monospace' }}
+                                >
+                                  {cell.trim()}
+                                </td>
+                              ))}
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              } else if (segment.type === 'formula') {
+                // Render formula with special styling
+                return (
+                  <span
+                    key={`formula-${index}`}
+                    className={`inline-block px-2 py-1 mx-1 rounded ${themeStyles.text} bg-opacity-10`}
+                    style={{
+                      fontFamily: 'monospace',
+                      fontSize: `${typography.fontSize * 0.95}px`,
+                      backgroundColor: themeStyles.text.includes('gray-100') ? '#1f2937' : '#f3f4f6'
+                    }}
+                  >
+                    {segment.content}
+                  </span>
+                )
+              } else if (segment.type === 'word') {
+                // Determine if this word is in the current paragraph
+                const isCurrentParagraph = segment.paragraphIndex === currentParagraphIndex
+                const isHighlighted = tts.highlightCurrentWord && 
+                                     tts.currentWordIndex === segment.wordIndex && 
+                                     pageNum === pageNumber
+                
+                // Apply focus mode dimming
+                const opacity = typography.focusMode && !isCurrentParagraph ? 0.3 : 1
+                
+                // Apply reading guide
+                const hasParagraphIndicator = typography.readingGuide && isCurrentParagraph
+                
+                return (
+                  <span
+                    key={`word-${index}`}
+                    className={`inline-block transition-all duration-200 ${
+                      isHighlighted 
+                        ? `${themeStyles.highlightBg} px-1 rounded shadow-sm transform scale-105` 
+                        : 'bg-transparent'
+                    }`}
+                    style={{
+                      opacity,
+                      borderLeft: hasParagraphIndicator && segment.wordIndex === segment.paragraphIndex ? '3px solid currentColor' : undefined,
+                      paddingLeft: hasParagraphIndicator && segment.wordIndex === segment.paragraphIndex ? '0.5em' : undefined
+                    }}
+                    onMouseEnter={() => {
+                      if (segment.paragraphIndex !== undefined) {
+                        setCurrentParagraphIndex(segment.paragraphIndex)
+                      }
+                    }}
+                  >
+                    {segment.content}
+                  </span>
+                )
+              }
+              return null
+            })}
+          </div>
+        </div>
+      )
+    }
     
     return (
-      <div className="flex-1 flex flex-col h-full bg-gradient-to-br from-amber-50 via-white to-orange-50">
+      <div className={`flex-1 flex flex-col h-full ${themeStyles.background}`}>
         {/* Reading Mode Header */}
-        <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-amber-200 shadow-sm">
+        <div className={`sticky top-0 z-50 ${themeStyles.headerBg} backdrop-blur-sm border-b ${themeStyles.headerBorder} shadow-sm`}>
+          {/* Progress Bar */}
+          <div className="h-1 bg-gray-200 dark:bg-gray-700">
+            <div 
+              className={`h-full ${themeStyles.progressBg} transition-all duration-300`}
+              style={{ width: `${progressPercentage}%` }}
+              title={`${Math.round(progressPercentage)}% complete`}
+            />
+          </div>
+
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center gap-4">
               <button
                 onClick={toggleReadingMode}
-                className="flex items-center gap-2 px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg transition-colors font-medium shadow-sm"
+                className={`flex items-center gap-2 px-4 py-2 ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} rounded-lg transition-colors font-medium shadow-sm`}
                 title="Exit Reading Mode (Press M or Escape)"
               >
                 <Eye className="w-4 h-4" />
                 <span>Exit Reading Mode</span>
               </button>
               
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+              <div className={`flex items-center gap-2 text-sm ${themeStyles.text}`}>
                 <BookOpen className="w-4 h-4" />
                 <span>Page {pageNumber} of {numPages}</span>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
+              {isEditing ? (
+                <>
+                  <button
+                    onClick={handleSaveEditedText}
+                    className={`px-4 py-2 ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} rounded-lg transition-colors font-medium`}
+                    title="Save Changes (Ctrl+S)"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsEditing(false)
+                      setEditingPageNum(null)
+                      setEditedTexts({})
+                      setHasUnsavedChanges(false)
+                    }}
+                    className={`px-4 py-2 ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} rounded-lg transition-colors font-medium`}
+                    title="Cancel (Escape)"
+                  >
+                    Cancel
+                  </button>
+                  {hasUnsavedChanges && (
+                    <div className={`text-xs ${themeStyles.text} opacity-70`}>
+                      Unsaved changes
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      // Initialize edited texts with current page texts
+                      const initialTexts: { [pageNum: number]: string } = {}
+                      document.pageTexts?.forEach((text, index) => {
+                        initialTexts[index + 1] = text
+                      })
+                      setEditedTexts(initialTexts)
+                      setIsEditing(true)
+                      setHasUnsavedChanges(false)
+                    }}
+                    className={`p-2 ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} rounded-lg transition-colors`}
+                    title="Edit Text (E)"
+                  >
+                    <FileText className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => setShowTypographySettings(true)}
+                    className={`p-2 ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} rounded-lg transition-colors`}
+                    title="Typography Settings"
+                  >
+                    <Type className="w-5 h-5" />
+                  </button>
+                </>
+              )}
               <button
                 onClick={goToPreviousPage}
                 disabled={pageNumber <= 1}
-                className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className={`p-2 ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <button
                 onClick={goToNextPage}
                 disabled={!numPages || pageNumber >= numPages}
-                className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className={`p-2 ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
@@ -790,47 +1292,284 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
         {/* Reading Mode Content */}
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-8 py-12">
-            <div className="prose prose-lg prose-amber max-w-none">
-              <div className="text-gray-800 leading-relaxed whitespace-pre-wrap font-sans text-lg">
-                {pageText ? (
-                  (() => {
-                    const words = pageText.split(/\s+/).filter(w => w.trim().length > 0);
-                    
-                    // Debug: Log highlighting state periodically
-                    if (tts.isPlaying && tts.currentWordIndex !== null && tts.currentWordIndex < 5) {
-                      console.log('Reading mode highlighting:', {
-                        highlightEnabled: tts.highlightCurrentWord,
-                        currentWordIndex: tts.currentWordIndex,
-                        totalWords: words.length,
-                        currentWord: words[tts.currentWordIndex],
-                        isPlaying: tts.isPlaying
-                      });
-                    }
-                    
-                    return words.map((word, index) => (
-                      <span
-                        key={index}
-                        className={
-                          tts.highlightCurrentWord && tts.currentWordIndex === index
-                            ? 'bg-amber-200'
-                            : 'bg-transparent'
-                        }
-                      >
-                        {word}{' '}
-                      </span>
-                    ));
-                  })()
-                ) : (
-                  'No text available for this page.'
-                )}
+          {isEditing ? (
+            // Edit mode - show textarea for all pages in continuous mode or single page
+            <div className="mx-auto px-8 py-12" style={{ maxWidth: `${typography.maxWidth}px` }}>
+              <div className={`text-xs ${themeStyles.text} opacity-50 mb-6 text-center`}>
+                Tip: Use Ctrl+S to save or Escape to cancel
+              </div>
+              {pdfViewer.scrollMode === 'continuous' ? (
+                // Show all pages for editing in continuous mode
+                numPages && Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
+                  <div key={pageNum} className="mb-12 last:mb-0">
+                    <label className={`block text-sm font-medium ${themeStyles.text} mb-2`}>
+                      Editing Page {pageNum}
+                    </label>
+                    <textarea
+                      value={editedTexts[pageNum] || ''}
+                      onChange={(e) => {
+                        setEditedTexts(prev => ({
+                          ...prev,
+                          [pageNum]: e.target.value
+                        }))
+                        setHasUnsavedChanges(true)
+                      }}
+                      className={`w-full min-h-96 p-4 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:outline-none resize-y ${fontClass} ${themeStyles.text}`}
+                      style={{
+                        fontSize: `${typography.fontSize}px`,
+                        lineHeight: typography.lineHeight,
+                        backgroundColor: 'var(--color-background)',
+                        color: 'var(--color-text)'
+                      }}
+                      placeholder={`Edit page ${pageNum} text here...`}
+                    />
+                  </div>
+                ))
+              ) : (
+                // Single page mode - edit current page only
+                <div className="mb-4">
+                  <label className={`block text-sm font-medium ${themeStyles.text} mb-2`}>
+                    Editing Page {pageNumber}
+                  </label>
+                  <textarea
+                    value={editedTexts[pageNumber] || ''}
+                    onChange={(e) => {
+                      setEditedTexts(prev => ({
+                        ...prev,
+                        [pageNumber]: e.target.value
+                      }))
+                      setHasUnsavedChanges(true)
+                    }}
+                    className={`w-full h-96 p-4 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:outline-none resize-y ${fontClass} ${themeStyles.text}`}
+                    style={{
+                      fontSize: `${typography.fontSize}px`,
+                      lineHeight: typography.lineHeight,
+                      backgroundColor: 'var(--color-background)',
+                      color: 'var(--color-text)'
+                    }}
+                    placeholder="Edit the text content here..."
+                  />
+                </div>
+              )}
             </div>
-          </div>
-          </div>
+          ) : pdfViewer.scrollMode === 'continuous' ? (
+            // Continuous scroll mode - render all pages
+            <div className="mx-auto px-8 py-12" style={{ maxWidth: `${typography.maxWidth}px` }}>
+              {numPages && Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => {
+                // If editing a page, only show that page
+                if (editingPageNum !== null && editingPageNum !== pageNum) {
+                  return null
+                }
+                
+                return (
+                  <div key={pageNum} className="mb-16 last:mb-0">
+                    {/* Page number indicator with edit icon */}
+                    <div className="flex items-center justify-center gap-3 mb-4">
+                      <div className={`text-sm ${themeStyles.text} opacity-50`}>
+                        — Page {pageNum} —
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (editingPageNum === pageNum) {
+                            // Stop editing this page
+                            setEditingPageNum(null)
+                            setIsEditing(false)
+                          } else {
+                            // Start editing this page
+                            const initialText = document.pageTexts?.[pageNum - 1] || ''
+                            setEditedTexts(prev => ({
+                              ...prev,
+                              [pageNum]: prev[pageNum] || initialText
+                            }))
+                            setEditingPageNum(pageNum)
+                            setIsEditing(true)
+                          }
+                        }}
+                        className={`p-2 rounded-lg transition-all ${
+                          editingPageNum === pageNum
+                            ? 'bg-blue-500 text-white shadow-md'
+                            : 'hover:bg-gray-200 dark:hover:bg-gray-700 hover:shadow-sm'
+                        }`}
+                        style={{
+                          color: editingPageNum === pageNum ? '#fff' : 'var(--color-text-primary)',
+                          opacity: editingPageNum === pageNum ? 1 : 0.8
+                        }}
+                        title={editingPageNum === pageNum ? 'Stop editing' : 'Edit this page'}
+                      >
+                        <FileText className="w-5 h-5" />
+                      </button>
+                    </div>
+                    
+                    {/* Page content - show textarea if editing this specific page */}
+                    {editingPageNum === pageNum ? (
+                      <div className="mb-4">
+                        <textarea
+                          value={editedTexts[pageNum] || ''}
+                          onChange={(e) => {
+                            setEditedTexts(prev => ({
+                              ...prev,
+                              [pageNum]: e.target.value
+                            }))
+                            setHasUnsavedChanges(true)
+                          }}
+                          className={`w-full min-h-96 p-4 rounded-lg border-2 border-blue-500 focus:border-blue-600 focus:outline-none resize-y ${fontClass} ${themeStyles.text}`}
+                          style={{
+                            fontSize: `${typography.fontSize}px`,
+                            lineHeight: typography.lineHeight,
+                            backgroundColor: 'var(--color-background)',
+                            color: 'var(--color-text)'
+                          }}
+                          placeholder={`Edit page ${pageNum} text here...`}
+                        />
+                        <div className="flex items-center gap-3 mt-3">
+                          <button
+                            onClick={async () => {
+                              await handleSaveEditedText()
+                              setEditingPageNum(null)
+                            }}
+                            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium text-sm"
+                            title="Save Changes (Ctrl+S)"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditedTexts(prev => {
+                                const newTexts = { ...prev }
+                                delete newTexts[pageNum]
+                                return newTexts
+                              })
+                              setEditingPageNum(null)
+                              setIsEditing(false)
+                              setHasUnsavedChanges(false)
+                            }}
+                            className={`px-4 py-2 ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} rounded-lg transition-colors font-medium text-sm`}
+                            title="Cancel (Escape)"
+                          >
+                            Cancel
+                          </button>
+                          {hasUnsavedChanges && (
+                            <div className={`text-xs ${themeStyles.text} opacity-70`}>
+                              Unsaved changes
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="prose prose-lg max-w-none">
+                        {renderPageContent(pageNum)}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            // Single page mode
+            <div className="mx-auto px-8 py-12" style={{ maxWidth: `${typography.maxWidth}px` }}>
+              {/* Page number indicator with edit icon */}
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <div className={`text-sm ${themeStyles.text} opacity-50`}>
+                  — Page {pageNumber} —
+                </div>
+                <button
+                  onClick={() => {
+                    if (editingPageNum === pageNumber) {
+                      // Stop editing this page
+                      setEditingPageNum(null)
+                      setIsEditing(false)
+                    } else {
+                      // Start editing this page
+                      const initialText = document.pageTexts?.[pageNumber - 1] || ''
+                      setEditedTexts(prev => ({
+                        ...prev,
+                        [pageNumber]: prev[pageNumber] || initialText
+                      }))
+                      setEditingPageNum(pageNumber)
+                      setIsEditing(true)
+                    }
+                  }}
+                  className={`p-2 rounded-lg transition-all ${
+                    editingPageNum === pageNumber
+                      ? 'bg-blue-500 text-white shadow-md'
+                      : 'hover:bg-gray-200 dark:hover:bg-gray-700 hover:shadow-sm'
+                  }`}
+                  style={{
+                    color: editingPageNum === pageNumber ? '#fff' : 'var(--color-text-primary)',
+                    opacity: editingPageNum === pageNumber ? 1 : 0.8
+                  }}
+                  title={editingPageNum === pageNumber ? 'Stop editing' : 'Edit this page'}
+                >
+                  <FileText className="w-5 h-5" />
+                </button>
+              </div>
+              
+              {/* Page content - show textarea if editing this specific page */}
+              {editingPageNum === pageNumber ? (
+                <div className="mb-4">
+                  <textarea
+                    value={editedTexts[pageNumber] || ''}
+                    onChange={(e) => {
+                      setEditedTexts(prev => ({
+                        ...prev,
+                        [pageNumber]: e.target.value
+                      }))
+                      setHasUnsavedChanges(true)
+                    }}
+                    className={`w-full min-h-96 p-4 rounded-lg border-2 border-blue-500 focus:border-blue-600 focus:outline-none resize-y ${fontClass} ${themeStyles.text}`}
+                    style={{
+                      fontSize: `${typography.fontSize}px`,
+                      lineHeight: typography.lineHeight,
+                      backgroundColor: 'var(--color-background)',
+                      color: 'var(--color-text)'
+                    }}
+                    placeholder={`Edit page ${pageNumber} text here...`}
+                  />
+                  <div className="flex items-center gap-3 mt-3">
+                    <button
+                      onClick={async () => {
+                        await handleSaveEditedText()
+                        setEditingPageNum(null)
+                      }}
+                      className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium text-sm"
+                      title="Save Changes (Ctrl+S)"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditedTexts(prev => {
+                          const newTexts = { ...prev }
+                          delete newTexts[pageNumber]
+                          return newTexts
+                        })
+                        setEditingPageNum(null)
+                        setIsEditing(false)
+                        setHasUnsavedChanges(false)
+                      }}
+                      className={`px-4 py-2 ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} rounded-lg transition-colors font-medium text-sm`}
+                      title="Cancel (Escape)"
+                    >
+                      Cancel
+                    </button>
+                    {hasUnsavedChanges && (
+                      <div className={`text-xs ${themeStyles.text} opacity-70`}>
+                        Unsaved changes
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="prose prose-lg max-w-none">
+                  {renderPageContent(pageNumber)}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Reading Mode Active Indicator */}
-        <div className="fixed bottom-4 left-4 bg-amber-500 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+        <div className={`fixed bottom-4 left-4 ${themeStyles.indicatorBg} text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2`}>
           <BookOpen className="w-4 h-4" />
           <span className="text-sm font-medium">Reading Mode Active</span>
         </div>
@@ -839,6 +1578,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         <div className="fixed bottom-4 right-4 z-40">
           <AudioWidget />
         </div>
+
+        {/* Typography Settings Modal */}
+        {showTypographySettings && (
+          <TypographySettings onClose={() => setShowTypographySettings(false)} />
+        )}
       </div>
     )
   }

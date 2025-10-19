@@ -61,6 +61,9 @@ class GoogleCloudTTSService {
   private isPaused = false;
   private pauseTime = 0;
   private startTime = 0;
+  private currentAudioBuffer: AudioBuffer | null = null;
+  private audioStartTime = 0;
+  private audioPauseTime = 0;
 
   constructor() {
     // Get API key from environment
@@ -326,8 +329,14 @@ class GoogleCloudTTSService {
       languageCode: languageCode
     });
 
+    // Try to use SSML for better pause control if text contains breaks
+    const useSSML = text.includes('\n')
+    const inputText = useSSML ? this.insertSSMLPauses(text) : text
+    
     const requestBody = {
-      "input": {
+      "input": useSSML ? {
+        "ssml": inputText
+      } : {
         "text": text
       },
       "voice": {
@@ -463,18 +472,23 @@ class GoogleCloudTTSService {
       source.buffer = decodedAudio;
       source.connect(this.audioContext.destination);
       
-      // Store reference for control
+      // Store reference for control and progress tracking
       this.currentAudio = source;
+      this.currentAudioBuffer = decodedAudio;
       
       // Set up event handlers
       source.onended = () => {
         this.isPaused = false;
         this.pauseTime = 0;
         this.startTime = 0;
+        this.audioStartTime = 0;
+        this.audioPauseTime = 0;
+        this.currentAudioBuffer = null;
         if (onEnd) onEnd();
       };
 
-      // Start playing
+      // Start playing and track start time
+      this.audioStartTime = this.audioContext.currentTime;
       this.startTime = this.audioContext.currentTime;
       source.start();
       
@@ -521,6 +535,9 @@ class GoogleCloudTTSService {
     this.isPaused = false;
     this.pauseTime = 0;
     this.startTime = 0;
+    this.audioStartTime = 0;
+    this.audioPauseTime = 0;
+    this.currentAudioBuffer = null;
     console.log('GoogleCloudTTSService: Stop completed')
   }
 
@@ -532,20 +549,91 @@ class GoogleCloudTTSService {
     return this.isPaused;
   }
 
+  // Get current progress (0 to 1)
+  getProgress(): number {
+    if (!this.audioContext || !this.currentAudioBuffer || !this.isSpeaking()) {
+      return 0;
+    }
+    
+    const currentTime = this.audioContext.currentTime;
+    const elapsedTime = currentTime - this.audioStartTime;
+    const duration = this.currentAudioBuffer.duration;
+    
+    if (duration === 0) {
+      return 0;
+    }
+    
+    return Math.min(elapsedTime / duration, 1);
+  }
+
+  // Get current time in seconds
+  getCurrentTime(): number {
+    if (!this.audioContext || !this.currentAudioBuffer || !this.isSpeaking()) {
+      return 0;
+    }
+    
+    const currentTime = this.audioContext.currentTime;
+    return Math.min(currentTime - this.audioStartTime, this.currentAudioBuffer.duration);
+  }
+
+  // Get total duration in seconds
+  getDuration(): number {
+    if (!this.currentAudioBuffer) {
+      return 0;
+    }
+    
+    return this.currentAudioBuffer.duration;
+  }
+
   isSupported(): boolean {
     return this.isConfigured() && 
            typeof window !== 'undefined' && 
            window.AudioContext !== undefined;
   }
 
+  // Insert SSML pauses at paragraph breaks for natural speech flow
+  insertSSMLPauses(text: string): string {
+    // Google Cloud TTS supports SSML, so we can use proper pause tags
+    
+    // Section breaks (\n\n\n) -> 800ms pause
+    let processedText = text.replace(/\n\n\n/g, '<break time="800ms"/> ')
+    
+    // Paragraph breaks (\n\n) -> 500ms pause
+    processedText = processedText.replace(/\n\n/g, '<break time="500ms"/> ')
+    
+    // Line breaks (\n) -> 200ms pause
+    processedText = processedText.replace(/\n/g, '<break time="200ms"/> ')
+    
+    // Wrap in SSML speak tags if pauses were added
+    if (processedText.includes('<break')) {
+      processedText = `<speak>${processedText}</speak>`
+    }
+    
+    return processedText
+  }
+
   // Clean text for better TTS pronunciation
   cleanText(text: string): string {
-    return text
+    // First insert pauses for breaks (without SSML for compatibility)
+    let cleaned = text
+    
+    // Section breaks (\n\n\n) -> long pause
+    cleaned = cleaned.replace(/\n\n\n/g, '... ')
+    
+    // Paragraph breaks (\n\n) -> medium pause
+    cleaned = cleaned.replace(/\n\n/g, '. ')
+    
+    // Line breaks (\n) -> short pause
+    cleaned = cleaned.replace(/\n/g, ', ')
+    
+    // Normalize
+    cleaned = cleaned
       .replace(/\s+/g, ' ') // Normalize whitespace
       .replace(/([.!?])\s*([A-Z])/g, '$1 $2') // Add space after punctuation
-      .replace(/\n+/g, '. ') // Replace newlines with periods
       .replace(/\s+([.!?,;:])/g, '$1') // Remove space before punctuation
-      .trim();
+      .trim()
+    
+    return cleaned
   }
 
   // Split long text into sentences for better control
