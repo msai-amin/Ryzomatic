@@ -81,7 +81,7 @@ export class BookStorageService {
         });
 
       if (error) {
-        logger.warn('Supabase Storage upload failed, trying API fallback', context, { error: error.message });
+        logger.warn('Supabase Storage upload failed, trying API fallback', context, { errorMessage: error.message });
         
         // Fallback to API endpoint if Supabase Storage fails
         try {
@@ -170,7 +170,7 @@ export class BookStorageService {
         .download(s3Key);
 
       if (error) {
-        logger.warn('Supabase Storage download failed, trying API fallback', context, { error: error.message });
+        logger.warn('Supabase Storage download failed, trying API fallback', context, { errorMessage: error.message });
         
         // Fallback to API endpoint if Supabase Storage fails
         try {
