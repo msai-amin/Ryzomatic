@@ -1,11 +1,26 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { theme1Config, ThemeConfig, annotationColors } from './theme1-config';
+import { theme1Config, ThemeConfig, annotationColors as defaultAnnotationColors } from './theme1-config';
 import '../src/themes/theme1-variables.css';
+import { MoreVertical, Plus } from 'lucide-react';
+import { ColorEditModal } from './ColorEditModal';
+import { AddCategoryModal } from './AddCategoryModal';
+
+export interface AnnotationColor {
+  id: string;
+  color: string;
+  name: string;
+  value: string;
+  bgOpacity: string;
+}
 
 interface ThemeContextType {
   currentTheme: ThemeConfig;
   setTheme: (theme: ThemeConfig) => void;
-  annotationColors: typeof annotationColors;
+  annotationColors: AnnotationColor[];
+  updateAnnotationColor: (id: string, updates: Partial<AnnotationColor>) => void;
+  addAnnotationColor: (color: Omit<AnnotationColor, 'id'>) => void;
+  deleteAnnotationColor: (id: string) => void;
+  resetAnnotationColor: (id: string) => void;
   isDarkMode: boolean;
   toggleDarkMode: () => void;
 }
@@ -23,11 +38,13 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
 }) => {
   const [currentTheme, setCurrentTheme] = useState<ThemeConfig>(defaultTheme);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [annotationColors, setAnnotationColors] = useState<AnnotationColor[]>(defaultAnnotationColors);
 
-  // Load theme from localStorage on mount
+  // Load theme and custom colors from localStorage on mount
   useEffect(() => {
     const savedTheme = localStorage.getItem('academic-reader-theme');
     const savedDarkMode = localStorage.getItem('academic-reader-dark-mode');
+    const savedColors = localStorage.getItem('annotation-colors-custom');
     
     if (savedTheme) {
       try {
@@ -41,6 +58,15 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     if (savedDarkMode) {
       setIsDarkMode(JSON.parse(savedDarkMode as string));
     }
+
+    if (savedColors) {
+      try {
+        const parsedColors = JSON.parse(savedColors as string);
+        setAnnotationColors(parsedColors);
+      } catch (error) {
+        console.warn('Failed to parse saved colors, using defaults');
+      }
+    }
   }, []);
 
   // Save theme to localStorage when it changes
@@ -52,6 +78,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   useEffect(() => {
     localStorage.setItem('academic-reader-dark-mode', JSON.stringify(isDarkMode));
   }, [isDarkMode]);
+
+  // Save custom annotation colors to localStorage
+  useEffect(() => {
+    localStorage.setItem('annotation-colors-custom', JSON.stringify(annotationColors));
+  }, [annotationColors]);
 
   // Apply theme to document root
   useEffect(() => {
@@ -110,10 +141,42 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     setIsDarkMode(!isDarkMode);
   };
 
+  // Color management functions
+  const updateAnnotationColor = (id: string, updates: Partial<AnnotationColor>) => {
+    setAnnotationColors((colors) =>
+      colors.map((color) =>
+        color.id === id ? { ...color, ...updates } : color
+      )
+    );
+  };
+
+  const addAnnotationColor = (color: Omit<AnnotationColor, 'id'>) => {
+    const newColor: AnnotationColor = {
+      ...color,
+      id: `custom-${Date.now()}`,
+    };
+    setAnnotationColors((colors) => [...colors, newColor]);
+  };
+
+  const deleteAnnotationColor = (id: string) => {
+    setAnnotationColors((colors) => colors.filter((color) => color.id !== id));
+  };
+
+  const resetAnnotationColor = (id: string) => {
+    const defaultColor = defaultAnnotationColors.find((color) => color.id === id);
+    if (defaultColor) {
+      updateAnnotationColor(id, defaultColor);
+    }
+  };
+
   const value: ThemeContextType = {
     currentTheme,
     setTheme,
     annotationColors,
+    updateAnnotationColor,
+    addAnnotationColor,
+    deleteAnnotationColor,
+    resetAnnotationColor,
     isDarkMode,
     toggleDarkMode,
   };
@@ -196,40 +259,117 @@ export const AnnotationColorPicker: React.FC<{
   selectedColor: string;
   onColorSelect: (color: string) => void;
 }> = ({ selectedColor, onColorSelect }) => {
-  const { annotationColors } = useTheme();
+  const { 
+    annotationColors, 
+    updateAnnotationColor, 
+    addAnnotationColor, 
+    deleteAnnotationColor, 
+    resetAnnotationColor 
+  } = useTheme();
+  
+  const [editingColor, setEditingColor] = useState<AnnotationColor | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  const handleEdit = (color: AnnotationColor, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingColor(color);
+  };
+
+  const isDefaultColor = (id: string) => id.startsWith('default-');
 
   return (
-    <div className="space-y-2">
-      <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>Color Coding System</h3>
+    <>
       <div className="space-y-2">
-        {annotationColors.map((item) => (
-          <div
-            key={item.value}
-            className="flex items-center space-x-3 p-2 rounded-lg cursor-pointer transition-colors"
-            style={{
-              backgroundColor: selectedColor === item.color ? 'rgba(156, 163, 175, 0.2)' : 'transparent',
-              border: selectedColor === item.color ? '2px solid var(--color-primary)' : '2px solid transparent',
-            }}
-            onClick={() => onColorSelect(item.color)}
-          >
+        <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+          Color Coding System
+        </h3>
+        <div className="space-y-2">
+          {annotationColors.map((item) => (
             <div
-              className="w-6 h-6 rounded-full"
-              style={{ 
-                backgroundColor: item.color,
-                border: '2px solid var(--color-border)'
-              }}
-            />
-            <span 
-              className="text-sm font-semibold"
+              key={item.id}
+              className="flex items-center space-x-3 p-2 rounded-lg cursor-pointer transition-colors relative group"
               style={{
-                color: 'var(--color-text-primary)'
+                backgroundColor: selectedColor === item.color ? 'rgba(156, 163, 175, 0.2)' : 'transparent',
+                border: selectedColor === item.color ? '2px solid var(--color-primary)' : '2px solid transparent',
               }}
+              onClick={() => onColorSelect(item.color)}
+              onMouseEnter={() => setHoveredId(item.id)}
+              onMouseLeave={() => setHoveredId(null)}
             >
-              {item.name}
-            </span>
-          </div>
-        ))}
+              <div
+                className="w-6 h-6 rounded-full flex-shrink-0"
+                style={{ 
+                  backgroundColor: item.color,
+                  border: '2px solid var(--color-border)'
+                }}
+              />
+              <span 
+                className="text-sm font-semibold flex-1"
+                style={{
+                  color: 'var(--color-text-primary)'
+                }}
+              >
+                {item.name}
+              </span>
+              {/* Kebab menu button */}
+              <button
+                onClick={(e) => handleEdit(item, e)}
+                className="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                style={{
+                  color: 'var(--color-text-secondary)',
+                  backgroundColor: hoveredId === item.id ? 'var(--color-surface-hover)' : 'transparent',
+                }}
+                title="Edit category"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Add New Category Button */}
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="w-full mt-4 flex items-center justify-center space-x-2 p-2 rounded-lg border-2 border-dashed transition-colors"
+          style={{
+            borderColor: 'var(--color-border)',
+            color: 'var(--color-text-secondary)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = 'var(--color-primary)';
+            e.currentTarget.style.color = 'var(--color-primary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'var(--color-border)';
+            e.currentTarget.style.color = 'var(--color-text-secondary)';
+          }}
+        >
+          <Plus className="w-4 h-4" />
+          <span className="text-sm font-medium">Add New Category</span>
+        </button>
       </div>
-    </div>
+
+      {/* Edit Modal */}
+      {editingColor && (
+        <ColorEditModal
+          isOpen={!!editingColor}
+          onClose={() => setEditingColor(null)}
+          color={editingColor}
+          onSave={updateAnnotationColor}
+          onDelete={deleteAnnotationColor}
+          onReset={resetAnnotationColor}
+          isDefault={isDefaultColor(editingColor.id)}
+        />
+      )}
+
+      {/* Add Modal */}
+      <AddCategoryModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAdd={addAnnotationColor}
+        existingColors={annotationColors}
+      />
+    </>
   );
 };

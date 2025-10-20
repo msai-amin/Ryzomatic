@@ -1,6 +1,7 @@
-import React from 'react'
-import { X, Type, Palette, AlignLeft, AlignJustify, AlignCenter, Space, Eye, Crosshair } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { X, Type, Palette, AlignLeft, AlignJustify, AlignCenter, Space, Eye, Crosshair, Calculator, RefreshCw } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
+import { getCacheStats, clearFormulaCache } from '../services/formulaService'
 
 interface TypographySettingsProps {
   onClose: () => void
@@ -8,6 +9,12 @@ interface TypographySettingsProps {
 
 export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose }) => {
   const { typography, updateTypography } = useAppStore()
+  const [cacheStats, setCacheStats] = useState({ count: 0, totalSize: 0, oldestEntry: null as number | null })
+  const [clearing, setClearing] = useState(false)
+
+  useEffect(() => {
+    setCacheStats(getCacheStats())
+  }, [])
 
   const handleFontFamilyChange = (fontFamily: 'serif' | 'sans' | 'mono') => {
     updateTypography({ fontFamily })
@@ -43,6 +50,19 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
 
   const handleReadingGuideChange = (readingGuide: boolean) => {
     updateTypography({ readingGuide })
+  }
+
+  const handleRenderFormulasChange = (renderFormulas: boolean) => {
+    updateTypography({ renderFormulas })
+  }
+
+  const handleClearCache = () => {
+    if (window.confirm('Clear all cached formula conversions? You may need to re-convert formulas.')) {
+      setClearing(true)
+      clearFormulaCache()
+      setCacheStats(getCacheStats())
+      setTimeout(() => setClearing(false), 500)
+    }
   }
 
   return (
@@ -247,8 +267,55 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
                 </div>
                 <span className="text-xs text-gray-500 ml-auto">Highlight current paragraph</span>
               </label>
+              
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={typography.renderFormulas}
+                  onChange={(e) => handleRenderFormulasChange(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <div className="flex items-center space-x-2">
+                  <Calculator className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm text-gray-700">Render Formulas</span>
+                </div>
+                <span className="text-xs text-gray-500 ml-auto">Convert math to LaTeX</span>
+              </label>
             </div>
           </div>
+
+          {/* Formula Cache Management */}
+          {typography.renderFormulas && (
+            <div className="pt-4 border-t border-gray-200">
+              <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 mb-3">
+                <Calculator className="w-4 h-4" />
+                <span>Formula Cache</span>
+              </label>
+              <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Cached formulas:</span>
+                  <span className="font-medium text-gray-900">{cacheStats.count}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Cache size:</span>
+                  <span className="font-medium text-gray-900">
+                    {(cacheStats.totalSize / 1024).toFixed(1)} KB
+                  </span>
+                </div>
+                <button
+                  onClick={handleClearCache}
+                  disabled={clearing || cacheStats.count === 0}
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm"
+                >
+                  <RefreshCw className={`w-4 h-4 ${clearing ? 'animate-spin' : ''}`} />
+                  <span>{clearing ? 'Clearing...' : 'Clear Cache'}</span>
+                </button>
+                <p className="text-xs text-gray-500 text-center">
+                  Clearing cache will require re-converting formulas on next view
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

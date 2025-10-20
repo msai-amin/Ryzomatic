@@ -10,3 +10,5 @@ logs/
 
 # Archive directory (keep in git for reference)
 # archive/
+.env.production.local
+.env.supabase

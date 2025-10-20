@@ -215,6 +215,17 @@ function containsMathSymbols(text: string): boolean {
 }
 
 /**
+ * Mark formulas with special markers for later processing
+ */
+function markFormula(text: string, isBlock: boolean): string {
+  if (isBlock) {
+    return `\n|||FORMULA_BLOCK_START|||${text}|||FORMULA_BLOCK_END|||\n`
+  } else {
+    return `|||FORMULA_INLINE_START|||${text}|||FORMULA_INLINE_END|||`
+  }
+}
+
+/**
  * Format a table row with proper column alignment
  */
 function formatTableRow(line: TextLine): string {
@@ -331,7 +342,9 @@ function buildTextWithBreaks(lines: TextLine[]): string {
     
     // Mark formulas for special rendering
     if (hasMath && !inTable) {
-      result += '`' + lineText + '`'
+      // Determine if this should be a block formula
+      const isBlockFormula = lineText.length > 40 || /[∑∏∫]/.test(lineText)
+      result += markFormula(lineText, isBlockFormula)
     } else {
       result += lineText
     }
@@ -433,5 +446,40 @@ export function sortTextItemsByPosition(items: any[]): any[] {
   })
   
   return sorted
+}
+
+/**
+ * Extract formulas from text with markers
+ * Returns array of formulas with their types
+ */
+export function extractMarkedFormulas(text: string): Array<{
+  formula: string
+  isBlock: boolean
+  marker: string
+}> {
+  const formulas: Array<{ formula: string; isBlock: boolean; marker: string }> = []
+  
+  // Extract block formulas
+  const blockRegex = /\|\|\|FORMULA_BLOCK_START\|\|\|(.*?)\|\|\|FORMULA_BLOCK_END\|\|\|/g
+  let match
+  while ((match = blockRegex.exec(text)) !== null) {
+    formulas.push({
+      formula: match[1],
+      isBlock: true,
+      marker: match[0],
+    })
+  }
+  
+  // Extract inline formulas
+  const inlineRegex = /\|\|\|FORMULA_INLINE_START\|\|\|(.*?)\|\|\|FORMULA_INLINE_END\|\|\|/g
+  while ((match = inlineRegex.exec(text)) !== null) {
+    formulas.push({
+      formula: match[1],
+      isBlock: false,
+      marker: match[0],
+    })
+  }
+  
+  return formulas
 }
 

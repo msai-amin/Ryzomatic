@@ -32,6 +32,9 @@ import { VoiceSelector } from './VoiceSelector'
 import { TypographySettings } from './TypographySettings'
 import { storageService } from '../services/storageService'
 import { OCRBanner, OCRStatusBadge } from './OCRStatusBadge'
+import { FormulaRenderer, FormulaPlaceholder } from './FormulaRenderer'
+import { extractMarkedFormulas } from '../utils/pdfTextExtractor'
+import { convertMultipleFormulas } from '../services/formulaService'
 
 // PDF.js will be imported dynamically
 
@@ -207,6 +210,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const [editingPageNum, setEditingPageNum] = useState<number | null>(null)
   const [editedTexts, setEditedTexts] = useState<{ [pageNum: number]: string }>({})
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [formulaLatex, setFormulaLatex] = useState<Map<string, string>>(new Map())
+  const [isConvertingFormulas, setIsConvertingFormulas] = useState(false)
+  const [formulaConversionProgress, setFormulaConversionProgress] = useState({ current: 0, total: 0 })
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -589,8 +595,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           break
         case 'e':
         case 'E':
-          // Toggle edit mode - ONLY in reading mode
-          if (pdfViewer.readingMode && !isEditing) {
+          // Toggle edit mode - ONLY in reading mode and single-page mode
+          // In continuous mode, users should use per-page edit buttons
+          if (pdfViewer.readingMode && !isEditing && pdfViewer.scrollMode === 'single') {
             // Initialize edited texts with current page texts
             const initialTexts: { [pageNum: number]: string } = {}
             document.pageTexts?.forEach((text, index) => {
@@ -752,6 +759,64 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       };
     }
   }, [ocrStatus, document.id])
+
+  // Process formulas for LaTeX conversion when entering reading mode
+  useEffect(() => {
+    const processFormulas = async () => {
+      if (!pdfViewer.readingMode || !typography.renderFormulas || !document.pageTexts) {
+        return
+      }
+
+      // Extract formulas from all pages
+      const allFormulas: Array<{ formula: string; isBlock: boolean; marker: string; pageNum: number }> = []
+      
+      document.pageTexts.forEach((pageText, index) => {
+        const markedFormulas = extractMarkedFormulas(pageText)
+        markedFormulas.forEach(f => {
+          allFormulas.push({ ...f, pageNum: index + 1 })
+        })
+      })
+
+      if (allFormulas.length === 0) {
+        return
+      }
+
+      // Convert formulas that aren't already cached
+      setIsConvertingFormulas(true)
+      setFormulaConversionProgress({ current: 0, total: allFormulas.length })
+
+      try {
+        const formulasToConvert = allFormulas.map(f => ({
+          text: f.formula,
+          startIndex: 0,
+          endIndex: f.formula.length,
+          isBlock: f.isBlock,
+          confidence: 1.0,
+        }))
+
+        const latexMap = await convertMultipleFormulas(
+          formulasToConvert,
+          (current, total) => {
+            setFormulaConversionProgress({ current, total })
+          }
+        )
+
+        // Store the LaTeX conversions
+        const newLatexMap = new Map<string, string>()
+        latexMap.forEach((result, formulaText) => {
+          newLatexMap.set(formulaText, result.latex)
+        })
+        
+        setFormulaLatex(newLatexMap)
+      } catch (error) {
+        console.error('Failed to convert formulas:', error)
+      } finally {
+        setIsConvertingFormulas(false)
+      }
+    }
+
+    processFormulas()
+  }, [pdfViewer.readingMode, typography.renderFormulas, document.pageTexts, document.id])
 
   // Handle OCR retry
   // Handle saving edited text
@@ -1130,20 +1195,44 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                   </div>
                 )
               } else if (segment.type === 'formula') {
-                // Render formula with special styling
-                return (
-                  <span
-                    key={`formula-${index}`}
-                    className={`inline-block px-2 py-1 mx-1 rounded ${themeStyles.text} bg-opacity-10`}
-                    style={{
-                      fontFamily: 'monospace',
-                      fontSize: `${typography.fontSize * 0.95}px`,
-                      backgroundColor: themeStyles.text.includes('gray-100') ? '#1f2937' : '#f3f4f6'
-                    }}
-                  >
-                    {segment.content}
-                  </span>
-                )
+                // Render formula with LaTeX if enabled and available
+                const formulaText = segment.content
+                const latex = formulaLatex.get(formulaText)
+                
+                if (typography.renderFormulas && latex && !isConvertingFormulas) {
+                  return (
+                    <FormulaRenderer
+                      key={`formula-${index}`}
+                      latex={latex}
+                      isBlock={false}
+                      fallback={formulaText}
+                      showCopyButton={true}
+                    />
+                  )
+                } else if (typography.renderFormulas && isConvertingFormulas) {
+                  return (
+                    <FormulaPlaceholder
+                      key={`formula-${index}`}
+                      text={formulaText}
+                      isBlock={false}
+                    />
+                  )
+                } else {
+                  // Fallback to monospace rendering
+                  return (
+                    <span
+                      key={`formula-${index}`}
+                      className={`inline-block px-2 py-1 mx-1 rounded ${themeStyles.text} bg-opacity-10`}
+                      style={{
+                        fontFamily: 'monospace',
+                        fontSize: `${typography.fontSize * 0.95}px`,
+                        backgroundColor: themeStyles.text.includes('gray-100') ? '#1f2937' : '#f3f4f6'
+                      }}
+                    >
+                      {formulaText}
+                    </span>
+                  )
+                }
               } else if (segment.type === 'word') {
                 // Determine if this word is in the current paragraph
                 const isCurrentParagraph = segment.paragraphIndex === currentParagraphIndex
@@ -1215,6 +1304,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                 <BookOpen className="w-4 h-4" />
                 <span>Page {pageNumber} of {numPages}</span>
               </div>
+              
+              {/* Formula conversion indicator */}
+              {isConvertingFormulas && (
+                <div className={`flex items-center gap-2 text-xs ${themeStyles.text} opacity-70 px-3 py-1 rounded-lg`} style={{ backgroundColor: 'var(--color-background-secondary)' }}>
+                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent" />
+                  <span>Converting formulas... {formulaConversionProgress.current}/{formulaConversionProgress.total}</span>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -1293,64 +1390,36 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         {/* Reading Mode Content */}
         <div className="flex-1 overflow-y-auto">
           {isEditing ? (
-            // Edit mode - show textarea for all pages in continuous mode or single page
+            // Edit mode - show textarea for current page only
             <div className="mx-auto px-8 py-12" style={{ maxWidth: `${typography.maxWidth}px` }}>
               <div className={`text-xs ${themeStyles.text} opacity-50 mb-6 text-center`}>
                 Tip: Use Ctrl+S to save or Escape to cancel
               </div>
-              {pdfViewer.scrollMode === 'continuous' ? (
-                // Show all pages for editing in continuous mode
-                numPages && Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
-                  <div key={pageNum} className="mb-12 last:mb-0">
-                    <label className={`block text-sm font-medium ${themeStyles.text} mb-2`}>
-                      Editing Page {pageNum}
-                    </label>
-                    <textarea
-                      value={editedTexts[pageNum] || ''}
-                      onChange={(e) => {
-                        setEditedTexts(prev => ({
-                          ...prev,
-                          [pageNum]: e.target.value
-                        }))
-                        setHasUnsavedChanges(true)
-                      }}
-                      className={`w-full min-h-96 p-4 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:outline-none resize-y ${fontClass} ${themeStyles.text}`}
-                      style={{
-                        fontSize: `${typography.fontSize}px`,
-                        lineHeight: typography.lineHeight,
-                        backgroundColor: 'var(--color-background)',
-                        color: 'var(--color-text)'
-                      }}
-                      placeholder={`Edit page ${pageNum} text here...`}
-                    />
-                  </div>
-                ))
-              ) : (
-                // Single page mode - edit current page only
-                <div className="mb-4">
-                  <label className={`block text-sm font-medium ${themeStyles.text} mb-2`}>
-                    Editing Page {pageNumber}
-                  </label>
-                  <textarea
-                    value={editedTexts[pageNumber] || ''}
-                    onChange={(e) => {
-                      setEditedTexts(prev => ({
-                        ...prev,
-                        [pageNumber]: e.target.value
-                      }))
-                      setHasUnsavedChanges(true)
-                    }}
-                    className={`w-full h-96 p-4 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:outline-none resize-y ${fontClass} ${themeStyles.text}`}
-                    style={{
-                      fontSize: `${typography.fontSize}px`,
-                      lineHeight: typography.lineHeight,
-                      backgroundColor: 'var(--color-background)',
-                      color: 'var(--color-text)'
-                    }}
-                    placeholder="Edit the text content here..."
-                  />
-                </div>
-              )}
+              <div className="mb-4">
+                <label className={`block text-sm font-medium ${themeStyles.text} mb-2`}>
+                  Editing Page {editingPageNum || pageNumber}
+                </label>
+                <textarea
+                  value={editedTexts[editingPageNum || pageNumber] || ''}
+                  onChange={(e) => {
+                    const currentPage = editingPageNum || pageNumber
+                    setEditedTexts(prev => ({
+                      ...prev,
+                      [currentPage]: e.target.value
+                    }))
+                    setHasUnsavedChanges(true)
+                  }}
+                  className={`w-full min-h-96 p-4 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:outline-none resize-y ${fontClass} ${themeStyles.text}`}
+                  style={{
+                    fontSize: `${typography.fontSize}px`,
+                    lineHeight: typography.lineHeight,
+                    backgroundColor: 'var(--color-background)',
+                    color: 'var(--color-text)'
+                  }}
+                  placeholder={`Edit page ${editingPageNum || pageNumber} text here...`}
+                  autoFocus
+                />
+              </div>
             </div>
           ) : pdfViewer.scrollMode === 'continuous' ? (
             // Continuous scroll mode - render all pages

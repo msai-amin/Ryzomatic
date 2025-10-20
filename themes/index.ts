@@ -9,6 +9,11 @@ export type { ThemeConfig, ThemeColors, ThemeSpacing, ThemeTypography, ThemeBord
 
 // Theme Provider and Hooks
 export { ThemeProvider, useTheme, ThemeSwitcher, AnnotationColorPicker } from './ThemeProvider'
+export type { AnnotationColor } from './ThemeProvider'
+
+// Color Management Modals
+export { ColorEditModal } from './ColorEditModal'
+export { AddCategoryModal } from './AddCategoryModal'
 
 // Themed Components
 export { ThemedApp } from './ThemedApp'

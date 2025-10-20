@@ -268,11 +268,11 @@ export const theme1Config: ThemeConfig = {
 
 // Color palette for annotations (matching the sample)
 export const annotationColors = [
-  { color: '#FFD700', name: 'Interesting Points', value: 'yellow', bgOpacity: 'rgba(255, 215, 0, 0.1)' },
-  { color: '#4ECDC4', name: 'Key Concepts', value: 'teal', bgOpacity: 'rgba(78, 205, 196, 0.1)' },
-  { color: '#FF6B6B', name: 'Critique', value: 'red', bgOpacity: 'rgba(255, 107, 107, 0.1)' },
-  { color: '#45B7D1', name: 'Questions', value: 'blue', bgOpacity: 'rgba(69, 183, 209, 0.1)' },
-  { color: '#96CEB4', name: 'Evidence', value: 'green', bgOpacity: 'rgba(150, 206, 180, 0.1)' },
+  { id: 'default-yellow', color: '#FFD700', name: 'Interesting Points', value: 'yellow', bgOpacity: 'rgba(255, 215, 0, 0.1)' },
+  { id: 'default-teal', color: '#4ECDC4', name: 'Key Concepts', value: 'teal', bgOpacity: 'rgba(78, 205, 196, 0.1)' },
+  { id: 'default-red', color: '#FF6B6B', name: 'Critique', value: 'red', bgOpacity: 'rgba(255, 107, 107, 0.1)' },
+  { id: 'default-blue', color: '#45B7D1', name: 'Questions', value: 'blue', bgOpacity: 'rgba(69, 183, 209, 0.1)' },
+  { id: 'default-green', color: '#96CEB4', name: 'Evidence', value: 'green', bgOpacity: 'rgba(150, 206, 180, 0.1)' },
 ];
 
 // Component-specific style configurations

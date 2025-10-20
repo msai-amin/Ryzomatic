@@ -41,6 +41,7 @@ export interface TypographySettings {
   spacingMultiplier: number
   focusMode: boolean
   readingGuide: boolean
+  renderFormulas: boolean
 }
 
 export interface ThemeSettings {
@@ -161,7 +162,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     textAlign: 'left',
     spacingMultiplier: 1.0,
     focusMode: false,
-    readingGuide: false
+    readingGuide: false,
+    renderFormulas: true
   },
   theme: {
     currentTheme: 'default',
