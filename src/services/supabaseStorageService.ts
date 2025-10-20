@@ -17,6 +17,9 @@ export interface SavedBook {
   notes?: Note[];
   googleDriveId?: string;
   syncedAt?: Date;
+  s3_key?: string;
+  text_content?: string;
+  reading_progress?: number;
 }
 
 export interface Note {
@@ -346,7 +349,10 @@ class SupabaseStorageService {
         totalPages: data.total_pages,
         pageTexts: [],  // Not stored anymore
         notes: [],
-        syncedAt: new Date(data.updated_at)
+        syncedAt: new Date(data.updated_at),
+        s3_key: data.s3_key,
+        text_content: data.text_content,
+        reading_progress: data.reading_progress
       };
 
       // NEW: Download from S3 if s3_key exists

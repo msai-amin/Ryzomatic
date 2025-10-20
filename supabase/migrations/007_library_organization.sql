@@ -2,7 +2,7 @@
 -- Adds collections, tags, and enhanced metadata for scalable library management
 
 -- Collections/Folders Table
-CREATE TABLE user_collections (
+CREATE TABLE IF NOT EXISTS user_collections (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
   name TEXT NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE user_collections (
 );
 
 -- Tags Table
-CREATE TABLE book_tags (
+CREATE TABLE IF NOT EXISTS book_tags (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
   name TEXT NOT NULL,
@@ -30,7 +30,7 @@ CREATE TABLE book_tags (
 );
 
 -- Book-Collection Junction Table
-CREATE TABLE book_collections (
+CREATE TABLE IF NOT EXISTS book_collections (
   book_id UUID REFERENCES user_books(id) ON DELETE CASCADE NOT NULL,
   collection_id UUID REFERENCES user_collections(id) ON DELETE CASCADE NOT NULL,
   added_at TIMESTAMPTZ DEFAULT NOW(),
@@ -39,7 +39,7 @@ CREATE TABLE book_collections (
 );
 
 -- Book-Tag Junction Table
-CREATE TABLE book_tag_assignments (
+CREATE TABLE IF NOT EXISTS book_tag_assignments (
   book_id UUID REFERENCES user_books(id) ON DELETE CASCADE NOT NULL,
   tag_id UUID REFERENCES book_tags(id) ON DELETE CASCADE NOT NULL,
   assigned_at TIMESTAMPTZ DEFAULT NOW(),
@@ -94,50 +94,62 @@ ALTER TABLE book_collections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE book_tag_assignments ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for user_collections
+DROP POLICY IF EXISTS "Users can read own collections" ON user_collections;
 CREATE POLICY "Users can read own collections" ON user_collections
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can create own collections" ON user_collections;
 CREATE POLICY "Users can create own collections" ON user_collections
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own collections" ON user_collections;
 CREATE POLICY "Users can update own collections" ON user_collections
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own collections" ON user_collections;
 CREATE POLICY "Users can delete own collections" ON user_collections
   FOR DELETE USING (auth.uid() = user_id);
 
 -- RLS Policies for book_tags
+DROP POLICY IF EXISTS "Users can read own tags" ON book_tags;
 CREATE POLICY "Users can read own tags" ON book_tags
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can create own tags" ON book_tags;
 CREATE POLICY "Users can create own tags" ON book_tags
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own tags" ON book_tags;
 CREATE POLICY "Users can update own tags" ON book_tags
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own tags" ON book_tags;
 CREATE POLICY "Users can delete own tags" ON book_tags
   FOR DELETE USING (auth.uid() = user_id);
 
 -- RLS Policies for book_collections
+DROP POLICY IF EXISTS "Users can read own book collections" ON book_collections;
 CREATE POLICY "Users can read own book collections" ON book_collections
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM user_books WHERE id = book_id AND user_id = auth.uid()) OR
     EXISTS (SELECT 1 FROM user_collections WHERE id = collection_id AND user_id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "Users can create own book collections" ON book_collections;
 CREATE POLICY "Users can create own book collections" ON book_collections
   FOR INSERT WITH CHECK (
     EXISTS (SELECT 1 FROM user_books WHERE id = book_id AND user_id = auth.uid()) AND
     EXISTS (SELECT 1 FROM user_collections WHERE id = collection_id AND user_id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "Users can update own book collections" ON book_collections;
 CREATE POLICY "Users can update own book collections" ON book_collections
   FOR UPDATE USING (
     EXISTS (SELECT 1 FROM user_books WHERE id = book_id AND user_id = auth.uid()) AND
     EXISTS (SELECT 1 FROM user_collections WHERE id = collection_id AND user_id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "Users can delete own book collections" ON book_collections;
 CREATE POLICY "Users can delete own book collections" ON book_collections
   FOR DELETE USING (
     EXISTS (SELECT 1 FROM user_books WHERE id = book_id AND user_id = auth.uid()) AND
@@ -145,24 +157,28 @@ CREATE POLICY "Users can delete own book collections" ON book_collections
   );
 
 -- RLS Policies for book_tag_assignments
+DROP POLICY IF EXISTS "Users can read own book tag assignments" ON book_tag_assignments;
 CREATE POLICY "Users can read own book tag assignments" ON book_tag_assignments
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM user_books WHERE id = book_id AND user_id = auth.uid()) AND
     EXISTS (SELECT 1 FROM book_tags WHERE id = tag_id AND user_id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "Users can create own book tag assignments" ON book_tag_assignments;
 CREATE POLICY "Users can create own book tag assignments" ON book_tag_assignments
   FOR INSERT WITH CHECK (
     EXISTS (SELECT 1 FROM user_books WHERE id = book_id AND user_id = auth.uid()) AND
     EXISTS (SELECT 1 FROM book_tags WHERE id = tag_id AND user_id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "Users can update own book tag assignments" ON book_tag_assignments;
 CREATE POLICY "Users can update own book tag assignments" ON book_tag_assignments
   FOR UPDATE USING (
     EXISTS (SELECT 1 FROM user_books WHERE id = book_id AND user_id = auth.uid()) AND
     EXISTS (SELECT 1 FROM book_tags WHERE id = tag_id AND user_id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "Users can delete own book tag assignments" ON book_tag_assignments;
 CREATE POLICY "Users can delete own book tag assignments" ON book_tag_assignments
   FOR DELETE USING (
     EXISTS (SELECT 1 FROM user_books WHERE id = book_id AND user_id = auth.uid()) AND
@@ -170,9 +186,11 @@ CREATE POLICY "Users can delete own book tag assignments" ON book_tag_assignment
   );
 
 -- Triggers for updated_at
+DROP TRIGGER IF EXISTS update_user_collections_updated_at ON user_collections;
 CREATE TRIGGER update_user_collections_updated_at BEFORE UPDATE ON user_collections
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_book_tags_updated_at ON book_tags;
 CREATE TRIGGER update_book_tags_updated_at BEFORE UPDATE ON book_tags
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -196,6 +214,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger to update tag usage count
+DROP TRIGGER IF EXISTS update_tag_usage_on_assignment ON book_tag_assignments;
 CREATE TRIGGER update_tag_usage_on_assignment
   AFTER INSERT OR DELETE ON book_tag_assignments
   FOR EACH ROW EXECUTE FUNCTION update_tag_usage_count();

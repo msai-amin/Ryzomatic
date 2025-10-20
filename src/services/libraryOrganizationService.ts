@@ -119,14 +119,18 @@ class LibraryOrganizationService {
     try {
       const start = Date.now();
       
-      // Try cached hierarchy first
+      // Simple query without RPC functions
       const { data, error } = await supabase
-        .rpc('get_collection_hierarchy_cached', { user_uuid: this.currentUserId! });
+        .from('user_collections')
+        .select('*')
+        .eq('user_id', this.currentUserId!)
+        .order('display_order', { ascending: true });
 
       if (error) {
-        // Fallback to original function if cache fails
         const { data: fallbackData, error: fallbackError } = await supabase
-          .rpc('get_collection_hierarchy', { user_uuid: this.currentUserId! });
+          .from('user_collections')
+          .select('*')
+          .eq('user_id', this.currentUserId!);
 
         if (fallbackError) {
           throw errorHandler.createError(

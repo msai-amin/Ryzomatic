@@ -147,11 +147,38 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
     setLibraryFilters({ tags: newTags });
   }, [libraryView.selectedTags, setSelectedTags, setLibraryFilters]);
 
-  const handleBookOpen = useCallback((book: SearchResult) => {
-    // Convert SearchResult to Document format and open
-    // This would integrate with the existing document opening logic
-    console.log('Opening book:', book);
-    onClose();
+  const handleBookOpen = useCallback(async (book: SearchResult) => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch the full book data from storage
+      const bookData = await supabaseStorageService.getBook(book.id);
+      
+      if (!bookData) {
+        throw new Error('Book not found');
+      }
+
+      // Convert to Document format
+      const document = {
+        id: bookData.id,
+        name: bookData.title,
+        content: (bookData.text_content || bookData.fileData || '') as string,
+        type: bookData.type as 'text' | 'pdf',
+        uploadedAt: bookData.savedAt,
+        pdfData: bookData.type === 'pdf' ? bookData.fileData : undefined, // ArrayBuffer for PDFs
+        totalPages: bookData.totalPages,
+        lastReadPage: bookData.lastReadPage,
+      };
+
+      // Set the current document and close the library
+      useAppStore.getState().setCurrentDocument(document as any);
+      onClose();
+    } catch (error) {
+      console.error('Failed to open book:', error);
+      setError('Failed to open book. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   }, [onClose]);
 
   const handleBookEdit = useCallback((book: SearchResult) => {

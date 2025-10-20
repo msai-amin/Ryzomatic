@@ -107,20 +107,8 @@ class LibrarySearchService {
     if (cached && this.isCacheValid(cached.timestamp)) {
       logger.debug('Returning cached search results', { cacheKey });
       
-      // Log cache hit performance
-      try {
-        await supabase.rpc('log_query_performance_with_alerts', {
-          user_uuid: this.currentUserId!,
-          query_type_param: 'search_books_cache_hit',
-          execution_time_ms_param: 0,
-          rows_returned_param: cached.data.length,
-          cache_hit_param: true,
-          filters_param: filters,
-          payload_size_bytes_param: null
-        });
-      } catch (logError) {
-        logger.warn('Failed to log cache hit performance', { error: logError });
-      }
+      // Cache hit - no need to log performance (RPC function doesn't exist yet)
+      // This would be logged in a future enhancement
       
       return {
         results: cached.data,
@@ -244,21 +232,9 @@ class LibrarySearchService {
 
       const durationMs = Date.now() - start;
       
-      // Log performance metrics with alerts
-      try {
-        const payloadSizeBytes = JSON.stringify(results).length;
-        await supabase.rpc('log_query_performance_with_alerts', {
-          user_uuid: this.currentUserId!,
-          query_type_param: 'search_books',
-          execution_time_ms_param: durationMs,
-          rows_returned_param: results.length,
-          cache_hit_param: false,
-          filters_param: rpcFilters,
-          payload_size_bytes_param: payloadSizeBytes
-        });
-      } catch (logError) {
-        logger.warn('Failed to log query performance', { error: logError });
-      }
+      // Performance logging would go here (RPC function doesn't exist yet)
+      // This would be implemented in a future enhancement
+      logger.debug('Search completed', { durationMs, resultCount: results.length });
       
       logger.info('Search completed', {
         ...context,

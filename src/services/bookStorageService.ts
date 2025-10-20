@@ -43,7 +43,7 @@ export class BookStorageService {
   }
 
   /**
-   * Upload book file to S3 using presigned URL
+   * Upload book file to Supabase Storage
    * Returns S3 key for storage in database
    */
   async uploadBook(
@@ -60,52 +60,68 @@ export class BookStorageService {
     try {
       const s3Key = this.generateBookKey(metadata.userId, metadata.bookId, metadata.fileType);
 
-      logger.info('Getting presigned upload URL', context, {
+      logger.info('Uploading to Supabase Storage', context, {
         s3Key,
         fileSize: metadata.fileSize,
         fileType: metadata.fileType
       });
 
-      // Step 1: Get presigned URL from API
-      const urlResponse = await fetch('/api/books/get-upload-url', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          s3Key,
-          contentType: file.type || 'application/pdf',
-          userId: metadata.userId
-        })
-      });
+      // Import supabase dynamically
+      const { supabase } = await import('../../lib/supabase');
 
-      if (!urlResponse.ok) {
-        const error = await urlResponse.json();
-        throw new Error(error.message || 'Failed to get upload URL');
-      }
+      // Upload to Supabase Storage
+      const bucketName = 'books';
+      
+      const { data, error } = await supabase
+        .storage
+        .from(bucketName)
+        .upload(s3Key, file, {
+          contentType: file.type || (metadata.fileType === 'pdf' ? 'application/pdf' : 'text/plain'),
+          upsert: true // Overwrite if exists
+        });
 
-      const { uploadUrl } = await urlResponse.json();
+      if (error) {
+        logger.warn('Supabase Storage upload failed, trying API fallback', context, { error: error.message });
+        
+        // Fallback to API endpoint if Supabase Storage fails
+        try {
+          const urlResponse = await fetch('/api/books/storage', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              operation: 'GET_UPLOAD_URL',
+              s3Key,
+              contentType: file.type || 'application/pdf',
+              userId: metadata.userId
+            })
+          });
 
-      logger.info('Got presigned URL, uploading directly to S3', context, {
-        s3Key
-      });
+          if (!urlResponse.ok) {
+            throw new Error('API fallback failed');
+          }
 
-      // Step 2: Upload directly to S3 using presigned URL
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': file.type || 'application/pdf',
-        },
-        body: file
-      });
+          const { uploadUrl } = await urlResponse.json();
+          const uploadResponse = await fetch(uploadUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': file.type || 'application/pdf',
+            },
+            body: file
+          });
 
-      if (!uploadResponse.ok) {
-        throw new Error(`S3 upload failed: ${uploadResponse.statusText}`);
+          if (!uploadResponse.ok) {
+            throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+          }
+        } catch (apiError) {
+          throw new Error(`Both Supabase Storage and API failed: ${error.message}`);
+        }
       }
 
       const url = this.getBookUrl(s3Key);
 
-      logger.info('Book uploaded to S3 successfully', context, {
+      logger.info('Book uploaded successfully', context, {
         s3Key,
         url
       });
@@ -116,7 +132,7 @@ export class BookStorageService {
       };
 
     } catch (error) {
-      logger.error('Failed to upload book to S3', context, error as Error);
+      logger.error('Failed to upload book', context, error as Error);
       throw errorHandler.createError(
         `Failed to upload book: ${error instanceof Error ? error.message : 'Unknown error'}`,
         ErrorType.STORAGE,
@@ -127,7 +143,7 @@ export class BookStorageService {
   }
 
   /**
-   * Download book from S3
+   * Download book from S3 via Supabase Storage
    * Returns the file as ArrayBuffer
    */
   async downloadBook(s3Key: string, userId: string): Promise<ArrayBuffer> {
@@ -139,40 +155,65 @@ export class BookStorageService {
     };
 
     try {
-      logger.info('Downloading book from S3', context);
+      logger.info('Downloading book from Supabase Storage', context);
 
-      // Call API endpoint to get signed URL
-      const response = await fetch('/api/books/download-from-s3', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ s3Key, userId })
-      });
+      // Import supabase dynamically to avoid circular dependencies
+      const { supabase } = await import('../../lib/supabase');
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Download failed');
+      // Download file from Supabase Storage
+      // Supabase Storage bucket name (should match upload)
+      const bucketName = 'books';
+      
+      const { data, error } = await supabase
+        .storage
+        .from(bucketName)
+        .download(s3Key);
+
+      if (error) {
+        logger.warn('Supabase Storage download failed, trying API fallback', context, { error: error.message });
+        
+        // Fallback to API endpoint if Supabase Storage fails
+        try {
+          const response = await fetch('/api/books/access', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              operation: 'GET_DOWNLOAD_URL',
+              s3Key, 
+              userId 
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error('API fallback failed');
+          }
+
+          const { signedUrl } = await response.json();
+          const fileResponse = await fetch(signedUrl);
+          
+          if (!fileResponse.ok) {
+            throw new Error('Failed to download from signed URL');
+          }
+
+          return await fileResponse.arrayBuffer();
+        } catch (apiError) {
+          throw new Error(`Both Supabase Storage and API failed: ${error.message}`);
+        }
       }
 
-      const { signedUrl } = await response.json();
+      // Convert Blob to ArrayBuffer
+      const arrayBuffer = await data.arrayBuffer();
 
-      // Download file from signed URL
-      const fileResponse = await fetch(signedUrl);
-      if (!fileResponse.ok) {
-        throw new Error('Failed to download from S3');
-      }
-
-      const arrayBuffer = await fileResponse.arrayBuffer();
-
-      logger.info('Book downloaded from S3 successfully', context, {
+      logger.info('Book downloaded successfully', context, {
         size: arrayBuffer.byteLength
       });
 
       return arrayBuffer;
 
     } catch (error) {
-      logger.error('Failed to download book from S3', context, error as Error);
+      logger.error('Failed to download book', context, error as Error);
       throw errorHandler.createError(
         `Failed to download book: ${error instanceof Error ? error.message : 'Unknown error'}`,
         ErrorType.STORAGE,
@@ -196,12 +237,16 @@ export class BookStorageService {
     try {
       logger.info('Deleting book from S3', context);
 
-      const response = await fetch('/api/books/delete-from-s3', {
+      const response = await fetch('/api/books/access', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ s3Key, userId })
+        body: JSON.stringify({ 
+          operation: 'DELETE',
+          s3Key, 
+          userId 
+        })
       });
 
       if (!response.ok) {
@@ -227,12 +272,16 @@ export class BookStorageService {
    */
   async bookExists(s3Key: string, userId: string): Promise<boolean> {
     try {
-      const response = await fetch('/api/books/check-exists', {
+      const response = await fetch('/api/books/access', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ s3Key, userId })
+        body: JSON.stringify({ 
+          operation: 'CHECK_EXISTS',
+          s3Key, 
+          userId 
+        })
       });
 
       const { exists } = await response.json();
