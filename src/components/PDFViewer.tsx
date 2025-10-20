@@ -1192,7 +1192,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         {/* Reading Mode Header */}
         <div className={`sticky top-0 z-50 ${themeStyles.headerBg} backdrop-blur-sm border-b ${themeStyles.headerBorder} shadow-sm`}>
           {/* Progress Bar */}
-          <div className="h-1 bg-gray-200 dark:bg-gray-700">
+          <div className={`h-1 ${themeStyles.text} opacity-10`}>
             <div 
               className={`h-full ${themeStyles.progressBg} transition-all duration-300`}
               style={{ width: `${progressPercentage}%` }}
@@ -1388,10 +1388,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                         className={`p-2 rounded-lg transition-all ${
                           editingPageNum === pageNum
                             ? 'bg-blue-500 text-white shadow-md'
-                            : 'hover:bg-gray-200 dark:hover:bg-gray-700 hover:shadow-sm'
+                            : `${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} hover:shadow-sm`
                         }`}
                         style={{
-                          color: editingPageNum === pageNum ? '#fff' : 'var(--color-text-primary)',
                           opacity: editingPageNum === pageNum ? 1 : 0.8
                         }}
                         title={editingPageNum === pageNum ? 'Stop editing' : 'Edit this page'}
@@ -1492,10 +1491,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                   className={`p-2 rounded-lg transition-all ${
                     editingPageNum === pageNumber
                       ? 'bg-blue-500 text-white shadow-md'
-                      : 'hover:bg-gray-200 dark:hover:bg-gray-700 hover:shadow-sm'
+                      : `${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} hover:shadow-sm`
                   }`}
                   style={{
-                    color: editingPageNum === pageNumber ? '#fff' : 'var(--color-text-primary)',
                     opacity: editingPageNum === pageNumber ? 1 : 0.8
                   }}
                   title={editingPageNum === pageNumber ? 'Stop editing' : 'Edit this page'}
