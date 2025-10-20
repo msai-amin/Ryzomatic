@@ -61,6 +61,30 @@ export interface PDFViewerSettings {
   readingMode: boolean
 }
 
+export interface LibraryFilters {
+  searchQuery?: string
+  fileType?: 'pdf' | 'text' | 'all'
+  readingProgress?: { min: number; max: number }
+  dateRange?: { start: Date; end: Date }
+  collections?: string[]
+  tags?: string[]
+  isFavorite?: boolean
+  hasNotes?: boolean
+  hasAudio?: boolean
+  fileSizeRange?: { min: number; max: number }
+}
+
+export interface LibraryViewSettings {
+  viewMode: 'grid' | 'list' | 'comfortable'
+  sortBy: 'title' | 'created_at' | 'last_read_at' | 'reading_progress' | 'file_size_bytes' | 'notes_count' | 'pomodoro_sessions_count'
+  sortOrder: 'asc' | 'desc'
+  selectedCollectionId: string | null
+  selectedTags: string[]
+  searchQuery: string
+  filters: LibraryFilters
+  selectedBooks: string[] // for bulk operations
+}
+
 export interface Voice {
   name: string
   languageCode: string
@@ -114,6 +138,9 @@ interface AppState {
   // Library refresh
   libraryRefreshTrigger: number
   
+  // Library view settings
+  libraryView: LibraryViewSettings
+  
   // Pomodoro state
   activePomodoroSessionId: string | null
   activePomodoroBookId: string | null
@@ -141,6 +168,18 @@ interface AppState {
   clearChat: () => void
   setTyping: (typing: boolean) => void
   refreshLibrary: () => void
+  
+  // Library view actions
+  setLibraryView: (settings: Partial<LibraryViewSettings>) => void
+  setLibrarySort: (sortBy: LibraryViewSettings['sortBy'], sortOrder: LibraryViewSettings['sortOrder']) => void
+  setLibraryFilters: (filters: Partial<LibraryFilters>) => void
+  setSearchQuery: (query: string) => void
+  setActiveCollection: (collectionId: string | null) => void
+  setSelectedTags: (tags: string[]) => void
+  toggleBookSelection: (bookId: string) => void
+  clearSelection: () => void
+  selectAllBooks: (bookIds: string[]) => void
+  
   setPomodoroSession: (sessionId: string | null, bookId: string | null, startTime: number | null) => void
   updatePomodoroTimer: (timeLeft: number | null, isRunning: boolean, mode: 'work' | 'shortBreak' | 'longBreak') => void
 }
@@ -195,6 +234,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   chatMessages: [],
   isTyping: false,
   libraryRefreshTrigger: 0,
+  
+  // Library view settings
+  libraryView: {
+    viewMode: 'grid',
+    sortBy: 'last_read_at',
+    sortOrder: 'desc',
+    selectedCollectionId: null,
+    selectedTags: [],
+    searchQuery: '',
+    filters: {},
+    selectedBooks: []
+  },
   
   // Pomodoro state
   activePomodoroSessionId: null,
@@ -371,7 +422,53 @@ export const useAppStore = create<AppState>((set, get) => ({
     pomodoroTimeLeft: timeLeft,
     pomodoroIsRunning: isRunning,
     pomodoroMode: mode
-  })
+  }),
+  
+  // Library view actions
+  setLibraryView: (settings) => set((state) => ({
+    libraryView: { ...state.libraryView, ...settings }
+  })),
+  
+  setLibrarySort: (sortBy, sortOrder) => set((state) => ({
+    libraryView: { ...state.libraryView, sortBy, sortOrder }
+  })),
+  
+  setLibraryFilters: (filters) => set((state) => ({
+    libraryView: { 
+      ...state.libraryView, 
+      filters: { ...state.libraryView.filters, ...filters }
+    }
+  })),
+  
+  setSearchQuery: (query) => set((state) => ({
+    libraryView: { ...state.libraryView, searchQuery: query }
+  })),
+  
+  setActiveCollection: (collectionId) => set((state) => ({
+    libraryView: { ...state.libraryView, selectedCollectionId: collectionId }
+  })),
+  
+  setSelectedTags: (tags) => set((state) => ({
+    libraryView: { ...state.libraryView, selectedTags: tags }
+  })),
+  
+  toggleBookSelection: (bookId) => set((state) => {
+    const selectedBooks = state.libraryView.selectedBooks.includes(bookId)
+      ? state.libraryView.selectedBooks.filter(id => id !== bookId)
+      : [...state.libraryView.selectedBooks, bookId];
+    
+    return {
+      libraryView: { ...state.libraryView, selectedBooks }
+    };
+  }),
+  
+  clearSelection: () => set((state) => ({
+    libraryView: { ...state.libraryView, selectedBooks: [] }
+  })),
+  
+  selectAllBooks: (bookIds) => set((state) => ({
+    libraryView: { ...state.libraryView, selectedBooks: bookIds }
+  }))
 }))
 
 

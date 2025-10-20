@@ -12,6 +12,8 @@ import { healthMonitor } from './services/healthMonitor'
 import { logger } from './services/logger'
 import { errorHandler } from './services/errorHandler'
 import { supabaseStorageService } from './services/supabaseStorageService'
+import { libraryOrganizationService } from './services/libraryOrganizationService'
+import { librarySearchService } from './services/librarySearchService'
 import { ThemeProvider } from '../themes/ThemeProvider'
 
 function App() {
@@ -137,6 +139,8 @@ function App() {
           // Initialize Supabase storage service if user is already authenticated
           if (isAuthenticated && user) {
             supabaseStorageService.setCurrentUser(user.id)
+            libraryOrganizationService.setCurrentUser(user.id)
+            librarySearchService.setCurrentUser(user.id)
             logger.info('Supabase storage service initialized on startup', { userId: user.id })
           }
         } else {
@@ -168,6 +172,8 @@ function App() {
           
           // Initialize Supabase storage service with user ID
           supabaseStorageService.setCurrentUser(user.id)
+          libraryOrganizationService.setCurrentUser(user.id)
+          librarySearchService.setCurrentUser(user.id)
           logger.info('Supabase storage service initialized', { userId: user.id })
           
           setIsAuthModalOpen(false)

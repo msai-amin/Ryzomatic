@@ -2,7 +2,7 @@ import React from 'react'
 import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut, Menu } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { TypographySettings } from '../src/components/TypographySettings'
-import { LibraryModal } from '../src/components/LibraryModal'
+import { ModernLibraryModal } from '../src/components/ModernLibraryModal'
 import { AuthModal } from '../src/components/AuthModal'
 import { PomodoroTimer } from '../src/components/PomodoroTimer'
 import { Tooltip } from '../src/components/Tooltip'
@@ -320,7 +320,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
       )}
 
       {showLibrary && (
-        <LibraryModal 
+        <ModernLibraryModal 
           isOpen={showLibrary} 
           onClose={() => setShowLibrary(false)} 
           refreshTrigger={libraryRefreshTrigger}

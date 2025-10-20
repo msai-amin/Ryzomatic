@@ -647,6 +647,264 @@ class SupabaseStorageService {
       isEnabled: false
     };
   }
+
+  // Enhanced metadata methods for library organization
+  async getBookWithMetadata(bookId: string): Promise<any> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { data, error } = await supabase
+        .from('user_books')
+        .select(`
+          *,
+          book_collections!inner(
+            collection_id,
+            user_collections!inner(
+              id,
+              name,
+              color,
+              icon,
+              parent_id
+            )
+          ),
+          book_tag_assignments!inner(
+            tag_id,
+            book_tags!inner(
+              id,
+              name,
+              color,
+              category
+            )
+          )
+        `)
+        .eq('id', bookId)
+        .eq('user_id', this.currentUserId!)
+        .single();
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to get book with metadata: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'getBookWithMetadata', bookId, error: error.message }
+        );
+      }
+
+      return data;
+    } catch (error) {
+      logger.error('Error getting book with metadata', { bookId }, error as Error);
+      throw error;
+    }
+  }
+
+  async updateBookMetadata(bookId: string, metadata: {
+    is_favorite?: boolean;
+    custom_metadata?: Record<string, any>;
+    notes_count?: number;
+    pomodoro_sessions_count?: number;
+  }): Promise<void> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { error } = await supabase
+        .from('user_books')
+        .update(metadata)
+        .eq('id', bookId)
+        .eq('user_id', this.currentUserId!);
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to update book metadata: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'updateBookMetadata', bookId, error: error.message }
+        );
+      }
+
+      logger.info('Book metadata updated', { bookId, metadata, userId: this.currentUserId });
+    } catch (error) {
+      logger.error('Error updating book metadata', { bookId, metadata }, error as Error);
+      throw error;
+    }
+  }
+
+  async getLibraryStats(): Promise<any> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { data, error } = await supabase
+        .rpc('get_library_stats', { user_uuid: this.currentUserId! });
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to get library stats: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'getLibraryStats', error: error.message }
+        );
+      }
+
+      return data?.[0] || {};
+    } catch (error) {
+      logger.error('Error getting library stats', { userId: this.currentUserId }, error as Error);
+      throw error;
+    }
+  }
+
+  async searchLibrary(
+    searchQuery: string,
+    filters: {
+      fileType?: 'pdf' | 'text' | 'all';
+      collections?: string[];
+      tags?: string[];
+      isFavorite?: boolean;
+      hasNotes?: boolean;
+      hasAudio?: boolean;
+    } = {},
+    sort: {
+      field: 'title' | 'created_at' | 'last_read_at' | 'reading_progress' | 'file_size_bytes' | 'notes_count' | 'pomodoro_sessions_count';
+      order: 'asc' | 'desc';
+    } = { field: 'last_read_at', order: 'desc' },
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<{ results: any[]; total: number }> {
+    this.ensureAuthenticated();
+    
+    try {
+      let query = supabase
+        .from('user_books')
+        .select(`
+          *,
+          book_collections!inner(
+            collection_id,
+            user_collections!inner(
+              name,
+              color,
+              icon
+            )
+          ),
+          book_tag_assignments!inner(
+            tag_id,
+            book_tags!inner(
+              name,
+              color,
+              category
+            )
+          )
+        `)
+        .eq('user_id', this.currentUserId!);
+
+      // Apply search query
+      if (searchQuery && searchQuery.trim()) {
+        query = query.or(`title.ilike.%${searchQuery}%,file_name.ilike.%${searchQuery}%`);
+      }
+
+      // Apply filters
+      if (filters.fileType && filters.fileType !== 'all') {
+        query = query.eq('file_type', filters.fileType);
+      }
+
+      if (filters.isFavorite !== undefined) {
+        query = query.eq('is_favorite', filters.isFavorite);
+      }
+
+      if (filters.hasNotes !== undefined) {
+        if (filters.hasNotes) {
+          query = query.gt('notes_count', 0);
+        } else {
+          query = query.eq('notes_count', 0);
+        }
+      }
+
+      if (filters.hasAudio !== undefined) {
+        if (filters.hasAudio) {
+          query = query.gt('pomodoro_sessions_count', 0);
+        } else {
+          query = query.eq('pomodoro_sessions_count', 0);
+        }
+      }
+
+      if (filters.collections && filters.collections.length > 0) {
+        query = query.in('book_collections.collection_id', filters.collections);
+      }
+
+      if (filters.tags && filters.tags.length > 0) {
+        query = query.in('book_tag_assignments.tag_id', filters.tags);
+      }
+
+      // Apply sorting
+      const sortField = this.getSortField(sort.field);
+      query = query.order(sortField, { ascending: sort.order === 'asc' });
+
+      // Apply pagination
+      query = query.range(offset, offset + limit - 1);
+
+      const { data, error, count } = await query;
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to search library: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'searchLibrary', error: error.message }
+        );
+      }
+
+      return {
+        results: data || [],
+        total: count || 0
+      };
+    } catch (error) {
+      logger.error('Error searching library', { searchQuery, filters }, error as Error);
+      throw error;
+    }
+  }
+
+  // Helper method to convert sort field to database column
+  private getSortField(field: string): string {
+    const fieldMap: Record<string, string> = {
+      'title': 'title',
+      'created_at': 'created_at',
+      'last_read_at': 'last_read_at',
+      'reading_progress': 'reading_progress',
+      'file_size_bytes': 'file_size_bytes',
+      'notes_count': 'notes_count',
+      'pomodoro_sessions_count': 'pomodoro_sessions_count'
+    };
+
+    return fieldMap[field] || 'last_read_at';
+  }
+
+  // Update book counts when notes or audio are added/removed
+  async updateBookCounts(bookId: string, type: 'notes' | 'audio', delta: number): Promise<void> {
+    this.ensureAuthenticated();
+    
+    try {
+      const updateField = type === 'notes' ? 'notes_count' : 'pomodoro_sessions_count';
+      
+      const { error } = await supabase
+        .from('user_books')
+        .update({
+          [updateField]: supabase.raw(`${updateField} + ${delta}`)
+        })
+        .eq('id', bookId)
+        .eq('user_id', this.currentUserId!);
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to update book counts: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'updateBookCounts', bookId, type, delta, error: error.message }
+        );
+      }
+
+      logger.info('Book counts updated', { bookId, type, delta, userId: this.currentUserId });
+    } catch (error) {
+      logger.error('Error updating book counts', { bookId, type, delta }, error as Error);
+      throw error;
+    }
+  }
 }
 
 export const supabaseStorageService = new SupabaseStorageService();
