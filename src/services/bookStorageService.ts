@@ -35,11 +35,13 @@ export class BookStorageService {
 
   /**
    * Generate S3 key for a book
-   * Pattern: books/{userId}/{bookId}.pdf
+   * Pattern for AWS S3: books/{userId}/{bookId}.pdf
+   * Pattern for Supabase Storage: {userId}/{bookId}.pdf (bucket name is separate)
    */
-  private generateBookKey(userId: string, bookId: string, fileType: 'pdf' | 'text'): string {
+  private generateBookKey(userId: string, bookId: string, fileType: 'pdf' | 'text', includeBookPrefix: boolean = false): string {
     const extension = fileType === 'pdf' ? 'pdf' : 'txt';
-    return `books/${userId}/${bookId}.${extension}`;
+    const path = `${userId}/${bookId}.${extension}`;
+    return includeBookPrefix ? `books/${path}` : path;
   }
 
   /**
@@ -58,10 +60,13 @@ export class BookStorageService {
     };
 
     try {
-      const s3Key = this.generateBookKey(metadata.userId, metadata.bookId, metadata.fileType);
+      // Generate key WITHOUT 'books/' prefix for Supabase Storage
+      const supabaseKey = this.generateBookKey(metadata.userId, metadata.bookId, metadata.fileType, false);
+      // Generate key WITH 'books/' prefix for AWS S3 API
+      const s3Key = this.generateBookKey(metadata.userId, metadata.bookId, metadata.fileType, true);
 
       logger.info('Uploading to Supabase Storage', context, {
-        s3Key,
+        supabaseKey,
         fileSize: metadata.fileSize,
         fileType: metadata.fileType
       });
@@ -75,7 +80,7 @@ export class BookStorageService {
       const { data, error } = await supabase
         .storage
         .from(bucketName)
-        .upload(s3Key, file, {
+        .upload(supabaseKey, file, {
           contentType: file.type || (metadata.fileType === 'pdf' ? 'application/pdf' : 'text/plain'),
           upsert: true // Overwrite if exists
         });
@@ -83,7 +88,7 @@ export class BookStorageService {
       if (error) {
         logger.warn('Supabase Storage upload failed, trying API fallback', context, undefined, { error: error.message });
         
-        // Fallback to API endpoint if Supabase Storage fails
+        // Fallback to API endpoint if Supabase Storage fails (uses full s3Key with 'books/' prefix)
         try {
           const urlResponse = await fetch('/api/books/storage', {
             method: 'POST',
@@ -92,7 +97,7 @@ export class BookStorageService {
             },
             body: JSON.stringify({
               operation: 'GET_UPLOAD_URL',
-              s3Key,
+              s3Key, // Use full path for AWS S3
               contentType: file.type || 'application/pdf',
               userId: metadata.userId
             })
@@ -123,9 +128,11 @@ export class BookStorageService {
 
       logger.info('Book uploaded successfully', context, {
         s3Key,
+        supabaseKey,
         url
       });
 
+      // Return s3Key with 'books/' prefix for database storage
       return {
         s3Key,
         url
@@ -164,10 +171,13 @@ export class BookStorageService {
       // Supabase Storage bucket name (should match upload)
       const bucketName = 'books';
       
+      // Remove 'books/' prefix from s3Key if present (Supabase Storage doesn't need it)
+      const supabaseKey = s3Key.startsWith('books/') ? s3Key.substring(6) : s3Key;
+      
       const { data, error } = await supabase
         .storage
         .from(bucketName)
-        .download(s3Key);
+        .download(supabaseKey);
 
       if (error) {
         logger.warn('Supabase Storage download failed, trying API fallback', context, undefined, { error: error.message });
