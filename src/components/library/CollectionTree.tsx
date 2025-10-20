@@ -267,9 +267,9 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({
   const { setActiveCollection } = useAppStore();
 
   // Build tree structure
-  const buildTree = (collections: Collection[]): Collection[] => {
+  const buildTree = (collections: Collection[]): (Collection & { children: Collection[] })[] => {
     const collectionMap = new Map<string, Collection & { children: Collection[] }>();
-    const rootCollections: Collection[] = [];
+    const rootCollections: (Collection & { children: Collection[] })[] = [];
 
     // Create map with children array
     collections.forEach(collection => {
@@ -336,7 +336,7 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({
         
         {/* Render children */}
         {isExpanded && collection.children.map(child => 
-          renderCollectionNode(child, level + 1)
+          renderCollectionNode(child as Collection & { children: Collection[] }, level + 1)
         )}
       </div>
     );

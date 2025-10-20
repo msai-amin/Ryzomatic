@@ -91,7 +91,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
           order: libraryView.sortOrder
         },
         100, // Load more books for better UX
-        0
+        null // No cursor for initial load
       );
       
       setBooks(results);

@@ -1,4 +1,4 @@
-import { userBooks, userNotes, userAudio, UserBook, UserNote, UserAudio } from '../../lib/supabase';
+import { userBooks, userNotes, userAudio, UserBook, UserNote, UserAudio, supabase } from '../../lib/supabase';
 import { logger } from './logger';
 import { errorHandler, ErrorType, ErrorSeverity } from './errorHandler';
 import { bookStorageService } from './bookStorageService';
@@ -882,10 +882,22 @@ class SupabaseStorageService {
     try {
       const updateField = type === 'notes' ? 'notes_count' : 'pomodoro_sessions_count';
       
+      // First get the current value
+      const { data: currentData, error: fetchError } = await supabase
+        .from('user_books')
+        .select(updateField)
+        .eq('id', bookId)
+        .eq('user_id', this.currentUserId!)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
+      // Then update with new value
+      const currentValue = (currentData as any)?.[updateField] || 0;
       const { error } = await supabase
         .from('user_books')
         .update({
-          [updateField]: supabase.raw(`${updateField} + ${delta}`)
+          [updateField]: currentValue + delta
         })
         .eq('id', bookId)
         .eq('user_id', this.currentUserId!);

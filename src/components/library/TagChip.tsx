@@ -75,7 +75,7 @@ export const TagChip: React.FC<TagChipProps> = ({
           backgroundColor: isSelected ? tag.color + '20' : tag.color + '15',
           color: tag.color,
           border: `1px solid ${tag.color}40`,
-          ringColor: isSelected ? tag.color : undefined
+          boxShadow: isSelected ? `0 0 0 2px ${tag.color}40` : undefined
         }}
         onClick={handleClick}
         onMouseEnter={() => setIsHovered(true)}
