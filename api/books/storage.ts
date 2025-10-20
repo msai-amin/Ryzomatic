@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { uploadFile } from '../../lib/s3';
+import { uploadFile } from '../../lib/s3.js';
 
 // Initialize S3 client
 const s3Client = new S3Client({

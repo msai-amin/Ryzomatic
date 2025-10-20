@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getDownloadUrl, deleteFile, fileExists } from '../../lib/s3';
+import { getDownloadUrl, deleteFile, fileExists } from '../../lib/s3.js';
 
 type AccessOperation = 'GET_DOWNLOAD_URL' | 'DELETE' | 'CHECK_EXISTS';
 
