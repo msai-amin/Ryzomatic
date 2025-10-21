@@ -517,10 +517,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     if (pdfViewer.scrollMode !== 'continuous' || !pdfDocRef.current || !numPages) return
     if (pdfViewer.readingMode) return // Don't render PDF when in reading mode
     
+    console.log('🔄 Continuous mode rendering triggered')
 
     const renderAllPages = async () => {
-      // Wait a brief moment for refs to be populated after DOM render
-      await new Promise(resolve => setTimeout(resolve, 50))
+      // Wait longer for refs to be populated after DOM render
+      await new Promise(resolve => setTimeout(resolve, 100))
       
       for (let pageNum = 1; pageNum <= numPages; pageNum++) {
         const canvas = pageCanvasRefs.current.get(pageNum)
@@ -625,13 +626,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             
             textLayerDiv.appendChild(textLayerFrag)
             
-            // CRITICAL: Make text layer visible immediately after rendering
+            // CRITICAL: Make text layer visible and interactive immediately after rendering
             textLayerDiv.style.opacity = '1'
+            textLayerDiv.style.pointerEvents = 'auto'
+            textLayerDiv.style.userSelect = 'text'
             
             console.log(`📝 Text layer rendered for page ${pageNum}:`, {
               textElements: textContent.items.length,
               hasTextLayer: !!textLayerDiv,
-              textLayerOpacity: textLayerDiv.style.opacity
+              textLayerOpacity: textLayerDiv.style.opacity,
+              textLayerPointerEvents: textLayerDiv.style.pointerEvents,
+              textLayerUserSelect: textLayerDiv.style.userSelect
             })
           }
         } catch (error) {
@@ -1241,6 +1246,19 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       }
     }
 
+    console.log('📝 Text selection detected:', {
+      selectedText: selectedText.substring(0, 50),
+      scrollMode: pdfViewer.scrollMode,
+      pageNumber: currentPage,
+      selectionRect: { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
+      rangeInfo: {
+        startContainer: range.startContainer.nodeName,
+        endContainer: range.endContainer.nodeName,
+        startOffset: range.startOffset,
+        endOffset: range.endOffset
+      }
+    })
+
     setSelectedTextInfo({
       text: selectedText,
       pageNumber: currentPage,
@@ -1295,10 +1313,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
     try {
       const range = selectedTextInfo.range
-      const rects = range.getClientRects()
       
-      if (rects.length === 0) {
-        console.warn('No bounding rectangles found for selection')
+      // Use getBoundingClientRect() instead of getClientRects() for a single unified rect
+      // This gives us the bounding box that encompasses the entire selection
+      const selectionRect = range.getBoundingClientRect()
+      
+      if (!selectionRect || selectionRect.width === 0 || selectionRect.height === 0) {
+        console.warn('Invalid bounding rectangle for selection')
         setHighlightPickerPosition(null)
         setSelectedTextInfo(null)
         return
@@ -1333,25 +1354,20 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         return
       }
 
-      // Get the bounding rectangles
+      // Get the container's bounding rectangle
       const containerRect = pageContainer.getBoundingClientRect()
-      const firstRect = rects[0]
       
-      // CRITICAL FIX: For continuous mode, we need to account for scroll position
-      // In continuous mode, each page container is positioned within the scroll container
-      // We need position relative to the individual page container, NOT the viewport
-      let scrollAdjustment = 0
-      if (pdfViewer.scrollMode === 'continuous' && scrollContainerRef.current) {
-        scrollAdjustment = scrollContainerRef.current.scrollTop
-      }
+      // CRITICAL: Calculate position relative to the page container
+      // The text spans use position: absolute within the page container
+      // We need to match their coordinate system exactly
       
-      // Calculate position relative to the PDF page container
-      // IMPORTANT: Store positions normalized to scale 1.0 so they work at any zoom level
+      // selectionRect gives us viewport coordinates, containerRect gives us the container's viewport position
+      // Subtracting gives us the position within the container - same coordinate system as text spans
       const rawPosition = {
-        x: firstRect.left - containerRect.left,
-        y: firstRect.top - containerRect.top,
-        width: firstRect.width,
-        height: firstRect.height
+        x: selectionRect.left - containerRect.left,
+        y: selectionRect.top - containerRect.top,
+        width: selectionRect.width,
+        height: selectionRect.height
       }
 
       // TEXT ALIGNMENT: Use browser's getBoundingClientRect() without adjustments
@@ -1374,10 +1390,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         currentScale: scale,
         currentZoom: pdfViewer.zoom,
         selectionRect: { 
-          left: firstRect.left, 
-          top: firstRect.top, 
-          width: firstRect.width, 
-          height: firstRect.height 
+          left: selectionRect.left, 
+          top: selectionRect.top, 
+          width: selectionRect.width, 
+          height: selectionRect.height 
         },
         containerRect: { 
           left: containerRect.left, 
@@ -1393,7 +1409,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           offsetLeft: pageContainer.offsetLeft,
           scrollTop: scrollContainerRef.current?.scrollTop || 0
         },
-        rawPosition: rawPosition,
+        rawPositionBeforeNormalization: rawPosition,
         normalizedPosition: position,
         textElement: {
           fontSize: textElement?.style?.fontSize,
