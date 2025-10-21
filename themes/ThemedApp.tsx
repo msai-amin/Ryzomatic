@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { Plus } from 'lucide-react'
 import { useTheme, ThemeSwitcher } from './ThemeProvider'
 import { ThemedHeader } from './ThemedHeader'
 import { ThemedSidebar } from './ThemedSidebar'
@@ -7,7 +6,6 @@ import { ThemedMainContent } from './ThemedMainContent'
 import { DocumentViewer } from '../src/components/DocumentViewer'
 import { ChatPanel } from '../src/components/ChatPanel'
 import { DocumentUpload } from '../src/components/DocumentUpload'
-import { Tooltip } from '../src/components/Tooltip'
 import { useAppStore } from '../src/store/appStore'
 import { useKeyboardShortcuts } from '../src/hooks/useKeyboardShortcuts'
 
@@ -59,42 +57,6 @@ const ThemedAppContent: React.FC = () => {
       {showUpload && (
         <DocumentUpload onClose={() => setShowUpload(false)} />
       )}
-
-      {/* Floating Action Button - Reserved for future quick actions */}
-      <Tooltip content="Quick Actions (Coming Soon)" position="left">
-        <button
-          className="fixed shadow-lg transition-all duration-300 hover:scale-110"
-          style={{
-            bottom: 'var(--spacing-lg)',
-            right: 'var(--spacing-lg)',
-            width: 'var(--floating-button-size)',
-            height: 'var(--floating-button-size)',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)',
-            color: 'var(--color-text-inverse)',
-            boxShadow: 'var(--shadow-lg)',
-            border: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'linear-gradient(135deg, var(--color-primary-hover) 0%, var(--color-primary-dark) 100%)'
-            e.currentTarget.style.boxShadow = 'var(--shadow-xl)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)'
-            e.currentTarget.style.boxShadow = 'var(--shadow-lg)'
-          }}
-          onClick={() => {
-            console.log('Quick actions - coming soon')
-          }}
-          aria-label="Quick Actions"
-        >
-          <Plus className="w-6 h-6" />
-        </button>
-      </Tooltip>
 
       {/* Theme Switcher (for development/testing) */}
       <div 
