@@ -18,30 +18,10 @@ export const EmptyState: React.FC = () => {
         Welcome to Academic Reader Pro
       </h2>
       
-      <p className="text-center max-w-md mb-8 text-body" style={{ color: 'var(--color-text-secondary)' }}>
+      <p className="text-center max-w-md mb-12 text-body" style={{ color: 'var(--color-text-secondary)' }}>
         Upload a document to get started. Our AI assistant can help you understand, 
         summarize, and answer questions about your content.
       </p>
-
-      {/* Prominent CTA Button */}
-      <div className="mb-12">
-        <button
-          className="btn-primary text-button px-8 py-4 text-lg"
-          style={{
-            backgroundColor: 'var(--color-primary)',
-            color: 'var(--color-text-inverse)',
-            borderRadius: 'var(--border-radius-lg)',
-            boxShadow: 'var(--shadow-lg)',
-          }}
-          onClick={() => {
-            // This would trigger the upload modal - placeholder for now
-            console.log('Upload document clicked');
-          }}
-          aria-label="Upload Your First Document"
-        >
-          Upload Your First Document
-        </button>
-      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-2xl">
         <div 
