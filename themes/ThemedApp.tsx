@@ -44,7 +44,7 @@ const ThemedAppContent: React.FC = () => {
 
         {/* Main Content */}
         <ThemedMainContent>
-          <DocumentViewer />
+          <DocumentViewer onUploadClick={() => setShowUpload(true)} />
         </ThemedMainContent>
       </div>
 

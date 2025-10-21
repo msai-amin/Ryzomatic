@@ -6,7 +6,11 @@ import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { storageService, Note } from '../services/storageService'
 
-export const DocumentViewer: React.FC = () => {
+interface DocumentViewerProps {
+  onUploadClick?: () => void
+}
+
+export const DocumentViewer: React.FC<DocumentViewerProps> = ({ onUploadClick }) => {
   const { 
     currentDocument, 
     typography, 
@@ -66,7 +70,7 @@ export const DocumentViewer: React.FC = () => {
   }, [currentDocument])
 
   if (!currentDocument) {
-    return <EmptyState />
+    return <EmptyState onUploadClick={onUploadClick} />
   }
 
   // Use PDF viewer for PDF documents
