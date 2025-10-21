@@ -35,6 +35,9 @@ import { OCRBanner, OCRStatusBadge } from './OCRStatusBadge'
 import { FormulaRenderer, FormulaPlaceholder } from './FormulaRenderer'
 import { extractMarkedFormulas } from '../utils/pdfTextExtractor'
 import { convertMultipleFormulas } from '../services/formulaService'
+import { highlightService, Highlight as HighlightType } from '../services/highlightService'
+import { HighlightColorPicker } from './HighlightColorPicker'
+import { HighlightManagementPanel } from './HighlightManagementPanel'
 
 // PDF.js will be imported dynamically
 
@@ -161,18 +164,7 @@ function parseTextWithBreaks(text: string): TextSegment[] {
   return segments
 }
 
-interface Highlight {
-  id: string
-  pageNumber: number
-  text: string
-  color: string
-  position: {
-    x: number
-    y: number
-    width: number
-    height: number
-  }
-}
+// Remove the old local Highlight interface - we'll use the one from highlightService
 
 interface PDFViewerProps {
   document: DocumentType
@@ -187,9 +179,16 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const [rotation, setRotation] = useState(0)
   const [pageInputValue, setPageInputValue] = useState('1')
   const [searchQuery, setSearchQuery] = useState('')
-  const [showHighlightMenu, setShowHighlightMenu] = useState(false)
-  const [selectedColor, setSelectedColor] = useState('#FFFF00')
-  const [highlights, setHighlights] = useState<Highlight[]>([])
+  const [highlightPickerPosition, setHighlightPickerPosition] = useState<{ x: number; y: number } | null>(null)
+  const [selectedTextInfo, setSelectedTextInfo] = useState<{
+    text: string
+    pageNumber: number
+    range: Range | null
+  } | null>(null)
+  const [highlights, setHighlights] = useState<HighlightType[]>([])
+  const [isHighlightMode, setIsHighlightMode] = useState(false)
+  const [highlightDragStart, setHighlightDragStart] = useState<{ x: number; y: number; pageNumber: number } | null>(null)
+  const [highlightDragCurrent, setHighlightDragCurrent] = useState<{ x: number; y: number } | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
@@ -200,6 +199,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const [selectionMode, setSelectionMode] = useState(false)
   const [showVoiceSelector, setShowVoiceSelector] = useState(false)
   const [showTypographySettings, setShowTypographySettings] = useState(false)
+  const [showHighlightPanel, setShowHighlightPanel] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [pageRendered, setPageRendered] = useState(false)
   const [ocrStatus, setOcrStatus] = useState(document.ocrStatus || 'not_needed')
@@ -223,13 +223,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const renderTaskRef = useRef<any>(null)
   const pageCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map())
   const pageTextLayerRefs = useRef<Map<number, HTMLDivElement>>(new Map())
-
-  const highlightColors = [
-    { name: 'Yellow', value: '#FFFF00' },
-    { name: 'Green', value: '#90EE90' },
-    { name: 'Blue', value: '#87CEEB' },
-    { name: 'Pink', value: '#FFB6C1' },
-  ]
 
   // Load PDF document
   useEffect(() => {
@@ -565,7 +558,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           break
         case 'h':
         case 'H':
-          setShowHighlightMenu(!showHighlightMenu)
+          setIsHighlightMode(!isHighlightMode)
           break
         case 'm':
         case 'M':
@@ -635,40 +628,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [pageNumber, numPages, scale, rotation, showHighlightMenu, showNotesPanel, pdfViewer.readingMode, updatePDFViewer, typography.textAlign, typography.focusMode, typography.readingGuide, updateTypography, isEditing])
+  }, [pageNumber, numPages, scale, rotation, isHighlightMode, showNotesPanel, pdfViewer.readingMode, updatePDFViewer, typography.textAlign, typography.focusMode, typography.readingGuide, updateTypography, isEditing])
 
-  // Text selection for highlighting and notes
+  // Context menu for adding notes
   useEffect(() => {
-    const handleSelection = (e: MouseEvent) => {
-      const selection = window.getSelection()
-      const selectedText = selection?.toString().trim()
-      
-      if (selectedText && showHighlightMenu) {
-        const range = selection?.getRangeAt(0)
-        const rect = range?.getBoundingClientRect()
-        
-        if (rect && pageContainerRef.current) {
-          const containerRect = pageContainerRef.current.getBoundingClientRect()
-          const relativeRect = {
-            x: rect.left - containerRect.left,
-            y: rect.top - containerRect.top,
-            width: rect.width,
-            height: rect.height
-          }
-
-          const newHighlight: Highlight = {
-            id: Date.now().toString(),
-            pageNumber,
-            text: selectedText,
-            color: selectedColor,
-            position: relativeRect
-          }
-
-          setHighlights([...highlights, newHighlight])
-        }
-      }
-    }
-
     const handleContextMenu = (e: MouseEvent) => {
       const selection = window.getSelection()
       const selectedText = selection?.toString().trim()
@@ -689,16 +652,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       setContextMenu(null)
     }
 
-    window.document.addEventListener('mouseup', handleSelection)
     window.document.addEventListener('contextmenu', handleContextMenu)
     window.document.addEventListener('click', handleClick)
     
     return () => {
-      window.document.removeEventListener('mouseup', handleSelection)
       window.document.removeEventListener('contextmenu', handleContextMenu)
       window.document.removeEventListener('click', handleClick)
     }
-  }, [showHighlightMenu, selectedColor, pageNumber, highlights])
+  }, [])
 
   // Cleanup TTS on unmount
   useEffect(() => {
@@ -1018,9 +979,280 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     setContextMenu(null)
   }, [])
 
-  const removeHighlight = useCallback((id: string) => {
-    setHighlights(highlights.filter(h => h.id !== id))
-  }, [highlights])
+  // Load highlights when document loads
+  useEffect(() => {
+    const loadHighlights = async () => {
+      if (!document.id || document.highlightsLoaded) return
+
+      try {
+        const bookHighlights = await highlightService.getHighlights(document.id, {
+          includeOrphaned: true
+        })
+        setHighlights(bookHighlights)
+        
+        // Update document to mark highlights as loaded
+        const updatedDoc = { ...document, highlights: bookHighlights, highlightsLoaded: true }
+        setCurrentDocument(updatedDoc)
+      } catch (error) {
+        console.warn('Highlights not available (API endpoints only work in production):', error)
+        // Set empty highlights array to prevent repeated attempts
+        setHighlights([])
+        const updatedDoc = { ...document, highlights: [], highlightsLoaded: true }
+        setCurrentDocument(updatedDoc)
+      }
+    }
+
+    loadHighlights()
+  }, [document.id])
+
+  // Handle text selection for highlighting (Method 1)
+  const handleTextSelection = useCallback((event: MouseEvent) => {
+    if (isHighlightMode) return // Skip if in drag-highlight mode
+    if (pdfViewer.readingMode) return // Skip in reading mode (read-only)
+
+    const selection = window.getSelection()
+    if (!selection || selection.isCollapsed || !selection.rangeCount) {
+      setHighlightPickerPosition(null)
+      setSelectedTextInfo(null)
+      return
+    }
+
+    const selectedText = selection.toString().trim()
+    if (selectedText.length < 2) {
+      setHighlightPickerPosition(null)
+      setSelectedTextInfo(null)
+      return
+    }
+
+    // Get the range and position
+    const range = selection.getRangeAt(0)
+    const rect = range.getBoundingClientRect()
+
+    // Determine which page the selection is on
+    let currentPage = pageNumber
+    if (pdfViewer.scrollMode === 'continuous') {
+      // Find the page containing the selection
+      const targetElement = range.commonAncestorContainer
+      const pageElement = (targetElement as Element).closest?.('[data-page-number]') ||
+                         (targetElement.parentElement as Element)?.closest?.('[data-page-number]')
+      if (pageElement) {
+        const pageAttr = pageElement.getAttribute('data-page-number')
+        if (pageAttr) currentPage = parseInt(pageAttr)
+      }
+    }
+
+    setSelectedTextInfo({
+      text: selectedText,
+      pageNumber: currentPage,
+      range
+    })
+
+    // Position the color picker near the selection
+    setHighlightPickerPosition({
+      x: rect.right + 10,
+      y: rect.top - 10
+    })
+  }, [isHighlightMode, pdfViewer.readingMode, pdfViewer.scrollMode, pageNumber])
+
+  // Create highlight after color selection
+  const handleCreateHighlight = useCallback(async (colorId: string, colorHex: string) => {
+    if (!selectedTextInfo || !selectedTextInfo.range) {
+      setHighlightPickerPosition(null)
+      return
+    }
+
+    try {
+      const range = selectedTextInfo.range
+      const rects = range.getClientRects()
+      
+      if (rects.length === 0) {
+        console.warn('No bounding rectangles found for selection')
+        setHighlightPickerPosition(null)
+        setSelectedTextInfo(null)
+        return
+      }
+
+      // Get the container element to calculate relative positions
+      const pageContainer = range.startContainer.parentElement?.closest('.relative') as HTMLElement
+      if (!pageContainer) {
+        console.warn('Could not find page container')
+        setHighlightPickerPosition(null)
+        setSelectedTextInfo(null)
+        return
+      }
+
+      const containerRect = pageContainer.getBoundingClientRect()
+      
+      // Calculate position relative to the PDF page
+      const firstRect = rects[0]
+      const position = {
+        x: firstRect.left - containerRect.left,
+        y: firstRect.top - containerRect.top,
+        width: firstRect.width,
+        height: firstRect.height
+      }
+
+      // Calculate text offset for reading mode sync
+      const pageText = document.pageTexts?.[selectedTextInfo.pageNumber - 1] || ''
+      const textOffset = highlightService.calculateTextOffset(
+        pageText,
+        selectedTextInfo.text,
+        0
+      )
+
+      // Create highlight via service
+      const highlight = await highlightService.createHighlight({
+        bookId: document.id,
+        pageNumber: selectedTextInfo.pageNumber,
+        highlightedText: selectedTextInfo.text,
+        colorId,
+        colorHex,
+        positionData: position,
+        textStartOffset: textOffset?.startOffset,
+        textEndOffset: textOffset?.endOffset,
+        textContextBefore: textOffset?.contextBefore,
+        textContextAfter: textOffset?.contextAfter
+      })
+
+      // Add to local state
+      setHighlights(prev => [...prev, highlight])
+
+      // Clear selection
+      window.getSelection()?.removeAllRanges()
+      setHighlightPickerPosition(null)
+      setSelectedTextInfo(null)
+    } catch (error: any) {
+      console.error('Error creating highlight:', error)
+      
+      // Show user-friendly message
+      if (error.message?.includes('only available in production')) {
+        alert('💡 Highlighting is only available in the deployed version.\n\nThis feature requires backend API endpoints that are only active in production.\n\nTo test highlights, please use the deployed app at your Vercel URL.')
+      } else {
+        alert('Failed to create highlight. Please try again.')
+      }
+    }
+  }, [selectedTextInfo, document.id, document.pageTexts])
+
+  const removeHighlight = useCallback(async (id: string) => {
+    try {
+      await highlightService.deleteHighlight(id)
+      setHighlights(prev => prev.filter(h => h.id !== id))
+    } catch (error) {
+      console.error('Error deleting highlight:', error)
+      alert('Failed to delete highlight. Please try again.')
+    }
+  }, [])
+
+  // Mark highlights as orphaned when page text is edited
+  const markPageHighlightsOrphaned = useCallback(async (pageNum: number) => {
+    try {
+      await highlightService.markPageHighlightsOrphaned(
+        document.id,
+        pageNum,
+        `Page text was edited on ${new Date().toLocaleDateString()}`
+      )
+      
+      // Update local state
+      setHighlights(prev => prev.map(h => 
+        h.page_number === pageNum && !h.is_orphaned
+          ? { ...h, is_orphaned: true, orphaned_reason: `Page text was edited on ${new Date().toLocaleDateString()}` }
+          : h
+      ))
+    } catch (error) {
+      console.error('Error marking highlights as orphaned:', error)
+    }
+  }, [document.id])
+
+  // This function should be called whenever page text is saved after editing
+  // Example: handleSavePageEdit(pageNum, newText)
+  const handleSavePageEdit = useCallback(async (pageNum: number, newText: string) => {
+    // Save the edited text (existing logic would go here)
+    // ... your save logic ...
+    
+    // Mark highlights on this page as orphaned
+    await markPageHighlightsOrphaned(pageNum)
+  }, [markPageHighlightsOrphaned])
+
+  // Add mouseup event listener for text selection highlighting
+  useEffect(() => {
+    window.document.addEventListener('mouseup', handleTextSelection as any)
+    return () => {
+      window.document.removeEventListener('mouseup', handleTextSelection as any)
+    }
+  }, [handleTextSelection])
+
+  // Drag-based highlighting (Method 2)
+  const handleHighlightDragStart = useCallback((event: React.MouseEvent, pageNum: number) => {
+    if (!isHighlightMode) return
+    event.preventDefault()
+    
+    const target = event.currentTarget as HTMLElement
+    const rect = target.getBoundingClientRect()
+    
+    setHighlightDragStart({
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+      pageNumber: pageNum
+    })
+    setHighlightDragCurrent({
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top
+    })
+  }, [isHighlightMode])
+
+  const handleHighlightDragMove = useCallback((event: React.MouseEvent) => {
+    if (!isHighlightMode || !highlightDragStart) return
+    
+    const target = event.currentTarget as HTMLElement
+    const rect = target.getBoundingClientRect()
+    
+    setHighlightDragCurrent({
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top
+    })
+  }, [isHighlightMode, highlightDragStart])
+
+  const handleHighlightDragEnd = useCallback(async (event: React.MouseEvent) => {
+    if (!isHighlightMode || !highlightDragStart || !highlightDragCurrent) {
+      setHighlightDragStart(null)
+      setHighlightDragCurrent(null)
+      return
+    }
+
+    // Calculate the bounding box
+    const position = {
+      x: Math.min(highlightDragStart.x, highlightDragCurrent.x),
+      y: Math.min(highlightDragStart.y, highlightDragCurrent.y),
+      width: Math.abs(highlightDragCurrent.x - highlightDragStart.x),
+      height: Math.abs(highlightDragCurrent.y - highlightDragStart.y)
+    }
+
+    // Minimum size check
+    if (position.width < 10 || position.height < 10) {
+      setHighlightDragStart(null)
+      setHighlightDragCurrent(null)
+      return
+    }
+
+    // Extract text from the highlighted area (simplified - just use page text for now)
+    const pageText = document.pageTexts?.[highlightDragStart.pageNumber - 1] || ''
+    const textSnippet = pageText.substring(0, 100) + '...' // Placeholder
+
+    // Show color picker at drag end position
+    setSelectedTextInfo({
+      text: textSnippet,
+      pageNumber: highlightDragStart.pageNumber,
+      range: null // No range for drag-based highlighting
+    })
+
+    setHighlightPickerPosition({
+      x: event.clientX + 10,
+      y: event.clientY - 10
+    })
+
+    setHighlightDragStart(null)
+    setHighlightDragCurrent(null)
+  }, [isHighlightMode, highlightDragStart, highlightDragCurrent, document.pageTexts])
 
   const handleVoiceSelect = useCallback((voice: any) => {
     // Convert voice to the format expected by the store
@@ -1236,9 +1468,29 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               } else if (segment.type === 'word') {
                 // Determine if this word is in the current paragraph
                 const isCurrentParagraph = segment.paragraphIndex === currentParagraphIndex
-                const isHighlighted = tts.highlightCurrentWord && 
+                const isTTSHighlighted = tts.highlightCurrentWord && 
                                      tts.currentWordIndex === segment.wordIndex && 
                                      pageNum === pageNumber
+                
+                // Check if this word is within a user highlight (read-only in reading mode)
+                let userHighlight: HighlightType | undefined
+                const pageHighlights = highlights.filter(h => h.page_number === pageNum && !h.is_orphaned)
+                
+                // Calculate approximate character position for this word
+                // This is a simplified approach - we'd need more precise tracking for production
+                const cumulativeTextLength = segments.slice(0, index).reduce((sum, seg) => 
+                  sum + (seg.type === 'word' ? seg.content.length + 1 : 0), 0
+                )
+                
+                for (const hl of pageHighlights) {
+                  if (hl.text_start_offset !== undefined && hl.text_end_offset !== undefined) {
+                    if (cumulativeTextLength >= hl.text_start_offset && 
+                        cumulativeTextLength < hl.text_end_offset) {
+                      userHighlight = hl
+                      break
+                    }
+                  }
+                }
                 
                 // Apply focus mode dimming
                 const opacity = typography.focusMode && !isCurrentParagraph ? 0.3 : 1
@@ -1250,15 +1502,18 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                   <span
                     key={`word-${index}`}
                     className={`inline-block transition-all duration-200 ${
-                      isHighlighted 
+                      isTTSHighlighted 
                         ? `${themeStyles.highlightBg} px-1 rounded shadow-sm transform scale-105` 
                         : 'bg-transparent'
                     }`}
                     style={{
                       opacity,
+                      backgroundColor: userHighlight ? userHighlight.color_hex : undefined,
+                      backgroundOpacity: userHighlight ? 0.3 : undefined,
                       borderLeft: hasParagraphIndicator && segment.wordIndex === segment.paragraphIndex ? '3px solid currentColor' : undefined,
                       paddingLeft: hasParagraphIndicator && segment.wordIndex === segment.paragraphIndex ? '0.5em' : undefined
                     }}
+                    title={userHighlight ? `Highlight: ${userHighlight.highlighted_text}` : undefined}
                     onMouseEnter={() => {
                       if (segment.paragraphIndex !== undefined) {
                         setCurrentParagraphIndex(segment.paragraphIndex)
@@ -1822,6 +2077,57 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             >
               <MousePointer2 className="w-5 h-5" />
             </button>
+
+            {/* Highlight Mode Toggle */}
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setIsHighlightMode(!isHighlightMode)
+              }}
+              className="p-2 rounded-lg transition-colors"
+              style={{
+                backgroundColor: isHighlightMode ? 'var(--color-primary-light)' : 'transparent',
+                color: isHighlightMode ? 'var(--color-primary)' : 'var(--color-text-primary)'
+              }}
+              onMouseEnter={(e) => {
+                if (!isHighlightMode) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+              }}
+              onMouseLeave={(e) => {
+                if (!isHighlightMode) e.currentTarget.style.backgroundColor = 'transparent'
+              }}
+              title="Highlight Mode (Click & Drag)"
+            >
+              <Highlighter className="w-5 h-5" />
+            </button>
+
+            {/* Highlight Management Panel Button */}
+            {highlights.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setShowHighlightPanel(true)
+                }}
+                className="p-2 rounded-lg transition-colors relative"
+                style={{
+                  backgroundColor: 'transparent',
+                  color: 'var(--color-text-primary)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                }}
+                title="Manage Highlights"
+              >
+                <Rows className="w-5 h-5" />
+                {highlights.filter(h => h.is_orphaned).length > 0 && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-500 rounded-full" />
+                )}
+              </button>
+            )}
             
             <button
               onClick={(e) => {
@@ -1848,28 +2154,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
           {/* Right controls */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setShowHighlightMenu(!showHighlightMenu)
-              }}
-              className="p-2 rounded-lg transition-colors"
-                  style={{
-                    backgroundColor: showHighlightMenu ? 'var(--color-primary-light)' : 'transparent',
-                    color: showHighlightMenu ? 'var(--color-primary)' : 'var(--color-text-primary)'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!showHighlightMenu) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!showHighlightMenu) e.currentTarget.style.backgroundColor = 'transparent'
-                  }}
-              title="Highlight (H)"
-            >
-              <Highlighter className="w-5 h-5" />
-            </button>
-            
             <button
               onClick={(e) => {
                 e.preventDefault()
@@ -1916,26 +2200,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                 </button>
               </div>
             </div>
-
-        {/* Highlight color picker */}
-        {showHighlightMenu && (
-          <div className="px-4 pb-4 flex items-center gap-2">
-            <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Highlight color:</span>
-            {highlightColors.map((color) => (
-              <button
-                key={color.value}
-                onClick={() => setSelectedColor(color.value)}
-                className="w-8 h-8 rounded-full border-2 transition-all"
-                style={{ 
-                  backgroundColor: color.value,
-                  borderColor: selectedColor === color.value ? 'var(--color-text-primary)' : 'var(--color-border)',
-                  transform: selectedColor === color.value ? 'scale(1.1)' : 'scale(1)'
-                }}
-                title={color.name}
-              />
-            ))}
-              </div>
-            )}
       </div>
 
       {/* PDF Canvas Container */}
@@ -1973,28 +2237,35 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                   />
                   {/* Render highlights for this page */}
                   {highlights
-                    .filter(h => h.pageNumber === pageNum)
+                    .filter(h => h.page_number === pageNum)
                     .map(highlight => (
                       <div
                         key={highlight.id}
                         className="absolute group"
                         style={{
-                          left: highlight.position.x,
-                          top: highlight.position.y,
-                          width: highlight.position.width,
-                          height: highlight.position.height,
-                          backgroundColor: highlight.color,
-                          opacity: 0.4,
-                          pointerEvents: 'auto'
+                          left: `${highlight.position_data.x}px`,
+                          top: `${highlight.position_data.y}px`,
+                          width: `${highlight.position_data.width}px`,
+                          height: `${highlight.position_data.height}px`,
+                          backgroundColor: highlight.color_hex,
+                          opacity: highlight.is_orphaned ? 0.2 : 0.4,
+                          pointerEvents: 'auto',
+                          border: highlight.is_orphaned ? '2px dashed #999' : 'none'
                         }}
+                        title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
                       >
-                <button
+                        {highlight.is_orphaned && (
+                          <div className="absolute -top-3 -left-1 bg-yellow-500 text-white text-xs px-1 rounded">
+                            ⚠
+                          </div>
+                        )}
+                        <button
                           onClick={() => removeHighlight(highlight.id)}
                           className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
+                        >
                           <Trash2 className="w-3 h-3" />
-                </button>
-              </div>
+                        </button>
+                      </div>
                     ))}
             </div>
               ))
@@ -2098,6 +2369,40 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         bookId={document.id}
         currentPage={pageNumber}
         selectedText={selectedTextForNote}
+      />
+
+      {/* Highlight Color Picker */}
+      <HighlightColorPicker
+        isOpen={highlightPickerPosition !== null}
+        position={highlightPickerPosition || { x: 0, y: 0 }}
+        onColorSelect={handleCreateHighlight}
+        onCancel={() => {
+          setHighlightPickerPosition(null)
+          setSelectedTextInfo(null)
+        }}
+      />
+
+      {/* Highlight Management Panel */}
+      <HighlightManagementPanel
+        isOpen={showHighlightPanel}
+        onClose={() => setShowHighlightPanel(false)}
+        highlights={highlights}
+        onDeleteHighlight={removeHighlight}
+        onDeleteMultiple={async (ids) => {
+          try {
+            await highlightService.deleteHighlights(ids)
+            setHighlights(prev => prev.filter(h => !ids.includes(h.id)))
+          } catch (error) {
+            console.error('Error deleting highlights:', error)
+            alert('Failed to delete highlights. Please try again.')
+          }
+        }}
+        onJumpToPage={(pageNum) => {
+          setPageNumber(pageNum)
+          updatePDFViewer({ currentPage: pageNum })
+          setShowHighlightPanel(false)
+        }}
+        bookName={document.name}
       />
 
       {/* Audio Widget */}

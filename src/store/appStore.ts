@@ -1,6 +1,30 @@
 import { create } from 'zustand'
 import { authService, AuthUser } from '../services/supabaseAuthService'
 
+export interface Highlight {
+  id: string
+  user_id: string
+  book_id: string
+  page_number: number
+  highlighted_text: string
+  color_id: string
+  color_hex: string
+  position_data: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  text_start_offset?: number
+  text_end_offset?: number
+  text_context_before?: string
+  text_context_after?: string
+  is_orphaned: boolean
+  orphaned_reason?: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Document {
   id: string
   name: string
@@ -22,6 +46,9 @@ export interface Document {
     pagesProcessed?: number
     error?: string
   }
+  // Highlights
+  highlights?: Highlight[]
+  highlightsLoaded?: boolean
 }
 
 export interface ChatMessage {
