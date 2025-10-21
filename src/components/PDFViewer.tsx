@@ -1337,6 +1337,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       const containerRect = pageContainer.getBoundingClientRect()
       const firstRect = rects[0]
       
+      // CRITICAL FIX: For continuous mode, we need to account for scroll position
+      // In continuous mode, each page container is positioned within the scroll container
+      // We need position relative to the individual page container, NOT the viewport
+      let scrollAdjustment = 0
+      if (pdfViewer.scrollMode === 'continuous' && scrollContainerRef.current) {
+        scrollAdjustment = scrollContainerRef.current.scrollTop
+      }
+      
       // Calculate position relative to the PDF page container
       // IMPORTANT: Store positions normalized to scale 1.0 so they work at any zoom level
       const rawPosition = {
@@ -1346,26 +1354,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         height: firstRect.height
       }
 
-      // TEXT ALIGNMENT FIX: Adjust position to better align with actual text rendering
-      // The bounding rect often includes space above/below the actual text
+      // TEXT ALIGNMENT: Use browser's getBoundingClientRect() without adjustments
+      // Previous adjustments were causing position misalignment - browser rect is already accurate
+      
+      // Get text element for debugging
       const textElement = range.startContainer.parentElement
-      if (textElement && textElement.style) {
-        const fontSize = parseFloat(textElement.style.fontSize) || 12
-        const lineHeight = parseFloat(textElement.style.lineHeight) || fontSize
-        
-        // More precise alignment based on font metrics
-        // For PDF.js text layers, the bounding rect often sits above the actual text baseline
-        const baselineAdjustment = fontSize * 0.2 // Move down 20% of font size
-        rawPosition.y += baselineAdjustment
-        
-        // Adjust height to better match actual text height
-        // Use a more conservative height that focuses on the main text body
-        const textBodyHeight = fontSize * 0.7 // Use 70% of font size for height
-        rawPosition.height = Math.min(rawPosition.height, textBodyHeight)
-        
-        // Ensure minimum height for very small fonts
-        rawPosition.height = Math.max(rawPosition.height, fontSize * 0.5)
-      }
 
       // Normalize by current scale so positions are stored at scale 1.0
       const position = {
@@ -1392,14 +1385,20 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           width: containerRect.width,
           height: containerRect.height
         },
+        containerInfo: {
+          hasDataPageNumber: pageContainer.hasAttribute('data-page-number'),
+          pageNumberAttr: pageContainer.getAttribute('data-page-number'),
+          className: pageContainer.className,
+          offsetTop: pageContainer.offsetTop,
+          offsetLeft: pageContainer.offsetLeft,
+          scrollTop: scrollContainerRef.current?.scrollTop || 0
+        },
         rawPosition: rawPosition,
         normalizedPosition: position,
-        textAlignment: {
+        textElement: {
           fontSize: textElement?.style?.fontSize,
           lineHeight: textElement?.style?.lineHeight,
-          baselineAdjustment: textElement ? parseFloat(textElement.style.fontSize || '12') * 0.2 : 0,
-          textBodyHeight: textElement ? parseFloat(textElement.style.fontSize || '12') * 0.7 : 0,
-          finalHeight: rawPosition.height
+          tagName: textElement?.tagName
         }
       })
 
@@ -2550,6 +2549,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                       if (el) pageTextLayerRefs.current.set(pageNum, el)
                     }}
                     className="textLayer"
+                    style={{ opacity: 1, pointerEvents: 'auto', userSelect: 'text' }}
                   />
                   {/* Render highlights for this page */}
                   {highlights
@@ -2575,7 +2575,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                             backgroundColor: highlight.color_hex,
                             opacity: highlight.is_orphaned ? 0.2 : 0.4,
                             pointerEvents: 'none',
-                            border: highlight.is_orphaned ? '2px dashed #999' : 'none'
+                            border: highlight.is_orphaned ? '2px dashed #999' : 'none',
+                            zIndex: 3
                           }}
                           title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
                         >
@@ -2662,7 +2663,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                         backgroundColor: highlight.color_hex,
                         opacity: highlight.is_orphaned ? 0.2 : 0.4,
                         pointerEvents: 'none',
-                        border: highlight.is_orphaned ? '2px dashed #999' : 'none'
+                        border: highlight.is_orphaned ? '2px dashed #999' : 'none',
+                        zIndex: 3
                       }}
                       title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
                     >
