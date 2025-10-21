@@ -246,7 +246,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         if (document.pdfData instanceof Blob) {
           pdfData = await document.pdfData.arrayBuffer()
         } else if (document.pdfData instanceof ArrayBuffer) {
-          pdfData = document.pdfData
+          // Check if ArrayBuffer is detached
+          try {
+            new Uint8Array(document.pdfData, 0, 1)
+            pdfData = document.pdfData
+          } catch (error) {
+            console.error('❌ ArrayBuffer is detached, cannot load PDF:', error)
+            throw new Error('PDF data is corrupted or detached. Please try re-opening the document.')
+          }
         } else if (typeof document.pdfData === 'string') {
           // If it's a blob URL, fetch it
           const response = await fetch(document.pdfData)

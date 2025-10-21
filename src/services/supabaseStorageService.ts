@@ -380,8 +380,12 @@ class SupabaseStorageService {
             const pdfjsLib = await import('pdfjs-dist');
             pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
             
-            // Load PDF and extract text
-            const pdf = await pdfjsLib.getDocument({ data: book.fileData }).promise;
+            // CRITICAL: Create a copy of the ArrayBuffer to prevent detachment
+            // The original ArrayBuffer will be used by PDFViewer, so we need a copy for text extraction
+            const pdfDataCopy = book.fileData.slice(0);
+            
+            // Load PDF and extract text using the copy
+            const pdf = await pdfjsLib.getDocument({ data: pdfDataCopy }).promise;
             const pageTexts: string[] = [];
             
             for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
@@ -400,8 +404,13 @@ class SupabaseStorageService {
             logger.info('PageTexts extracted successfully', context, {
               totalPages: pdf.numPages,
               extractedPages: pageTexts.length,
-              totalTextLength: pageTexts.join('').length
+              totalTextLength: pageTexts.join('').length,
+              originalArrayBufferSize: book.fileData.byteLength,
+              copyArrayBufferSize: pdfDataCopy.byteLength
             });
+            
+            // Clean up the PDF document to free memory
+            pdf.destroy();
             
           } catch (extractError) {
             logger.warn('Failed to extract pageTexts, TTS will not be available', context, extractError as Error);
