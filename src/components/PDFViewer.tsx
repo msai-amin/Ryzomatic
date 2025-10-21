@@ -453,6 +453,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             })
             
             textLayerRef.current.appendChild(textLayerFrag)
+            
+            // CRITICAL: Make text layer visible immediately after rendering
+            // Don't wait for pageRendered state to change
+            textLayerRef.current.style.opacity = '1'
+            
             console.log('📝 Text layer rendered with improved alignment:', {
               textElements: textDivs.length,
               pageNumber: pageNumber,
@@ -570,6 +575,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             })
             
             textLayerDiv.appendChild(textLayerFrag)
+            
+            // CRITICAL: Make text layer visible immediately after rendering
+            textLayerDiv.style.opacity = '1'
+            
             console.log(`📝 Text layer rendered for page ${pageNum}:`, {
               textElements: textContent.items.length,
               hasTextLayer: !!textLayerDiv,
@@ -584,6 +593,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
     renderAllPages()
   }, [pdfViewer.scrollMode, pdfViewer.readingMode, numPages, scale, rotation])
+
+  // Ensure text layer is visible when pageRendered changes
+  useEffect(() => {
+    if (pageRendered && textLayerRef.current) {
+      textLayerRef.current.style.opacity = '1'
+      console.log('🔍 Ensuring text layer visibility after pageRendered change')
+    }
+  }, [pageRendered])
 
   useEffect(() => {
     setPageInputValue(String(pageNumber))
