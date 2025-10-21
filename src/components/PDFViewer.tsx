@@ -385,6 +385,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         
         // High-DPI display support for crisp rendering
         const dpr = window.devicePixelRatio || 1
+        
+        // Set canvas dimensions
         canvas.height = viewport.height * dpr
         canvas.width = viewport.width * dpr
         canvas.style.width = viewport.width + 'px'
@@ -398,6 +400,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           dpr: dpr
         })
 
+        // Clear canvas and reset transformations
+        context.setTransform(1, 0, 0, 1, 0, 0)
+        context.clearRect(0, 0, canvas.width, canvas.height)
+        
         // Scale context to account for high-DPI
         context.scale(dpr, dpr)
 
@@ -528,10 +534,16 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           
           // High-DPI display support for crisp rendering
           const dpr = window.devicePixelRatio || 1
+          
+          // Set canvas dimensions
           canvas.height = viewport.height * dpr
           canvas.width = viewport.width * dpr
           canvas.style.width = viewport.width + 'px'
           canvas.style.height = viewport.height + 'px'
+          
+          // Clear canvas and reset transformations
+          context.setTransform(1, 0, 0, 1, 0, 0)
+          context.clearRect(0, 0, canvas.width, canvas.height)
           
           // Scale context to account for high-DPI
           context.scale(dpr, dpr)
