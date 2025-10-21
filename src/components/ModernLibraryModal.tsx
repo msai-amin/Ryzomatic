@@ -168,6 +168,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
         pdfData: bookData.type === 'pdf' ? bookData.fileData : undefined, // ArrayBuffer for PDFs
         totalPages: bookData.totalPages,
         lastReadPage: bookData.lastReadPage,
+        pageTexts: bookData.pageTexts || [], // CRITICAL: Include pageTexts for TTS functionality
       };
 
       // Set the current document and close the library
