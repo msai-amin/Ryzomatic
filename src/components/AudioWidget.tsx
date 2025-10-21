@@ -163,9 +163,15 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           }
           
           if (text.trim()) {
-            await ttsManager.speak(
+            // CRITICAL: Set isPlaying to true BEFORE starting audio, not after
+            updateTTS({ isPlaying: true });
+            
+            // Start audio (this is async and completes when audio finishes)
+            // DON'T await - let it play in the background
+            ttsManager.speak(
               text,
               () => {
+                // onEnd callback when audio finishes
                 updateTTS({ isPlaying: false, currentWordIndex: null });
               },
               (word, charIndex) => {
@@ -180,10 +186,18 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                 
                 updateTTS({ currentWordIndex: wordIndex });
               }
-            );
-            updateTTS({ isPlaying: true });
+            ).catch(error => {
+              // Handle errors and reset state
+              console.error('AudioWidget: TTS Error during playback:', error)
+              updateTTS({ isPlaying: false })
+              setIsProcessing(false)
+            });
+            
+            // Reset processing state immediately after starting audio
+            setIsProcessing(false)
           } else {
             console.warn('AudioWidget: No text available for TTS in any page')
+            setIsProcessing(false)
           }
         } else {
           console.warn('AudioWidget: Missing document or page data for TTS', {
@@ -196,12 +210,11 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           
           // Show user-friendly message
           alert('🔊 Audio not available\n\nText extraction is still in progress. Please wait a moment and try again.\n\nIf the issue persists, the PDF may not have extractable text.')
+          setIsProcessing(false)
         }
       } catch (error) {
         console.error('AudioWidget: TTS Error:', error)
         updateTTS({ isPlaying: false })
-      } finally {
-        // CRITICAL: Always reset processing state
         setIsProcessing(false)
       }
     }
