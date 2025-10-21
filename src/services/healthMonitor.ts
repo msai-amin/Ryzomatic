@@ -143,6 +143,9 @@ class HealthMonitor {
     });
 
     // Network connectivity check (basic)
+    // DISABLED: /api/health endpoint is not available in production
+    // Uncomment if health endpoint is re-enabled
+    /*
     this.addHealthCheck({
       name: 'connectivity',
       check: async () => {
@@ -177,6 +180,7 @@ class HealthMonitor {
       timeout: 10000, // Increased timeout
       critical: false // Made non-critical to avoid blocking other checks
     });
+    */
   }
 
   public addHealthCheck(healthCheck: HealthCheck): void {

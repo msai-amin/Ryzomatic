@@ -1208,7 +1208,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
   const handleTextSelection = useCallback((event: MouseEvent) => {
     if (isHighlightMode) return // Skip if in drag-highlight mode
-    if (pdfViewer.readingMode) return // Skip in reading mode (read-only)
+    // REMOVED: Don't skip in reading mode - users should be able to highlight in reading mode too
 
     const selection = window.getSelection()
     if (!selection || selection.isCollapsed || !selection.rangeCount) {
@@ -1252,7 +1252,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       x: rect.right + 10,
       y: rect.top - 10
     })
-  }, [isHighlightMode, pdfViewer.readingMode, pdfViewer.scrollMode, pageNumber])
+  }, [isHighlightMode, pdfViewer.scrollMode, pageNumber])
   
   // Handle right-click context menu for AI features
   const handleContextMenuClick = useCallback((event: React.MouseEvent) => {

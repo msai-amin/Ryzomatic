@@ -120,7 +120,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         
         // Get current document text for TTS
         const currentDoc = useAppStore.getState().currentDocument
-        const currentPage = useAppStore.getState().pdfViewer.currentPage
+        const currentPage = useAppStore.getState().pdfViewer.currentPage || 1 // Fallback to page 1 if not set
         
         console.log('AudioWidget: TTS Debug Info:', {
           hasCurrentDoc: !!currentDoc,
@@ -137,7 +137,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           }))
         })
         
-        if (currentDoc && currentDoc.pageTexts && currentPage) {
+        if (currentDoc && currentDoc.pageTexts && currentDoc.pageTexts.length > 0) {
           let text = currentDoc.pageTexts[currentPage - 1] || ''
           
           console.log('AudioWidget: Text for TTS:', {
