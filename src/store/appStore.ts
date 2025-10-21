@@ -257,7 +257,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     scale: 1.0,
     rotation: 0,
     viewMode: 'pdf',
-    scrollMode: 'continuous', // Default to scrolling mode for better UX
+    scrollMode: 'single', // Default to One Page mode
     showPageNumbers: true,
     showProgress: true,
     readingMode: false
