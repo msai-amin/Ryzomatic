@@ -80,7 +80,7 @@ export const sendMessageToAI = async (message: string, documentContent?: string)
           documentLength: documentContent?.length || 0
         });
 
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         
         const prompt = `You are an AI assistant helping users understand and analyze documents.
 
@@ -366,7 +366,7 @@ Please be clear, concise, and helpful.`;
           contextLength: context.length
         });
 
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const result = await model.generateContent(prompt);
         const response = result.response.text();
         
@@ -461,7 +461,7 @@ Be specific and actionable in your suggestions.`;
           contextLength: context.length
         });
 
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const result = await model.generateContent(prompt);
         const response = result.response.text();
         
