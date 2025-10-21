@@ -227,6 +227,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const [formulaLatex, setFormulaLatex] = useState<Map<string, string>>(new Map())
   const [isConvertingFormulas, setIsConvertingFormulas] = useState(false)
   const [formulaConversionProgress, setFormulaConversionProgress] = useState({ current: 0, total: 0 })
+  const [continuousModeRendered, setContinuousModeRendered] = useState(false)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -282,12 +283,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         pdfDocRef.current = pdf
         setNumPages(pdf.numPages)
         setIsLoading(false)
+        setContinuousModeRendered(false) // Reset to trigger re-render
         console.log('✅ PDF loaded successfully:', pdf.numPages, 'pages')
         console.log('PDF Document Info:', {
           numPages: pdf.numPages,
           hasPageTexts: !!document.pageTexts,
           pageTextsLength: document.pageTexts?.length || 0,
-          documentId: document.id
+          documentId: document.id,
+          scrollMode: pdfViewer.scrollMode
         })
       } catch (error) {
         console.error('Error loading PDF:', error)
@@ -512,22 +515,54 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     renderPage()
   }, [pageNumber, scale, rotation, pdfViewer.scrollMode, pdfViewer.readingMode, numPages])
 
+  // Reset continuous mode rendered flag when scale/rotation/scrollMode changes
+  useEffect(() => {
+    setContinuousModeRendered(false)
+  }, [scale, rotation, pdfViewer.scrollMode])
+  
   // Render all pages (continuous scroll mode)
   useEffect(() => {
-    if (pdfViewer.scrollMode !== 'continuous' || !pdfDocRef.current || !numPages) return
+    if (pdfViewer.scrollMode !== 'continuous' || !pdfDocRef.current || !numPages) {
+      return
+    }
     if (pdfViewer.readingMode) return // Don't render PDF when in reading mode
+    if (continuousModeRendered) return // Already rendered, skip to avoid re-renders
     
-    console.log('🔄 Continuous mode rendering triggered')
+    console.log('🔄 Continuous mode rendering triggered', {
+      numPages,
+      hasRefs: pageCanvasRefs.current.size > 0,
+      scrollMode: pdfViewer.scrollMode,
+      alreadyRendered: continuousModeRendered
+    })
 
     const renderAllPages = async () => {
-      // Wait longer for refs to be populated after DOM render
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // Wait for refs to be populated after DOM render
+      // Use multiple attempts with increasing delays to ensure refs are ready
+      let attempts = 0
+      const maxAttempts = 20 // 20 attempts * 50ms = 1 second max wait
+      
+      while (attempts < maxAttempts && pageCanvasRefs.current.size === 0) {
+        await new Promise(resolve => setTimeout(resolve, 50))
+        attempts++
+      }
+      
+      if (pageCanvasRefs.current.size === 0) {
+        console.warn('⚠️ Canvas refs never populated, aborting render')
+        return
+      }
+      
+      console.log(`✅ Canvas refs ready after ${attempts * 50}ms, starting render`)
       
       for (let pageNum = 1; pageNum <= numPages; pageNum++) {
         const canvas = pageCanvasRefs.current.get(pageNum)
         const textLayerDiv = pageTextLayerRefs.current.get(pageNum)
         if (!canvas) {
           console.log(`⏭️ Skipping page ${pageNum} - canvas ref not ready`)
+          continue
+        }
+        
+        if (!textLayerDiv) {
+          console.log(`⏭️ Skipping page ${pageNum} - textLayer ref not ready`)
           continue
         }
 
@@ -636,17 +671,44 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               hasTextLayer: !!textLayerDiv,
               textLayerOpacity: textLayerDiv.style.opacity,
               textLayerPointerEvents: textLayerDiv.style.pointerEvents,
-              textLayerUserSelect: textLayerDiv.style.userSelect
+              textLayerUserSelect: textLayerDiv.style.userSelect,
+              childSpans: textLayerDiv.children.length
             })
           }
         } catch (error) {
           console.error(`Error rendering page ${pageNum}:`, error)
         }
       }
+      
+      console.log('🎉 All pages rendered in continuous mode')
+      setContinuousModeRendered(true)
     }
 
     renderAllPages()
   }, [pdfViewer.scrollMode, pdfViewer.readingMode, numPages, scale, rotation])
+  
+  // Force text layer interactivity after any render (additional safety net)
+  useEffect(() => {
+    if (pdfViewer.scrollMode === 'continuous' && numPages) {
+      // Double-check all text layers are interactive
+      const checkTimer = setTimeout(() => {
+        pageTextLayerRefs.current.forEach((textLayerDiv, pageNum) => {
+          if (textLayerDiv) {
+            textLayerDiv.style.opacity = '1'
+            textLayerDiv.style.pointerEvents = 'auto'
+            textLayerDiv.style.userSelect = 'text'
+            
+            // Log if text layer is empty (potential issue)
+            if (textLayerDiv.children.length === 0) {
+              console.warn(`⚠️ Text layer for page ${pageNum} is empty!`)
+            }
+          }
+        })
+      }, 200) // Check after 200ms
+      
+      return () => clearTimeout(checkTimer)
+    }
+  }, [pdfViewer.scrollMode, numPages])
 
   // Ensure text layer is visible when pageRendered changes
   useEffect(() => {
