@@ -984,15 +984,16 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     const loadHighlights = async () => {
       if (!document.id || document.highlightsLoaded) return
 
-      // Check if document was just uploaded (within last 10 seconds)
+      // Check if document was just uploaded (within last 5 seconds)
+      // With ID sync fix, only brief delay needed for S3/database completion
       const uploadTime = document.uploadedAt ? new Date(document.uploadedAt).getTime() : 0
       const now = Date.now()
-      const isRecentlyUploaded = (now - uploadTime) < 10000 // 10 seconds
+      const isRecentlyUploaded = (now - uploadTime) < 5000 // 5 seconds
       
-      // If recently uploaded, wait a bit for the database to sync
+      // If recently uploaded, brief wait for the database to sync
       if (isRecentlyUploaded) {
         console.log('Document recently uploaded, waiting for database sync...')
-        await new Promise(resolve => setTimeout(resolve, 2000)) // Wait 2 seconds
+        await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
       }
 
       try {
@@ -1094,13 +1095,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       return
     }
 
-    // Check if document is recently uploaded and might not be in database yet
+    // Check if document is very recently uploaded (within 5 seconds)
+    // With ID sync fix, only need brief delay for S3/database to complete
     const uploadTime = document.uploadedAt ? new Date(document.uploadedAt).getTime() : 0
     const now = Date.now()
-    const isRecentlyUploaded = (now - uploadTime) < 30000 // 30 seconds
+    const isVeryRecentlyUploaded = (now - uploadTime) < 5000 // 5 seconds
     
-    if (isRecentlyUploaded) {
-      alert('⏳ Please wait a moment...\n\nYour document is still being saved to the database.\nTry creating highlights in a few seconds, or refresh the page.')
+    if (isVeryRecentlyUploaded) {
+      alert('⏳ Document is still being saved...\n\nPlease wait a few seconds and try again.')
       setHighlightPickerPosition(null)
       setSelectedTextInfo(null)
       return
@@ -1151,18 +1153,27 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       const firstRect = rects[0]
       
       // Calculate position relative to the PDF page container
-      // getBoundingClientRect gives viewport-relative positions
-      // We need positions relative to the page container (which includes its internal layout)
-      const position = {
+      // IMPORTANT: Store positions normalized to scale 1.0 so they work at any zoom level
+      const rawPosition = {
         x: firstRect.left - containerRect.left,
         y: firstRect.top - containerRect.top,
         width: firstRect.width,
         height: firstRect.height
       }
 
+      // Normalize by current scale so positions are stored at scale 1.0
+      const position = {
+        x: rawPosition.x / scale,
+        y: rawPosition.y / scale,
+        width: rawPosition.width / scale,
+        height: rawPosition.height / scale
+      }
+
       console.log('Highlight position debug:', {
         pageNumber: selectedTextInfo.pageNumber,
         scrollMode: pdfViewer.scrollMode,
+        currentScale: scale,
+        currentZoom: pdfViewer.zoom,
         selectionRect: { 
           left: firstRect.left, 
           top: firstRect.top, 
@@ -1175,9 +1186,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           width: containerRect.width,
           height: containerRect.height
         },
-        calculatedPosition: position,
-        scale: scale,
-        zoom: pdfViewer.zoom
+        rawPosition: rawPosition,
+        normalizedPosition: position
       })
 
       // Calculate text offset for reading mode sync
@@ -2325,35 +2335,45 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                   {/* Render highlights for this page */}
                   {highlights
                     .filter(h => h.page_number === pageNum)
-                    .map(highlight => (
-                      <div
-                        key={highlight.id}
-                        className="absolute group"
-                        style={{
-                          left: `${highlight.position_data.x}px`,
-                          top: `${highlight.position_data.y}px`,
-                          width: `${highlight.position_data.width}px`,
-                          height: `${highlight.position_data.height}px`,
-                          backgroundColor: highlight.color_hex,
-                          opacity: highlight.is_orphaned ? 0.2 : 0.4,
-                          pointerEvents: 'auto',
-                          border: highlight.is_orphaned ? '2px dashed #999' : 'none'
-                        }}
-                        title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
-                      >
-                        {highlight.is_orphaned && (
-                          <div className="absolute -top-3 -left-1 bg-yellow-500 text-white text-xs px-1 rounded">
-                            ⚠
-                          </div>
-                        )}
-                        <button
-                          onClick={() => removeHighlight(highlight.id)}
-                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    .map(highlight => {
+                      // Scale positions by current scale (positions are stored normalized at scale 1.0)
+                      const scaledPosition = {
+                        x: highlight.position_data.x * scale,
+                        y: highlight.position_data.y * scale,
+                        width: highlight.position_data.width * scale,
+                        height: highlight.position_data.height * scale
+                      }
+                      
+                      return (
+                        <div
+                          key={highlight.id}
+                          className="absolute group"
+                          style={{
+                            left: `${scaledPosition.x}px`,
+                            top: `${scaledPosition.y}px`,
+                            width: `${scaledPosition.width}px`,
+                            height: `${scaledPosition.height}px`,
+                            backgroundColor: highlight.color_hex,
+                            opacity: highlight.is_orphaned ? 0.2 : 0.4,
+                            pointerEvents: 'auto',
+                            border: highlight.is_orphaned ? '2px dashed #999' : 'none'
+                          }}
+                          title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
                         >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
+                          {highlight.is_orphaned && (
+                            <div className="absolute -top-3 -left-1 bg-yellow-500 text-white text-xs px-1 rounded">
+                              ⚠
+                            </div>
+                          )}
+                          <button
+                            onClick={() => removeHighlight(highlight.id)}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )
+                    })}
             </div>
               ))
             )}
@@ -2396,15 +2416,24 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               {/* Render highlights */}
               {highlights
                 .filter(h => h.page_number === pageNumber)
-                .map(highlight => (
+                .map(highlight => {
+                  // Scale positions by current scale (positions are stored normalized at scale 1.0)
+                  const scaledPosition = {
+                    x: highlight.position_data.x * scale,
+                    y: highlight.position_data.y * scale,
+                    width: highlight.position_data.width * scale,
+                    height: highlight.position_data.height * scale
+                  }
+                  
+                  return (
                     <div
                       key={highlight.id}
                       className="absolute group"
                       style={{
-                        left: `${highlight.position_data.x}px`,
-                        top: `${highlight.position_data.y}px`,
-                        width: `${highlight.position_data.width}px`,
-                        height: `${highlight.position_data.height}px`,
+                        left: `${scaledPosition.x}px`,
+                        top: `${scaledPosition.y}px`,
+                        width: `${scaledPosition.width}px`,
+                        height: `${scaledPosition.height}px`,
                         backgroundColor: highlight.color_hex,
                         opacity: highlight.is_orphaned ? 0.2 : 0.4,
                         pointerEvents: 'auto',
@@ -2424,7 +2453,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                         <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
-                ))}
+                  )
+                })}
                 </div>
         </div>
       )}

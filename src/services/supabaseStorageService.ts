@@ -191,6 +191,7 @@ class SupabaseStorageService {
 
       // Create database record with S3 key (no large data)
       const userBook: Partial<UserBook> = {
+        id: book.id,  // CRITICAL: Use the same ID as the local document for highlights to work
         user_id: this.currentUserId!,
         title: sanitizedTitle,
         file_name: sanitizedFileName,
