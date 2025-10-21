@@ -283,9 +283,41 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     }
   }, [document.pdfData])
 
+  // Re-render PDF when switching back from reading mode
+  useEffect(() => {
+    if (!pdfViewer.readingMode && pdfDocRef.current && !isLoading) {
+      console.log('🔄 Switching back from reading mode, re-rendering PDF...')
+      
+      // Clear any existing canvas/text layer content
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext('2d')
+        if (ctx) {
+          ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+        }
+      }
+      
+      if (textLayerRef.current) {
+        textLayerRef.current.innerHTML = ''
+      }
+      
+      // Clear page text layer refs
+      pageTextLayerRefs.current.clear()
+      
+      // Force re-render
+      setPageRendered(false)
+      
+      // Trigger page rendering for current mode with a small delay
+      setTimeout(() => {
+        console.log('🔄 Triggering PDF re-render after reading mode exit')
+        setPageRendered(true)
+      }, 150)
+    }
+  }, [pdfViewer.readingMode, pdfViewer.scrollMode, isLoading])
+
   // Render current page (single page mode)
   useEffect(() => {
     if (pdfViewer.scrollMode === 'continuous') return
+    if (pdfViewer.readingMode) return // Don't render PDF when in reading mode
 
     const renderPage = async () => {
       if (!pdfDocRef.current || !canvasRef.current) {
@@ -418,11 +450,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     }
 
     renderPage()
-  }, [pageNumber, scale, rotation, pdfViewer.scrollMode, numPages])
+  }, [pageNumber, scale, rotation, pdfViewer.scrollMode, pdfViewer.readingMode, numPages])
 
   // Render all pages (continuous scroll mode)
   useEffect(() => {
     if (pdfViewer.scrollMode !== 'continuous' || !pdfDocRef.current || !numPages) return
+    if (pdfViewer.readingMode) return // Don't render PDF when in reading mode
     
 
     const renderAllPages = async () => {
@@ -520,7 +553,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     }
 
     renderAllPages()
-  }, [pdfViewer.scrollMode, numPages, scale, rotation])
+  }, [pdfViewer.scrollMode, pdfViewer.readingMode, numPages, scale, rotation])
 
   useEffect(() => {
     setPageInputValue(String(pageNumber))
