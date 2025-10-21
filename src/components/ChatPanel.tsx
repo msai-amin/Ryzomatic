@@ -242,10 +242,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ onClose }) => {
             {currentDocument && (
               <button
                 onClick={() => setIncludeNotes(!includeNotes)}
-                className={`p-2 rounded-lg transition-colors ${includeNotes ? 'bg-opacity-20' : ''}`}
+                className="p-2 rounded-lg transition-colors"
                 style={{ 
                   color: includeNotes ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                  backgroundColor: includeNotes ? 'var(--color-primary)' : 'transparent',
+                  backgroundColor: includeNotes ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                 }}
                 title={includeNotes ? 'Notes context enabled' : 'Notes context disabled'}
               >
