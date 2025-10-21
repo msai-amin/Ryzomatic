@@ -1508,8 +1508,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                     }`}
                     style={{
                       opacity,
-                      backgroundColor: userHighlight ? userHighlight.color_hex : undefined,
-                      backgroundOpacity: userHighlight ? 0.3 : undefined,
+                      backgroundColor: userHighlight ? `${userHighlight.color_hex}40` : undefined, // 40 = 25% opacity in hex
                       borderLeft: hasParagraphIndicator && segment.wordIndex === segment.paragraphIndex ? '3px solid currentColor' : undefined,
                       paddingLeft: hasParagraphIndicator && segment.wordIndex === segment.paragraphIndex ? '0.5em' : undefined
                     }}
@@ -2308,29 +2307,36 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               
               {/* Render highlights */}
               {highlights
-                .filter(h => h.pageNumber === pageNumber)
+                .filter(h => h.page_number === pageNumber)
                 .map(highlight => (
                     <div
                       key={highlight.id}
-                    className="absolute group"
+                      className="absolute group"
                       style={{
-                      left: highlight.position.x,
-                      top: highlight.position.y,
-                      width: highlight.position.width,
-                      height: highlight.position.height,
-                        backgroundColor: highlight.color,
-                        opacity: 0.4,
-                      pointerEvents: 'auto'
-                    }}
-                  >
-                    <button
-                      onClick={() => removeHighlight(highlight.id)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        left: `${highlight.position_data.x}px`,
+                        top: `${highlight.position_data.y}px`,
+                        width: `${highlight.position_data.width}px`,
+                        height: `${highlight.position_data.height}px`,
+                        backgroundColor: highlight.color_hex,
+                        opacity: highlight.is_orphaned ? 0.2 : 0.4,
+                        pointerEvents: 'auto',
+                        border: highlight.is_orphaned ? '2px dashed #999' : 'none'
+                      }}
+                      title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
                     >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                      </div>
-                    ))}
+                      {highlight.is_orphaned && (
+                        <div className="absolute -top-3 -left-1 bg-yellow-500 text-white text-xs px-1 rounded">
+                          ⚠
+                        </div>
+                      )}
+                      <button
+                        onClick={() => removeHighlight(highlight.id)}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                ))}
                 </div>
         </div>
       )}
