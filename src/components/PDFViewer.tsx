@@ -984,6 +984,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     const loadHighlights = async () => {
       if (!document.id || document.highlightsLoaded) return
 
+      // Check if document was just uploaded (within last 10 seconds)
+      const uploadTime = document.uploadedAt ? new Date(document.uploadedAt).getTime() : 0
+      const now = Date.now()
+      const isRecentlyUploaded = (now - uploadTime) < 10000 // 10 seconds
+      
+      // If recently uploaded, wait a bit for the database to sync
+      if (isRecentlyUploaded) {
+        console.log('Document recently uploaded, waiting for database sync...')
+        await new Promise(resolve => setTimeout(resolve, 2000)) // Wait 2 seconds
+      }
+
       try {
         const bookHighlights = await highlightService.getHighlights(document.id, {
           includeOrphaned: true
@@ -993,12 +1004,20 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         // Update document to mark highlights as loaded
         const updatedDoc = { ...document, highlights: bookHighlights, highlightsLoaded: true }
         setCurrentDocument(updatedDoc)
-      } catch (error) {
-        console.warn('Highlights not available (API endpoints only work in production):', error)
-        // Set empty highlights array to prevent repeated attempts
-        setHighlights([])
-        const updatedDoc = { ...document, highlights: [], highlightsLoaded: true }
-        setCurrentDocument(updatedDoc)
+      } catch (error: any) {
+        // If book not found and recently uploaded, it might still be saving - just use empty array
+        if (error?.message?.includes('Book not found') && isRecentlyUploaded) {
+          console.log('Book not yet in database, will load highlights on refresh')
+          setHighlights([])
+          const updatedDoc = { ...document, highlights: [], highlightsLoaded: true }
+          setCurrentDocument(updatedDoc)
+        } else {
+          console.warn('Highlights not available:', error)
+          // Set empty highlights array to prevent repeated attempts
+          setHighlights([])
+          const updatedDoc = { ...document, highlights: [], highlightsLoaded: true }
+          setCurrentDocument(updatedDoc)
+        }
       }
     }
 
@@ -1058,6 +1077,18 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const handleCreateHighlight = useCallback(async (colorId: string, colorHex: string) => {
     if (!selectedTextInfo || !selectedTextInfo.range) {
       setHighlightPickerPosition(null)
+      return
+    }
+
+    // Check if document is recently uploaded and might not be in database yet
+    const uploadTime = document.uploadedAt ? new Date(document.uploadedAt).getTime() : 0
+    const now = Date.now()
+    const isRecentlyUploaded = (now - uploadTime) < 30000 // 30 seconds
+    
+    if (isRecentlyUploaded) {
+      alert('⏳ Please wait a moment...\n\nYour document is still being saved to the database.\nTry creating highlights in a few seconds, or refresh the page.')
+      setHighlightPickerPosition(null)
+      setSelectedTextInfo(null)
       return
     }
 
