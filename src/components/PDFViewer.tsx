@@ -1001,6 +1001,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         })
         setHighlights(bookHighlights)
         
+        console.log(`Loaded ${bookHighlights.length} highlights from database`)
+        
         // Update document to mark highlights as loaded
         const updatedDoc = { ...document, highlights: bookHighlights, highlightsLoaded: true }
         setCurrentDocument(updatedDoc)
@@ -1023,6 +1025,18 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
     loadHighlights()
   }, [document.id])
+
+  // Debug log when highlights change
+  useEffect(() => {
+    if (highlights.length > 0) {
+      console.log('Rendering highlights:', highlights.map(h => ({
+        id: h.id.substring(0, 8),
+        page: h.page_number,
+        position: h.position_data,
+        text: h.highlighted_text.substring(0, 30) + '...'
+      })))
+    }
+  }, [highlights])
 
   // Handle text selection for highlighting (Method 1)
   const handleTextSelection = useCallback((event: MouseEvent) => {
@@ -1103,8 +1117,28 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         return
       }
 
-      // Get the container element to calculate relative positions
-      const pageContainer = range.startContainer.parentElement?.closest('.relative') as HTMLElement
+      // Find the page container - look for the element with data-page-number or the canvas parent
+      let pageContainer: HTMLElement | null = null
+      
+      // Try to find the page container by traversing up the DOM
+      let currentElement = range.startContainer.parentElement
+      while (currentElement && !pageContainer) {
+        if (currentElement.hasAttribute('data-page-number') || 
+            currentElement.classList.contains('relative') && currentElement.querySelector('canvas')) {
+          pageContainer = currentElement
+          break
+        }
+        currentElement = currentElement.parentElement
+      }
+
+      // Fallback: look for single page mode container
+      if (!pageContainer) {
+        const singlePageCanvas = canvasRef.current?.parentElement
+        if (singlePageCanvas) {
+          pageContainer = singlePageCanvas as HTMLElement
+        }
+      }
+
       if (!pageContainer) {
         console.warn('Could not find page container')
         setHighlightPickerPosition(null)
@@ -1112,16 +1146,39 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         return
       }
 
+      // Get the bounding rectangles
       const containerRect = pageContainer.getBoundingClientRect()
-      
-      // Calculate position relative to the PDF page
       const firstRect = rects[0]
+      
+      // Calculate position relative to the PDF page container
+      // getBoundingClientRect gives viewport-relative positions
+      // We need positions relative to the page container (which includes its internal layout)
       const position = {
         x: firstRect.left - containerRect.left,
         y: firstRect.top - containerRect.top,
         width: firstRect.width,
         height: firstRect.height
       }
+
+      console.log('Highlight position debug:', {
+        pageNumber: selectedTextInfo.pageNumber,
+        scrollMode: pdfViewer.scrollMode,
+        selectionRect: { 
+          left: firstRect.left, 
+          top: firstRect.top, 
+          width: firstRect.width, 
+          height: firstRect.height 
+        },
+        containerRect: { 
+          left: containerRect.left, 
+          top: containerRect.top,
+          width: containerRect.width,
+          height: containerRect.height
+        },
+        calculatedPosition: position,
+        scale: scale,
+        zoom: pdfViewer.zoom
+      })
 
       // Calculate text offset for reading mode sync
       const pageText = document.pageTexts?.[selectedTextInfo.pageNumber - 1] || ''
