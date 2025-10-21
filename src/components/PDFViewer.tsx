@@ -519,10 +519,16 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     
 
     const renderAllPages = async () => {
+      // Wait a brief moment for refs to be populated after DOM render
+      await new Promise(resolve => setTimeout(resolve, 50))
+      
       for (let pageNum = 1; pageNum <= numPages; pageNum++) {
         const canvas = pageCanvasRefs.current.get(pageNum)
         const textLayerDiv = pageTextLayerRefs.current.get(pageNum)
-        if (!canvas) continue
+        if (!canvas) {
+          console.log(`⏭️ Skipping page ${pageNum} - canvas ref not ready`)
+          continue
+        }
 
         try {
           const page = await pdfDocRef.current!.getPage(pageNum)
