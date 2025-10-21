@@ -28,17 +28,45 @@ textLayerDiv.style.pointerEvents = 'auto'
 textLayerDiv.style.userSelect = 'text'
 ```
 
-**C. Increased Rendering Delay** (Line 524)
+**C. Retry Mechanism for Ref Readiness** (Lines 533-547)
 ```typescript
-// Changed from 50ms to 100ms
-await new Promise(resolve => setTimeout(resolve, 100))
+// Wait up to 1 second for canvas refs to be populated
+let attempts = 0
+const maxAttempts = 20 // 20 attempts * 50ms = 1 second max wait
+
+while (attempts < maxAttempts && pageCanvasRefs.current.size === 0) {
+  await new Promise(resolve => setTimeout(resolve, 50))
+  attempts++
+}
+```
+
+**D. Render Completion Tracking** (Lines 230, 286, 520, 675, 679)
+```typescript
+const [continuousModeRendered, setContinuousModeRendered] = useState(false)
+// Reset when PDF loads or mode changes
+// Set to true after rendering completes
+// Guard prevents duplicate renders
+```
+
+**E. Safety Net Check** (Lines 686-702)
+```typescript
+// Double-check all text layers after 200ms
+setTimeout(() => {
+  pageTextLayerRefs.current.forEach((textLayerDiv) => {
+    textLayerDiv.style.opacity = '1'
+    textLayerDiv.style.pointerEvents = 'auto'
+    textLayerDiv.style.userSelect = 'text'
+  })
+}, 200)
 ```
 
 **Why This Works**:
-- Static styles ensure visibility even before JS runs
-- Dynamic styles ensure they're applied after DOM manipulation
-- Longer delay ensures refs are fully populated
-- Text selection now works immediately on page load
+- Retry mechanism waits for DOM to be ready instead of fixed delay
+- Render tracking prevents infinite loops and duplicate renders
+- Safety net catches cases where initial render fails
+- Multiple defensive layers ensure text selection always works
+- Extensive logging helps diagnose any remaining issues
+- Text selection now works immediately on page load without mode switching
 
 ### 2. Highlighted Area Doesn't Match Selection Area
 
@@ -109,16 +137,24 @@ This ensures highlights scale correctly when zooming.
 ## Files Modified
 
 - `src/components/PDFViewer.tsx`:
-  - Line 524: Increased rendering delay from 50ms to 100ms
-  - Line 520: Added continuous mode rendering debug log
-  - Lines 630-632: Added dynamic inline styles in renderAllPages
-  - Lines 634-640: Enhanced text layer rendering logs
-  - Line 1319: Changed from getClientRects() to getBoundingClientRect()
+  - Line 230: Added continuousModeRendered state tracking
+  - Line 286: Reset continuousModeRendered when PDF loads
+  - Line 293: Added scrollMode to PDF info logging
+  - Lines 518-521: Reset render flag when scale/rotation/mode changes
+  - Lines 524-529: Added render guard and enhanced logging
+  - Lines 533-547: Added retry mechanism for ref readiness (up to 1 second)
+  - Line 549: Log when refs are ready
+  - Lines 552-556: Check both canvas and textLayer refs
+  - Lines 657-667: Enhanced text layer render logging with child count
+  - Lines 675-679: Set render completion flag and log success
+  - Lines 686-702: Added safety net to force text layer styles after 200ms
+  - Line 1323: Changed from getClientRects() to getBoundingClientRect()
   - Lines 1249-1260: Added selection detection logging
-  - Line 2553: Added inline styles to textLayer in continuous mode  
-  - Lines 1373-1374: Removed problematic text alignment adjustments
-  - Lines 1387-1419: Enhanced highlight position debug logging
-  - Lines 2576, 2664: Added z-index: 3 to highlights
+  - Lines 1340-1346: Improved position calculation comments
+  - Line 2557: Added inline styles to textLayer in continuous mode
+  - Lines 1361-1362: Removed problematic text alignment adjustments
+  - Lines 1391-1403: Enhanced highlight position debug logging
+  - Lines 2580, 2668: Added z-index: 3 to highlights
 
 ## Impact
 
