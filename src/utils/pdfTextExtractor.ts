@@ -116,24 +116,32 @@ function groupIntoLines(items: PositionedTextItem[]): TextLine[] {
 /**
  * Detect columns by analyzing X-position distribution
  * Returns column boundaries (X coordinates)
+ * Enhanced with dynamic threshold based on page width
  */
 function detectColumns(lines: TextLine[]): number[] {
   if (lines.length === 0) return []
 
-  // Collect all starting X positions
+  // Collect all starting X positions and calculate page width
   const xPositions = lines.map(line => line.items[0]?.x || 0)
+  const pageWidth = Math.max(...lines.map(line => {
+    const lastItem = line.items[line.items.length - 1]
+    return lastItem ? lastItem.x + lastItem.width : 0
+  }))
   
   // Simple clustering: if there are distinct groups of X positions,
   // we likely have columns
   const sortedX = [...xPositions].sort((a, b) => a - b)
   const columns: number[] = [sortedX[0]]
   
+  // Dynamic threshold based on page width (15% of page width, minimum 50px)
+  const columnGapThreshold = Math.max(50, pageWidth * 0.15)
+  
   // Detect significant gaps in X positions (potential column boundaries)
   for (let i = 1; i < sortedX.length; i++) {
     const gap = sortedX[i] - sortedX[i - 1]
     
-    // If gap is > 100px, it's likely a new column
-    if (gap > 100) {
+    // Use dynamic threshold instead of hardcoded 100px
+    if (gap > columnGapThreshold) {
       // Check if this X position appears frequently (actual column start)
       const frequency = xPositions.filter(x => Math.abs(x - sortedX[i]) < 20).length
       if (frequency > lines.length * 0.1) { // At least 10% of lines start here
@@ -226,6 +234,38 @@ function markFormula(text: string, isBlock: boolean): string {
 }
 
 /**
+ * Build line text with intelligent word spacing
+ * Analyzes gaps between text items to determine if spaces are needed
+ */
+function buildLineText(items: PositionedTextItem[]): string {
+  if (items.length === 0) return ''
+  if (items.length === 1) return items[0].text
+  
+  let text = ''
+  for (let i = 0; i < items.length; i++) {
+    text += items[i].text
+    
+    if (i < items.length - 1) {
+      const currentItem = items[i]
+      const nextItem = items[i + 1]
+      
+      // Calculate gap between current and next item
+      const gap = nextItem.x - (currentItem.x + currentItem.width)
+      
+      // Use font size to determine if gap is significant enough for a space
+      // Typical space width is about 25% of font size
+      const spaceWidth = currentItem.fontSize * 0.25
+      
+      if (gap > spaceWidth) {
+        text += ' '
+      }
+    }
+  }
+  
+  return text
+}
+
+/**
  * Format a table row with proper column alignment
  */
 function formatTableRow(line: TextLine): string {
@@ -280,8 +320,34 @@ function detectTableRegions(lines: TextLine[]): Set<number> {
 }
 
 /**
+ * Detect if line is a heading based on font size and formatting
+ */
+function detectHeading(line: TextLine, medianFontSize: number, lineText: string): boolean {
+  const isBold = line.avgFontSize > medianFontSize * 1.2
+  const isShort = line.items.length < 10
+  const hasTrailingColon = lineText.trim().endsWith(':')
+  const allCaps = lineText === lineText.toUpperCase() && lineText.length > 3
+  
+  return (isBold && isShort) || hasTrailingColon || (allCaps && isShort)
+}
+
+/**
+ * Check if line ends with hyphenation that should be merged
+ */
+function shouldMergeHyphenation(currentLineText: string, nextLine?: TextLine): boolean {
+  if (!nextLine || !currentLineText.endsWith('-')) return false
+  
+  // Get first word of next line
+  const nextLineFirstChar = nextLine.items[0]?.text.trim()[0]
+  if (!nextLineFirstChar) return false
+  
+  // Merge if next line starts with lowercase (word continuation)
+  return /[a-z]/.test(nextLineFirstChar)
+}
+
+/**
  * Build text from lines with proper line and paragraph breaks
- * Enhanced with table and formula detection
+ * Enhanced with table and formula detection, hyphenation, and sentence-aware breaks
  */
 function buildTextWithBreaks(lines: TextLine[]): string {
   if (lines.length === 0) return ''
@@ -299,9 +365,13 @@ function buildTextWithBreaks(lines: TextLine[]): string {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
+    const nextLine = i < lines.length - 1 ? lines[i + 1] : undefined
     const isTableLine = tableLines.has(i)
-    const lineText = isTableLine ? formatTableRow(line) : line.items.map(item => item.text).join('')
+    
+    // Use intelligent word spacing for non-table lines
+    let lineText = isTableLine ? formatTableRow(line) : buildLineText(line.items)
     const hasMath = containsMathSymbols(lineText)
+    const isHeading = !isTableLine && detectHeading(line, medianFontSize, lineText)
     
     // Handle table transitions
     if (isTableLine && !inTable) {
@@ -315,15 +385,31 @@ function buildTextWithBreaks(lines: TextLine[]): string {
       inTable = false
     }
     
+    // Handle hyphenation merging
+    const shouldMergeHyphen = shouldMergeHyphenation(lineText, nextLine)
+    if (shouldMergeHyphen) {
+      lineText = lineText.slice(0, -1) // Remove trailing hyphen
+    }
+    
     if (i > 0 && !inTable) {
       const yGap = previousY - line.y // Remember Y decreases as we go down
       const normalizedGap = yGap / medianFontSize
       
-      if (normalizedGap > 3.0) {
-        // Section break (very large gap)
+      // Check for sentence endings and indentation for better paragraph detection
+      const prevLineText = result.trim()
+      const endsWithSentence = /[.!?]["']?\s*$/.test(prevLineText)
+      const nextStartsCapital = /^[A-Z]/.test(lineText)
+      const hasIndent = line.items[0] && lines[i-1].items[0] && 
+                        (line.items[0].x - lines[i-1].items[0].x) > 20
+      
+      if (shouldMergeHyphen) {
+        // Hyphenated word continuation - no break
+        // Don't add any spacing
+      } else if (normalizedGap > 3.0 || isHeading) {
+        // Section break (very large gap or heading)
         result += '\n\n\n'
-      } else if (normalizedGap > 2.0) {
-        // Paragraph break
+      } else if (normalizedGap > 2.0 || (normalizedGap > 0.8 && endsWithSentence && nextStartsCapital) || hasIndent) {
+        // Paragraph break - enhanced with sentence detection
         result += '\n\n'
       } else if (normalizedGap > 1.2) {
         // Line break
@@ -361,6 +447,43 @@ function buildTextWithBreaks(lines: TextLine[]): string {
 }
 
 /**
+ * Detect and filter out header/footer lines
+ * Headers/footers are typically in top/bottom 10% of page and may contain page numbers
+ */
+function filterHeadersFooters(lines: TextLine[]): TextLine[] {
+  if (lines.length < 5) return lines // Too few lines to have headers/footers
+  
+  // Calculate page height from Y positions
+  const minY = Math.min(...lines.map(l => l.y))
+  const maxY = Math.max(...lines.map(l => l.y))
+  const pageHeight = maxY - minY
+  
+  if (pageHeight === 0) return lines
+  
+  const headerThreshold = maxY - (pageHeight * 0.10) // Top 10%
+  const footerThreshold = minY + (pageHeight * 0.10) // Bottom 10%
+  
+  return lines.filter(line => {
+    const isInHeaderZone = line.y > headerThreshold
+    const isInFooterZone = line.y < footerThreshold
+    
+    if (!isInHeaderZone && !isInFooterZone) return true
+    
+    // Check if line looks like header/footer content
+    const lineText = line.items.map(item => item.text).join('').trim()
+    const isPageNumber = /^(Page\s+)?\d+(\s+of\s+\d+)?$/i.test(lineText)
+    const isShortAndIsolated = lineText.length < 50 && line.items.length < 5
+    
+    // Filter out likely headers/footers
+    if ((isInHeaderZone || isInFooterZone) && (isPageNumber || isShortAndIsolated)) {
+      return false
+    }
+    
+    return true
+  })
+}
+
+/**
  * Main function: Extract structured text from PDF text items
  * 
  * @param items - Raw PDF text items from PDF.js getTextContent()
@@ -379,13 +502,20 @@ export function extractStructuredText(items: any[]): string {
   }
 
   // Step 2: Group into lines
-  const lines = groupIntoLines(positionedItems)
+  let lines = groupIntoLines(positionedItems)
   
   if (lines.length === 0) {
     return ''
   }
 
-  // Step 3: Detect columns
+  // Step 3: Filter out headers and footers
+  lines = filterHeadersFooters(lines)
+  
+  if (lines.length === 0) {
+    return ''
+  }
+
+  // Step 4: Detect columns
   const columns = detectColumns(lines)
   
   if (columns.length <= 1) {
@@ -393,10 +523,10 @@ export function extractStructuredText(items: any[]): string {
     return buildTextWithBreaks(lines)
   }
 
-  // Step 4: Multi-column layout
+  // Step 5: Multi-column layout
   const columnMap = assignLinesToColumns(lines, columns)
   
-  // Step 5: Process each column separately and combine
+  // Step 6: Process each column separately and combine
   let result = ''
   
   columns.forEach((columnX, index) => {
