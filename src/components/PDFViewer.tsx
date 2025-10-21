@@ -1161,6 +1161,27 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         height: firstRect.height
       }
 
+      // TEXT ALIGNMENT FIX: Adjust position to better align with actual text rendering
+      // The bounding rect often includes space above/below the actual text
+      const textElement = range.startContainer.parentElement
+      if (textElement && textElement.style) {
+        const fontSize = parseFloat(textElement.style.fontSize) || 12
+        const lineHeight = parseFloat(textElement.style.lineHeight) || fontSize
+        
+        // More precise alignment based on font metrics
+        // For PDF.js text layers, the bounding rect often sits above the actual text baseline
+        const baselineAdjustment = fontSize * 0.2 // Move down 20% of font size
+        rawPosition.y += baselineAdjustment
+        
+        // Adjust height to better match actual text height
+        // Use a more conservative height that focuses on the main text body
+        const textBodyHeight = fontSize * 0.7 // Use 70% of font size for height
+        rawPosition.height = Math.min(rawPosition.height, textBodyHeight)
+        
+        // Ensure minimum height for very small fonts
+        rawPosition.height = Math.max(rawPosition.height, fontSize * 0.5)
+      }
+
       // Normalize by current scale so positions are stored at scale 1.0
       const position = {
         x: rawPosition.x / scale,
@@ -1187,7 +1208,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           height: containerRect.height
         },
         rawPosition: rawPosition,
-        normalizedPosition: position
+        normalizedPosition: position,
+        textAlignment: {
+          fontSize: textElement?.style?.fontSize,
+          lineHeight: textElement?.style?.lineHeight,
+          baselineAdjustment: textElement ? parseFloat(textElement.style.fontSize || '12') * 0.2 : 0,
+          textBodyHeight: textElement ? parseFloat(textElement.style.fontSize || '12') * 0.7 : 0,
+          finalHeight: rawPosition.height
+        }
       })
 
       // Calculate text offset for reading mode sync
