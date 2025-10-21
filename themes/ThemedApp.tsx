@@ -5,7 +5,7 @@ import { ThemedHeader } from './ThemedHeader'
 import { ThemedSidebar } from './ThemedSidebar'
 import { ThemedMainContent } from './ThemedMainContent'
 import { DocumentViewer } from '../src/components/DocumentViewer'
-import { ChatModal } from '../src/components/ChatModal'
+import { ChatPanel } from '../src/components/ChatPanel'
 import { DocumentUpload } from '../src/components/DocumentUpload'
 import { Tooltip } from '../src/components/Tooltip'
 import { useAppStore } from '../src/store/appStore'
@@ -50,9 +50,9 @@ const ThemedAppContent: React.FC = () => {
         </ThemedMainContent>
       </div>
 
-      {/* Chat Modal */}
+      {/* Chat Panel */}
       {isChatOpen && (
-        <ChatModal onClose={() => toggleChat()} />
+        <ChatPanel onClose={() => toggleChat()} />
       )}
 
       {/* Upload Modal */}

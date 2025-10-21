@@ -112,6 +112,14 @@ export interface LibraryViewSettings {
   selectedBooks: string[] // for bulk operations
 }
 
+export interface TextSelectionContext {
+  selectedText: string
+  beforeContext: string
+  afterContext: string
+  pageNumber?: number
+  fullContext: string
+}
+
 export interface Voice {
   name: string
   languageCode: string
@@ -145,6 +153,10 @@ interface AppState {
   // UI state
   isChatOpen: boolean
   isLoading: boolean
+  
+  // Text selection and AI context
+  selectedTextContext: TextSelectionContext | null
+  chatMode: 'general' | 'clarification' | 'further-reading'
   
   // Typography settings
   typography: TypographySettings
@@ -209,6 +221,10 @@ interface AppState {
   
   setPomodoroSession: (sessionId: string | null, bookId: string | null, startTime: number | null) => void
   updatePomodoroTimer: (timeLeft: number | null, isRunning: boolean, mode: 'work' | 'shortBreak' | 'longBreak') => void
+  
+  // Text selection and AI mode actions
+  setSelectedTextContext: (context: TextSelectionContext | null) => void
+  setChatMode: (mode: 'general' | 'clarification' | 'further-reading') => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -261,6 +277,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   chatMessages: [],
   isTyping: false,
   libraryRefreshTrigger: 0,
+  
+  // Text selection and AI context
+  selectedTextContext: null,
+  chatMode: 'general',
   
   // Library view settings
   libraryView: {
@@ -495,7 +515,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   
   selectAllBooks: (bookIds) => set((state) => ({
     libraryView: { ...state.libraryView, selectedBooks: bookIds }
-  }))
+  })),
+  
+  // Text selection and AI mode actions
+  setSelectedTextContext: (context) => set({ selectedTextContext: context }),
+  
+  setChatMode: (mode) => set({ chatMode: mode })
 }))
 
 

@@ -1,10 +1,69 @@
-import React from 'react'
+import React, { useState, useCallback } from 'react'
 import { useAppStore } from '../store/appStore'
 import { EmptyState } from './EmptyState'
 import { PDFViewer } from './PDFViewer'
+import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
+import { getTextSelectionContext, hasTextSelection } from '../utils/textSelection'
+import { storageService, Note } from '../services/storageService'
 
 export const DocumentViewer: React.FC = () => {
-  const { currentDocument, typography } = useAppStore()
+  const { 
+    currentDocument, 
+    typography, 
+    setSelectedTextContext, 
+    setChatMode, 
+    toggleChat,
+    isChatOpen 
+  } = useAppStore()
+  
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    // Check if there's a text selection
+    if (hasTextSelection()) {
+      e.preventDefault()
+      setContextMenu({ x: e.clientX, y: e.clientY })
+    }
+  }, [])
+
+  const handleClarification = useCallback(() => {
+    const context = getTextSelectionContext()
+    if (context) {
+      setSelectedTextContext(context)
+      setChatMode('clarification')
+      if (!isChatOpen) {
+        toggleChat()
+      }
+    }
+  }, [setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
+
+  const handleFurtherReading = useCallback(() => {
+    const context = getTextSelectionContext()
+    if (context) {
+      setSelectedTextContext(context)
+      setChatMode('further-reading')
+      if (!isChatOpen) {
+        toggleChat()
+      }
+    }
+  }, [setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
+
+  const handleSaveNote = useCallback(() => {
+    const context = getTextSelectionContext()
+    if (context && currentDocument) {
+      const note: Note = {
+        id: crypto.randomUUID(),
+        bookId: currentDocument.id,
+        bookName: currentDocument.name,
+        pageNumber: 1, // Default to page 1 for text documents
+        content: '',
+        selectedText: context.selectedText,
+        createdAt: new Date(),
+      }
+      storageService.saveNote(note)
+      console.log('Note saved from selection')
+    }
+  }, [currentDocument])
 
   if (!currentDocument) {
     return <EmptyState />
@@ -62,27 +121,44 @@ export const DocumentViewer: React.FC = () => {
   }
 
   return (
-    <div className="flex justify-center">
-      <div 
-        className="rounded-xl p-12 transition-all duration-300"
-        style={{
-          ...getThemeStyles(),
-          fontFamily: getFontFamily(),
-          fontSize: `${typography.fontSize}px`,
-          lineHeight: typography.lineHeight,
-          maxWidth: `${typography.maxWidth}px`,
-          width: '100%',
-          boxShadow: 'var(--shadow-lg)',
-          borderRadius: 'var(--border-radius-lg)',
-        }}
-      >
-        <div className="prose prose-lg max-w-none">
-          <pre className="whitespace-pre-wrap font-inherit leading-inherit">
-            {cleanContent(currentDocument.content)}
-          </pre>
+    <>
+      <div className="flex justify-center">
+        <div 
+          className="rounded-xl p-12 transition-all duration-300"
+          style={{
+            ...getThemeStyles(),
+            fontFamily: getFontFamily(),
+            fontSize: `${typography.fontSize}px`,
+            lineHeight: typography.lineHeight,
+            maxWidth: `${typography.maxWidth}px`,
+            width: '100%',
+            boxShadow: 'var(--shadow-lg)',
+            borderRadius: 'var(--border-radius-lg)',
+          }}
+          onContextMenu={handleContextMenu}
+        >
+          <div className="prose prose-lg max-w-none">
+            <pre className="whitespace-pre-wrap font-inherit leading-inherit">
+              {cleanContent(currentDocument.content)}
+            </pre>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          options={createAIContextMenuOptions(
+            handleClarification,
+            handleFurtherReading,
+            handleSaveNote
+          )}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+    </>
   )
 }
 

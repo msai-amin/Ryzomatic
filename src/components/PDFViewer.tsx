@@ -38,6 +38,8 @@ import { convertMultipleFormulas } from '../services/formulaService'
 import { highlightService, Highlight as HighlightType } from '../services/highlightService'
 import { HighlightColorPicker } from './HighlightColorPicker'
 import { HighlightManagementPanel } from './HighlightManagementPanel'
+import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
+import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 
 // PDF.js will be imported dynamically
 
@@ -171,7 +173,19 @@ interface PDFViewerProps {
 }
 
 export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
-  const { pdfViewer, tts, typography, updatePDFViewer, updateTTS, updateTypography, setCurrentDocument } = useAppStore()
+  const { 
+    pdfViewer, 
+    tts, 
+    typography, 
+    updatePDFViewer, 
+    updateTTS, 
+    updateTypography, 
+    setCurrentDocument,
+    setSelectedTextContext,
+    setChatMode,
+    toggleChat,
+    isChatOpen
+  } = useAppStore()
   
   const [pageNumber, setPageNumber] = useState(1)
   const [numPages, setNumPages] = useState<number | null>(null)
@@ -1120,6 +1134,43 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   }, [highlights])
 
   // Handle text selection for highlighting (Method 1)
+  // AI Context Menu Handlers
+  const handleAIClarification = useCallback(() => {
+    // Get current page text for context
+    const pageText = document.pageTexts?.[pageNumber - 1]
+    const context = getPDFTextSelectionContext(pageNumber, pageText)
+    
+    if (context) {
+      setSelectedTextContext(context)
+      setChatMode('clarification')
+      if (!isChatOpen) {
+        toggleChat()
+      }
+    }
+    setContextMenu(null)
+  }, [pageNumber, document.pageTexts, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
+
+  const handleAIFurtherReading = useCallback(() => {
+    const pageText = document.pageTexts?.[pageNumber - 1]
+    const context = getPDFTextSelectionContext(pageNumber, pageText)
+    
+    if (context) {
+      setSelectedTextContext(context)
+      setChatMode('further-reading')
+      if (!isChatOpen) {
+        toggleChat()
+      }
+    }
+    setContextMenu(null)
+  }, [pageNumber, document.pageTexts, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
+
+  const handleSaveNoteFromContext = useCallback(() => {
+    if (contextMenu) {
+      handleAddNote(contextMenu.text)
+    }
+    setContextMenu(null)
+  }, [contextMenu])
+
   const handleTextSelection = useCallback((event: MouseEvent) => {
     if (isHighlightMode) return // Skip if in drag-highlight mode
     if (pdfViewer.readingMode) return // Skip in reading mode (read-only)
@@ -1167,6 +1218,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       y: rect.top - 10
     })
   }, [isHighlightMode, pdfViewer.readingMode, pdfViewer.scrollMode, pageNumber])
+  
+  // Handle right-click context menu for AI features
+  const handleContextMenuClick = useCallback((event: React.MouseEvent) => {
+    if (hasTextSelection()) {
+      event.preventDefault()
+      const selection = window.getSelection()
+      if (selection) {
+        setContextMenu({
+          x: event.clientX,
+          y: event.clientY,
+          text: selection.toString().trim()
+        })
+      }
+    }
+  }, [])
 
   // Create highlight after color selection
   const handleCreateHighlight = useCallback(async (colorId: string, colorHex: string) => {
@@ -2427,7 +2493,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               </div>
             ) : (
               numPages && Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
-                <div key={pageNum} className="relative bg-white shadow-2xl" data-page-number={pageNum} style={{ minHeight: '600px', minWidth: '400px' }}>
+                <div 
+                  key={pageNum} 
+                  className="relative bg-white shadow-2xl" 
+                  data-page-number={pageNum} 
+                  style={{ minHeight: '600px', minWidth: '400px' }}
+                  onContextMenu={handleContextMenuClick}
+                >
                   <canvas
                     ref={(el) => {
                       if (el) pageCanvasRefs.current.set(pageNum, el)
@@ -2489,7 +2561,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         ) : (
           // Single page mode
           <div className="flex justify-center">
-            <div ref={pageContainerRef} className="relative bg-white shadow-2xl" style={{ minHeight: '600px', minWidth: '400px' }}>
+            <div 
+              ref={pageContainerRef} 
+              className="relative bg-white shadow-2xl" 
+              style={{ minHeight: '600px', minWidth: '400px' }}
+              onContextMenu={handleContextMenuClick}
+            >
               {/* Loading indicator */}
               {(() => {
                 const shouldShowLoading = isLoading || !pageRendered;
@@ -2568,29 +2645,18 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       )}
           </div>
 
-      {/* Context Menu */}
+      {/* AI Context Menu */}
       {contextMenu && (
-        <div
-          className="fixed rounded-lg shadow-lg py-2 z-50"
-          style={{ 
-            left: contextMenu.x, 
-            top: contextMenu.y,
-            backgroundColor: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-            boxShadow: 'var(--shadow-lg)'
-          }}
-        >
-          <button
-            onClick={() => handleAddNote(contextMenu.text)}
-            className="w-full px-4 py-2 text-left flex items-center gap-2 transition-colors"
-            style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-          >
-            <StickyNote className="w-4 h-4" />
-            Add to Notes
-          </button>
-        </div>
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          options={createAIContextMenuOptions(
+            handleAIClarification,
+            handleAIFurtherReading,
+            handleSaveNoteFromContext
+          )}
+          onClose={() => setContextMenu(null)}
+        />
       )}
 
       {/* Notes Panel */}

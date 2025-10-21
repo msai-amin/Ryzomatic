@@ -329,6 +329,195 @@ Text: ${text}`
   });
 };
 
+/**
+ * Ask AI for clarification on selected text with context
+ */
+export const askForClarification = async (
+  selectedText: string,
+  context: string,
+  documentContent?: string
+): Promise<string> => {
+  const logContext = {
+    component: 'AIService',
+    action: 'askForClarification'
+  };
+
+  return trackPerformance('askForClarification', async () => {
+    const prompt = `Please clarify and explain the following text in simpler, easier-to-understand terms.
+
+Selected text to clarify:
+"${selectedText}"
+
+Surrounding context:
+${context}
+
+Please provide:
+1. A simplified explanation of what this text means
+2. Key terms or concepts defined
+3. Examples or analogies to help understand it better
+4. Why this might be important in the context of the document
+
+Please be clear, concise, and helpful.`;
+
+    if (genAI) {
+      try {
+        logger.info('Using Gemini for clarification', logContext, {
+          selectedTextLength: selectedText.length,
+          contextLength: context.length
+        });
+
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const result = await model.generateContent(prompt);
+        const response = result.response.text();
+        
+        logger.info('Gemini clarification response received', logContext, {
+          responseLength: response.length
+        });
+        
+        return response;
+      } catch (error) {
+        logger.error('Gemini clarification error', logContext, error as Error);
+      }
+    }
+
+    if (openai && openaiApiKey && openaiApiKey !== 'your_openai_api_key_here') {
+      try {
+        logger.info('Using OpenAI for clarification', logContext, {
+          selectedTextLength: selectedText.length,
+          contextLength: context.length
+        });
+
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: "You are a helpful AI assistant that excels at explaining complex concepts in simple, clear language."
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          max_tokens: 2000,
+          temperature: 0.7,
+        });
+
+        const response = completion.choices[0]?.message?.content || 'Sorry, I couldn\'t generate a clarification.';
+        
+        logger.info('OpenAI clarification response received', logContext, {
+          responseLength: response.length
+        });
+        
+        return response;
+      } catch (error) {
+        logger.error('OpenAI clarification error', logContext, error as Error);
+      }
+    }
+
+    // Fallback response
+    return `I'd be happy to clarify this text for you:\n\n"${selectedText}"\n\nIn a real implementation with AI API keys configured, I would provide a detailed, simplified explanation of this concept. Please configure your Gemini or OpenAI API key to enable this feature.`;
+  }, logContext, {
+    selectedTextLength: selectedText.length,
+    contextLength: context.length
+  });
+};
+
+/**
+ * Get further reading suggestions based on selected text
+ */
+export const getFurtherReading = async (
+  selectedText: string,
+  context: string,
+  documentContent?: string
+): Promise<string> => {
+  const logContext = {
+    component: 'AIService',
+    action: 'getFurtherReading'
+  };
+
+  return trackPerformance('getFurtherReading', async () => {
+    const prompt = `Based on the following text, suggest further reading topics, related concepts, and resources to explore.
+
+Selected text:
+"${selectedText}"
+
+Surrounding context:
+${context}
+
+Please provide:
+1. Key concepts and topics related to this text
+2. Suggested areas for deeper exploration
+3. Related theoretical frameworks or methodologies
+4. Recommended search terms or keywords for further research
+5. How this connects to broader themes in the field
+
+Be specific and actionable in your suggestions.`;
+
+    if (genAI) {
+      try {
+        logger.info('Using Gemini for further reading suggestions', logContext, {
+          selectedTextLength: selectedText.length,
+          contextLength: context.length
+        });
+
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const result = await model.generateContent(prompt);
+        const response = result.response.text();
+        
+        logger.info('Gemini further reading response received', logContext, {
+          responseLength: response.length
+        });
+        
+        return response;
+      } catch (error) {
+        logger.error('Gemini further reading error', logContext, error as Error);
+      }
+    }
+
+    if (openai && openaiApiKey && openaiApiKey !== 'your_openai_api_key_here') {
+      try {
+        logger.info('Using OpenAI for further reading suggestions', logContext, {
+          selectedTextLength: selectedText.length,
+          contextLength: context.length
+        });
+
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: "You are a knowledgeable research assistant that helps people discover related topics and deepen their understanding through further reading."
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          max_tokens: 2000,
+          temperature: 0.7,
+        });
+
+        const response = completion.choices[0]?.message?.content || 'Sorry, I couldn\'t generate suggestions.';
+        
+        logger.info('OpenAI further reading response received', logContext, {
+          responseLength: response.length
+        });
+        
+        return response;
+      } catch (error) {
+        logger.error('OpenAI further reading error', logContext, error as Error);
+      }
+    }
+
+    // Fallback response
+    return `I'd be happy to suggest further reading based on:\n\n"${selectedText}"\n\nIn a real implementation with AI API keys configured, I would provide detailed suggestions for related topics, concepts, and resources to explore. Please configure your Gemini or OpenAI API key to enable this feature.`;
+  }, logContext, {
+    selectedTextLength: selectedText.length,
+    contextLength: context.length
+  });
+};
+
 // Export the AI clients for advanced usage
 export { openai, genAI };
 
