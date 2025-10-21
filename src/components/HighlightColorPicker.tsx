@@ -80,7 +80,7 @@ export const HighlightColorPicker: React.FC<HighlightColorPickerProps> = ({
   return (
     <div
       ref={pickerRef}
-      className="fixed z-50 shadow-lg rounded-lg p-3"
+      className="fixed z-40 shadow-lg rounded-lg p-3"
       style={{
         backgroundColor: 'var(--color-surface)',
         border: '1px solid var(--color-border)',

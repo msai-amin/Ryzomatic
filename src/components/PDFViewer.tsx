@@ -383,13 +383,23 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
         const viewport = page.getViewport({ scale, rotation })
         
-        canvas.height = viewport.height
-        canvas.width = viewport.width
+        // High-DPI display support for crisp rendering
+        const dpr = window.devicePixelRatio || 1
+        canvas.height = viewport.height * dpr
+        canvas.width = viewport.width * dpr
+        canvas.style.width = viewport.width + 'px'
+        canvas.style.height = viewport.height + 'px'
 
         console.log('📐 Canvas dimensions set:', {
           width: canvas.width,
-          height: canvas.height
+          height: canvas.height,
+          cssWidth: canvas.style.width,
+          cssHeight: canvas.style.height,
+          dpr: dpr
         })
+
+        // Scale context to account for high-DPI
+        context.scale(dpr, dpr)
 
         const renderContext = {
           canvasContext: context,
@@ -516,8 +526,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
           const viewport = page.getViewport({ scale, rotation })
           
-          canvas.height = viewport.height
-          canvas.width = viewport.width
+          // High-DPI display support for crisp rendering
+          const dpr = window.devicePixelRatio || 1
+          canvas.height = viewport.height * dpr
+          canvas.width = viewport.width * dpr
+          canvas.style.width = viewport.width + 'px'
+          canvas.style.height = viewport.height + 'px'
+          
+          // Scale context to account for high-DPI
+          context.scale(dpr, dpr)
 
           const renderContext = {
             canvasContext: context,
@@ -1225,6 +1242,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       event.preventDefault()
       const selection = window.getSelection()
       if (selection) {
+        // Close highlight picker when context menu opens to avoid z-index conflicts
+        setHighlightPickerPosition(null)
+        setSelectedTextInfo(null)
+        
         setContextMenu({
           x: event.clientX,
           y: event.clientY,
@@ -2535,7 +2556,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                             height: `${scaledPosition.height}px`,
                             backgroundColor: highlight.color_hex,
                             opacity: highlight.is_orphaned ? 0.2 : 0.4,
-                            pointerEvents: 'auto',
+                            pointerEvents: 'none',
                             border: highlight.is_orphaned ? '2px dashed #999' : 'none'
                           }}
                           title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
@@ -2548,6 +2569,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                           <button
                             onClick={() => removeHighlight(highlight.id)}
                             className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            style={{ pointerEvents: 'auto' }}
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>
@@ -2621,7 +2643,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                         height: `${scaledPosition.height}px`,
                         backgroundColor: highlight.color_hex,
                         opacity: highlight.is_orphaned ? 0.2 : 0.4,
-                        pointerEvents: 'auto',
+                        pointerEvents: 'none',
                         border: highlight.is_orphaned ? '2px dashed #999' : 'none'
                       }}
                       title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
@@ -2634,6 +2656,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                       <button
                         onClick={() => removeHighlight(highlight.id)}
                         className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        style={{ pointerEvents: 'auto' }}
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
