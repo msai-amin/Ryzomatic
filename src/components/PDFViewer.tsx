@@ -536,12 +536,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     })
 
     const renderAllPages = async () => {
-      // Wait for refs to be populated after DOM render
+      // Wait for BOTH canvas AND textLayer refs to be populated after DOM render
       // Use multiple attempts with increasing delays to ensure refs are ready
       let attempts = 0
       const maxAttempts = 20 // 20 attempts * 50ms = 1 second max wait
       
-      while (attempts < maxAttempts && pageCanvasRefs.current.size === 0) {
+      while (attempts < maxAttempts && 
+             (pageCanvasRefs.current.size === 0 || pageTextLayerRefs.current.size === 0)) {
         await new Promise(resolve => setTimeout(resolve, 50))
         attempts++
       }
@@ -551,7 +552,16 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         return
       }
       
-      console.log(`✅ Canvas refs ready after ${attempts * 50}ms, starting render`)
+      if (pageTextLayerRefs.current.size === 0) {
+        console.warn('⚠️ TextLayer refs never populated, aborting render')
+        return
+      }
+      
+      console.log(`✅ Canvas and TextLayer refs ready after ${attempts * 50}ms, starting render`, {
+        canvasRefs: pageCanvasRefs.current.size,
+        textLayerRefs: pageTextLayerRefs.current.size,
+        expectedPages: numPages
+      })
       
       for (let pageNum = 1; pageNum <= numPages; pageNum++) {
         const canvas = pageCanvasRefs.current.get(pageNum)
