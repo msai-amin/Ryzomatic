@@ -4,48 +4,71 @@
 
 ### 1. Text Selection Not Working in Continuous Scrolling Mode
 
-**Problem**: Users couldn't select text when viewing PDFs in continuous scrolling mode.
+**Problem**: Users couldn't select text when viewing PDFs in continuous scrolling mode. Selection only worked after switching to single page mode first.
 
-**Root Cause**: The text layer div in continuous mode didn't have explicit inline styles to ensure it was visible and selectable.
+**Root Causes**: 
+1. Text layer div in continuous mode didn't have explicit inline styles
+2. Rendering timing issue - refs not ready when text layers were being created
+3. Styles not applied programmatically after rendering
 
-**Fix**: Added explicit inline styles to the textLayer div in continuous mode
+**Fixes Applied**:
+
+**A. Static Inline Styles** (Line 2553)
 ```typescript
-// Line 2553
 <div
   className="textLayer"
   style={{ opacity: 1, pointerEvents: 'auto', userSelect: 'text' }}
 />
 ```
 
+**B. Dynamic Styles in renderAllPages** (Lines 630-632)
+```typescript
+textLayerDiv.style.opacity = '1'
+textLayerDiv.style.pointerEvents = 'auto'
+textLayerDiv.style.userSelect = 'text'
+```
+
+**C. Increased Rendering Delay** (Line 524)
+```typescript
+// Changed from 50ms to 100ms
+await new Promise(resolve => setTimeout(resolve, 100))
+```
+
 **Why This Works**:
-- `opacity: 1` - Ensures text layer is visible
-- `pointerEvents: 'auto'` - Allows mouse interactions
-- `userSelect: 'text'` - Enables text selection
+- Static styles ensure visibility even before JS runs
+- Dynamic styles ensure they're applied after DOM manipulation
+- Longer delay ensures refs are fully populated
+- Text selection now works immediately on page load
 
 ### 2. Highlighted Area Doesn't Match Selection Area
 
-**Problem**: When creating highlights, the yellow/colored boxes appeared in incorrect positions, not matching the selected text.
+**Problem**: When creating highlights, the yellow/colored boxes appeared in incorrect positions, not matching the selected text. Sometimes the selection would cover the phrase completely, sometimes not, and the highlight wouldn't match.
 
-**Root Cause**: The position calculation was applying font-based adjustments (baseline adjustment, height reduction) that were causing misalignment:
+**Root Causes**: 
+1. Using `getClientRects()` which returns multiple rectangles (one per line fragment)
+2. Font-based adjustments were being applied to positions
+3. Using only the first rectangle from a multi-rect selection
+
+**Fixes Applied**:
+
+**A. Changed to getBoundingClientRect()** (Line 1319)
 ```typescript
-// REMOVED - These were causing misalignment:
-const baselineAdjustment = fontSize * 0.2 // Move down 20% 
-rawPosition.y += baselineAdjustment
-const textBodyHeight = fontSize * 0.7 // Use 70% of font size
-rawPosition.height = Math.min(rawPosition.height, textBodyHeight)
+// Before: const rects = range.getClientRects()
+// After:
+const selectionRect = range.getBoundingClientRect()
 ```
 
-**Fix**: Removed the text alignment adjustments and trusted the browser's `getBoundingClientRect()` API
+**B. Removed Font-Based Adjustments** (Line 1373-1374)
 ```typescript
-// Line 1357-1358
 // TEXT ALIGNMENT: Use browser's getBoundingClientRect() without adjustments  
 // Previous adjustments were causing position misalignment - browser rect is already accurate
 ```
 
 **Why This Works**:
-- Browser's `getBoundingClientRect()` already provides accurate positions
-- No need for font-based adjustments
-- Positions now correctly match the selected text bounds
+- `getBoundingClientRect()` returns a single unified bounding box encompassing the entire selection
+- No multiple rects to handle - one box fits all selected text
+- Browser's API already provides pixel-perfect accuracy
+- Positions match the text span coordinates exactly (e.g., left: 216.07px, top: 167.447px)
 
 ### 3. Enhanced Debugging
 
@@ -86,10 +109,15 @@ This ensures highlights scale correctly when zooming.
 ## Files Modified
 
 - `src/components/PDFViewer.tsx`:
-  - Line 2553: Added inline styles to textLayer in continuous mode
-  - Line 1357-1358: Removed problematic text alignment adjustments
-  - Lines 1343-1346: Added scroll adjustment tracking (for future use)
-  - Lines 1385-1399: Enhanced debug logging
+  - Line 524: Increased rendering delay from 50ms to 100ms
+  - Line 520: Added continuous mode rendering debug log
+  - Lines 630-632: Added dynamic inline styles in renderAllPages
+  - Lines 634-640: Enhanced text layer rendering logs
+  - Line 1319: Changed from getClientRects() to getBoundingClientRect()
+  - Lines 1249-1260: Added selection detection logging
+  - Line 2553: Added inline styles to textLayer in continuous mode  
+  - Lines 1373-1374: Removed problematic text alignment adjustments
+  - Lines 1387-1419: Enhanced highlight position debug logging
   - Lines 2576, 2664: Added z-index: 3 to highlights
 
 ## Impact
