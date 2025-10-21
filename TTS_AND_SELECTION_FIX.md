@@ -111,10 +111,37 @@ Disabled the connectivity health check by commenting it out in `healthMonitor.ts
 **Files Modified**:
 - `src/services/healthMonitor.ts` (lines 145-183)
 
+## Critical Update: Root Cause of TTS with Highlights
+
+### The Real Problem (Discovered Later)
+
+After deployment, user reported TTS still not working when PDF has highlights. Investigation revealed:
+
+**Console showed**:
+```
+[INFO] PageTexts extracted successfully  ✅
+[WARN] AudioWidget: Missing document or page data for TTS  ❌
+```
+
+**Root Cause**: When opening books from the library, `pageTexts` were being extracted and stored but **NOT copied to the Document object**!
+
+**Location**: `src/components/ModernLibraryModal.tsx` line 171
+
+**Fix**: Added `pageTexts: bookData.pageTexts || []` when converting SavedBook to Document format.
+
+**Why This Happened**: 
+- PageTexts were successfully extracted during `getBook()` (stored in `bookData.pageTexts`)
+- But when creating the Document object to pass to `setCurrentDocument()`, only basic fields were copied
+- The `pageTexts` array was left behind, causing TTS to fail
+
+**Files Modified**:
+- `src/components/ModernLibraryModal.tsx` (line 171)
+
 ## Impact
 
 - **TTS**: Now works reliably even when highlights are present or when page state initialization has timing issues
 - **Text Selection**: Works consistently in all modes (single page, continuous scroll, reading mode)
 - **Console Output**: Clean console without health check spam
-- **User Experience**: Both features now work as expected without workarounds
+- **PageTexts Preservation**: PageTexts are now properly preserved when opening books from library
+- **User Experience**: All features now work as expected without workarounds
 
