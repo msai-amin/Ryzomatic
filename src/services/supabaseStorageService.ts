@@ -369,6 +369,45 @@ class SupabaseStorageService {
           logger.info('PDF downloaded from S3 successfully', context, {
             size: book.fileData.byteLength / 1024 / 1024 + 'MB'
           });
+
+          // EXTRACT PAGETEXTS ON-DEMAND for TTS functionality
+          // Since page_texts column was removed to save storage, extract them now
+          try {
+            logger.info('Extracting pageTexts for TTS functionality', context);
+            const { extractStructuredText } = await import('../utils/pdfTextExtractor');
+            
+            // Import PDF.js dynamically
+            const pdfjsLib = await import('pdfjs-dist');
+            pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+            
+            // Load PDF and extract text
+            const pdf = await pdfjsLib.getDocument({ data: book.fileData }).promise;
+            const pageTexts: string[] = [];
+            
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+              try {
+                const page = await pdf.getPage(pageNum);
+                const textContent = await page.getTextContent();
+                const pageText = extractStructuredText(textContent.items);
+                pageTexts.push(pageText);
+              } catch (pageError) {
+                logger.warn(`Error extracting text from page ${pageNum}`, context, pageError as Error);
+                pageTexts.push(''); // Empty string for failed pages
+              }
+            }
+            
+            book.pageTexts = pageTexts;
+            logger.info('PageTexts extracted successfully', context, {
+              totalPages: pdf.numPages,
+              extractedPages: pageTexts.length,
+              totalTextLength: pageTexts.join('').length
+            });
+            
+          } catch (extractError) {
+            logger.warn('Failed to extract pageTexts, TTS will not be available', context, extractError as Error);
+            book.pageTexts = []; // Empty array if extraction fails
+          }
+          
         } catch (error) {
           logger.error('Error downloading PDF from S3', context, error as Error);
           throw errorHandler.createError(
@@ -380,6 +419,8 @@ class SupabaseStorageService {
         }
       } else if (data.file_type === 'text' && data.text_content) {
         book.fileData = data.text_content;
+        // For text files, create a single pageTexts entry
+        book.pageTexts = [data.text_content];
       } else if (data.file_type === 'pdf' && !data.s3_key) {
         logger.error('PDF book has no S3 key', context);
         throw errorHandler.createError(

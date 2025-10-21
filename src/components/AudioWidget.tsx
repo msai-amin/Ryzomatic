@@ -28,6 +28,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const [isDragging, setIsDragging] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false) // CRITICAL: Prevent multiple simultaneous requests
+  const [isExtractingText, setIsExtractingText] = useState(false) // Show when text extraction is happening
   const progressRef = useRef<HTMLDivElement>(null)
   const lastClickTimeRef = useRef<number>(0) // CRITICAL: Debounce rapid clicks
 
@@ -185,7 +186,16 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             console.warn('AudioWidget: No text available for TTS in any page')
           }
         } else {
-          console.warn('AudioWidget: Missing document or page data for TTS')
+          console.warn('AudioWidget: Missing document or page data for TTS', {
+            hasCurrentDoc: !!currentDoc,
+            docType: currentDoc?.type,
+            hasPageTexts: !!currentDoc?.pageTexts,
+            pageTextsLength: currentDoc?.pageTexts?.length || 0,
+            currentPage: currentPage
+          })
+          
+          // Show user-friendly message
+          alert('🔊 Audio not available\n\nText extraction is still in progress. Please wait a moment and try again.\n\nIf the issue persists, the PDF may not have extractable text.')
         }
       } catch (error) {
         console.error('AudioWidget: TTS Error:', error)
@@ -389,23 +399,25 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           
           <button
             onClick={handlePlayPause}
-            disabled={isProcessing}
+            disabled={isProcessing || isExtractingText}
             className="p-3 rounded-full transition-colors shadow-lg"
             style={{
-              backgroundColor: isProcessing ? 'var(--color-text-tertiary)' : 'var(--color-primary)',
+              backgroundColor: (isProcessing || isExtractingText) ? 'var(--color-text-tertiary)' : 'var(--color-primary)',
               color: 'var(--color-text-inverse)',
-              cursor: isProcessing ? 'not-allowed' : 'pointer',
+              cursor: (isProcessing || isExtractingText) ? 'not-allowed' : 'pointer',
               boxShadow: 'var(--shadow-lg)'
             }}
             onMouseEnter={(e) => {
-              if (!isProcessing) e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'
+              if (!isProcessing && !isExtractingText) e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'
             }}
             onMouseLeave={(e) => {
-              if (!isProcessing) e.currentTarget.style.backgroundColor = 'var(--color-primary)'
+              if (!isProcessing && !isExtractingText) e.currentTarget.style.backgroundColor = 'var(--color-primary)'
             }}
             title={
               isProcessing 
                 ? "Processing..." 
+                : isExtractingText
+                  ? "Extracting text for audio..."
                 : tts.isPlaying 
                   ? "Pause" 
                   : ttsManager.isPausedState()
@@ -413,7 +425,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                     : "Play"
             }
           >
-            {isProcessing ? (
+            {(isProcessing || isExtractingText) ? (
               <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-text-inverse)' }} />
             ) : tts.isPlaying ? (
               <Pause className="w-6 h-6" />
