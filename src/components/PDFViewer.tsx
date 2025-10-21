@@ -310,21 +310,34 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       // Clear page text layer refs
       pageTextLayerRefs.current.clear()
       
-      // Force re-render
+      // Force re-render by resetting pageRendered state
+      // The normal page rendering useEffect will handle the actual re-render
       setPageRendered(false)
       
-      // Trigger page rendering for current mode with a small delay
-      setTimeout(() => {
-        console.log('🔄 Triggering PDF re-render after reading mode exit')
-        setPageRendered(true)
-      }, 150)
+      console.log('🔄 PDF re-render will be triggered by normal page rendering logic')
     }
   }, [pdfViewer.readingMode, pdfViewer.scrollMode, isLoading])
 
   // Render current page (single page mode)
   useEffect(() => {
-    if (pdfViewer.scrollMode === 'continuous') return
-    if (pdfViewer.readingMode) return // Don't render PDF when in reading mode
+    console.log('🔄 Page render useEffect triggered:', {
+      scrollMode: pdfViewer.scrollMode,
+      readingMode: pdfViewer.readingMode,
+      pageNumber,
+      scale,
+      rotation,
+      hasPdfDoc: !!pdfDocRef.current,
+      hasCanvas: !!canvasRef.current
+    })
+    
+    if (pdfViewer.scrollMode === 'continuous') {
+      console.log('⏭️ Skipping single page render - continuous mode')
+      return
+    }
+    if (pdfViewer.readingMode) {
+      console.log('⏭️ Skipping single page render - reading mode')
+      return // Don't render PDF when in reading mode
+    }
 
     const renderPage = async () => {
       if (!pdfDocRef.current || !canvasRef.current) {
@@ -440,7 +453,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             })
             
             textLayerRef.current.appendChild(textLayerFrag)
-            console.log('📝 Text layer rendered with improved alignment')
+            console.log('📝 Text layer rendered with improved alignment:', {
+              textElements: textDivs.length,
+              pageNumber: pageNumber,
+              hasTextLayer: !!textLayerRef.current,
+              textLayerOpacity: textLayerRef.current.style.opacity
+            })
           }
           
           // Mark page as rendered
@@ -552,6 +570,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             })
             
             textLayerDiv.appendChild(textLayerFrag)
+            console.log(`📝 Text layer rendered for page ${pageNum}:`, {
+              textElements: textContent.items.length,
+              hasTextLayer: !!textLayerDiv,
+              textLayerOpacity: textLayerDiv.style.opacity
+            })
           }
         } catch (error) {
           console.error(`Error rendering page ${pageNum}:`, error)
