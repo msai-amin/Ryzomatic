@@ -210,17 +210,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ onClose }) => {
     <>
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black bg-opacity-25 z-40 transition-opacity duration-200"
+        className="fixed inset-0 bg-black bg-opacity-25 transition-opacity duration-200"
+        style={{ zIndex: 9998 }}
         onClick={onClose}
       />
       
       {/* Chat Panel */}
       <div 
         ref={panelRef}
-        className={`fixed right-0 top-0 ${panelWidth} ${panelHeight} shadow-2xl z-50 flex flex-col border-l transition-all duration-300 ease-in-out`}
+        className={`fixed right-0 top-0 ${panelWidth} ${panelHeight} shadow-2xl flex flex-col border-l transition-all duration-300 ease-in-out`}
         style={{
           backgroundColor: 'var(--color-surface)',
           borderColor: 'var(--color-border)',
+          zIndex: 9999, // Ensure it's above everything
         }}
       >
         {/* Header */}

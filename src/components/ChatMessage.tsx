@@ -33,9 +33,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         <div 
           className="inline-block p-3 rounded-lg"
           style={{
-            backgroundColor: isUser ? 'var(--color-primary)' : 'var(--color-background)',
-            color: isUser ? 'var(--color-text-inverse)' : 'var(--color-text-primary)',
+            backgroundColor: isUser ? 'var(--color-primary)' : '#f3f4f6',
+            color: isUser ? 'var(--color-text-inverse)' : '#1f2937',
             borderRadius: 'var(--border-radius-md)',
+            border: isUser ? 'none' : '1px solid #e5e7eb',
           }}
         >
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
