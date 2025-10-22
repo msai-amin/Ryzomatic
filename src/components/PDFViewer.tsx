@@ -287,6 +287,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     text: string
   } | null>(null)
   const [showNotesPanel, setShowNotesPanel] = useState<boolean>(false)
+  const [isToolbarStuck, setIsToolbarStuck] = useState<boolean>(false)
+  const toolbarRef = useRef<HTMLDivElement>(null)
   const [selectedTextForNote, setSelectedTextForNote] = useState<string>('')
   const [selectionMode, setSelectionMode] = useState(false)
   const [showVoiceSelector, setShowVoiceSelector] = useState(false)
@@ -946,6 +948,26 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
   }, [pageNumber, numPages, scale, rotation, isHighlightMode, showNotesPanel, pdfViewer.readingMode, updatePDFViewer, typography.textAlign, typography.focusMode, typography.readingGuide, updateTypography, isEditing])
+
+  // Intersection observer for sticky toolbar
+  useEffect(() => {
+    const toolbarElement = toolbarRef.current
+    if (!toolbarElement) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsToolbarStuck(!entry.isIntersecting)
+      },
+      {
+        threshold: 0,
+        rootMargin: '-1px 0px 0px 0px'
+      }
+    )
+
+    observer.observe(toolbarElement)
+
+    return () => observer.disconnect()
+  }, [])
 
   // Context menu for adding notes
   useEffect(() => {
@@ -2498,7 +2520,19 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       )}
       
       {/* PDF Controls */}
-      <div className="sticky top-0 z-50 shadow-sm" style={{ backgroundColor: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)' }}>
+      <div 
+        ref={toolbarRef}
+        className={`sticky top-0 z-50 transition-all duration-300 ease-in-out ${isToolbarStuck ? 'backdrop-blur-md shadow-lg' : 'backdrop-blur-sm shadow-sm'}`}
+        style={{ 
+          backgroundColor: 'var(--color-surface)', 
+          borderBottom: isToolbarStuck 
+            ? '2px solid var(--color-border)' 
+            : '1px solid var(--color-border)',
+          boxShadow: isToolbarStuck 
+            ? '0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.1)' 
+            : '0 2px 8px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08)'
+        }}
+      >
         <div className="flex items-center justify-between p-4">
           {/* Left controls */}
           <div className="flex items-center gap-2">
