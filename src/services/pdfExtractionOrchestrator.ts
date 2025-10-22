@@ -224,7 +224,9 @@ export async function extractWithFallback(
     // ========================================
     // FINALIZE RESULTS
     // ========================================
-    const finalFullText = finalPageTexts.join('\n\n').trim()
+    // Ensure all pageTexts are strings before joining
+    const safePageTexts = finalPageTexts.map(text => typeof text === 'string' ? text : String(text || ''))
+    const finalFullText = safePageTexts.join('\n\n').trim()
     const processingTime = Date.now() - startTime
 
     // Clean up PDF document
