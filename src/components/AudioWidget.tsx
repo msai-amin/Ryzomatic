@@ -41,6 +41,14 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       
       // Get text from content or pageTexts
       if (currentDocument.content) {
+        console.log('🔍 AudioWidget: Raw content analysis', {
+          contentType: typeof currentDocument.content,
+          contentConstructor: currentDocument.content?.constructor?.name,
+          contentValue: currentDocument.content,
+          isString: typeof currentDocument.content === 'string',
+          hasSplit: typeof currentDocument.content === 'string' && 'split' in (currentDocument.content as any)
+        });
+        
         // Ensure content is a string
         text = typeof currentDocument.content === 'string' ? currentDocument.content : String(currentDocument.content || '')
         console.log('🔍 AudioWidget: Using content', { textType: typeof text, textLength: text.length });
@@ -67,10 +75,23 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         const safeText = typeof text === 'string' ? text : String(text || '')
         
         console.log('🔍 AudioWidget: About to split text', {
-          textType: typeof safeText,
-          textLength: safeText.length,
+          originalTextType: typeof text,
+          originalTextValue: text,
+          safeTextType: typeof safeText,
+          safeTextLength: safeText.length,
+          safeTextValue: safeText.substring(0, 200) + (safeText.length > 200 ? '...' : ''),
           hasSplit: typeof safeText === 'string' && 'split' in (safeText as any)
         });
+        
+        // Additional safety check
+        if (typeof safeText !== 'string') {
+          console.error('🔍 AudioWidget: safeText is not a string!', {
+            type: typeof safeText,
+            value: safeText,
+            constructor: (safeText as any)?.constructor?.name
+          });
+          return;
+        }
         
         // Split by double newlines (paragraph breaks) or periods followed by newlines
         const paragraphs = safeText
