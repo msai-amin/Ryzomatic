@@ -63,7 +63,7 @@ function parseTextWithBreaks(text: string): TextSegment[] {
   console.log('🔍 parseTextWithBreaks: Received text:', {
     type: typeof text,
     isString: typeof text === 'string',
-    value: text,
+    value: String(text).substring(0, 100) + (String(text).length > 100 ? '...' : ''),
     hasSplit: typeof text === 'string' ? 'split' in text : false
   });
   
@@ -256,7 +256,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         index: i,
         type: typeof text,
         isString: typeof text === 'string',
-        value: text
+        value: String(text).substring(0, 50) + (String(text).length > 50 ? '...' : '')
       }))
     });
   }
@@ -394,7 +394,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               index: i,
               type: typeof text,
               isString: typeof text === 'string',
-              value: text
+              value: String(text).substring(0, 50) + (String(text).length > 50 ? '...' : '')
             }))
           });
         }
@@ -1889,7 +1889,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       console.log('🔍 renderPageContent: Raw page text', {
         pageNum,
         rawPageTextType: typeof rawPageText,
-        rawPageTextValue: rawPageText
+        rawPageTextValue: String(rawPageText).substring(0, 100) + (String(rawPageText).length > 100 ? '...' : '')
       });
       
       const pageText = typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
@@ -1902,7 +1902,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       console.log('🔍 renderPageContent: Safe page text', {
         pageNum,
         safePageTextType: typeof safePageText,
-        safePageTextValue: safePageText,
+        safePageTextValue: String(safePageText).substring(0, 100) + (String(safePageText).length > 100 ? '...' : ''),
         hasSplit: typeof safePageText === 'string' ? 'split' in safePageText : false
       });
       
@@ -1917,7 +1917,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       console.log('🔍 renderPageContent: About to call parseTextWithBreaks', {
         pageNum,
         safePageTextType: typeof safePageText,
-        safePageTextValue: safePageText
+        safePageTextValue: String(safePageText).substring(0, 100) + (String(safePageText).length > 100 ? '...' : '')
       });
 
       const segments = parseTextWithBreaks(safePageText)
