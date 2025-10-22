@@ -44,10 +44,9 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         console.log('🔍 AudioWidget: Raw content analysis', {
           contentType: typeof currentDocument.content,
           contentConstructor: (currentDocument.content as any)?.constructor?.name,
-          contentValue: currentDocument.content,
+          contentValue: currentDocument.content.substring(0, 200) + (currentDocument.content.length > 200 ? '...' : ''),
           isString: typeof currentDocument.content === 'string',
-          isArrayBuffer: (currentDocument.content as any) instanceof ArrayBuffer,
-          hasSplit: typeof currentDocument.content === 'string' && 'split' in (currentDocument.content as any)
+          isArrayBuffer: (currentDocument.content as any) instanceof ArrayBuffer
         });
         
         // Use string content directly
@@ -83,11 +82,11 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         
         console.log('🔍 AudioWidget: About to split text', {
           originalTextType: typeof text,
-          originalTextValue: text,
+          originalTextValue: text.substring(0, 200) + (text.length > 200 ? '...' : ''),
           safeTextType: typeof safeText,
           safeTextLength: safeText.length,
           safeTextValue: safeText.substring(0, 200) + (safeText.length > 200 ? '...' : ''),
-          hasSplit: typeof safeText === 'string' && 'split' in (safeText as any)
+          isString: typeof safeText === 'string'
         });
         
         // Additional safety check
