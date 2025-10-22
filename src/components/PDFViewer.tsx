@@ -323,6 +323,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     const loadPDF = async () => {
       if (!document.pdfData) return
 
+      console.log('🔍 loadPDF: Starting PDF load process', {
+        documentId: document.id,
+        hasPageTexts: !!document.pageTexts,
+        pageTextsLength: document.pageTexts?.length || 0
+      });
+
       setIsLoading(true)
       setPageRendered(false)
 
@@ -1850,14 +1856,34 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
     // Render page content with structured paragraphs and word highlighting
     const renderPageContent = (pageNum: number) => {
+      console.log('🔍 renderPageContent: Processing page', {
+        pageNum,
+        documentId: document.id,
+        hasPageTexts: !!document.pageTexts,
+        pageTextsLength: document.pageTexts?.length || 0
+      });
+      
       // Ensure pageTexts array exists and the specific page text is a string
       const rawPageText = document.pageTexts?.[pageNum - 1]
+      console.log('🔍 renderPageContent: Raw page text', {
+        pageNum,
+        rawPageTextType: typeof rawPageText,
+        rawPageTextValue: rawPageText
+      });
+      
       const pageText = typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
       
       const currentPageText = isEditing && editedTexts[pageNum] ? editedTexts[pageNum] : pageText
       
       // Ensure currentPageText is a string
       const safePageText = typeof currentPageText === 'string' ? currentPageText : String(currentPageText || '')
+      
+      console.log('🔍 renderPageContent: Safe page text', {
+        pageNum,
+        safePageTextType: typeof safePageText,
+        safePageTextValue: safePageText,
+        hasSplit: typeof safePageText === 'string' ? 'split' in safePageText : false
+      });
       
       if (!safePageText) {
         return (
@@ -1866,6 +1892,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           </div>
         )
       }
+
+      console.log('🔍 renderPageContent: About to call parseTextWithBreaks', {
+        pageNum,
+        safePageTextType: typeof safePageText,
+        safePageTextValue: safePageText
+      });
 
       const segments = parseTextWithBreaks(safePageText)
       const totalWords = segments.filter(s => s.type === 'word').length
