@@ -192,6 +192,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   const [scale, setScale] = useState(pdfViewer.zoom)
   const [rotation, setRotation] = useState(0)
   const [pageInputValue, setPageInputValue] = useState('1')
+  
+  // CRITICAL: Keep local scale in sync with store zoom for accurate highlighting
+  useEffect(() => {
+    setScale(pdfViewer.zoom)
+  }, [pdfViewer.zoom])
   const [searchQuery, setSearchQuery] = useState('')
   const [highlightPickerPosition, setHighlightPickerPosition] = useState<{ x: number; y: number } | null>(null)
   const [selectedTextInfo, setSelectedTextInfo] = useState<{
@@ -752,11 +757,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           break
         case '+':
         case '=':
-          setScale(Math.min(scale + 0.1, 3))
+          const newScaleUp = Math.min(scale + 0.1, 3)
+          setScale(newScaleUp)
+          updatePDFViewer({ zoom: newScaleUp })
           break
         case '-':
         case '_':
-          setScale(Math.max(scale - 0.1, 0.5))
+          const newScaleDown = Math.max(scale - 0.1, 0.5)
+          setScale(newScaleDown)
+          updatePDFViewer({ zoom: newScaleDown })
           break
         case 'r':
         case 'R':
@@ -1127,12 +1136,16 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   }, [numPages, tts.isPlaying, updateTTS])
 
   const handleZoomIn = useCallback(() => {
-    setScale(Math.min(scale + 0.1, 3))
-  }, [scale])
+    const newScale = Math.min(scale + 0.1, 3)
+    setScale(newScale)
+    updatePDFViewer({ zoom: newScale })
+  }, [scale, updatePDFViewer])
 
   const handleZoomOut = useCallback(() => {
-    setScale(Math.max(scale - 0.1, 0.5))
-  }, [scale])
+    const newScale = Math.max(scale - 0.1, 0.5)
+    setScale(newScale)
+    updatePDFViewer({ zoom: newScale })
+  }, [scale, updatePDFViewer])
 
   const handleRotate = useCallback(() => {
     setRotation((rotation + 90) % 360)
@@ -1391,8 +1404,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       // This gives us the bounding box that encompasses the entire selection
       const selectionRect = range.getBoundingClientRect()
       
+      // ROBUST VALIDATION: Check for valid selection rectangle
       if (!selectionRect || selectionRect.width === 0 || selectionRect.height === 0) {
-        console.warn('Invalid bounding rectangle for selection')
+        console.warn('Invalid bounding rectangle for selection:', selectionRect)
+        setHighlightPickerPosition(null)
+        setSelectedTextInfo(null)
+        return
+      }
+
+      // Additional validation for reasonable dimensions
+      if (selectionRect.width < 1 || selectionRect.height < 1) {
+        console.warn('Selection too small to create highlight:', selectionRect)
         setHighlightPickerPosition(null)
         setSelectedTextInfo(null)
         return
@@ -1449,12 +1471,22 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       // Get text element for debugging
       const textElement = range.startContainer.parentElement
 
-      // Normalize by current scale so positions are stored at scale 1.0
+      // ROBUST SCALING: Normalize by current scale so positions are stored at scale 1.0
+      // Add safeguards to prevent division by zero or invalid scale values
+      const safeScale = Math.max(scale, 0.1) // Prevent division by zero
       const position = {
-        x: rawPosition.x / scale,
-        y: rawPosition.y / scale,
-        width: rawPosition.width / scale,
-        height: rawPosition.height / scale
+        x: rawPosition.x / safeScale,
+        y: rawPosition.y / safeScale,
+        width: rawPosition.width / safeScale,
+        height: rawPosition.height / safeScale
+      }
+
+      // ROBUST VALIDATION: Check for reasonable position values
+      if (position.x < 0 || position.y < 0 || position.width <= 0 || position.height <= 0) {
+        console.warn('Invalid calculated position:', { rawPosition, position, scale })
+        setHighlightPickerPosition(null)
+        setSelectedTextInfo(null)
+        return
       }
 
       console.log('Highlight position debug:', {
@@ -1484,6 +1516,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         },
         rawPositionBeforeNormalization: rawPosition,
         normalizedPosition: position,
+        safeScale: safeScale,
         textElement: {
           fontSize: textElement?.style?.fontSize,
           lineHeight: textElement?.style?.lineHeight,
@@ -2642,12 +2675,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                   {highlights
                     .filter(h => h.page_number === pageNum)
                     .map(highlight => {
-                      // Scale positions by current scale (positions are stored normalized at scale 1.0)
+                      // ROBUST SCALING: Scale positions by current scale (positions are stored normalized at scale 1.0)
+                      // Add safeguards to prevent invalid scale values
+                      const safeScale = Math.max(scale, 0.1)
                       const scaledPosition = {
-                        x: highlight.position_data.x * scale,
-                        y: highlight.position_data.y * scale,
-                        width: highlight.position_data.width * scale,
-                        height: highlight.position_data.height * scale
+                        x: highlight.position_data.x * safeScale,
+                        y: highlight.position_data.y * safeScale,
+                        width: highlight.position_data.width * safeScale,
+                        height: highlight.position_data.height * safeScale
                       }
                       
                       return (
@@ -2730,12 +2765,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
               {highlights
                 .filter(h => h.page_number === pageNumber)
                 .map(highlight => {
-                  // Scale positions by current scale (positions are stored normalized at scale 1.0)
+                  // ROBUST SCALING: Scale positions by current scale (positions are stored normalized at scale 1.0)
+                  // Add safeguards to prevent invalid scale values
+                  const safeScale = Math.max(scale, 0.1)
                   const scaledPosition = {
-                    x: highlight.position_data.x * scale,
-                    y: highlight.position_data.y * scale,
-                    width: highlight.position_data.width * scale,
-                    height: highlight.position_data.height * scale
+                    x: highlight.position_data.x * safeScale,
+                    y: highlight.position_data.y * safeScale,
+                    width: highlight.position_data.width * safeScale,
+                    height: highlight.position_data.height * safeScale
                   }
                   
                   return (
