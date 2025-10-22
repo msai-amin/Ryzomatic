@@ -384,7 +384,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   
   // Actions
-  setCurrentDocument: (document) => set({ currentDocument: document }),
+  setCurrentDocument: (document) => {
+    if (document && document.pageTexts) {
+      // Sanitize pageTexts to ensure all elements are strings
+      document.pageTexts = document.pageTexts.map(text => 
+        typeof text === 'string' ? text : String(text || '')
+      );
+    }
+    set({ currentDocument: document });
+  },
   
   addDocument: (document) => {
     console.log('AppStore: Adding document:', {
