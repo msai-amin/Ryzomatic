@@ -19,46 +19,47 @@ const ThemedLandingPage: React.FC = () => {
 
   const pricingTiers: PricingTier[] = [
     {
-      name: "STUDENT",
-      price: "$0",
+      name: "EXPLORER",
+      price: "Free",
       period: "forever",
       color: "var(--color-accent-1)",
       features: [
         "5 documents per month",
-        "Basic AI analysis",
-        "Standard reading modes",
-        "Community support",
-        "100 credits included"
+        "20 AI chats per month",
+        "Basic PDF viewing",
+        "1GB storage",
+        "Community support"
       ]
     },
     {
-      name: "RESEARCHER",
-      price: activePricing === 'monthly' ? "$19" : "$15",
+      name: "SCHOLAR",
+      price: activePricing === 'monthly' ? "$4.99" : "$3.99",
       period: activePricing === 'monthly' ? "month" : "month (billed yearly)",
       color: "var(--color-primary)",
       popular: true,
       features: [
-        "Unlimited documents",
-        "Advanced AI analysis",
-        "All reading modes",
+        "25 documents per month",
+        "100 AI chats per month",
+        "OCR processing",
+        "10GB storage",
         "Priority support",
-        "1000 credits included",
-        "Export capabilities",
-        "Team collaboration"
+        "Advanced highlighting",
+        "Pomodoro tracking"
       ]
     },
     {
-      name: "INSTITUTION",
-      price: "Custom",
-      period: "contact us",
+      name: "ACADEMIC",
+      price: activePricing === 'monthly' ? "$9.99" : "$7.99",
+      period: activePricing === 'monthly' ? "month" : "month (billed yearly)",
       color: "var(--color-accent-2)",
       features: [
-        "Everything in Researcher",
-        "Custom integrations",
-        "Dedicated support",
-        "Advanced analytics",
-        "White-label options",
-        "SLA guarantees"
+        "Unlimited documents",
+        "300 AI chats per month",
+        "Gemini-2.5-Pro AI",
+        "50GB storage",
+        "Export features",
+        "Team collaboration (3 users)",
+        "Priority support"
       ]
     }
   ]

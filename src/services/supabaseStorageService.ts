@@ -404,7 +404,7 @@ class SupabaseStorageService {
             logger.info('PageTexts extracted successfully', context, {
               totalPages: pdf.numPages,
               extractedPages: pageTexts.length,
-              totalTextLength: pageTexts.join('').length,
+              totalTextLength: pageTexts.map(text => typeof text === 'string' ? text : String(text || '')).join('').length,
               originalArrayBufferSize: book.fileData.byteLength,
               copyArrayBufferSize: pdfDataCopy.byteLength
             });

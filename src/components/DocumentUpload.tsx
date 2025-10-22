@@ -186,11 +186,14 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
           totalPages,
           contentLength: content.length,
           pageTextsCount: pageTexts.length,
-          pageTextsPreview: pageTexts.slice(0, 3).map((text, i) => ({
-            page: i + 1,
-            textLength: text.length,
-            textPreview: text.substring(0, 50) + (text.length > 50 ? '...' : '')
-          }))
+          pageTextsPreview: pageTexts.slice(0, 3).map((text, i) => {
+            const safeText = typeof text === 'string' ? text : String(text || '')
+            return {
+              page: i + 1,
+              textLength: safeText.length,
+              textPreview: safeText.substring(0, 50) + (safeText.length > 50 ? '...' : '')
+            }
+          })
         });
         
         // Save to library if checkbox is checked

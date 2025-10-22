@@ -75,36 +75,44 @@ const LandingPage: React.FC = () => {
 
   const pricingTiers: PricingTier[] = [
     {
-      name: "Student",
-      price: "$12",
-      period: "month, billed annually",
+      name: "Explorer",
+      price: "Free",
+      period: "forever",
       features: [
-        "Up to 10 projects",
-        "Literature Synthesizer",
-        "Basic collaboration tools"
+        "5 documents per month",
+        "20 AI chats per month",
+        "Basic PDF viewing",
+        "1GB storage",
+        "Community support"
       ]
     },
     {
-      name: "Researcher",
-      price: "$25",
+      name: "Scholar",
+      price: "$4.99",
       period: "month, billed annually",
       popular: true,
       features: [
-        "Unlimited projects & collaborators",
-        "Advanced AI features",
-        "Project Tracker & Analytics",
-        "Priority support"
+        "25 documents per month",
+        "100 AI chats per month",
+        "OCR processing",
+        "10GB storage",
+        "Priority support",
+        "Advanced highlighting",
+        "Pomodoro tracking"
       ]
     },
     {
-      name: "Institution",
-      price: "Custom",
-      period: "For departments & universities",
+      name: "Academic",
+      price: "$9.99",
+      period: "month, billed annually",
       features: [
-        "Site-wide licensing",
-        "Dedicated support & training",
-        "Advanced security & SSO",
-        "LMS integration"
+        "Unlimited documents",
+        "300 AI chats per month",
+        "Gemini-2.5-Pro AI",
+        "50GB storage",
+        "Export features",
+        "Team collaboration (3 users)",
+        "Priority support"
       ]
     }
   ];
@@ -359,14 +367,14 @@ const LandingPage: React.FC = () => {
                 
                 <div className="pt-8">
                   <button
-                    onClick={tier.name === 'Institution' ? () => window.location.href = 'mailto:support@vstyle.co' : handleGetStarted}
+                    onClick={tier.name === 'Academic' ? () => window.location.href = 'mailto:support@vstyle.co' : handleGetStarted}
                     className={`w-full rounded-full px-4 py-3 text-sm font-semibold transition ${
                       tier.popular
                         ? 'bg-slate-800 text-white shadow-lg shadow-slate-800/20 hover:bg-slate-700'
                         : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    {tier.name === 'Institution' ? 'Contact Sales' : `Choose ${tier.name}`}
+                    {tier.name === 'Explorer' ? 'Get Started Free' : tier.name === 'Academic' ? 'Contact Sales' : `Choose ${tier.name}`}
                   </button>
                 </div>
               </div>

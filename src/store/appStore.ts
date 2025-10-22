@@ -393,11 +393,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       type: document.type,
       hasPageTexts: !!document.pageTexts,
       pageTextsLength: document.pageTexts?.length || 0,
-      pageTextsPreview: document.pageTexts?.slice(0, 2).map((text, i) => ({
-        page: i + 1,
-        textLength: text.length,
-        textPreview: text.substring(0, 30) + (text.length > 30 ? '...' : '')
-      })) || []
+      pageTextsPreview: document.pageTexts?.slice(0, 2).map((text, i) => {
+        const safeText = typeof text === 'string' ? text : String(text || '')
+        return {
+          page: i + 1,
+          textLength: safeText.length,
+          textPreview: safeText.substring(0, 30) + (safeText.length > 30 ? '...' : '')
+        }
+      }) || []
     });
     set((state) => ({
       documents: [...state.documents, document],
@@ -412,11 +415,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       type: document.type,
       hasPageTexts: !!document.pageTexts,
       pageTextsLength: document.pageTexts?.length || 0,
-      pageTextsPreview: document.pageTexts?.slice(0, 2).map((text, i) => ({
-        page: i + 1,
-        textLength: text.length,
-        textPreview: text.substring(0, 30) + (text.length > 30 ? '...' : '')
-      })) || []
+      pageTextsPreview: document.pageTexts?.slice(0, 2).map((text, i) => {
+        const safeText = typeof text === 'string' ? text : String(text || '')
+        return {
+          page: i + 1,
+          textLength: safeText.length,
+          textPreview: safeText.substring(0, 30) + (safeText.length > 30 ? '...' : '')
+        }
+      }) || []
     });
     set((state) => ({
       documents: state.documents.map(doc => doc.id === document.id ? document : doc),

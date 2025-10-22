@@ -80,7 +80,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       // Fallback to page text if no paragraphs
       const currentPage = pdfViewer.currentPage || 1
       if (currentDocument?.pageTexts && currentDocument.pageTexts.length > 0) {
-        return currentDocument.pageTexts[currentPage - 1] || ''
+        const rawPageText = currentDocument.pageTexts[currentPage - 1]
+        return typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
       }
       return currentDocument?.content || ''
     }
