@@ -59,6 +59,12 @@ function parseTextWithBreaks(text: string): TextSegment[] {
   let wordIndex = 0
   let paragraphIndex = 0
   
+  // Ensure text is a string
+  if (typeof text !== 'string') {
+    console.warn('parseTextWithBreaks: text is not a string, converting...', typeof text, text)
+    text = String(text || '')
+  }
+  
   // First, extract tables and formulas
   const tableRegex = /```table\n([\s\S]*?)\n```/g
   const formulaRegex = /`([^`]+)`/g
@@ -70,7 +76,9 @@ function parseTextWithBreaks(text: string): TextSegment[] {
   // Extract tables
   let tableMatch
   while ((tableMatch = tableRegex.exec(text)) !== null) {
-    const tableContent = tableMatch[1].split('\n').filter(row => row.trim().length > 0)
+    // Ensure tableMatch[1] is a string
+    const tableText = typeof tableMatch[1] === 'string' ? tableMatch[1] : String(tableMatch[1] || '')
+    const tableContent = tableText.split('\n').filter(row => row.trim().length > 0)
     const placeholder = `__TABLE_${tables.length}__`
     tables.push({ index: tableMatch.index, content: tableContent })
     processedText = processedText.replace(tableMatch[0], placeholder)
@@ -80,41 +88,76 @@ function parseTextWithBreaks(text: string): TextSegment[] {
   let formulaMatch
   const tempText = processedText
   while ((formulaMatch = formulaRegex.exec(tempText)) !== null) {
+    // Ensure formulaMatch[1] is a string
+    const formulaText = typeof formulaMatch[1] === 'string' ? formulaMatch[1] : String(formulaMatch[1] || '')
     // Skip if it's a table placeholder
-    if (!formulaMatch[1].startsWith('__TABLE_')) {
+    if (!formulaText.startsWith('__TABLE_')) {
       const placeholder = `__FORMULA_${formulas.length}__`
-      formulas.push({ index: formulaMatch.index, content: formulaMatch[1] })
+      formulas.push({ index: formulaMatch.index, content: formulaText })
       processedText = processedText.replace(formulaMatch[0], placeholder)
     }
+  }
+  
+  // Ensure processedText is a string before splitting
+  if (typeof processedText !== 'string') {
+    console.warn('parseTextWithBreaks: processedText is not a string, converting...', typeof processedText, processedText)
+    processedText = String(processedText || '')
   }
   
   // Split by section breaks first (\n\n\n)
   const sections = processedText.split(/\n\n\n/)
   
   sections.forEach((section, sectionIdx) => {
+    // Ensure section is a string
+    if (typeof section !== 'string') {
+      console.warn('parseTextWithBreaks: section is not a string, skipping...', typeof section, section)
+      return
+    }
+    
     if (sectionIdx > 0) {
       segments.push({ type: 'break', content: '', breakLevel: 4 }) // Section break
     }
     
+    // Ensure section is a string before splitting
+    const safeSection = typeof section === 'string' ? section : String(section || '')
+    
     // Split by paragraph breaks (\n\n)
-    const paragraphs = section.split(/\n\n/)
+    const paragraphs = safeSection.split(/\n\n/)
     
     paragraphs.forEach((paragraph, paraIdx) => {
+      // Ensure paragraph is a string
+      if (typeof paragraph !== 'string') {
+        console.warn('parseTextWithBreaks: paragraph is not a string, skipping...', typeof paragraph, paragraph)
+        return
+      }
+      
       if (paraIdx > 0) {
         segments.push({ type: 'break', content: '', breakLevel: 3 }) // Paragraph break
         paragraphIndex++
       }
       
+      // Ensure paragraph is a string before splitting
+      const safeParagraph = typeof paragraph === 'string' ? paragraph : String(paragraph || '')
+      
       // Split by line breaks (\n)
-      const lines = paragraph.split(/\n/)
+      const lines = safeParagraph.split(/\n/)
       
       lines.forEach((line, lineIdx) => {
+        // Ensure line is a string
+        if (typeof line !== 'string') {
+          console.warn('parseTextWithBreaks: line is not a string, skipping...', typeof line, line)
+          return
+        }
+        
         if (lineIdx > 0) {
           segments.push({ type: 'break', content: '', breakLevel: 2 }) // Line break
         }
         
+        // Ensure line is a string before splitting
+        const safeLine = typeof line === 'string' ? line : String(line || '')
+        
         // Split into words
-        const words = line.split(/\s+/).filter(w => w.trim().length > 0)
+        const words = safeLine.split(/\s+/).filter(w => w.trim().length > 0)
         
         words.forEach((word, idx) => {
           // Check if this word is a table placeholder
@@ -809,7 +852,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
             // Initialize edited texts with current page texts
             const initialTexts: { [pageNum: number]: string } = {}
             document.pageTexts?.forEach((text, index) => {
-              initialTexts[index + 1] = text
+              // Ensure text is a string
+              const safeText = typeof text === 'string' ? text : String(text || '')
+              initialTexts[index + 1] = safeText
             })
             setEditedTexts(initialTexts)
             setIsEditing(true)
@@ -946,8 +991,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       // Extract formulas from all pages
       const allFormulas: Array<{ formula: string; isBlock: boolean; marker: string; pageNum: number }> = []
       
-      document.pageTexts.forEach((pageText, index) => {
-        const markedFormulas = extractMarkedFormulas(pageText)
+      document.pageTexts?.forEach((pageText, index) => {
+        // Ensure pageText is a string
+        const safePageText = typeof pageText === 'string' ? pageText : String(pageText || '')
+        const markedFormulas = extractMarkedFormulas(safePageText)
         markedFormulas.forEach(f => {
           allFormulas.push({ ...f, pageNum: index + 1 })
         })
@@ -1262,7 +1309,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   // AI Context Menu Handlers
   const handleAIClarification = useCallback(() => {
     // Get current page text for context
-    const pageText = document.pageTexts?.[pageNumber - 1]
+    const rawPageText = document.pageTexts?.[pageNumber - 1]
+    const pageText = typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
     const context = getPDFTextSelectionContext(pageNumber, pageText)
     
     if (context) {
@@ -1276,7 +1324,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   }, [pageNumber, document.pageTexts, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
 
   const handleAIFurtherReading = useCallback(() => {
-    const pageText = document.pageTexts?.[pageNumber - 1]
+    const rawPageText = document.pageTexts?.[pageNumber - 1]
+    const pageText = typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
     const context = getPDFTextSelectionContext(pageNumber, pageText)
     
     if (context) {
@@ -1525,7 +1574,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       })
 
       // Calculate text offset for reading mode sync
-      const pageText = document.pageTexts?.[selectedTextInfo.pageNumber - 1] || ''
+      const rawPageText = document.pageTexts?.[selectedTextInfo.pageNumber - 1]
+      const pageText = typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
       const textOffset = highlightService.calculateTextOffset(
         pageText,
         selectedTextInfo.text,
@@ -1667,7 +1717,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     }
 
     // Extract text from the highlighted area (simplified - just use page text for now)
-    const pageText = document.pageTexts?.[highlightDragStart.pageNumber - 1] || ''
+    const rawPageText = document.pageTexts?.[highlightDragStart.pageNumber - 1]
+    const pageText = typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
     const textSnippet = pageText.substring(0, 100) + '...' // Placeholder
 
     // Show color picker at drag end position
@@ -1768,10 +1819,16 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
 
     // Render page content with structured paragraphs and word highlighting
     const renderPageContent = (pageNum: number) => {
-      const pageText = document.pageTexts?.[pageNum - 1] || ''
+      // Ensure pageTexts array exists and the specific page text is a string
+      const rawPageText = document.pageTexts?.[pageNum - 1]
+      const pageText = typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
+      
       const currentPageText = isEditing && editedTexts[pageNum] ? editedTexts[pageNum] : pageText
       
-      if (!currentPageText) {
+      // Ensure currentPageText is a string
+      const safePageText = typeof currentPageText === 'string' ? currentPageText : String(currentPageText || '')
+      
+      if (!safePageText) {
         return (
           <div className={`text-center py-8 ${themeStyles.text} opacity-50`}>
             No text available for page {pageNum}.
@@ -1779,7 +1836,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
         )
       }
 
-      const segments = parseTextWithBreaks(currentPageText)
+      const segments = parseTextWithBreaks(safePageText)
       const totalWords = segments.filter(s => s.type === 'word').length
       const wordsRead = tts.currentWordIndex !== null ? tts.currentWordIndex + 1 : 0
       
@@ -1839,7 +1896,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                     <table className={`min-w-full border-collapse border ${themeStyles.text} opacity-90`}>
                       <tbody>
                         {segment.tableData?.map((row, rowIdx) => {
-                          const cells = row.split('\t')
+                          // Ensure row is a string
+                          const rowText = typeof row === 'string' ? row : String(row || '')
+                          const cells = rowText.split('\t')
                           return (
                             <tr key={rowIdx} className="border-b">
                               {cells.map((cell, cellIdx) => (
@@ -2035,7 +2094,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                       // Initialize edited texts with current page texts
                       const initialTexts: { [pageNum: number]: string } = {}
                       document.pageTexts?.forEach((text, index) => {
-                        initialTexts[index + 1] = text
+                        // Ensure text is a string
+                        const safeText = typeof text === 'string' ? text : String(text || '')
+                        initialTexts[index + 1] = safeText
                       })
                       setEditedTexts(initialTexts)
                       setIsEditing(true)
@@ -2131,7 +2192,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                             setIsEditing(false)
                           } else {
                             // Start editing this page
-                            const initialText = document.pageTexts?.[pageNum - 1] || ''
+                            const rawInitialText = document.pageTexts?.[pageNum - 1]
+                            const initialText = typeof rawInitialText === 'string' ? rawInitialText : String(rawInitialText || '')
                             setEditedTexts(prev => ({
                               ...prev,
                               [pageNum]: prev[pageNum] || initialText
@@ -2234,7 +2296,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
                       setIsEditing(false)
                     } else {
                       // Start editing this page
-                      const initialText = document.pageTexts?.[pageNumber - 1] || ''
+                      const rawInitialText = document.pageTexts?.[pageNumber - 1]
+                      const initialText = typeof rawInitialText === 'string' ? rawInitialText : String(rawInitialText || '')
                       setEditedTexts(prev => ({
                         ...prev,
                         [pageNumber]: prev[pageNumber] || initialText
