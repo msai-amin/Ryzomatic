@@ -63,8 +63,7 @@ function parseTextWithBreaks(text: string): TextSegment[] {
   console.log('🔍 parseTextWithBreaks: Received text:', {
     type: typeof text,
     isString: typeof text === 'string',
-    value: String(text).substring(0, 100) + (String(text).length > 100 ? '...' : ''),
-    hasSplit: typeof text === 'string' ? 'split' in text : false
+    hasSplit: typeof text === 'string' && 'split' in (text as any)
   });
   
   // Ensure text is a string
@@ -1902,8 +1901,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       console.log('🔍 renderPageContent: Safe page text', {
         pageNum,
         safePageTextType: typeof safePageText,
-        safePageTextValue: String(safePageText).substring(0, 100) + (String(safePageText).length > 100 ? '...' : ''),
-        hasSplit: typeof safePageText === 'string' ? 'split' in safePageText : false
+        hasSplit: typeof safePageText === 'string' && 'split' in (safePageText as any)
       });
       
       if (!safePageText) {
@@ -1917,7 +1915,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       console.log('🔍 renderPageContent: About to call parseTextWithBreaks', {
         pageNum,
         safePageTextType: typeof safePageText,
-        safePageTextValue: String(safePageText).substring(0, 100) + (String(safePageText).length > 100 ? '...' : '')
+        safePageTextValue: (String(safePageText).substring(0, 100) + (String(safePageText).length > 100 ? '...' : ''))
       });
 
       const segments = parseTextWithBreaks(safePageText)

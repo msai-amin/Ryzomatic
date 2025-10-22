@@ -49,7 +49,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             index: i,
             type: typeof text,
             isString: typeof text === 'string',
-            value: String(text).substring(0, 100) + (String(text).length > 100 ? '...' : '')
+            value: (String(text).substring(0, 100) + (String(text).length > 100 ? '...' : ''))
           }))
         });
         
@@ -65,8 +65,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         console.log('🔍 AudioWidget: About to split text', {
           textType: typeof text,
           textLength: text.length,
-          hasSplit: typeof text === 'string' ? 'split' in text : false,
-          textValue: String(text).substring(0, 100) + (String(text).length > 100 ? '...' : '')
+          hasSplit: typeof text === 'string' && 'split' in (text as any)
         });
         
         // Split by double newlines (paragraph breaks) or periods followed by newlines
@@ -77,7 +76,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         
         console.log('🔍 AudioWidget: Split successful', {
           paragraphsCount: paragraphs.length,
-          paragraphsTypes: paragraphs.map((p, i) => ({ index: i, type: typeof p, value: String(p).substring(0, 50) + (String(p).length > 50 ? '...' : '') }))
+          paragraphsTypes: paragraphs.map((p, i) => ({ index: i, type: typeof p, value: (String(p).substring(0, 50) + (String(p).length > 50 ? '...' : '')) }))
         });
         
         updateTTS({ paragraphs, currentParagraphIndex: 0 })

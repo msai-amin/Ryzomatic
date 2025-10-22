@@ -394,7 +394,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         index: i,
         type: typeof text,
         isString: typeof text === 'string',
-        value: String(text).substring(0, 50) + (String(text).length > 50 ? '...' : '')
+        value: (String(text).substring(0, 50) + (String(text).length > 50 ? '...' : ''))
       })));
       
       // Sanitize pageTexts to ensure all elements are strings
@@ -410,7 +410,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         index: i,
         type: typeof text,
         isString: typeof text === 'string',
-        value: String(text).substring(0, 50) + (String(text).length > 50 ? '...' : '')
+        value: (String(text).substring(0, 50) + (String(text).length > 50 ? '...' : ''))
       })));
     }
     set({ currentDocument: document });
