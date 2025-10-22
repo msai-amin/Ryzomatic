@@ -103,6 +103,12 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
     }
   };
 
+  // Helper function to sanitize pageTexts arrays
+  const sanitizePageTexts = (pageTexts: any[] | undefined): string[] => {
+    if (!pageTexts || !Array.isArray(pageTexts)) return [];
+    return pageTexts.map(text => typeof text === 'string' ? text : String(text || ''));
+  };
+
   const handleOpenBook = (book: SavedBook) => {
     try {
       console.log('Opening book from Library:', {
@@ -205,7 +211,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       uploadedAt: book.savedAt,
       pdfData: book.type === 'pdf' ? book.fileData as ArrayBuffer : undefined,
       totalPages: book.totalPages,
-      pageTexts: book.pageTexts, // Include pageTexts for TTS functionality
+      pageTexts: sanitizePageTexts(book.pageTexts), // Include pageTexts for TTS functionality
     };
 
       console.log('Document created for app store:', {

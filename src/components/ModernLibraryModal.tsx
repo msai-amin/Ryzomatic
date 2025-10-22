@@ -147,6 +147,12 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
     setLibraryFilters({ tags: newTags });
   }, [libraryView.selectedTags, setSelectedTags, setLibraryFilters]);
 
+  // Helper function to sanitize pageTexts arrays
+  const sanitizePageTexts = (pageTexts: any[] | undefined): string[] => {
+    if (!pageTexts || !Array.isArray(pageTexts)) return [];
+    return pageTexts.map(text => typeof text === 'string' ? text : String(text || ''));
+  };
+
   const handleBookOpen = useCallback(async (book: SearchResult) => {
     try {
       setIsLoading(true);
@@ -168,7 +174,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
         pdfData: bookData.type === 'pdf' ? bookData.fileData : undefined, // ArrayBuffer for PDFs
         totalPages: bookData.totalPages,
         lastReadPage: bookData.lastReadPage,
-        pageTexts: bookData.pageTexts || [], // CRITICAL: Include pageTexts for TTS functionality
+        pageTexts: sanitizePageTexts(bookData.pageTexts), // CRITICAL: Include pageTexts for TTS functionality
       };
 
       // Set the current document and close the library
