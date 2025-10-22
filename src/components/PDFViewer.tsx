@@ -320,6 +320,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
   // Load PDF document
   useEffect(() => {
+    console.log('🔍 PDFViewer useEffect triggered for document.pdfData', {
+      documentId: document.id,
+      hasPdfData: !!document.pdfData,
+      hasPageTexts: !!document.pageTexts,
+      pageTextsLength: document.pageTexts?.length || 0
+    });
+    
     const loadPDF = async () => {
       if (!document.pdfData) return
 
@@ -377,6 +384,20 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           documentId: document.id,
           scrollMode: pdfViewer.scrollMode
         })
+        
+        // Debug: Log pageTexts after PDF loading
+        if (document.pageTexts) {
+          console.log('🔍 loadPDF: PageTexts after PDF loading:', {
+            documentId: document.id,
+            pageTextsLength: document.pageTexts.length,
+            pageTextsTypes: document.pageTexts.map((text, i) => ({
+              index: i,
+              type: typeof text,
+              isString: typeof text === 'string',
+              value: text
+            }))
+          });
+        }
       } catch (error) {
         console.error('Error loading PDF:', error)
         setIsLoading(false)
