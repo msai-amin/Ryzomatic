@@ -4,7 +4,7 @@
  * Track and monitor Gemini Vision API usage, costs, and rate limits
  */
 
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { logger } from './logger';
 
 export interface VisionUsageStats {
@@ -365,7 +365,7 @@ export async function checkAndResetMonthlyCounters(): Promise<number> {
       .eq('vision_pages_monthly', 0)
       .gte('vision_last_reset', new Date(Date.now() - 1000).toISOString())
 
-    logger.info('Monthly vision counters reset', context, undefined, {
+    logger.info('Monthly vision counters reset', context, {
       profilesReset: count || 0
     })
 
