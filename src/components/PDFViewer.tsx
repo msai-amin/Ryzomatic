@@ -1930,7 +1930,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     }
     
     return (
-      <div className={`flex-1 flex flex-col h-full ${themeStyles.background}`}>
+      <div className={`flex-1 flex flex-col h-full ${themeStyles.background}`} style={{ paddingBottom: '100px' }}>
         {/* Reading Mode Header */}
         <div className={`sticky top-0 z-50 ${themeStyles.headerBg} backdrop-blur-sm border-b ${themeStyles.headerBorder} shadow-sm`}>
           {/* Progress Bar */}
@@ -2288,16 +2288,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
           )}
         </div>
 
-        {/* Reading Mode Active Indicator */}
-        <div className={`fixed bottom-4 left-4 ${themeStyles.indicatorBg} text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2`}>
+        {/* Reading Mode Active Indicator - Positioned above audio player */}
+        <div className={`fixed bottom-24 left-4 ${themeStyles.indicatorBg} text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2`}>
           <BookOpen className="w-4 h-4" />
           <span className="text-sm font-medium">Reading Mode Active</span>
         </div>
 
         {/* Audio Widget - also shown in reading mode */}
-        <div className="fixed bottom-4 right-4 z-40">
-          <AudioWidget />
-        </div>
+        <AudioWidget />
 
         {/* Typography Settings Modal */}
         {showTypographySettings && (
@@ -2308,7 +2306,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full" style={{ backgroundColor: 'var(--color-background)' }}>
+    <div className="flex-1 flex flex-col h-full" style={{ backgroundColor: 'var(--color-background)', paddingBottom: '100px' }}>
       {/* OCR Status Banner */}
       {ocrStatus !== 'not_needed' && ocrStatus !== 'user_declined' && (
         <div className="p-4" style={{ backgroundColor: 'var(--color-background)' }}>
@@ -2836,9 +2834,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       />
 
       {/* Audio Widget */}
-      <div className="fixed bottom-4 right-4 z-40">
-        <AudioWidget />
-      </div>
+      <AudioWidget />
 
       {/* Voice Selector Modal */}
       <VoiceSelector

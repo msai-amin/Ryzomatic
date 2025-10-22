@@ -23,6 +23,7 @@
   --color-surface: #111827;
   --color-surface-hover: #1f2937;
   --color-surface-border: #374151;
+  --color-surface-rgb: 17, 24, 39;
   
   /* Text Colors (Light text on dark background) */
   --color-text-primary: #f9fafb;
@@ -36,8 +37,10 @@
   --color-success-light: #064e3b;
   --color-warning: #f59e0b;
   --color-warning-hover: #d97706;
+  --color-warning-light: #78350f;
   --color-error: #f87171;
   --color-error-hover: #ef4444;
+  --color-error-light: #7f1d1d;
   --color-info: #3b82f6;
   --color-info-hover: #2563eb;
   

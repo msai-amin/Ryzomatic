@@ -139,6 +139,9 @@ export interface TTSSettings {
   voice: Voice | null
   highlightCurrentWord: boolean
   currentWordIndex: number | null
+  currentParagraphIndex: number | null
+  paragraphs: string[]
+  autoAdvanceParagraph: boolean
 }
 
 interface AppState {
@@ -272,7 +275,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     voiceName: null,
     voice: null,
     highlightCurrentWord: true,
-    currentWordIndex: null
+    currentWordIndex: null,
+    currentParagraphIndex: null,
+    paragraphs: [],
+    autoAdvanceParagraph: true
   },
   chatMessages: [],
   isTyping: false,

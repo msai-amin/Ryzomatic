@@ -64,6 +64,8 @@ class GoogleCloudTTSService {
   private currentAudioBuffer: AudioBuffer | null = null;
   private audioStartTime = 0;
   private audioPauseTime = 0;
+  private onEndCallback: (() => void) | null = null;
+  private onWordCallback: ((word: string, charIndex: number) => void) | null = null;
 
   constructor() {
     // Get API key from environment
@@ -476,6 +478,10 @@ class GoogleCloudTTSService {
       this.currentAudio = source;
       this.currentAudioBuffer = decodedAudio;
       
+      // Store callbacks for resume functionality
+      this.onEndCallback = onEnd || null;
+      this.onWordCallback = onWord || null;
+      
       // Set up event handlers
       source.onended = () => {
         this.isPaused = false;
@@ -484,7 +490,10 @@ class GoogleCloudTTSService {
         this.audioStartTime = 0;
         this.audioPauseTime = 0;
         this.currentAudioBuffer = null;
+        this.currentAudio = null;
         if (onEnd) onEnd();
+        this.onEndCallback = null;
+        this.onWordCallback = null;
       };
 
       // Start playing and track start time
@@ -504,23 +513,49 @@ class GoogleCloudTTSService {
 
   pause() {
     if (this.currentAudio && this.audioContext && !this.isPaused) {
-      this.pauseTime = this.audioContext.currentTime - this.startTime;
+      // Calculate how far into the audio we are
+      this.pauseTime = this.audioContext.currentTime - this.audioStartTime;
       this.currentAudio.stop();
+      this.currentAudio.disconnect();
+      this.currentAudio = null;
       this.isPaused = true;
       console.log('GoogleCloudTTSService: Paused at time:', this.pauseTime);
     }
   }
 
   resume() {
-    if (this.isPaused && this.audioContext) {
-      console.log('GoogleCloudTTSService: Resume requested, but Google Cloud TTS does not support true pause/resume');
-      console.log('GoogleCloudTTSService: For now, we will stop and require user to restart');
-      // For Google Cloud TTS, we can't truly resume from pause point
-      // The best we can do is stop and let the user restart
-      this.stop();
+    if (this.isPaused && this.audioContext && this.currentAudioBuffer) {
+      console.log('GoogleCloudTTSService: Resuming from time:', this.pauseTime);
+      
+      // Create a new audio source
+      const source = this.audioContext.createBufferSource();
+      source.buffer = this.currentAudioBuffer;
+      source.connect(this.audioContext.destination);
+      
+      // Set up end handler
+      source.onended = () => {
+        this.isPaused = false;
+        this.pauseTime = 0;
+        this.startTime = 0;
+        this.audioStartTime = 0;
+        this.audioPauseTime = 0;
+        this.currentAudioBuffer = null;
+        this.currentAudio = null;
+        if (this.onEndCallback) {
+          this.onEndCallback();
+          this.onEndCallback = null;
+        }
+      };
+      
+      // Store reference
+      this.currentAudio = source;
+      
+      // Resume from pause position
+      this.audioStartTime = this.audioContext.currentTime - this.pauseTime;
+      source.start(0, this.pauseTime);
+      
       this.isPaused = false;
-      this.pauseTime = 0;
-      this.startTime = 0;
+      console.log('GoogleCloudTTSService: Resumed successfully from', this.pauseTime, 'seconds');
     }
   }
 
@@ -528,8 +563,12 @@ class GoogleCloudTTSService {
     console.log('GoogleCloudTTSService.stop() called')
     if (this.currentAudio) {
       console.log('GoogleCloudTTSService: Stopping current audio')
-      this.currentAudio.stop();
-      this.currentAudio.disconnect();
+      try {
+        this.currentAudio.stop();
+        this.currentAudio.disconnect();
+      } catch (e) {
+        // Ignore errors if already stopped
+      }
       this.currentAudio = null;
     }
     this.isPaused = false;
@@ -538,6 +577,8 @@ class GoogleCloudTTSService {
     this.audioStartTime = 0;
     this.audioPauseTime = 0;
     this.currentAudioBuffer = null;
+    this.onEndCallback = null;
+    this.onWordCallback = null;
     console.log('GoogleCloudTTSService: Stop completed')
   }
 
