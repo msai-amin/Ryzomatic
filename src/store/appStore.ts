@@ -386,10 +386,34 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Actions
   setCurrentDocument: (document) => {
     if (document && document.pageTexts) {
+      // Debug: Log the pageTexts before sanitization
+      console.log('🔍 setCurrentDocument: Before sanitization:', {
+        documentId: document.id,
+        pageTextsLength: document.pageTexts.length,
+        pageTextsTypes: document.pageTexts.map((text, i) => ({
+          index: i,
+          type: typeof text,
+          isString: typeof text === 'string',
+          value: text
+        }))
+      });
+      
       // Sanitize pageTexts to ensure all elements are strings
       document.pageTexts = document.pageTexts.map(text => 
         typeof text === 'string' ? text : String(text || '')
       );
+      
+      // Debug: Log the pageTexts after sanitization
+      console.log('🔍 setCurrentDocument: After sanitization:', {
+        documentId: document.id,
+        pageTextsLength: document.pageTexts.length,
+        pageTextsTypes: document.pageTexts.map((text, i) => ({
+          index: i,
+          type: typeof text,
+          isString: typeof text === 'string',
+          value: text
+        }))
+      });
     }
     set({ currentDocument: document });
   },
