@@ -41,7 +41,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       
       // Get text from content or pageTexts
       if (currentDocument.content) {
-        text = currentDocument.content
+        // Ensure content is a string
+        text = typeof currentDocument.content === 'string' ? currentDocument.content : String(currentDocument.content || '')
         console.log('🔍 AudioWidget: Using content', { textType: typeof text, textLength: text.length });
       } else if (currentDocument.pageTexts && currentDocument.pageTexts.length > 0) {
         console.log('🔍 AudioWidget: Processing pageTexts', {
@@ -62,14 +63,17 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       }
       
       if (text) {
+        // Ensure text is a string before splitting
+        const safeText = typeof text === 'string' ? text : String(text || '')
+        
         console.log('🔍 AudioWidget: About to split text', {
-          textType: typeof text,
-          textLength: text.length,
-          hasSplit: typeof text === 'string' && 'split' in (text as any)
+          textType: typeof safeText,
+          textLength: safeText.length,
+          hasSplit: typeof safeText === 'string' && 'split' in (safeText as any)
         });
         
         // Split by double newlines (paragraph breaks) or periods followed by newlines
-        const paragraphs = text
+        const paragraphs = safeText
           .split(/\n\n+/)
           .map(p => p.trim())
           .filter(p => p.length > 0)
