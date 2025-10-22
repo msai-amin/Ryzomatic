@@ -6,22 +6,22 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 // Model configuration based on tier
 const MODEL_CONFIG = {
   free: {
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.5-flash-lite',
     maxOutputTokens: 2048,
     temperature: 0.7,
   },
   pro: {
-    model: 'gemini-1.5-pro',
+    model: 'gemini-2.5-pro',
     maxOutputTokens: 4096,
     temperature: 0.7,
   },
   premium: {
-    model: 'gemini-1.5-pro',
+    model: 'gemini-2.5-pro',
     maxOutputTokens: 8192,
     temperature: 0.7,
   },
   enterprise: {
-    model: 'gemini-1.5-pro',
+    model: 'gemini-2.5-pro',
     maxOutputTokens: 8192,
     temperature: 0.7,
   },

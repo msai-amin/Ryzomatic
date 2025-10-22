@@ -11,6 +11,8 @@ import { validatePDFFile, validateFile } from '../services/validation'
 import { OCRConsentDialog } from './OCRConsentDialog'
 import { calculateOCRCredits } from '../utils/ocrUtils'
 import { extractStructuredText } from '../utils/pdfTextExtractor'
+import { extractWithFallback } from '../services/pdfExtractionOrchestrator'
+import { canPerformVisionExtraction } from '../services/visionUsageService'
 // PDF.js will be imported dynamically to avoid ES module issues
 
 interface DocumentUploadProps {
@@ -25,6 +27,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
   const [error, setError] = useState<string | null>(null)
   const [saveToLibrary, setSaveToLibrary] = useState(true)
   const [userProfile, setUserProfile] = useState<any>({ tier: 'free', credits: 0, ocr_count_monthly: 0 })
+  const [extractionProgress, setExtractionProgress] = useState<string>('')
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -59,6 +62,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
     };
 
     setError(null)
+    setExtractionProgress('')
     setLoading(true)
 
     try {
@@ -99,14 +103,54 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
       }
 
       if (file.type === 'application/pdf') {
-        const pdfResult = await trackPerformance(
-          'extractPDFData',
-          () => extractPDFData(file),
+        // Get user info for vision fallback
+        setExtractionProgress('Extracting text from PDF...')
+        
+        let userId: string | undefined
+        let userTier: string | undefined
+        let authToken: string | undefined
+        
+        try {
+          const { data: { user } } = await supabaseStorageService['supabase'].auth.getUser()
+          if (user) {
+            userId = user.id
+            const { data: profile } = await supabaseStorageService['supabase']
+              .from('profiles')
+              .select('tier')
+              .eq('id', user.id)
+              .single()
+            userTier = profile?.tier || 'free'
+            const session = await supabaseStorageService['supabase'].auth.getSession()
+            authToken = session.data.session?.access_token
+          }
+        } catch (authError) {
+          logger.warn('Could not get user info for vision fallback', context, authError as Error)
+        }
+
+        // Use the new orchestrator for robust extraction
+        const extractionResult = await trackPerformance(
+          'extractWithFallback',
+          () => extractWithFallback(file, {
+            enabled: !!userId && !!authToken, // Enable vision fallback if user is authenticated
+            userId,
+            userTier,
+            authToken
+          }),
           context,
           { fileName: file.name, fileSize: file.size }
         );
 
-        const { content, pdfData, totalPages, pageTexts, needsOCR, ocrStatus } = pdfResult;
+        // Show quality report
+        if (extractionResult.metadata.visionPages > 0) {
+          setExtractionProgress(
+            `✓ ${extractionResult.metadata.pdfJsPages} pages extracted\n` +
+            `✓ ${extractionResult.metadata.visionPages} pages enhanced with AI vision`
+          )
+        } else {
+          setExtractionProgress(`✓ All ${extractionResult.totalPages} pages extracted successfully`)
+        }
+
+        const { content, pdfData, totalPages, pageTexts, needsOCR, ocrStatus, extractionMethod, visionPagesUsed } = extractionResult;
 
         const document = {
           id: crypto.randomUUID(),
@@ -118,7 +162,9 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
           totalPages,
           pageTexts,
           needsOCR,
-          ocrStatus: ocrStatus as 'not_needed' | 'pending' | 'processing' | 'completed' | 'failed' | 'user_declined'
+          ocrStatus: ocrStatus as 'not_needed' | 'pending' | 'processing' | 'completed' | 'failed' | 'user_declined',
+          extractionMethod, // Add extraction method for UI badges
+          visionPages: visionPagesUsed
         }
         
         // Check if we should show OCR dialog (auto-approve if session setting is enabled)
@@ -600,6 +646,18 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
             </div>
           )}
 
+          {extractionProgress && (
+            <div 
+              className="mt-4 p-4 rounded-lg"
+              style={{
+                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                border: '1px solid rgb(34, 197, 94)',
+              }}
+            >
+              <pre className="text-sm whitespace-pre-wrap" style={{ color: 'rgb(34, 197, 94)' }}>{extractionProgress}</pre>
+            </div>
+          )}
+
           <div className="mt-6" style={{ color: 'var(--color-text-secondary)' }}>
             <p className="text-caption font-medium mb-2">Supported formats:</p>
             <ul className="space-y-1 text-caption">
@@ -607,8 +665,8 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
               <li>• PDF documents (.pdf)</li>
             </ul>
             <p className="mt-3 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
-              Note: For PDFs, text extraction is attempted first. If the advanced PDF viewer has issues, 
-              the app will automatically fall back to text-only view.
+              Note: PDFs use intelligent 3-tier extraction with AI vision enhancement for poor quality pages.
+              If text extraction quality is low, the app will automatically use OCR.
             </p>
           </div>
 

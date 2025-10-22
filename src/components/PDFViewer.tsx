@@ -1194,12 +1194,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       // With ID sync fix, only brief delay needed for S3/database completion
       const uploadTime = document.uploadedAt ? new Date(document.uploadedAt).getTime() : 0
       const now = Date.now()
-      const isRecentlyUploaded = (now - uploadTime) < 5000 // 5 seconds
+      const isRecentlyUploaded = (now - uploadTime) < 10000 // 10 seconds
       
-      // If recently uploaded, brief wait for the database to sync
+      // If recently uploaded, wait longer for the database to sync
       if (isRecentlyUploaded) {
         console.log('Document recently uploaded, waiting for database sync...')
-        await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
+        await new Promise(resolve => setTimeout(resolve, 3000)) // Wait 3 seconds
       }
 
       try {
@@ -1370,14 +1370,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
       return
     }
 
-    // Check if document is very recently uploaded (within 5 seconds)
-    // With ID sync fix, only need brief delay for S3/database to complete
+    // Check if document is very recently uploaded (within 10 seconds)
+    // Need to wait for S3 upload + database save + potential replication delay
     const uploadTime = document.uploadedAt ? new Date(document.uploadedAt).getTime() : 0
     const now = Date.now()
-    const isVeryRecentlyUploaded = (now - uploadTime) < 5000 // 5 seconds
+    const isVeryRecentlyUploaded = (now - uploadTime) < 10000 // 10 seconds
     
     if (isVeryRecentlyUploaded) {
-      alert('⏳ Document is still being saved...\n\nPlease wait a few seconds and try again.')
+      const secondsRemaining = Math.ceil((10000 - (now - uploadTime)) / 1000)
+      alert(`⏳ Document is still being saved to database...\n\nPlease wait ${secondsRemaining} more second${secondsRemaining > 1 ? 's' : ''} and try again.`)
       setHighlightPickerPosition(null)
       setSelectedTextInfo(null)
       return

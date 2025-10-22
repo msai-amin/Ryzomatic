@@ -20,6 +20,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ onClose }) => {
     chatMode,
     setChatMode,
     setSelectedTextContext,
+    user,
   } = useAppStore()
   
   const [inputValue, setInputValue] = useState('')
@@ -68,7 +69,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ onClose }) => {
         response = await askForClarification(
           selectedTextContext.selectedText,
           context,
-          currentDocument?.content
+          currentDocument?.content,
+          user?.tier || 'free'
         )
       } else if (chatMode === 'further-reading') {
         // Add user message
@@ -80,7 +82,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ onClose }) => {
         response = await getFurtherReading(
           selectedTextContext.selectedText,
           context,
-          currentDocument?.content
+          currentDocument?.content,
+          user?.tier || 'free'
         )
       } else {
         return
@@ -126,7 +129,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ onClose }) => {
         }
       }
       
-      const response = await sendMessageToAI(userMessage, documentContext)
+      const response = await sendMessageToAI(userMessage, documentContext, user?.tier || 'free')
       addChatMessage({ role: 'assistant', content: response })
     } catch (error) {
       addChatMessage({ 

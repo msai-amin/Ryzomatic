@@ -254,7 +254,7 @@ const LandingPage: React.FC = () => {
                   opacity: 0.95,
                 }}
               >
-                <source src="/videos/product-demo.mp4" type="video/mp4" />
+                <source src="/videos/landing-pg-animation.mp4" type="video/mp4" />
                 {/* Fallback for browsers that don't support video */}
                 <div className="flex items-center justify-center h-full" style={{ minHeight: '400px' }}>
                   <div className="text-center">

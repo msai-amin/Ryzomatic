@@ -14,7 +14,8 @@ export const ChatModal: React.FC<ChatModalProps> = ({ onClose }) => {
     addChatMessage, 
     isTyping, 
     setTyping, 
-    currentDocument 
+    currentDocument,
+    user
   } = useAppStore()
   
   const [inputValue, setInputValue] = useState('')
@@ -38,7 +39,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({ onClose }) => {
 
     try {
       setTyping(true)
-      const response = await sendMessageToAI(userMessage, currentDocument?.content || '')
+      const response = await sendMessageToAI(userMessage, currentDocument?.content || '', user?.tier || 'free')
       addChatMessage({ role: 'assistant', content: response })
     } catch (error) {
       addChatMessage({ 

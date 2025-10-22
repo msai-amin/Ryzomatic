@@ -29,7 +29,19 @@ const openai = openaiApiKey ? new OpenAI({
 // Initialize Gemini client
 const genAI = geminiApiKey ? new GoogleGenerativeAI(geminiApiKey) : null;
 
-export const sendMessageToAI = async (message: string, documentContent?: string): Promise<string> => {
+// Helper function to get the appropriate Gemini model based on tier
+const getGeminiModel = (tier: 'free' | 'pro' | 'premium' | 'enterprise' = 'free') => {
+  if (!genAI) return null;
+  
+  const modelName = tier === 'free' ? 'gemini-2.5-flash-lite' : 'gemini-2.5-pro';
+  return genAI.getGenerativeModel({ model: modelName });
+};
+
+export const sendMessageToAI = async (
+  message: string, 
+  documentContent?: string, 
+  tier: 'free' | 'pro' | 'premium' | 'enterprise' = 'free'
+): Promise<string> => {
   const context = {
     component: 'AIService',
     action: 'sendMessageToAI'
@@ -77,10 +89,11 @@ export const sendMessageToAI = async (message: string, documentContent?: string)
         logger.info('Using Gemini API', context, {
           messageLength: message.length,
           hasDocumentContent: !!documentContent,
-          documentLength: documentContent?.length || 0
+          documentLength: documentContent?.length || 0,
+          tier: tier
         });
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = getGeminiModel(tier);
         
         const prompt = `You are an AI assistant helping users understand and analyze documents.
 
@@ -335,7 +348,8 @@ Text: ${text}`
 export const askForClarification = async (
   selectedText: string,
   context: string,
-  documentContent?: string
+  documentContent?: string,
+  tier: 'free' | 'pro' | 'premium' | 'enterprise' = 'free'
 ): Promise<string> => {
   const logContext = {
     component: 'AIService',
@@ -363,10 +377,11 @@ Please be clear, concise, and helpful.`;
       try {
         logger.info('Using Gemini for clarification', logContext, {
           selectedTextLength: selectedText.length,
-          contextLength: context.length
+          contextLength: context.length,
+          tier: tier
         });
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = getGeminiModel(tier);
         const result = await model.generateContent(prompt);
         const response = result.response.text();
         
@@ -429,7 +444,8 @@ Please be clear, concise, and helpful.`;
 export const getFurtherReading = async (
   selectedText: string,
   context: string,
-  documentContent?: string
+  documentContent?: string,
+  tier: 'free' | 'pro' | 'premium' | 'enterprise' = 'free'
 ): Promise<string> => {
   const logContext = {
     component: 'AIService',
@@ -458,10 +474,11 @@ Be specific and actionable in your suggestions.`;
       try {
         logger.info('Using Gemini for further reading suggestions', logContext, {
           selectedTextLength: selectedText.length,
-          contextLength: context.length
+          contextLength: context.length,
+          tier: tier
         });
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = getGeminiModel(tier);
         const result = await model.generateContent(prompt);
         const response = result.response.text();
         
