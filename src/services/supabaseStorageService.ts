@@ -393,14 +393,18 @@ class SupabaseStorageService {
                 const page = await pdf.getPage(pageNum);
                 const textContent = await page.getTextContent();
                 const pageText = extractStructuredText(textContent.items);
-                pageTexts.push(pageText);
+                // Ensure pageText is always a string
+                const safePageText = typeof pageText === 'string' ? pageText : String(pageText || '');
+                pageTexts.push(safePageText);
               } catch (pageError) {
                 logger.warn(`Error extracting text from page ${pageNum}`, context, pageError as Error);
                 pageTexts.push(''); // Empty string for failed pages
               }
             }
             
-            book.pageTexts = pageTexts;
+            // Sanitize all pageTexts to ensure they are strings
+            const sanitizedPageTexts = pageTexts.map(text => typeof text === 'string' ? text : String(text || ''));
+            book.pageTexts = sanitizedPageTexts;
             logger.info('PageTexts extracted successfully', context, {
               totalPages: pdf.numPages,
               extractedPages: pageTexts.length,
