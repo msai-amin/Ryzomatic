@@ -37,7 +37,11 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       if (currentDocument.content) {
         text = currentDocument.content
       } else if (currentDocument.pageTexts && currentDocument.pageTexts.length > 0) {
-        text = currentDocument.pageTexts.join('\n\n')
+        // Ensure all pageTexts elements are strings before joining
+        const safePageTexts = currentDocument.pageTexts.map(pageText => 
+          typeof pageText === 'string' ? pageText : String(pageText || '')
+        )
+        text = safePageTexts.join('\n\n')
       }
       
       if (text) {
@@ -132,7 +136,9 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               }
             },
             (word, charIndex) => {
-              const words = text.slice(0, charIndex + 1).split(/\s+/)
+              // Ensure text is a string before splitting
+              const safeText = typeof text === 'string' ? text : String(text || '')
+              const words = safeText.slice(0, charIndex + 1).split(/\s+/)
               const wordIndex = words.length - 1
               updateTTS({ currentWordIndex: wordIndex })
             }
