@@ -387,16 +387,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCurrentDocument: (document) => {
     if (document && document.pageTexts) {
       // Debug: Log the pageTexts before sanitization
-      console.log('🔍 setCurrentDocument: Before sanitization:', {
-        documentId: document.id,
-        pageTextsLength: document.pageTexts.length,
-        pageTextsTypes: document.pageTexts.map((text, i) => ({
-          index: i,
-          type: typeof text,
-          isString: typeof text === 'string',
-          value: text
-        }))
-      });
+      console.log('🔍 setCurrentDocument: Before sanitization:');
+      console.log('  Document ID:', document.id);
+      console.log('  PageTexts Length:', document.pageTexts.length);
+      console.log('  PageTexts Types:', document.pageTexts.map((text, i) => ({
+        index: i,
+        type: typeof text,
+        isString: typeof text === 'string',
+        value: text
+      })));
       
       // Sanitize pageTexts to ensure all elements are strings
       document.pageTexts = document.pageTexts.map(text => 
@@ -404,16 +403,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       );
       
       // Debug: Log the pageTexts after sanitization
-      console.log('🔍 setCurrentDocument: After sanitization:', {
-        documentId: document.id,
-        pageTextsLength: document.pageTexts.length,
-        pageTextsTypes: document.pageTexts.map((text, i) => ({
-          index: i,
-          type: typeof text,
-          isString: typeof text === 'string',
-          value: text
-        }))
-      });
+      console.log('🔍 setCurrentDocument: After sanitization:');
+      console.log('  Document ID:', document.id);
+      console.log('  PageTexts Length:', document.pageTexts.length);
+      console.log('  PageTexts Types:', document.pageTexts.map((text, i) => ({
+        index: i,
+        type: typeof text,
+        isString: typeof text === 'string',
+        value: text
+      })));
     }
     set({ currentDocument: document });
   },
