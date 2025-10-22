@@ -75,7 +75,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ onUploadClick })
 
   // Use PDF viewer for PDF documents
   if (currentDocument.type === 'pdf' && currentDocument.pdfData && currentDocument.totalPages) {
-    return <PDFViewer document={currentDocument} />
+    return <PDFViewer />
   }
 
   // Use text viewer for text documents

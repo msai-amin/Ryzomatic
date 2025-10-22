@@ -212,11 +212,12 @@ function parseTextWithBreaks(text: string): TextSegment[] {
 // Remove the old local Highlight interface - we'll use the one from highlightService
 
 interface PDFViewerProps {
-  document: DocumentType
+  // No props needed - gets document from store
 }
 
-export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
+export const PDFViewer: React.FC<PDFViewerProps> = () => {
   const { 
+    currentDocument,
     pdfViewer, 
     tts, 
     typography, 
@@ -229,6 +230,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ document }) => {
     toggleChat,
     isChatOpen
   } = useAppStore()
+  
+  // Get document from store (which is sanitized)
+  const document = currentDocument
+  
+  // Safety check - return early if no document
+  if (!document) {
+    return <div>No document loaded</div>
+  }
   
   const [pageNumber, setPageNumber] = useState(1)
   const [numPages, setNumPages] = useState<number | null>(null)
