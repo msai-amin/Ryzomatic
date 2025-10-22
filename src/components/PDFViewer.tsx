@@ -59,6 +59,14 @@ function parseTextWithBreaks(text: string): TextSegment[] {
   let wordIndex = 0
   let paragraphIndex = 0
   
+  // Debug: Log what we're receiving
+  console.log('🔍 parseTextWithBreaks: Received text:', {
+    type: typeof text,
+    isString: typeof text === 'string',
+    value: text,
+    hasSplit: typeof text === 'string' ? 'split' in text : false
+  });
+  
   // Ensure text is a string
   if (typeof text !== 'string') {
     console.warn('parseTextWithBreaks: text is not a string, converting...', typeof text, text)
@@ -237,6 +245,20 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   // Safety check - return early if no document
   if (!document) {
     return <div>No document loaded</div>
+  }
+  
+  // Debug: Log document pageTexts when PDFViewer receives it
+  if (document.pageTexts) {
+    console.log('🔍 PDFViewer: Received document with pageTexts:', {
+      documentId: document.id,
+      pageTextsLength: document.pageTexts.length,
+      pageTextsTypes: document.pageTexts.map((text, i) => ({
+        index: i,
+        type: typeof text,
+        isString: typeof text === 'string',
+        value: text
+      }))
+    });
   }
   
   const [pageNumber, setPageNumber] = useState(1)
