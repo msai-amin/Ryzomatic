@@ -211,6 +211,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       uploadedAt: book.savedAt,
       pdfData: book.type === 'pdf' ? book.fileData as ArrayBuffer : undefined,
       totalPages: book.totalPages,
+      lastReadPage: book.lastReadPage,
       pageTexts: sanitizePageTexts(book.pageTexts), // Include pageTexts for TTS functionality
     };
 
@@ -232,11 +233,11 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         }) || []
       });
 
-      addDocument(doc);
+      useAppStore.getState().setCurrentDocument(doc as any);
       onClose();
     } catch (error) {
-      console.error('Error opening book from Library:', error);
-      alert(`Failed to open book: ${error.message}`);
+      console.error('Failed to open book:', error);
+      alert('Failed to open book. Please try again.');
     }
   };
 
