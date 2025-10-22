@@ -31,25 +31,54 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   // Extract paragraphs from current document
   useEffect(() => {
     if (currentDocument) {
+      console.log('🔍 AudioWidget: Processing document', {
+        documentId: currentDocument.id,
+        hasPageTexts: !!currentDocument.pageTexts,
+        pageTextsLength: currentDocument.pageTexts?.length || 0
+      });
+      
       let text = ''
       
       // Get text from content or pageTexts
       if (currentDocument.content) {
         text = currentDocument.content
+        console.log('🔍 AudioWidget: Using content', { textType: typeof text, textLength: text.length });
       } else if (currentDocument.pageTexts && currentDocument.pageTexts.length > 0) {
+        console.log('🔍 AudioWidget: Processing pageTexts', {
+          pageTextsTypes: currentDocument.pageTexts.map((text, i) => ({
+            index: i,
+            type: typeof text,
+            isString: typeof text === 'string',
+            value: text
+          }))
+        });
+        
         // Ensure all pageTexts elements are strings before joining
         const safePageTexts = currentDocument.pageTexts.map(pageText => 
           typeof pageText === 'string' ? pageText : String(pageText || '')
         )
         text = safePageTexts.join('\n\n')
+        console.log('🔍 AudioWidget: Joined text', { textType: typeof text, textLength: text.length });
       }
       
       if (text) {
+        console.log('🔍 AudioWidget: About to split text', {
+          textType: typeof text,
+          textLength: text.length,
+          hasSplit: typeof text === 'string' ? 'split' in text : false,
+          textValue: text
+        });
+        
         // Split by double newlines (paragraph breaks) or periods followed by newlines
         const paragraphs = text
           .split(/\n\n+/)
           .map(p => p.trim())
           .filter(p => p.length > 0)
+        
+        console.log('🔍 AudioWidget: Split successful', {
+          paragraphsCount: paragraphs.length,
+          paragraphsTypes: paragraphs.map((p, i) => ({ index: i, type: typeof p, value: p }))
+        });
         
         updateTTS({ paragraphs, currentParagraphIndex: 0 })
       }
