@@ -18,11 +18,6 @@ interface UseCase {
   icon: string;
 }
 
-interface Testimonial {
-  quote: string;
-  name: string;
-  role: string;
-}
 
 interface PricingTier {
   name: string;
@@ -38,7 +33,6 @@ const LandingPage: React.FC = () => {
   const navigation: NavigationItem[] = [
     { name: "Features", href: "#features" },
     { name: "Use Cases", href: "#use-cases" },
-    { name: "Testimonials", href: "#testimonials" },
     { name: "Pricing", href: "#pricing" },
   ];
 
@@ -78,18 +72,6 @@ const LandingPage: React.FC = () => {
     }
   ];
 
-  const testimonials: Testimonial[] = [
-    {
-      quote: "Immersive Reader transformed how I manage my literature reviews. I can synthesize papers in a fraction of the time, which is invaluable for my research.",
-      name: "Dr. Eleanor Vance",
-      role: "Postdoctoral Fellow, Department of History"
-    },
-    {
-      quote: "Managing dissertation sources was overwhelming. Immersive Reader's workflow tools helped me organize everything and focus on writing. It's been a lifesaver.",
-      name: "Ben Carter",
-      role: "PhD Candidate, Sociology"
-    }
-  ];
 
   const pricingTiers: PricingTier[] = [
     {
@@ -333,32 +315,6 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Testimonials Section */}
-      <section id="testimonials" className="bg-slate-50 border-y border-slate-200">
-        <div className="mx-auto max-w-6xl px-6 py-24">
-          <div className="flex flex-col gap-6 text-center">
-            <h2 className="text-4xl font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
-              Trusted by Academics at Leading Institutions
-            </h2>
-          </div>
-          
-          <div className="mt-16 grid gap-8 md:grid-cols-2">
-            {testimonials.map((testimonial) => (
-              <div
-                key={testimonial.name}
-                className="rounded-2xl border border-slate-200 bg-white p-8 text-left shadow-sm"
-              >
-                <div className="text-4xl text-slate-300">"</div>
-                <p className="mt-4 text-lg text-slate-700">{testimonial.quote}</p>
-                <div className="mt-6 text-sm text-slate-500">
-                  <p className="font-semibold text-slate-800">{testimonial.name}</p>
-                  <p>{testimonial.role}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* Pricing Section */}
       <section id="pricing" className="bg-white">
