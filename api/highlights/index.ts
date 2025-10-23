@@ -17,22 +17,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).end()
   }
 
-  // Get auth token from header
-  const authHeader = req.headers.authorization
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
-
-  const token = authHeader.substring(7)
-  const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-  // Verify user
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-  if (authError || !user) {
-    return res.status(401).json({ error: 'Invalid token' })
-  }
-
   try {
+    // Get auth token from header
+    const authHeader = req.headers.authorization
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    const token = authHeader.substring(7)
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Verify user
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !user) {
+      console.error('Auth error:', authError)
+      return res.status(401).json({ error: 'Invalid token' })
+    }
+
     if (req.method === 'GET') {
       // List highlights
       const { bookId } = req.query
