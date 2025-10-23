@@ -99,11 +99,15 @@ class HighlightService {
         },
         body: JSON.stringify({
           bookId: data.bookId,
-          text: data.highlightedText,
-          startOffset: data.textStartOffset,
-          endOffset: data.textEndOffset,
-          color: data.colorHex,
-          note: null
+          pageNumber: data.pageNumber,
+          highlightedText: data.highlightedText,
+          colorId: data.colorId,
+          colorHex: data.colorHex,
+          positionData: data.positionData,
+          textStartOffset: data.textStartOffset,
+          textEndOffset: data.textEndOffset,
+          textContextBefore: data.textContextBefore,
+          textContextAfter: data.textContextAfter,
         }),
       });
 
@@ -188,9 +192,13 @@ class HighlightService {
         },
         body: JSON.stringify({
           id: highlightId,
-          text: updates.colorId ? undefined : undefined, // Keep existing text
-          color: updates.colorHex,
-          note: undefined // Keep existing note
+          colorId: updates.colorId,
+          colorHex: updates.colorHex,
+          positionData: updates.positionData,
+          textStartOffset: updates.textStartOffset,
+          textEndOffset: updates.textEndOffset,
+          isOrphaned: updates.isOrphaned,
+          orphanedReason: updates.orphanedReason
         }),
       });
 
