@@ -64,12 +64,13 @@ function parseTextWithBreaks(text: string): TextSegment[] {
   let wordIndex = 0
   let paragraphIndex = 0
   
-  // Debug: Log what we're receiving - CACHE BUST v3
-  console.log('🔍 parseTextWithBreaks: Received text (CACHE BUST v3):', {
+  // Debug: Log what we're receiving - FORCE DEPLOY v4
+  console.log('🔍 parseTextWithBreaks: Received text (FORCE DEPLOY v4):', {
     type: typeof text,
     isString: typeof text === 'string',
     hasSplit: typeof text === 'string' && typeof text.split === 'function',
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    version: '4.0.0'
   });
   
   // Comprehensive text sanitization
