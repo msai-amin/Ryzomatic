@@ -58,16 +58,18 @@ interface TextSegment {
 }
 
 // Parse text to preserve paragraph structure - USED ONLY IN READING MODE
+// CACHE BUST v3 - Force Vercel to rebuild with new bundle hash
 function parseTextWithBreaks(text: string): TextSegment[] {
   const segments: TextSegment[] = []
   let wordIndex = 0
   let paragraphIndex = 0
   
-  // Debug: Log what we're receiving
-  console.log('🔍 parseTextWithBreaks: Received text (v2):', {
+  // Debug: Log what we're receiving - CACHE BUST v3
+  console.log('🔍 parseTextWithBreaks: Received text (CACHE BUST v3):', {
     type: typeof text,
     isString: typeof text === 'string',
-    hasSplit: typeof text === 'string' && typeof text.split === 'function'
+    hasSplit: typeof text === 'string' && typeof text.split === 'function',
+    timestamp: Date.now()
   });
   
   // Comprehensive text sanitization
