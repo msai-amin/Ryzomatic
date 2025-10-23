@@ -67,7 +67,7 @@ function parseTextWithBreaks(text: string): TextSegment[] {
   console.log('🔍 parseTextWithBreaks: Received text:', {
     type: typeof text,
     isString: typeof text === 'string',
-    hasSplit: typeof text === 'string' && 'split' in (text as any)
+    hasSplit: typeof text === 'string' && typeof text.split === 'function'
   });
   
   // Ensure text is a string
@@ -1923,7 +1923,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       console.log('🔍 renderPageContent: Safe page text', {
         pageNum,
         safePageTextType: typeof safePageText,
-        hasSplit: typeof safePageText === 'string' && 'split' in (safePageText as any)
+        hasSplit: typeof safePageText === 'string' && typeof safePageText.split === 'function'
       });
       
       if (!safePageText) {
