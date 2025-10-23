@@ -40,17 +40,24 @@ class PomodoroGamificationService {
     completed: boolean
   }): Promise<NewAchievement[]> {
     try {
-      const { data, error } = await supabase.rpc('check_pomodoro_achievements', {
-        p_user_id: userId,
-        p_session_data: sessionData
+      const response = await fetch('/api/pomodoro/gamification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'check-achievements',
+          ...sessionData
+        }),
       })
 
-      if (error) {
-        console.error('Error checking achievements:', error)
+      if (!response.ok) {
+        console.error('Error checking achievements:', response.statusText)
         return []
       }
 
-      return data || []
+      const data = await response.json()
+      return data.newAchievements || []
     } catch (error) {
       console.error('Error in checkAchievements:', error)
       return []
@@ -62,13 +69,18 @@ class PomodoroGamificationService {
    */
   async updateStreak(userId: string, sessionDate?: Date): Promise<void> {
     try {
-      const { error } = await supabase.rpc('update_pomodoro_streak', {
-        p_user_id: userId,
-        p_session_date: sessionDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
+      const response = await fetch('/api/pomodoro/gamification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'update-streak'
+        }),
       })
 
-      if (error) {
-        console.error('Error updating streak:', error)
+      if (!response.ok) {
+        console.error('Error updating streak:', response.statusText)
       }
     } catch (error) {
       console.error('Error in updateStreak:', error)
@@ -80,16 +92,20 @@ class PomodoroGamificationService {
    */
   async getUserAchievements(userId: string): Promise<Achievement[]> {
     try {
-      const { data, error } = await supabase.rpc('get_user_achievements', {
-        p_user_id: userId
+      const response = await fetch('/api/pomodoro/gamification', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       })
 
-      if (error) {
-        console.error('Error getting user achievements:', error)
+      if (!response.ok) {
+        console.error('Error getting user achievements:', response.statusText)
         return []
       }
 
-      return data || []
+      const data = await response.json()
+      return data.achievements || []
     } catch (error) {
       console.error('Error in getUserAchievements:', error)
       return []
@@ -101,16 +117,20 @@ class PomodoroGamificationService {
    */
   async getUserStreak(userId: string): Promise<StreakInfo | null> {
     try {
-      const { data, error } = await supabase.rpc('get_user_streak', {
-        p_user_id: userId
+      const response = await fetch('/api/pomodoro/gamification', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       })
 
-      if (error) {
-        console.error('Error getting user streak:', error)
+      if (!response.ok) {
+        console.error('Error getting user streak:', response.statusText)
         return null
       }
 
-      return data?.[0] || null
+      const data = await response.json()
+      return data.streak || null
     } catch (error) {
       console.error('Error in getUserStreak:', error)
       return null

@@ -91,7 +91,7 @@ class HighlightService {
     try {
       const authHeader = await this.getAuthHeader();
 
-      const response = await fetch(`${this.API_BASE}/create`, {
+      const response = await fetch(`${this.API_BASE}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -99,15 +99,11 @@ class HighlightService {
         },
         body: JSON.stringify({
           bookId: data.bookId,
-          pageNumber: data.pageNumber,
-          highlightedText: data.highlightedText,
-          colorId: data.colorId,
-          colorHex: data.colorHex,
-          positionData: data.positionData,
-          textStartOffset: data.textStartOffset,
-          textEndOffset: data.textEndOffset,
-          textContextBefore: data.textContextBefore,
-          textContextAfter: data.textContextAfter,
+          text: data.highlightedText,
+          startOffset: data.textStartOffset,
+          endOffset: data.textEndOffset,
+          color: data.colorHex,
+          note: null
         }),
       });
 
@@ -151,7 +147,7 @@ class HighlightService {
         params.append('includeOrphaned', options.includeOrphaned.toString());
       }
 
-      const response = await fetch(`${this.API_BASE}/list?${params.toString()}`, {
+      const response = await fetch(`${this.API_BASE}?bookId=${bookId}`, {
         method: 'GET',
         headers: {
           'Authorization': authHeader,
@@ -184,23 +180,17 @@ class HighlightService {
     try {
       const authHeader = await this.getAuthHeader();
 
-      const response = await fetch(`${this.API_BASE}/update`, {
+      const response = await fetch(`${this.API_BASE}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': authHeader,
         },
         body: JSON.stringify({
-          highlightId,
-          updates: {
-            color_id: updates.colorId,
-            color_hex: updates.colorHex,
-            position_data: updates.positionData,
-            text_start_offset: updates.textStartOffset,
-            text_end_offset: updates.textEndOffset,
-            is_orphaned: updates.isOrphaned,
-            orphaned_reason: updates.orphanedReason,
-          },
+          id: highlightId,
+          text: updates.colorId ? undefined : undefined, // Keep existing text
+          color: updates.colorHex,
+          note: undefined // Keep existing note
         }),
       });
 
@@ -228,13 +218,11 @@ class HighlightService {
     try {
       const authHeader = await this.getAuthHeader();
 
-      const response = await fetch(`${this.API_BASE}/delete`, {
+      const response = await fetch(`${this.API_BASE}?id=${highlightId}`, {
         method: 'DELETE',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': authHeader,
         },
-        body: JSON.stringify({ highlightId }),
       });
 
       if (!response.ok) {
