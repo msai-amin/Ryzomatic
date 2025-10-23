@@ -70,10 +70,33 @@ function parseTextWithBreaks(text: string): TextSegment[] {
     hasSplit: typeof text === 'string' && typeof text.split === 'function'
   });
   
-  // Ensure text is a string
+  // Comprehensive text sanitization
+  if (text === null || text === undefined) {
+    console.warn('parseTextWithBreaks: text is null/undefined, using empty string');
+    text = '';
+  } else if (typeof text !== 'string') {
+    console.warn('parseTextWithBreaks: text is not a string, converting...', {
+      type: typeof text,
+      constructor: (text as any)?.constructor?.name,
+      value: String(text).substring(0, 100) + (String(text).length > 100 ? '...' : '')
+    });
+    
+    if (typeof text === 'object') {
+      try {
+        text = JSON.stringify(text);
+      } catch (e) {
+        console.warn('parseTextWithBreaks: Failed to stringify object, using fallback');
+        text = String(text);
+      }
+    } else {
+      text = String(text);
+    }
+  }
+  
+  // Final safety check
   if (typeof text !== 'string') {
-    console.warn('parseTextWithBreaks: text is not a string, converting...', typeof text, text)
-    text = String(text || '')
+    console.error('parseTextWithBreaks: Failed to convert to string, using empty string');
+    text = '';
   }
   
   // First, extract tables and formulas
@@ -1913,12 +1936,44 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         rawPageTextValue: String(rawPageText).substring(0, 100) + (String(rawPageText).length > 100 ? '...' : '')
       });
       
-      const pageText = typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
+      // Comprehensive sanitization of pageText
+      let pageText: string;
+      if (rawPageText === null || rawPageText === undefined) {
+        console.warn(`renderPageContent: PageText ${pageNum} is null/undefined, using empty string`);
+        pageText = '';
+      } else if (typeof rawPageText === 'string') {
+        pageText = rawPageText;
+      } else if (typeof rawPageText === 'object') {
+        console.warn(`renderPageContent: PageText ${pageNum} is object, stringifying:`, {
+          type: typeof rawPageText,
+          constructor: (rawPageText as any)?.constructor?.name,
+          keys: Object.keys(rawPageText || {}),
+          value: JSON.stringify(rawPageText).substring(0, 100)
+        });
+        try {
+          pageText = JSON.stringify(rawPageText);
+        } catch (e) {
+          console.warn(`renderPageContent: Failed to stringify PageText ${pageNum}, using fallback`);
+          pageText = String(rawPageText);
+        }
+      } else {
+        console.warn(`renderPageContent: PageText ${pageNum} is ${typeof rawPageText}, converting to string`);
+        pageText = String(rawPageText);
+      }
       
       const currentPageText = isEditing && editedTexts[pageNum] ? editedTexts[pageNum] : pageText
       
-      // Ensure currentPageText is a string
-      const safePageText = typeof currentPageText === 'string' ? currentPageText : String(currentPageText || '')
+      // Ensure currentPageText is a string with additional safety
+      let safePageText: string;
+      if (currentPageText === null || currentPageText === undefined) {
+        console.warn(`renderPageContent: CurrentPageText ${pageNum} is null/undefined, using empty string`);
+        safePageText = '';
+      } else if (typeof currentPageText === 'string') {
+        safePageText = currentPageText;
+      } else {
+        console.warn(`renderPageContent: CurrentPageText ${pageNum} is ${typeof currentPageText}, converting to string`);
+        safePageText = String(currentPageText);
+      }
       
       console.log('🔍 renderPageContent: Safe page text', {
         pageNum,

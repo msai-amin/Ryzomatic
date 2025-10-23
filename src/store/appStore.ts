@@ -385,35 +385,77 @@ export const useAppStore = create<AppState>((set, get) => ({
   
   // Actions
   setCurrentDocument: (document) => {
-    if (document && document.pageTexts) {
-      // Debug: Log the pageTexts before sanitization
-      console.log('🔍 setCurrentDocument: Before sanitization:');
-      console.log('  Document ID:', document.id);
-      console.log('  PageTexts Length:', document.pageTexts.length);
-      console.log('  PageTexts Types:', document.pageTexts.map((text, i) => ({
-        index: i,
-        type: typeof text,
-        isString: typeof text === 'string',
-        value: (String(text).substring(0, 50) + (String(text).length > 50 ? '...' : ''))
-      })));
+    if (document) {
+      // Comprehensive sanitization of document data
+      const sanitizedDocument = { ...document };
       
-      // Sanitize pageTexts to ensure all elements are strings
-      document.pageTexts = document.pageTexts.map(text => 
-        typeof text === 'string' ? text : String(text || '')
-      );
+      // Sanitize pageTexts array
+      if (sanitizedDocument.pageTexts) {
+        // Debug: Log the pageTexts before sanitization
+        console.log('🔍 setCurrentDocument: Before sanitization:');
+        console.log('  Document ID:', sanitizedDocument.id);
+        console.log('  PageTexts Length:', sanitizedDocument.pageTexts.length);
+        console.log('  PageTexts Types:', sanitizedDocument.pageTexts.map((text, i) => ({
+          index: i,
+          type: typeof text,
+          isString: typeof text === 'string',
+          value: (String(text).substring(0, 50) + (String(text).length > 50 ? '...' : ''))
+        })));
+        
+        // Deep sanitization of pageTexts to ensure all elements are strings
+        sanitizedDocument.pageTexts = sanitizedDocument.pageTexts.map((text, index) => {
+          // Handle various data types that might be in the database
+          if (text === null || text === undefined) {
+            console.warn(`🔍 setCurrentDocument: PageText ${index} is null/undefined, converting to empty string`);
+            return '';
+          }
+          
+          if (typeof text === 'string') {
+            return text;
+          }
+          
+          if (typeof text === 'object') {
+            console.warn(`🔍 setCurrentDocument: PageText ${index} is object, stringifying:`, {
+              type: typeof text,
+              constructor: (text as any)?.constructor?.name,
+              keys: Object.keys(text || {}),
+              value: JSON.stringify(text).substring(0, 100)
+            });
+            return JSON.stringify(text);
+          }
+          
+          // For any other type, convert to string
+          console.warn(`🔍 setCurrentDocument: PageText ${index} is ${typeof text}, converting to string`);
+          return String(text);
+        });
+        
+        // Debug: Log the pageTexts after sanitization
+        console.log('🔍 setCurrentDocument: After sanitization:');
+        console.log('  Document ID:', sanitizedDocument.id);
+        console.log('  PageTexts Length:', sanitizedDocument.pageTexts.length);
+        console.log('  PageTexts Types:', sanitizedDocument.pageTexts.map((text, i) => ({
+          index: i,
+          type: typeof text,
+          isString: typeof text === 'string',
+          value: (String(text).substring(0, 50) + (String(text).length > 50 ? '...' : ''))
+        })));
+      }
       
-      // Debug: Log the pageTexts after sanitization
-      console.log('🔍 setCurrentDocument: After sanitization:');
-      console.log('  Document ID:', document.id);
-      console.log('  PageTexts Length:', document.pageTexts.length);
-      console.log('  PageTexts Types:', document.pageTexts.map((text, i) => ({
-        index: i,
-        type: typeof text,
-        isString: typeof text === 'string',
-        value: (String(text).substring(0, 50) + (String(text).length > 50 ? '...' : ''))
-      })));
+      // Sanitize other text fields that might cause issues
+      if (sanitizedDocument.content && typeof sanitizedDocument.content !== 'string') {
+        console.warn('🔍 setCurrentDocument: Content is not a string, converting:', typeof sanitizedDocument.content);
+        sanitizedDocument.content = String(sanitizedDocument.content);
+      }
+      
+      if (sanitizedDocument.name && typeof sanitizedDocument.name !== 'string') {
+        console.warn('🔍 setCurrentDocument: Name is not a string, converting:', typeof sanitizedDocument.name);
+        sanitizedDocument.name = String(sanitizedDocument.name);
+      }
+      
+      set({ currentDocument: sanitizedDocument });
+    } else {
+      set({ currentDocument: document });
     }
-    set({ currentDocument: document });
   },
   
   addDocument: (document) => {

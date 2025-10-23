@@ -402,8 +402,30 @@ class SupabaseStorageService {
               }
             }
             
-            // Sanitize all pageTexts to ensure they are strings
-            const sanitizedPageTexts = pageTexts.map(text => typeof text === 'string' ? text : String(text || ''));
+            // Comprehensive sanitization of pageTexts to ensure they are strings
+            const sanitizedPageTexts = pageTexts.map((text, index) => {
+              if (text === null || text === undefined) {
+                logger.warn(`PageText ${index} is null/undefined, converting to empty string`, context);
+                return '';
+              }
+              
+              if (typeof text === 'string') {
+                return text;
+              }
+              
+              if (typeof text === 'object') {
+                console.warn(`PageText ${index} is object, stringifying:`, {
+                  textType: typeof text,
+                  constructor: (text as any)?.constructor?.name,
+                  keys: Object.keys(text || {}),
+                  value: JSON.stringify(text).substring(0, 100)
+                });
+                return JSON.stringify(text);
+              }
+              
+              logger.warn(`PageText ${index} is ${typeof text}, converting to string`, context);
+              return String(text);
+            });
             book.pageTexts = sanitizedPageTexts;
             logger.info('PageTexts extracted successfully', context, {
               totalPages: pdf.numPages,
@@ -432,8 +454,11 @@ class SupabaseStorageService {
         }
       } else if (data.file_type === 'text' && data.text_content) {
         book.fileData = data.text_content;
-        // For text files, create a single pageTexts entry
-        book.pageTexts = [data.text_content];
+        // For text files, create a single pageTexts entry with sanitization
+        const sanitizedTextContent = typeof data.text_content === 'string' 
+          ? data.text_content 
+          : String(data.text_content || '');
+        book.pageTexts = [sanitizedTextContent];
       } else if (data.file_type === 'pdf' && !data.s3_key) {
         logger.error('PDF book has no S3 key', context);
         throw errorHandler.createError(
