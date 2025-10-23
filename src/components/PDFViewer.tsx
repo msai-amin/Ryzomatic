@@ -64,7 +64,7 @@ function parseTextWithBreaks(text: string): TextSegment[] {
   let paragraphIndex = 0
   
   // Debug: Log what we're receiving
-  console.log('🔍 parseTextWithBreaks: Received text:', {
+  console.log('🔍 parseTextWithBreaks: Received text (v2):', {
     type: typeof text,
     isString: typeof text === 'string',
     hasSplit: typeof text === 'string' && typeof text.split === 'function'
