@@ -25,7 +25,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const [duration, setDuration] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [isMinimized, setIsMinimized] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const lastClickTimeRef = useRef<number>(0)
 
   // Extract paragraphs from current document
@@ -275,67 +275,142 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const currentParagraphIndex = tts.currentParagraphIndex ?? 0
   const totalParagraphs = tts.paragraphs.length
 
-  if (isMinimized) {
-    return (
+  return (
+    <>
+      {/* Toggle Bar - Always Visible */}
       <div 
-        className="fixed bottom-4 right-4 z-30 cursor-pointer transition-all hover:scale-105"
-        onClick={() => setIsMinimized(false)}
+        className={`fixed bottom-4 right-4 z-30 transition-all duration-300 ${className}`}
         style={{
           backgroundColor: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
-          borderRadius: '50%',
-          padding: '12px',
-          boxShadow: 'var(--shadow-lg)'
+          borderRadius: '12px',
+          boxShadow: 'var(--shadow-lg)',
+          backdropFilter: 'blur(10px)'
         }}
       >
-        <ChevronUp className="w-6 h-6" style={{ color: 'var(--color-text-primary)' }} />
-      </div>
-    )
-  }
+        {/* Compact Toggle Bar */}
+        <div className="flex items-center gap-2 p-3">
+          {/* Play/Pause Button - Main Control */}
+          <button
+            onClick={handlePlayPause}
+            disabled={isProcessing}
+            className="p-3 rounded-full transition-all shadow-md"
+            style={{
+              backgroundColor: isProcessing ? 'var(--color-text-tertiary)' : 'var(--color-primary)',
+              color: 'var(--color-text-inverse)',
+              cursor: isProcessing ? 'not-allowed' : 'pointer',
+              boxShadow: 'var(--shadow-md)'
+            }}
+            onMouseEnter={(e) => {
+              if (!isProcessing) {
+                e.currentTarget.style.transform = 'scale(1.05)'
+                e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.2)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isProcessing) {
+                e.currentTarget.style.transform = 'scale(1)'
+                e.currentTarget.style.boxShadow = 'var(--shadow-md)'
+              }
+            }}
+            title={
+              isProcessing 
+                ? "Processing..." 
+                : tts.isPlaying 
+                  ? "Pause" 
+                  : ttsManager.isPausedState()
+                    ? "Resume"
+                    : "Play"
+            }
+          >
+            {isProcessing ? (
+              <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-text-inverse)' }} />
+            ) : tts.isPlaying ? (
+              <Pause className="w-5 h-5" />
+            ) : (
+              <Play className="w-5 h-5" />
+            )}
+          </button>
 
-  return (
-    <>
-      {/* Bottom-Docked Player Bar */}
-      <div 
-        className={`fixed bottom-0 left-0 right-0 z-30 backdrop-blur-lg transition-transform duration-300 ${className}`}
-        style={{
-          backgroundColor: 'rgba(var(--color-surface-rgb, 255, 255, 255), 0.95)',
-          borderTop: '1px solid var(--color-border)',
-          boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.1)',
-          transform: 'translateY(0)',
-        }}
-      >
-        <div className="max-w-screen-2xl mx-auto px-6 py-4">
-          {/* Progress Bar - Full Width on Top */}
-          <div className="mb-3">
-            <div
-              className="w-full h-1.5 rounded-full relative cursor-pointer group"
-              style={{ backgroundColor: 'var(--color-border)' }}
+          {/* Status Indicator */}
+          <div className="flex items-center gap-2 min-w-0">
+            <div 
+              className={`w-2 h-2 rounded-full flex-shrink-0 ${tts.isPlaying ? 'animate-pulse' : ''}`}
+              style={{ 
+                backgroundColor: tts.isPlaying 
+                  ? 'var(--color-success)' 
+                  : ttsManager.isPausedState() 
+                    ? 'var(--color-warning)' 
+                    : 'var(--color-text-tertiary)' 
+              }}
+            />
+            <span 
+              className="text-xs truncate max-w-20"
+              style={{ color: 'var(--color-text-secondary)' }}
             >
-              <div
-                className="h-full rounded-full transition-all duration-200"
-                style={{ 
-                  width: `${progressPercentage}%`,
-                  backgroundColor: 'var(--color-primary)'
-                }}
-              />
-              <div
-                className="absolute top-0 w-3 h-3 rounded-full transform -translate-y-1/2 transition-transform group-hover:scale-125"
-                style={{ 
-                  left: `${progressPercentage}%`, 
-                  marginLeft: '-6px',
-                  top: '50%',
-                  backgroundColor: 'var(--color-primary)',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                }}
-              />
-            </div>
+              {tts.isPlaying ? 'Playing' : ttsManager.isPausedState() ? 'Paused' : 'Stopped'}
+            </span>
           </div>
 
-          {/* Main Controls */}
-          <div className="flex items-center justify-between gap-4">
-            {/* Left Section - Playback Controls */}
-            <div className="flex items-center gap-3">
+          {/* Expand/Collapse Toggle */}
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="p-2 rounded-full transition-all"
+            style={{ color: 'var(--color-text-primary)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+              e.currentTarget.style.transform = 'scale(1.1)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent'
+              e.currentTarget.style.transform = 'scale(1)'
+            }}
+            title={isExpanded ? "Collapse controls" : "Expand controls"}
+          >
+            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {/* Expanded Controls */}
+        {isExpanded && (
+          <div 
+            className="border-t px-3 py-3 space-y-3"
+            style={{ borderColor: 'var(--color-border)' }}
+          >
+            {/* Progress Bar */}
+            <div className="space-y-2">
+              <div
+                className="w-full h-1.5 rounded-full relative cursor-pointer group"
+                style={{ backgroundColor: 'var(--color-border)' }}
+              >
+                <div
+                  className="h-full rounded-full transition-all duration-200"
+                  style={{ 
+                    width: `${progressPercentage}%`,
+                    backgroundColor: 'var(--color-primary)'
+                  }}
+                />
+                <div
+                  className="absolute top-0 w-3 h-3 rounded-full transform -translate-y-1/2 transition-transform group-hover:scale-125"
+                  style={{ 
+                    left: `${progressPercentage}%`, 
+                    marginLeft: '-6px',
+                    top: '50%',
+                    backgroundColor: 'var(--color-primary)',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                  }}
+                />
+              </div>
+              
+              {/* Time Display */}
+              <div className="flex justify-between text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                <span>{formatTime(currentTime)}</span>
+                <span>{formatTime(duration)}</span>
+              </div>
+            </div>
+
+            {/* Control Buttons Row */}
+            <div className="flex items-center justify-between gap-2">
               {/* Previous Paragraph */}
               <button
                 onClick={handlePrevParagraph}
@@ -354,49 +429,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                 }}
                 title="Previous paragraph"
               >
-                <SkipBack className="w-5 h-5" />
-              </button>
-
-              {/* Play/Pause */}
-              <button
-                onClick={handlePlayPause}
-                disabled={isProcessing}
-                className="p-4 rounded-full transition-all shadow-lg"
-                style={{
-                  backgroundColor: isProcessing ? 'var(--color-text-tertiary)' : 'var(--color-primary)',
-                  color: 'var(--color-text-inverse)',
-                  cursor: isProcessing ? 'not-allowed' : 'pointer',
-                  boxShadow: 'var(--shadow-lg)'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isProcessing) {
-                    e.currentTarget.style.transform = 'scale(1.05)'
-                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.2)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isProcessing) {
-                    e.currentTarget.style.transform = 'scale(1)'
-                    e.currentTarget.style.boxShadow = 'var(--shadow-lg)'
-                  }
-                }}
-                title={
-                  isProcessing 
-                    ? "Processing..." 
-                    : tts.isPlaying 
-                      ? "Pause" 
-                      : ttsManager.isPausedState()
-                        ? "Resume"
-                        : "Play"
-                }
-              >
-                {isProcessing ? (
-                  <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-text-inverse)' }} />
-                ) : tts.isPlaying ? (
-                  <Pause className="w-6 h-6" />
-                ) : (
-                  <Play className="w-6 h-6" />
-                )}
+                <SkipBack className="w-4 h-4" />
               </button>
 
               {/* Stop */}
@@ -416,7 +449,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                 }}
                 title="Stop"
               >
-                <Square className="w-5 h-5" />
+                <Square className="w-4 h-4" />
               </button>
 
               {/* Next Paragraph */}
@@ -437,61 +470,9 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                 }}
                 title="Next paragraph"
               >
-                <SkipForward className="w-5 h-5" />
+                <SkipForward className="w-4 h-4" />
               </button>
-            </div>
 
-            {/* Center Section - Info & Progress */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-4 text-xs mb-1">
-                <div className="flex items-center gap-2">
-                  {/* Playing Status Indicator */}
-                  <div 
-                    className={`w-2 h-2 rounded-full ${tts.isPlaying ? 'animate-pulse' : ''}`}
-                    style={{ 
-                      backgroundColor: tts.isPlaying 
-                        ? 'var(--color-success)' 
-                        : ttsManager.isPausedState() 
-                          ? 'var(--color-warning)' 
-                          : 'var(--color-text-tertiary)' 
-                    }}
-                  />
-                  <span style={{ color: 'var(--color-text-secondary)' }}>
-                    {tts.isPlaying ? 'Playing' : ttsManager.isPausedState() ? 'Paused' : 'Stopped'}
-                  </span>
-                  
-                  {/* Paragraph Indicator */}
-                  {totalParagraphs > 0 && (
-                    <span 
-                      className="px-2 py-0.5 rounded text-xs"
-                      style={{ 
-                        backgroundColor: 'var(--color-primary-light)',
-                        color: 'var(--color-primary)'
-                      }}
-                    >
-                      Paragraph {currentParagraphIndex + 1}/{totalParagraphs}
-                    </span>
-                  )}
-                </div>
-                
-                {/* Time Display */}
-                <div className="flex items-center gap-2" style={{ color: 'var(--color-text-secondary)' }}>
-                  <span>{formatTime(currentTime)}</span>
-                  <span className="opacity-50">/</span>
-                  <span>{formatTime(duration)}</span>
-                </div>
-              </div>
-
-              {/* Current Voice Name */}
-              {tts.voice && (
-                <div className="text-xs truncate" style={{ color: 'var(--color-text-tertiary)' }}>
-                  Voice: {tts.voice.name} • Speed: {tts.rate.toFixed(1)}x
-                </div>
-              )}
-            </div>
-
-            {/* Right Section - Volume & Settings */}
-            <div className="flex items-center gap-3">
               {/* Volume Control */}
               <button
                 onClick={handleVolumeToggle}
@@ -507,7 +488,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                 }}
                 title={tts.volume > 0 ? `Volume: ${Math.round(tts.volume * 100)}%` : "Unmute"}
               >
-                {tts.volume > 0 ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+                {tts.volume > 0 ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
               </button>
 
               {/* Settings Button */}
@@ -532,29 +513,33 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                 }}
                 title="Audio settings"
               >
-                <Settings className="w-5 h-5" />
-              </button>
-
-              {/* Minimize Button */}
-              <button
-                onClick={() => setIsMinimized(true)}
-                className="p-2 rounded-full transition-all"
-                style={{ color: 'var(--color-text-secondary)' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                  e.currentTarget.style.transform = 'scale(1.1)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                  e.currentTarget.style.transform = 'scale(1)'
-                }}
-                title="Minimize player"
-              >
-                <ChevronDown className="w-5 h-5" />
+                <Settings className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Paragraph Info */}
+            {totalParagraphs > 0 && (
+              <div className="text-center">
+                <span 
+                  className="px-2 py-1 rounded text-xs"
+                  style={{ 
+                    backgroundColor: 'var(--color-primary-light)',
+                    color: 'var(--color-primary)'
+                  }}
+                >
+                  Paragraph {currentParagraphIndex + 1}/{totalParagraphs}
+                </span>
+              </div>
+            )}
+
+            {/* Voice Info */}
+            {tts.voice && (
+              <div className="text-xs text-center truncate" style={{ color: 'var(--color-text-tertiary)' }}>
+                {tts.voice.name} • {tts.rate.toFixed(1)}x
+              </div>
+            )}
           </div>
-        </div>
+        )}
       </div>
 
       {/* Settings Panel Popup */}
