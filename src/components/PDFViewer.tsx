@@ -21,13 +21,17 @@ import {
   StickyNote,
   BookOpen,
   MousePointer2,
-  Type
+  Type,
+  Upload,
+  Library
 } from 'lucide-react'
 import { useAppStore, Document as DocumentType } from '../store/appStore'
 import { ttsManager } from '../services/ttsManager'
 import { TTSControls } from './TTSControls'
 import { NotesPanel } from './NotesPanel'
 import { AudioWidget } from './AudioWidget'
+import { LibraryModal } from './LibraryModal'
+import { DocumentUpload } from './DocumentUpload'
 import { VoiceSelector } from './VoiceSelector'
 import { TypographySettings } from './TypographySettings'
 import { storageService } from '../services/storageService'
@@ -288,6 +292,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   } | null>(null)
   const [showNotesPanel, setShowNotesPanel] = useState<boolean>(false)
   const [isToolbarStuck, setIsToolbarStuck] = useState<boolean>(false)
+  const [showLibrary, setShowLibrary] = useState<boolean>(false)
+  const [showUpload, setShowUpload] = useState<boolean>(false)
   const toolbarRef = useRef<HTMLDivElement>(null)
   const [selectedTextForNote, setSelectedTextForNote] = useState<string>('')
   const [selectionMode, setSelectionMode] = useState(false)
@@ -2756,6 +2762,47 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
           {/* Right controls */}
           <div className="flex items-center gap-2">
+            {/* Library Button */}
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setShowLibrary(true)
+              }}
+              className="p-2 rounded-lg transition-colors"
+              style={{
+                backgroundColor: 'transparent',
+                color: 'var(--color-text-primary)'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              title="View Library"
+            >
+              <Library className="w-5 h-5" />
+            </button>
+
+            {/* Upload Button */}
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setShowUpload(true)
+              }}
+              className="p-2 rounded-lg transition-colors"
+              style={{
+                backgroundColor: 'var(--color-primary)',
+                color: 'var(--color-text-inverse)'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-primary)'}
+              title="Upload New Document"
+            >
+              <Upload className="w-5 h-5" />
+            </button>
+
+            {/* Separator */}
+            <div className="w-px h-6 mx-2" style={{ backgroundColor: 'var(--color-border)' }} />
+
             <button
               onClick={(e) => {
                 e.preventDefault()
@@ -3053,6 +3100,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         onVoiceSelect={handleVoiceSelect}
         currentVoice={tts.voice}
       />
+
+      {/* Library Modal */}
+      <LibraryModal 
+        isOpen={showLibrary} 
+        onClose={() => setShowLibrary(false)} 
+      />
+
+      {/* Upload Modal */}
+      {showUpload && (
+        <DocumentUpload onClose={() => setShowUpload(false)} />
+      )}
     </div>
   )
 }
