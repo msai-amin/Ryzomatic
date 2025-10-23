@@ -190,6 +190,14 @@ interface AppState {
   pomodoroTimeLeft: number | null
   pomodoroIsRunning: boolean
   pomodoroMode: 'work' | 'shortBreak' | 'longBreak'
+  pomodoroTimerToggleRef: (() => void) | null
+  
+  // Feature tour state
+  hasSeenPomodoroTour: boolean
+  
+  // Pomodoro widget state
+  pomodoroWidgetPosition: { x: number; y: number }
+  showPomodoroDashboard: boolean
   
   // Actions
   setUser: (user: AuthUser | null) => void
@@ -224,6 +232,16 @@ interface AppState {
   
   setPomodoroSession: (sessionId: string | null, bookId: string | null, startTime: number | null) => void
   updatePomodoroTimer: (timeLeft: number | null, isRunning: boolean, mode: 'work' | 'shortBreak' | 'longBreak') => void
+  stopPomodoroTimer: () => void
+  startPomodoroTimer: () => void
+  setPomodoroTimerToggleRef: (toggleRef: (() => void) | null) => void
+  
+  // Feature tour actions
+  setHasSeenPomodoroTour: (seen: boolean) => void
+  
+  // Pomodoro widget actions
+  setPomodoroWidgetPosition: (position: { x: number; y: number }) => void
+  setShowPomodoroDashboard: (show: boolean) => void
   
   // Text selection and AI mode actions
   setSelectedTextContext: (context: TextSelectionContext | null) => void
@@ -307,6 +325,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   pomodoroTimeLeft: null,
   pomodoroIsRunning: false,
   pomodoroMode: 'work',
+  pomodoroTimerToggleRef: null,
+  
+  // Feature tour state
+  hasSeenPomodoroTour: false,
+  
+  // Pomodoro widget state
+  pomodoroWidgetPosition: { x: 0, y: 0 },
+  showPomodoroDashboard: false,
   
   // Authentication actions
   setUser: (user) => set({ user }),
@@ -554,6 +580,28 @@ export const useAppStore = create<AppState>((set, get) => ({
     pomodoroIsRunning: isRunning,
     pomodoroMode: mode
   }),
+  
+  stopPomodoroTimer: () => set({
+    pomodoroTimeLeft: null,
+    pomodoroIsRunning: false,
+    pomodoroMode: 'work'
+  }),
+  
+  startPomodoroTimer: () => {
+    const { pomodoroTimerToggleRef } = get()
+    if (pomodoroTimerToggleRef) {
+      pomodoroTimerToggleRef()
+    }
+  },
+  
+  setPomodoroTimerToggleRef: (toggleRef) => set({ pomodoroTimerToggleRef: toggleRef }),
+  
+  // Feature tour actions
+  setHasSeenPomodoroTour: (seen) => set({ hasSeenPomodoroTour: seen }),
+  
+  // Pomodoro widget actions
+  setPomodoroWidgetPosition: (position) => set({ pomodoroWidgetPosition: position }),
+  setShowPomodoroDashboard: (show) => set({ showPomodoroDashboard: show }),
   
   // Library view actions
   setLibraryView: (settings) => set((state) => ({

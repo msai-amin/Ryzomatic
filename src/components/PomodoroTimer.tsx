@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Play, Pause, RotateCcw, Settings, X, Coffee, BookOpen, Clock } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import { useAppStore } from '../store/appStore'
 import { pomodoroService } from '../services/pomodoroService'
+import { pomodoroGamificationService } from '../services/pomodoroGamificationService'
 
 interface PomodoroSettings {
   workDuration: number // in minutes
@@ -30,7 +31,8 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
     pomodoroIsRunning,
     pomodoroMode,
     setPomodoroSession,
-    updatePomodoroTimer
+    updatePomodoroTimer,
+    setPomodoroTimerToggleRef
   } = useAppStore()
   
   const [settings, setSettings] = useState<PomodoroSettings>({
@@ -98,6 +100,33 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
     }
   }, [])
 
+  const toggleTimer = useCallback(async () => {
+    if (!isRunning) {
+      // Starting timer - create session if user is authenticated and document is available
+      if (user && documentId && mode === 'work') {
+        const session = await pomodoroService.startSession(user.id, documentId, mode)
+        if (session) {
+          setPomodoroSession(session.id, session.bookId, Date.now())
+        }
+      }
+      setIsRunning(true)
+    } else {
+      // Pausing timer - save current session
+      if (user && activePomodoroSessionId) {
+        const duration = settings.workDuration * 60 - timeLeft
+        await pomodoroService.stopCurrentSession(false) // Mark as incomplete pause
+        setPomodoroSession(null, null, null)
+      }
+      setIsRunning(false)
+    }
+  }, [isRunning, user, documentId, mode, activePomodoroSessionId, settings.workDuration, timeLeft, setPomodoroSession])
+
+  // Register toggle function for external access
+  useEffect(() => {
+    setPomodoroTimerToggleRef(toggleTimer)
+    return () => setPomodoroTimerToggleRef(null)
+  }, [toggleTimer, setPomodoroTimerToggleRef])
+
   // Update global state whenever local state changes
   useEffect(() => {
     updatePomodoroTimer(timeLeft, isRunning, mode)
@@ -136,6 +165,26 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
       const duration = settings.workDuration * 60
       await pomodoroService.stopCurrentSession(true) // Mark as completed
       setPomodoroSession(null, null, null)
+      
+      // Check for new achievements
+      try {
+        const newAchievements = await pomodoroGamificationService.checkAchievements(user.id, {
+          bookId: documentId || undefined,
+          mode: 'work',
+          completed: true
+        })
+        
+        // Update streak tracking
+        await pomodoroGamificationService.updateStreak(user.id)
+        
+        // Show achievement notifications (this would be handled by a parent component)
+        if (newAchievements.length > 0) {
+          console.log('New achievements unlocked:', newAchievements)
+          // The parent component should handle showing achievement toasts
+        }
+      } catch (error) {
+        console.error('Error checking achievements:', error)
+      }
     }
     
     // Play notification sound
@@ -171,27 +220,6 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
       if (settings.autoStartPomodoros) {
         setIsRunning(true)
       }
-    }
-  }
-
-  const toggleTimer = async () => {
-    if (!isRunning) {
-      // Starting timer - create session if user is authenticated and document is available
-      if (user && documentId && mode === 'work') {
-        const session = await pomodoroService.startSession(user.id, documentId, mode)
-        if (session) {
-          setPomodoroSession(session.id, session.bookId, Date.now())
-        }
-      }
-      setIsRunning(true)
-    } else {
-      // Pausing timer - save current session
-      if (user && activePomodoroSessionId) {
-        const duration = settings.workDuration * 60 - timeLeft
-        await pomodoroService.stopCurrentSession(false) // Mark as incomplete pause
-        setPomodoroSession(null, null, null)
-      }
-      setIsRunning(false)
     }
   }
 

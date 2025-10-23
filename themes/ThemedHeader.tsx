@@ -23,7 +23,8 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     logout,
     libraryRefreshTrigger,
     pomodoroIsRunning,
-    pomodoroTimeLeft
+    pomodoroTimeLeft,
+    hasSeenPomodoroTour
   } = useAppStore()
   const [showSettings, setShowSettings] = React.useState(false)
   const [showLibrary, setShowLibrary] = React.useState(false)
@@ -139,6 +140,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             <>
               <Tooltip content="View Library" position="bottom">
                 <button
+                  data-tour="library-button"
                   onClick={() => setShowLibrary(true)}
                   className="btn-secondary flex items-center space-x-2"
                   style={{
@@ -184,6 +186,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
           
           <Tooltip content="Reading Settings" position="bottom">
             <button
+              data-tour="settings-button"
               onClick={() => setShowSettings(true)}
               className="p-2 rounded-lg transition-colors"
               style={{ color: 'var(--color-text-primary)' }}
@@ -262,10 +265,11 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
           <Tooltip content={pomodoroIsRunning ? `Timer Running: ${Math.floor((pomodoroTimeLeft || 0) / 60)}:${String((pomodoroTimeLeft || 0) % 60).padStart(2, '0')}` : "Pomodoro Timer - Stay Focused"} position="bottom">
             <button
               ref={pomodoroButtonRef}
+              data-tour="pomodoro-button"
               onClick={() => setShowPomodoro(!showPomodoro)}
               className={`p-2 rounded-lg transition-all duration-300 text-2xl leading-none relative ${
                 pomodoroIsRunning ? 'animate-pulse-slow' : ''
-              }`}
+              } ${!hasSeenPomodoroTour ? 'animate-pulse ring-2 ring-blue-500 ring-opacity-50' : ''}`}
               style={{
                 backgroundColor: showPomodoro ? 'var(--color-primary-light)' : 'transparent',
                 border: showPomodoro ? '2px solid var(--color-primary)' : 'none',
@@ -281,6 +285,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
 
           <Tooltip content="Text-to-Speech & AI Assistant" position="bottom">
             <button
+              data-tour="tts-button"
               onClick={toggleChat}
               className="btn-primary flex items-center space-x-2"
               style={{
@@ -299,16 +304,14 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
         </div>
       </div>
 
-      {/* Pomodoro Timer - Positioned in top right for easy access */}
-      {showPomodoro && (
-        <div ref={pomodoroRef} className="absolute top-16 right-4 z-50">
-          <PomodoroTimer 
-            documentId={currentDocument?.id || null}
-            documentName={currentDocument?.name || undefined}
-            onClose={() => setShowPomodoro(false)} 
-          />
-        </div>
-      )}
+      {/* Pomodoro Timer - Always rendered for floating widget access, positioned when visible */}
+      <div ref={pomodoroRef} className={`absolute top-16 right-4 z-50 ${showPomodoro ? 'block' : 'hidden'}`}>
+        <PomodoroTimer 
+          documentId={currentDocument?.id || null}
+          documentName={currentDocument?.name || undefined}
+          onClose={() => setShowPomodoro(false)} 
+        />
+      </div>
 
       {/* Modals */}
       {showAuth && (

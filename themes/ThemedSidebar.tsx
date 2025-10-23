@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { FileText, Clock, BookOpen, Tag, Timer, ChevronLeft, ChevronRight } from 'lucide-react'
+import { FileText, Clock, BookOpen, Tag, Timer, ChevronLeft, ChevronRight, Flame, Trophy, BarChart3, Target } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
 import { pomodoroService } from '../src/services/pomodoroService'
+import { pomodoroGamificationService, StreakInfo, Achievement } from '../src/services/pomodoroGamificationService'
+import { AchievementPanel } from '../src/components/AchievementPanel'
+import { PomodoroDashboard } from '../src/components/PomodoroDashboard'
 import { useTheme, AnnotationColorPicker } from './ThemeProvider'
 
 interface ThemedSidebarProps {
@@ -11,10 +14,13 @@ interface ThemedSidebarProps {
 }
 
 export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }) => {
-  const { currentDocument, user } = useAppStore()
+  const { currentDocument, user, showPomodoroDashboard, setShowPomodoroDashboard } = useAppStore()
   const { annotationColors } = useTheme()
   const [currentHighlightColor, setCurrentHighlightColor] = React.useState('#FFD700')
   const [pomodoroStats, setPomodoroStats] = useState<{ [key: string]: { timeMinutes: number, sessions: number } }>({})
+  const [streak, setStreak] = useState<StreakInfo | null>(null)
+  const [achievements, setAchievements] = useState<Achievement[]>([])
+  const [loading, setLoading] = useState(false)
 
   // Mock data for demonstration
   const mockDocuments = [
@@ -69,6 +75,30 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
     }
     
     loadStats()
+  }, [user])
+
+  // Load streak and achievements data
+  useEffect(() => {
+    const loadGamificationData = async () => {
+      if (!user) return
+      
+      setLoading(true)
+      try {
+        const [streakData, achievementsData] = await Promise.all([
+          pomodoroGamificationService.getUserStreak(user.id),
+          pomodoroGamificationService.getUserAchievements(user.id)
+        ])
+        
+        setStreak(streakData)
+        setAchievements(achievementsData)
+      } catch (error) {
+        console.error('Error loading gamification data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadGamificationData()
   }, [user])
 
   return (
@@ -229,15 +259,79 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
           />
         </div>
 
-        {/* Quick Stats */}
-        <div className="space-y-4">
-          <h3 
-            className="text-lg font-semibold"
-            style={{ color: 'var(--color-text-primary)' }}
-          >
-            Reading Stats
-          </h3>
+        {/* Enhanced Stats */}
+        <div className="space-y-4" data-tour="sidebar-stats">
+          <div className="flex items-center justify-between">
+            <h3 
+              className="text-lg font-semibold"
+              style={{ color: 'var(--color-text-primary)' }}
+            >
+              Productivity Stats
+            </h3>
+            <button
+              onClick={() => setShowPomodoroDashboard(true)}
+              className="p-1 rounded hover:bg-gray-100 transition-colors"
+              style={{ color: 'var(--color-text-secondary)' }}
+              title="View Analytics Dashboard"
+            >
+              <BarChart3 className="w-4 h-4" />
+            </button>
+          </div>
           
+          {/* Streak Display */}
+          {streak && (
+            <div 
+              className="p-3 rounded-lg"
+              style={{
+                backgroundColor: streak.current_streak > 0 ? '#fef2f2' : '#f8fafc',
+                border: `1px solid ${streak.current_streak > 0 ? '#fecaca' : 'var(--color-border)'}`,
+              }}
+            >
+              <div className="flex items-center space-x-2 mb-2">
+                <Flame className="w-4 h-4" style={{ color: streak.current_streak > 0 ? '#ef4444' : '#6b7280' }} />
+                <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                  Current Streak
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="text-2xl font-bold" style={{ color: streak.current_streak > 0 ? '#ef4444' : '#6b7280' }}>
+                  {streak.current_streak}
+                </div>
+                <div className="text-xs text-right" style={{ color: 'var(--color-text-secondary)' }}>
+                  <div>Best: {streak.longest_streak}</div>
+                  <div>Week: {streak.weekly_progress}/{streak.weekly_goal}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Achievement Summary */}
+          {achievements.length > 0 && (
+            <div 
+              className="p-3 rounded-lg"
+              style={{
+                backgroundColor: '#f0f9ff',
+                border: '1px solid #bae6fd',
+              }}
+            >
+              <div className="flex items-center space-x-2 mb-2">
+                <Trophy className="w-4 h-4" style={{ color: '#0ea5e9' }} />
+                <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                  Achievements
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="text-2xl font-bold" style={{ color: '#0ea5e9' }}>
+                  {achievements.length}
+                </div>
+                <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                  {achievements.length === 9 ? 'All unlocked! 🎉' : `${achievements.length}/9 unlocked`}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Basic Stats */}
           <div className="grid grid-cols-2 gap-4">
             <div 
               className="p-3 rounded-lg text-center"
@@ -357,8 +451,23 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
             </div>
           </div>
         </div>
+
+        {/* Achievements Panel */}
+        {user && (
+          <div className="mt-6">
+            <AchievementPanel userId={user.id} />
+          </div>
+        )}
         </div>
       </aside>
+
+      {/* Pomodoro Dashboard Modal */}
+      {user && (
+        <PomodoroDashboard 
+          isOpen={showPomodoroDashboard}
+          onClose={() => setShowPomodoroDashboard(false)}
+        />
+      )}
     </>
   )
 }
