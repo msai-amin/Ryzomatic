@@ -949,24 +949,18 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     return () => window.removeEventListener('keydown', handleKeyPress)
   }, [pageNumber, numPages, scale, rotation, isHighlightMode, showNotesPanel, pdfViewer.readingMode, updatePDFViewer, typography.textAlign, typography.focusMode, typography.readingGuide, updateTypography, isEditing])
 
-  // Intersection observer for sticky toolbar
+  // Intersection observer for toolbar visual feedback
   useEffect(() => {
-    const toolbarElement = toolbarRef.current
-    if (!toolbarElement) return
+    const scrollContainer = scrollContainerRef.current
+    if (!scrollContainer) return
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsToolbarStuck(!entry.isIntersecting)
-      },
-      {
-        threshold: 0,
-        rootMargin: '-1px 0px 0px 0px'
-      }
-    )
+    const handleScroll = () => {
+      const scrollTop = scrollContainer.scrollTop
+      setIsToolbarStuck(scrollTop > 10) // Show enhanced styling when scrolled down
+    }
 
-    observer.observe(toolbarElement)
-
-    return () => observer.disconnect()
+    scrollContainer.addEventListener('scroll', handleScroll)
+    return () => scrollContainer.removeEventListener('scroll', handleScroll)
   }, [])
 
   // Context menu for adding notes
@@ -2522,7 +2516,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       {/* PDF Controls */}
       <div 
         ref={toolbarRef}
-        className={`sticky top-0 z-50 transition-all duration-300 ease-in-out ${isToolbarStuck ? 'backdrop-blur-md shadow-lg' : 'backdrop-blur-sm shadow-sm'}`}
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${isToolbarStuck ? 'backdrop-blur-md shadow-lg' : 'backdrop-blur-sm shadow-sm'}`}
         style={{ 
           backgroundColor: 'var(--color-surface)', 
           borderBottom: isToolbarStuck 
@@ -2811,7 +2805,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       </div>
 
       {/* PDF Canvas Container */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-auto p-8" style={{ backgroundColor: 'var(--color-background-secondary)' }}>
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto p-8 pt-20" style={{ backgroundColor: 'var(--color-background-secondary)' }}>
         {pdfViewer.scrollMode === 'continuous' ? (
           // Continuous scroll mode - render all pages
           <div className="flex flex-col items-center gap-4">
