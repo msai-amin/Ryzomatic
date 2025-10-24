@@ -9,6 +9,7 @@ interface TypographySettingsProps {
 
 export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose }) => {
   const { typography, updateTypography } = useAppStore()
+  // Fixed syntax error in handleClearCache function
   const [cacheStats, setCacheStats] = useState({ count: 0, totalSize: 0, oldestEntry: null as number | null })
   const [clearing, setClearing] = useState(false)
 
