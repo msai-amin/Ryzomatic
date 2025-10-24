@@ -12,9 +12,10 @@ interface ThemedHeaderProps {
   onUploadClick: () => void
   isSidebarOpen: boolean
   onSidebarToggle: () => void
+  onPomodoroClose?: () => void
 }
 
-export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSidebarOpen, onSidebarToggle }) => {
+export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSidebarOpen, onSidebarToggle, onPomodoroClose }) => {
   const { 
     toggleChat, 
     currentDocument, 
@@ -159,6 +160,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
 
               <Tooltip content="Upload New Document" position="bottom">
                 <button
+                  data-tour="upload-button"
                   onClick={onUploadClick}
                   className="btn-primary flex items-center space-x-2"
                   style={{
@@ -283,24 +285,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             </button>
           </Tooltip>
 
-          <Tooltip content="Text-to-Speech & AI Assistant" position="bottom">
-            <button
-              data-tour="tts-button"
-              onClick={toggleChat}
-              className="btn-primary flex items-center space-x-2"
-              style={{
-                backgroundColor: 'var(--color-secondary)',
-                color: 'var(--color-text-inverse)',
-                border: 'none',
-                padding: 'var(--spacing-sm) var(--spacing-md)',
-                borderRadius: 'var(--border-radius-lg)',
-              }}
-              aria-label="Open Text-to-Speech & AI Assistant"
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>TTS</span>
-            </button>
-          </Tooltip>
         </div>
       </div>
 
@@ -309,7 +293,12 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
         <PomodoroTimer 
           documentId={currentDocument?.id || null}
           documentName={currentDocument?.name || undefined}
-          onClose={() => setShowPomodoro(false)} 
+          onClose={() => {
+            setShowPomodoro(false)
+            if (onPomodoroClose) {
+              onPomodoroClose()
+            }
+          }} 
         />
       </div>
 

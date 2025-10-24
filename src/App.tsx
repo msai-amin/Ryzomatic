@@ -160,13 +160,15 @@ function App() {
     // Listen for auth state changes (critical for OAuth callback!)
     let subscription: any = null
     if (supabase) {
-      const authStateChange = authService.onAuthStateChange(async (user) => {
+      const authStateChange = authService.onAuthStateChange(async (user, event) => {
         logger.info('Auth state changed', context, {
+          event: event,
           signedIn: !!user,
           userId: user?.id
         });
         
-        if (user) {
+        // Only process SIGNED_IN and SIGNED_OUT events
+        if (event === 'SIGNED_IN' && user) {
           // User just signed in (via OAuth or email)
           await checkAuth()
           
@@ -174,13 +176,15 @@ function App() {
           supabaseStorageService.setCurrentUser(user.id)
           libraryOrganizationService.setCurrentUser(user.id)
           librarySearchService.setCurrentUser(user.id)
-          logger.info('Supabase storage service initialized', { userId: user.id })
+          logger.info('User signed in, services initialized', { userId: user.id })
           
           setIsAuthModalOpen(false)
-        } else {
-          // User signed out
+        } else if (event === 'SIGNED_OUT') {
+          // Only clear state on explicit sign-out, not on token refresh
+          logger.info('User signed out')
           await checkAuth()
         }
+        // Ignore TOKEN_REFRESHED and other events to prevent loops
       })
       subscription = authStateChange.data.subscription
     }

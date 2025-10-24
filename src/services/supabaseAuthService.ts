@@ -22,7 +22,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = supabaseUrl && supabaseAnonKey 
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: window.localStorage,
+        storageKey: 'sb-auth-token',
+      }
+    })
   : null;
 
 export interface AuthUser {
@@ -228,9 +236,9 @@ class SupabaseAuthService {
   /**
    * Listen to auth state changes
    */
-  onAuthStateChange(callback: (user: any) => void) {
+  onAuthStateChange(callback: (user: any, event: string) => void) {
     return supabase.auth.onAuthStateChange((event, session) => {
-      callback(session?.user || null);
+      callback(session?.user || null, event);
     });
   }
 

@@ -285,7 +285,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           border: '1px solid var(--color-border)',
           borderRadius: '12px',
           boxShadow: 'var(--shadow-lg)',
-          backdropFilter: 'blur(10px)'
+          backdropFilter: 'blur(10px)',
+          // Ensure audio widget stays in its designated zone
+          minWidth: '200px',
+          maxWidth: '300px'
         }}
       >
         {/* Compact Toggle Bar */}

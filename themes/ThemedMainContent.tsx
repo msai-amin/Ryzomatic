@@ -32,6 +32,23 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
         {children}
       </div>
 
+      {/* Right Sidebar Toggle Button - Always visible when document is loaded */}
+      {currentDocument && (
+        <button
+          onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+          className="fixed top-24 right-4 p-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 z-40"
+          style={{
+            backgroundColor: 'var(--color-primary)',
+            color: 'var(--color-text-inverse)',
+            border: '1px solid var(--color-primary)',
+          }}
+          title={isRightSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+          aria-label={isRightSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+        >
+          {isRightSidebarOpen ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+        </button>
+      )}
+
       {/* Right Sidebar - Only show if there's a current document */}
       {currentDocument && (
         <div 
@@ -42,21 +59,6 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
             borderLeft: isRightSidebarOpen ? '1px solid var(--color-border)' : 'none',
           }}
         >
-          {/* Toggle Button */}
-          <button
-            onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
-            className="absolute -left-10 top-4 p-2 rounded-l-lg shadow-md hover:shadow-lg transition-all z-10"
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-              borderRight: 'none',
-              color: 'var(--color-text-primary)',
-            }}
-            title={isRightSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
-          >
-            {isRightSidebarOpen ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          </button>
-
           {/* Sidebar Content */}
           <div 
             className="p-8"

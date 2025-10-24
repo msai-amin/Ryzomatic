@@ -73,13 +73,13 @@ class ErrorHandler {
 
     // Authentication error recovery
     this.addRecoveryStrategy(ErrorType.AUTHENTICATION, {
-      canRecover: (error) => true,
+      canRecover: (error) => error.severity === ErrorSeverity.LOW,  // Only low severity
       recover: async (error) => {
         logger.info('Attempting authentication error recovery', error.context);
-        // Redirect to login or refresh token
-        window.location.reload();
+        // Don't reload - just log and let the app handle it gracefully
+        // The auth state listener will handle actual sign-out events
       },
-      description: 'Redirect to authentication'
+      description: 'Log authentication error without reload'
     });
 
     // PDF processing error recovery

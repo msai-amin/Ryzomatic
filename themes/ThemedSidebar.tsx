@@ -107,12 +107,14 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
       {!isOpen && (
         <button
           onClick={onToggle}
-          className="fixed top-20 left-4 z-50 p-2 rounded-lg shadow-lg transition-all duration-300 hover:scale-110"
+          className="fixed top-20 left-4 z-50 p-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
           style={{
             backgroundColor: 'var(--color-primary)',
             color: 'var(--color-text-inverse)',
+            border: '1px solid var(--color-primary)',
           }}
           aria-label="Open sidebar"
+          title="Open sidebar"
         >
           <ChevronRight className="w-5 h-5" />
         </button>
@@ -135,12 +137,14 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
           <div className="flex justify-end mb-4">
             <button
               onClick={onToggle}
-              className="p-2 rounded-lg transition-colors hover:bg-opacity-80"
+              className="p-2 rounded-lg transition-all duration-300 hover:scale-110 shadow-md hover:shadow-lg"
               style={{
                 backgroundColor: 'var(--color-surface-hover)',
                 color: 'var(--color-text-primary)',
+                border: '1px solid var(--color-border)',
               }}
               aria-label="Close sidebar"
+              title="Close sidebar"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>

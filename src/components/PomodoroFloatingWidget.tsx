@@ -32,9 +32,13 @@ export const PomodoroFloatingWidget: React.FC<PomodoroFloatingWidgetProps> = ({ 
   const [position, setPosition] = useState(() => {
     // Calculate proper initial position if current position is invalid
     if (pomodoroWidgetPosition.x === 0 && pomodoroWidgetPosition.y === 0) {
-      // Use a more conservative calculation
-      const x = Math.max(20, (window.innerWidth || 1200) - 160)
-      const y = Math.max(20, (window.innerHeight || 800) - 120)
+      // Use a more conservative calculation, avoiding audio widget zone
+      const viewportWidth = window.innerWidth || 1200
+      const viewportHeight = window.innerHeight || 800
+      
+      // Position in top-right area, avoiding bottom-right where audio widget is
+      const x = Math.max(20, viewportWidth - 180)
+      const y = Math.max(20, Math.min(100, viewportHeight - 200)) // Top area
       return { x, y }
     }
     return pomodoroWidgetPosition
@@ -52,13 +56,29 @@ export const PomodoroFloatingWidget: React.FC<PomodoroFloatingWidgetProps> = ({ 
   useEffect(() => {
     const ensurePositionInBounds = () => {
       setPosition(prev => {
-        const maxX = Math.max(0, (window.innerWidth || 1200) - 160)
-        const maxY = Math.max(0, (window.innerHeight || 800) - 120)
+        const viewportWidth = window.innerWidth || 1200
+        const viewportHeight = window.innerHeight || 800
+        const maxX = Math.max(0, viewportWidth - 160)
+        const maxY = Math.max(0, viewportHeight - 120)
         
-        return {
-          x: Math.max(20, Math.min(prev.x, maxX)),
-          y: Math.max(20, Math.min(prev.y, maxY))
+        // Define exclusion zone for audio widget (bottom-right corner)
+        const audioWidgetZone = {
+          left: viewportWidth - 200, // Audio widget area (right side)
+          right: viewportWidth,
+          top: viewportHeight - 100, // Bottom area
+          bottom: viewportHeight
         }
+        
+        let newX = Math.max(20, Math.min(prev.x, maxX))
+        let newY = Math.max(20, Math.min(prev.y, maxY))
+        
+        // Prevent overlap with audio widget (bottom-right corner)
+        if (newX >= audioWidgetZone.left && newY >= audioWidgetZone.top) {
+          // Move to left of audio widget
+          newX = audioWidgetZone.left - 20
+        }
+        
+        return { x: newX, y: newY }
       })
     }
     
@@ -103,10 +123,34 @@ export const PomodoroFloatingWidget: React.FC<PomodoroFloatingWidgetProps> = ({ 
       const maxX = Math.max(0, (window.innerWidth || 1200) - 160)
       const maxY = Math.max(0, (window.innerHeight || 800) - 120)
       
-      setPosition({
-        x: Math.max(20, Math.min(newX, maxX)),
-        y: Math.max(20, Math.min(newY, maxY))
-      })
+      // Define safe zones to avoid overlapping with other widgets
+      const getSafePosition = (x: number, y: number) => {
+        const viewportWidth = window.innerWidth || 1200
+        const viewportHeight = window.innerHeight || 800
+        
+        // Define exclusion zone for audio widget (bottom-right corner)
+        const audioWidgetZone = {
+          left: viewportWidth - 200, // Audio widget area (right side)
+          right: viewportWidth,
+          top: viewportHeight - 100, // Bottom area
+          bottom: viewportHeight
+        }
+        
+        // Prevent overlap with audio widget (bottom-right corner)
+        if (x >= audioWidgetZone.left && y >= audioWidgetZone.top) {
+          // Move to left of audio widget
+          x = audioWidgetZone.left - 20
+        }
+        
+        // Keep widget within viewport bounds
+        x = Math.max(20, Math.min(x, maxX))
+        y = Math.max(20, Math.min(y, maxY))
+        
+        return { x, y }
+      }
+      
+      const safePosition = getSafePosition(newX, newY)
+      setPosition(safePosition)
     }
   }, [isDragging, dragStart])
 
