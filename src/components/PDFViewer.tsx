@@ -2214,7 +2214,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               
               {/* Formula conversion indicator */}
               {isConvertingFormulas && (
-                <div className={`flex items-center gap-2 text-xs ${themeStyles.text} opacity-70 px-3 py-1 rounded-lg`} style={{ backgroundColor: 'var(--color-background-secondary)' }}>
+                <div className="flex items-center gap-2 text-xs opacity-70 px-3 py-1 rounded-lg" style={{ backgroundColor: 'var(--color-background-secondary)', color: 'var(--color-text-secondary)' }}>
                   <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent" />
                   <span>Converting formulas... {formulaConversionProgress.current}/{formulaConversionProgress.total}</span>
                 </div>
