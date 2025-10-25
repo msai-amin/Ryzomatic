@@ -7,18 +7,32 @@ import { pomodoroGamificationService, StreakInfo, Achievement } from '../src/ser
 import { AchievementPanel } from '../src/components/AchievementPanel'
 import { PomodoroDashboard } from '../src/components/PomodoroDashboard'
 import { useTheme } from './ThemeProvider'
+import { documents } from '../lib/supabase'
 
 interface ThemedSidebarProps {
   isOpen: boolean
   onToggle: () => void
 }
 
+interface DocumentWithProgress {
+  id: string
+  name: string
+  progress: number
+  readingTime: string
+  isActive: boolean
+  type: 'text' | 'pdf'
+  uploadedAt: string
+  totalPages?: number
+  currentPage?: number
+}
+
 export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }) => {
-  const { currentDocument, user, showPomodoroDashboard, setShowPomodoroDashboard } = useAppStore()
+  const { currentDocument, user, showPomodoroDashboard, setShowPomodoroDashboard, documents: appDocuments, setCurrentDocument, libraryRefreshTrigger } = useAppStore()
   const [pomodoroStats, setPomodoroStats] = useState<{ [key: string]: { timeMinutes: number, sessions: number } }>({})
   const [streak, setStreak] = useState<StreakInfo | null>(null)
   const [achievements, setAchievements] = useState<Achievement[]>([])
   const [loading, setLoading] = useState(false)
+  const [userDocuments, setUserDocuments] = useState<DocumentWithProgress[]>([])
   
   // Collapsible sections state
   const [sectionsExpanded, setSectionsExpanded] = useState({
@@ -27,51 +41,71 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
     activity: true
   })
 
-  // Mock data for demonstration
-  const mockDocuments = [
-    {
-      id: '1',
-      name: 'Research Paper.pdf',
-      progress: 72,
-      readingTime: '45 min',
-      isActive: true,
-    },
-    {
-      id: '2',
-      name: 'Literature Review.docx',
-      progress: 28,
-      readingTime: '15 min',
-      isActive: false,
-    },
-    {
-      id: '3',
-      name: 'Methodology Notes.pdf',
-      progress: 100,
-      readingTime: '2 hours',
-      isActive: false,
-    },
-  ]
-
-  // Load Pomodoro stats for real documents (skip mock data with non-UUID IDs)
+  // Load user documents from database
   useEffect(() => {
-    const loadStats = async () => {
+    const loadUserDocuments = async () => {
       if (!user) return
       
-      // Only load stats for real documents with valid UUID format
-      // Mock documents with IDs like "1", "2", "3" will be skipped
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      try {
+        const { data: dbDocuments, error } = await documents.list(user.id)
+        
+        if (error) {
+          console.error('Error loading documents:', error)
+          return
+        }
+        
+        if (dbDocuments) {
+          const documentsWithProgress: DocumentWithProgress[] = dbDocuments.map(doc => {
+            // Calculate reading progress based on current page and total pages
+            let progress = 0
+            if (doc.total_pages && doc.current_page) {
+              progress = Math.round((doc.current_page / doc.total_pages) * 100)
+            } else if (doc.reading_progress) {
+              progress = Math.round(doc.reading_progress)
+            }
+            
+            // Calculate estimated reading time (simplified calculation)
+            const readingTimeMinutes = Math.max(1, Math.round(progress * 0.5)) // Rough estimate
+            const readingTime = readingTimeMinutes < 60 
+              ? `${readingTimeMinutes} min` 
+              : `${Math.round(readingTimeMinutes / 60)} hours`
+            
+            return {
+              id: doc.id,
+              name: doc.title || doc.file_name || 'Untitled Document',
+              progress,
+              readingTime,
+              isActive: currentDocument?.id === doc.id,
+              type: doc.file_type === 'pdf' ? 'pdf' : 'text',
+              uploadedAt: doc.created_at,
+              totalPages: doc.total_pages,
+              currentPage: doc.current_page
+            }
+          })
+          
+          setUserDocuments(documentsWithProgress)
+        }
+      } catch (error) {
+        console.error('Error loading user documents:', error)
+      }
+    }
+    
+    loadUserDocuments()
+  }, [user, currentDocument?.id, libraryRefreshTrigger])
+
+  // Load Pomodoro stats for real documents
+  useEffect(() => {
+    const loadStats = async () => {
+      if (!user || userDocuments.length === 0) return
       
       const stats: { [key: string]: { timeMinutes: number, sessions: number } } = {}
       
-      for (const doc of mockDocuments) {
-        // Only fetch stats for valid UUIDs
-        if (uuidRegex.test(doc.id)) {
-          const bookStats = await pomodoroService.getBookStats(doc.id)
-          if (bookStats) {
-            stats[doc.id] = {
-              timeMinutes: Math.round(bookStats.total_time_minutes),
-              sessions: bookStats.total_sessions
-            }
+      for (const doc of userDocuments) {
+        const bookStats = await pomodoroService.getBookStats(doc.id)
+        if (bookStats) {
+          stats[doc.id] = {
+            timeMinutes: Math.round(bookStats.total_time_minutes),
+            sessions: bookStats.total_sessions
           }
         }
       }
@@ -80,7 +114,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
     }
     
     loadStats()
-  }, [user])
+  }, [user, userDocuments])
 
   // Load streak and achievements data
   useEffect(() => {
@@ -111,6 +145,39 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
       ...prev,
       [section]: !prev[section]
     }))
+  }
+
+  const handleDocumentClick = async (doc: DocumentWithProgress) => {
+    try {
+      // Find the document in appDocuments or load it from database
+      let documentToLoad = appDocuments.find(d => d.id === doc.id)
+      
+      if (!documentToLoad) {
+        // Load document from database if not in app store
+        const { data: dbDoc, error } = await documents.get(doc.id)
+        if (error || !dbDoc) {
+          console.error('Error loading document:', error)
+          return
+        }
+        
+        // Convert database document to app store format
+        documentToLoad = {
+          id: dbDoc.id,
+          name: dbDoc.title || dbDoc.file_name || 'Untitled Document',
+          content: dbDoc.content || '',
+          type: dbDoc.file_type === 'pdf' ? 'pdf' : 'text',
+          uploadedAt: new Date(dbDoc.created_at),
+          totalPages: dbDoc.total_pages,
+          pageTexts: dbDoc.page_texts || [],
+          highlights: [],
+          highlightsLoaded: false
+        }
+      }
+      
+      setCurrentDocument(documentToLoad)
+    } catch (error) {
+      console.error('Error opening document:', error)
+    }
   }
 
   return (
@@ -182,26 +249,18 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
               </button>
             </div>
             
-            {/* Add New Button - Moved to top */}
-            <div className="mb-4">
-              <button
-                className="w-full flex items-center justify-center space-x-2 p-3 rounded-lg transition-colors"
-                style={{
-                  backgroundColor: 'var(--color-primary)',
-                  color: 'var(--color-text-inverse)',
-                  border: 'none',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-primary)'}
-              >
-                <Plus className="w-4 h-4" />
-                <span className="font-medium">Add New Document</span>
-              </button>
-            </div>
             
             {sectionsExpanded.library && (
               <div className="space-y-3">
-                {mockDocuments.map((doc) => (
+                {userDocuments.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" style={{ color: 'var(--color-text-tertiary)' }} />
+                    <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                      No documents yet. Upload your first document to get started!
+                    </p>
+                  </div>
+                ) : (
+                  userDocuments.map((doc) => (
               <div
                 key={doc.id}
                 className="p-3 rounded-lg border transition-colors cursor-pointer"
@@ -209,6 +268,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
                   backgroundColor: doc.isActive ? 'var(--color-primary-light)' : 'var(--color-surface)',
                   borderColor: doc.isActive ? 'var(--color-primary)' : 'var(--color-border)',
                 }}
+                onClick={() => handleDocumentClick(doc)}
                 onMouseEnter={(e) => {
                   if (!doc.isActive) {
                     e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
@@ -292,7 +352,8 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
                   />
                 </div>
               </div>
-                ))}
+                  ))
+                )}
               </div>
             )}
           </div>
@@ -400,7 +461,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
                 className="text-2xl font-bold"
                 style={{ color: 'var(--color-primary)' }}
               >
-                12
+                {userDocuments.length}
               </div>
               <div 
                 className="text-xs"
