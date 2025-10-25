@@ -13,7 +13,6 @@ import {
   ChevronsRight,
   Maximize2,
   Search,
-  Highlighter,
   Trash2,
   Rows,
   Pause,
@@ -24,6 +23,7 @@ import {
   Type,
   Upload,
   Library,
+  Palette,
   MoreVertical
 } from 'lucide-react'
 import { useAppStore, Document as DocumentType } from '../store/appStore'
@@ -311,12 +311,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     range: Range | null
   } | null>(null)
   const [highlights, setHighlights] = useState<HighlightType[]>([])
-  const [isHighlightMode, setIsHighlightMode] = useState(false)
   const [showHighlightColorPopover, setShowHighlightColorPopover] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [currentHighlightColor, setCurrentHighlightColor] = useState('#FFD700')
-  const [highlightDragStart, setHighlightDragStart] = useState<{ x: number; y: number; pageNumber: number } | null>(null)
-  const [highlightDragCurrent, setHighlightDragCurrent] = useState<{ x: number; y: number } | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
@@ -915,7 +912,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           break
         case 'h':
         case 'H':
-          setIsHighlightMode(!isHighlightMode)
           break
         case 'm':
         case 'M':
@@ -987,7 +983,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [pageNumber, numPages, scale, rotation, isHighlightMode, showNotesPanel, pdfViewer.readingMode, updatePDFViewer, typography.textAlign, typography.focusMode, typography.readingGuide, updateTypography, isEditing])
+  }, [pageNumber, numPages, scale, rotation, showNotesPanel, pdfViewer.readingMode, updatePDFViewer, typography.textAlign, typography.focusMode, typography.readingGuide, updateTypography, isEditing])
 
   // Intersection observer for toolbar visual feedback
   useEffect(() => {
@@ -1477,7 +1473,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   }, [contextMenu])
 
   const handleTextSelection = useCallback((event: MouseEvent) => {
-    if (isHighlightMode) return // Skip if in drag-highlight mode
     // REMOVED: Don't skip in reading mode - users should be able to highlight in reading mode too
 
     const selection = window.getSelection()
@@ -1535,7 +1530,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       x: rect.right + 10,
       y: rect.top - 10
     })
-  }, [isHighlightMode, pdfViewer.scrollMode, pageNumber])
+  }, [pdfViewer.scrollMode, pageNumber])
   
   // Handle right-click context menu for AI features
   const handleContextMenuClick = useCallback((event: React.MouseEvent) => {
@@ -1794,79 +1789,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     }
   }, [handleTextSelection])
 
-  // Drag-based highlighting (Method 2)
-  const handleHighlightDragStart = useCallback((event: React.MouseEvent, pageNum: number) => {
-    if (!isHighlightMode) return
-    event.preventDefault()
-    
-    const target = event.currentTarget as HTMLElement
-    const rect = target.getBoundingClientRect()
-    
-    setHighlightDragStart({
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-      pageNumber: pageNum
-    })
-    setHighlightDragCurrent({
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top
-    })
-  }, [isHighlightMode])
-
-  const handleHighlightDragMove = useCallback((event: React.MouseEvent) => {
-    if (!isHighlightMode || !highlightDragStart) return
-    
-    const target = event.currentTarget as HTMLElement
-    const rect = target.getBoundingClientRect()
-    
-    setHighlightDragCurrent({
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top
-    })
-  }, [isHighlightMode, highlightDragStart])
-
-  const handleHighlightDragEnd = useCallback(async (event: React.MouseEvent) => {
-    if (!isHighlightMode || !highlightDragStart || !highlightDragCurrent) {
-      setHighlightDragStart(null)
-      setHighlightDragCurrent(null)
-      return
-    }
-
-    // Calculate the bounding box
-    const position = {
-      x: Math.min(highlightDragStart.x, highlightDragCurrent.x),
-      y: Math.min(highlightDragStart.y, highlightDragCurrent.y),
-      width: Math.abs(highlightDragCurrent.x - highlightDragStart.x),
-      height: Math.abs(highlightDragCurrent.y - highlightDragStart.y)
-    }
-
-    // Minimum size check
-    if (position.width < 10 || position.height < 10) {
-      setHighlightDragStart(null)
-      setHighlightDragCurrent(null)
-      return
-    }
-
-    // Extract text from the highlighted area (simplified - just use page text for now)
-    const rawPageText = document.pageTexts?.[highlightDragStart.pageNumber - 1]
-    const pageText = typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
-    const textSnippet = pageText.substring(0, 100) + '...' // Placeholder
-
-    // Show color picker at drag end position
-    setSelectedTextInfo({
-      text: textSnippet,
-      pageNumber: highlightDragStart.pageNumber,
-      range: null // No range for drag-based highlighting
-    })
-
-    setHighlightPickerPosition({
-      x: event.clientX + 10,
-      y: event.clientY - 10
-    })
-
-    setHighlightDragStart(null)
-    setHighlightDragCurrent(null)
-  }, [isHighlightMode, highlightDragStart, highlightDragCurrent, document.pageTexts])
 
   const handleVoiceSelect = useCallback((voice: any) => {
     // Convert voice to the format expected by the store
@@ -2770,28 +2692,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               <MousePointer2 className="w-5 h-5" />
             </button>
 
-            {/* Highlight Mode Toggle */}
-            <button
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setIsHighlightMode(!isHighlightMode)
-              }}
-              className="p-2 rounded-lg transition-colors"
-              style={{
-                backgroundColor: isHighlightMode ? 'var(--color-primary-light)' : 'transparent',
-                color: isHighlightMode ? 'var(--color-primary)' : 'var(--color-text-primary)'
-              }}
-              onMouseEnter={(e) => {
-                if (!isHighlightMode) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-              }}
-              onMouseLeave={(e) => {
-                if (!isHighlightMode) e.currentTarget.style.backgroundColor = 'transparent'
-              }}
-              title="Highlight Mode (Click & Drag)"
-            >
-              <Highlighter className="w-5 h-5" />
-            </button>
 
             {/* Highlight Color Picker Button */}
             <button
@@ -2814,7 +2714,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               }}
               title="Highlight Colors"
             >
-              <Highlighter className="w-5 h-5" />
+              <Palette className="w-5 h-5" />
             </button>
 
             {/* Highlight Management Panel Button */}
