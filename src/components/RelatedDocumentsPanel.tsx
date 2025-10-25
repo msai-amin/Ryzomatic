@@ -170,10 +170,10 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
                     {relationship.relevance_calculation_status === 'completed' && relationship.relevance_percentage
                       ? `${relationship.relevance_percentage}% relevant`
                       : relationship.relevance_calculation_status === 'processing'
-                      ? 'Analyzing...'
+                      ? 'AI is analyzing documents...'
                       : relationship.relevance_calculation_status === 'failed'
-                      ? 'Analysis failed'
-                      : 'Pending analysis'
+                      ? 'Analysis failed - will retry automatically'
+                      : 'Waiting for AI analysis...'
                     }
                   </span>
                   <div className="flex items-center space-x-1">

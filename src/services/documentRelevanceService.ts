@@ -20,6 +20,49 @@ class DocumentRelevanceService {
   private isProcessing = false;
 
   /**
+   * Calculate relevance with retry logic and timeout handling
+   */
+  async calculateRelevanceWithRetry(
+    sourceDocId: string, 
+    relatedDocId: string, 
+    relationshipId: string,
+    maxRetries: number = 3
+  ): Promise<DocumentSimilarityResult | null> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`DocumentRelevanceService: Attempt ${attempt}/${maxRetries} for relationship ${relationshipId}`);
+        
+        // Set a timeout for the entire calculation process
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Calculation timeout after 2 minutes')), 120000); // 2 minutes
+        });
+
+        const calculationPromise = this.calculateRelevance(sourceDocId, relatedDocId);
+        
+        const result = await Promise.race([calculationPromise, timeoutPromise]);
+        
+        console.log(`DocumentRelevanceService: Success on attempt ${attempt} for relationship ${relationshipId}`);
+        return result;
+        
+      } catch (error) {
+        console.warn(`DocumentRelevanceService: Attempt ${attempt}/${maxRetries} failed for relationship ${relationshipId}:`, error);
+        
+        if (attempt === maxRetries) {
+          console.error(`DocumentRelevanceService: All ${maxRetries} attempts failed for relationship ${relationshipId}`);
+          return null;
+        }
+        
+        // Wait before retrying (exponential backoff)
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000); // Max 10 seconds
+        console.log(`DocumentRelevanceService: Waiting ${delay}ms before retry for relationship ${relationshipId}`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    
+    return null;
+  }
+
+  /**
    * Calculate relevance between two documents using AI analysis
    */
   async calculateRelevance(sourceDocId: string, relatedDocId: string): Promise<DocumentSimilarityResult> {
@@ -306,20 +349,27 @@ class DocumentRelevanceService {
           // Mark as processing
           await documentRelationships.markAsProcessing(relationship.id);
 
-          // Calculate relevance
-          const result = await this.calculateRelevance(
+          // Calculate relevance with timeout and retry logic
+          const result = await this.calculateRelevanceWithRetry(
             relationship.source_document_id,
-            relationship.related_document_id
+            relationship.related_document_id,
+            relationship.id
           );
 
-          // Update with results
-          await documentRelationships.markAsCompleted(
-            relationship.id,
-            result.relevancePercentage,
-            result.aiDescription
-          );
+          if (result) {
+            // Update with results
+            await documentRelationships.markAsCompleted(
+              relationship.id,
+              result.relevancePercentage,
+              result.aiDescription
+            );
 
-          console.log(`DocumentRelevanceService: Completed calculation for relationship ${relationship.id}: ${result.relevancePercentage}%`);
+            console.log(`DocumentRelevanceService: Completed calculation for relationship ${relationship.id}: ${result.relevancePercentage}%`);
+          } else {
+            // Mark as failed after retries
+            await documentRelationships.markAsFailed(relationship.id);
+            console.log(`DocumentRelevanceService: Failed calculation for relationship ${relationship.id} after retries`);
+          }
 
         } catch (error) {
           console.error(`DocumentRelevanceService: Error processing relationship ${relationship.id}:`, error);
@@ -330,8 +380,8 @@ class DocumentRelevanceService {
           this.processingQueue.delete(relationship.id);
         }
 
-        // Add small delay to avoid overwhelming the AI service
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Add delay to avoid overwhelming the AI service
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
 
     } catch (error) {

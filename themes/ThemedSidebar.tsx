@@ -44,12 +44,12 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [selectedRelationship, setSelectedRelationship] = useState<DocumentRelationshipWithDetails | null>(null)
   
-  // Collapsible sections state
+  // Collapsible sections state - all collapsed by default
   const [sectionsExpanded, setSectionsExpanded] = useState({
-    library: true,
-    related: true,
-    stats: true,
-    activity: true
+    library: false,
+    related: false,
+    stats: false,
+    activity: false
   })
 
   // Load user documents from database

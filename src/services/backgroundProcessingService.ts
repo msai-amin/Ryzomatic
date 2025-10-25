@@ -3,7 +3,7 @@ import { documentRelevanceService } from './documentRelevanceService';
 class BackgroundProcessingService {
   private isRunning = false;
   private intervalId: NodeJS.Timeout | null = null;
-  private readonly PROCESSING_INTERVAL = 30000; // 30 seconds
+  private readonly PROCESSING_INTERVAL = 60000; // 60 seconds - longer interval for AI processing
 
   start() {
     if (this.isRunning) {
