@@ -101,7 +101,7 @@ export const ContextualHelp: React.FC = () => {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 z-40"
+        className="fixed bottom-4 right-72 p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 z-40"
         style={{
           backgroundColor: 'var(--color-primary)',
           color: 'var(--color-text-inverse)',
