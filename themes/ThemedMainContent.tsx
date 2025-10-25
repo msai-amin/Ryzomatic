@@ -32,18 +32,18 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
         {children}
       </div>
 
-      {/* Right Sidebar Toggle Button - Always visible when document is loaded */}
-      {currentDocument && (
+      {/* Right Sidebar Toggle Button (visible when sidebar is closed) */}
+      {currentDocument && !isRightSidebarOpen && (
         <button
-          onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+          onClick={() => setIsRightSidebarOpen(true)}
           className="fixed top-24 right-4 p-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 z-50"
           style={{
             backgroundColor: 'var(--color-primary)',
             color: 'var(--color-text-inverse)',
             border: '1px solid var(--color-primary)',
           }}
-          title={isRightSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
-          aria-label={isRightSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+          title="Show sidebar"
+          aria-label="Show sidebar"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
