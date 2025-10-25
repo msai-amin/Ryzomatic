@@ -3,16 +3,26 @@ import { createClient } from '@supabase/supabase-js';
 
 // Create Supabase client for serverless functions
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+// Use service role key if available, otherwise fall back to anon key
+const supabaseKey = supabaseServiceKey || supabaseAnonKey;
+
+if (!supabaseUrl || !supabaseKey) {
   console.error('Missing Supabase environment variables in API context');
   console.error('URL:', supabaseUrl);
-  console.error('Key present:', !!supabaseAnonKey);
+  console.error('Service Key present:', !!supabaseServiceKey);
+  console.error('Anon Key present:', !!supabaseAnonKey);
 }
 
-const supabase = supabaseUrl && supabaseAnonKey 
-  ? createClient(supabaseUrl, supabaseAnonKey)
+const supabase = supabaseUrl && supabaseKey 
+  ? createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
   : null;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
