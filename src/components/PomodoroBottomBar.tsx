@@ -94,7 +94,7 @@ export const PomodoroBottomBar: React.FC<PomodoroBottomBarProps> = ({ onExpand }
   if (isCollapsed) {
     return (
       <div 
-        className="fixed bottom-4 right-4 z-50 transition-all duration-300"
+        className="fixed bottom-4 right-4 z-50 transition-all duration-300 sm:right-8 md:right-16 lg:right-32"
         style={{
           backgroundColor: modeInfo.bgColor,
           border: `1px solid ${modeInfo.borderColor}`,
@@ -119,11 +119,14 @@ export const PomodoroBottomBar: React.FC<PomodoroBottomBarProps> = ({ onExpand }
 
   return (
     <div 
-      className="fixed bottom-0 left-0 right-0 z-50 transition-all duration-300"
+      className="fixed bottom-4 left-4 right-4 z-50 transition-all duration-300 sm:left-8 sm:right-8 md:left-16 md:right-16 lg:left-32 lg:right-32"
       style={{
         backgroundColor: modeInfo.bgColor,
-        borderTop: `2px solid ${modeInfo.borderColor}`,
-        boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.1)',
+        border: `2px solid ${modeInfo.borderColor}`,
+        borderRadius: 'var(--border-radius-lg)',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+        maxWidth: '800px',
+        margin: '0 auto',
       }}
     >
       <div className="flex items-center justify-between p-4">
