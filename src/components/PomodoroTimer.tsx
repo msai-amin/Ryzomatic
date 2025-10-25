@@ -150,32 +150,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
     updatePomodoroTimer(timeLeft, isRunning, mode)
   }, [timeLeft, isRunning, mode])
 
-  // Timer countdown logic
-  useEffect(() => {
-    if (isRunning && timeLeft > 0) {
-      intervalRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            handleTimerComplete()
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
-    }
-  }, [isRunning, timeLeft])
-
-  const handleTimerComplete = async () => {
+  const handleTimerComplete = useCallback(async () => {
     setIsRunning(false)
     
     // Save completed session to database
@@ -237,7 +212,37 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
         setIsRunning(true)
       }
     }
-  }
+  }, [user, activePomodoroSessionId, mode, settings, documentId, completedSessions, setPomodoroSession])
+
+  // Timer countdown logic
+  useEffect(() => {
+    console.log('Timer useEffect triggered:', { isRunning, timeLeft, hasInterval: !!intervalRef.current })
+    
+    if (isRunning && timeLeft > 0) {
+      console.log('Starting timer countdown from:', timeLeft)
+      intervalRef.current = setInterval(() => {
+        setTimeLeft((prev) => {
+          console.log('Timer tick:', prev)
+          if (prev <= 1) {
+            handleTimerComplete()
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+    } else {
+      if (intervalRef.current) {
+        console.log('Clearing timer interval')
+        clearInterval(intervalRef.current)
+      }
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+  }, [isRunning, timeLeft, handleTimerComplete])
 
   const resetTimer = async () => {
     // Stop active session if running
