@@ -240,6 +240,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
               }
               
               // Trigger library refresh
+              console.log('DocumentUpload: Calling refreshLibrary() after successful PDF save')
               refreshLibrary();
               
               // Upload to Google Drive "Readings In Progress" if user is signed in
@@ -324,6 +325,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
               }
               
               // Trigger library refresh
+              console.log('DocumentUpload: Calling refreshLibrary() after successful text save')
               refreshLibrary();
             } catch (err) {
               // In local development, S3 API may not be available (404)
@@ -373,6 +375,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
           savedAt: new Date()
         });
         
+        console.log('DocumentUpload: Calling refreshLibrary() after OCR approval')
         refreshLibrary();
       }
 

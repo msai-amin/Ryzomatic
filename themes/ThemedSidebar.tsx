@@ -44,15 +44,22 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
   // Load user documents from database
   useEffect(() => {
     const loadUserDocuments = async () => {
-      if (!user) return
+      if (!user) {
+        console.log('ThemedSidebar: No user, skipping document load')
+        return
+      }
+      
+      console.log('ThemedSidebar: Loading documents for user:', user.id, 'refreshTrigger:', libraryRefreshTrigger)
       
       try {
         const { data: dbDocuments, error } = await userBooks.list(user.id)
         
         if (error) {
-          console.error('Error loading documents:', error)
+          console.error('ThemedSidebar: Error loading documents:', error)
           return
         }
+        
+        console.log('ThemedSidebar: Loaded documents from database:', dbDocuments?.length || 0, 'documents')
         
         if (dbDocuments) {
           const documentsWithProgress: DocumentWithProgress[] = dbDocuments.map(doc => {
@@ -83,10 +90,14 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
             }
           })
           
+          console.log('ThemedSidebar: Setting userDocuments:', documentsWithProgress.length, 'documents')
           setUserDocuments(documentsWithProgress)
+        } else {
+          console.log('ThemedSidebar: No documents found in database')
+          setUserDocuments([])
         }
       } catch (error) {
-        console.error('Error loading user documents:', error)
+        console.error('ThemedSidebar: Error loading user documents:', error)
       }
     }
     

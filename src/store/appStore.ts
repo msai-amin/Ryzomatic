@@ -565,9 +565,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   
   setTyping: (typing) => set({ isTyping: typing }),
   
-  refreshLibrary: () => set((state) => ({ 
-    libraryRefreshTrigger: state.libraryRefreshTrigger + 1 
-  })),
+  refreshLibrary: () => {
+    console.log('AppStore: refreshLibrary() called, incrementing trigger')
+    set((state) => ({ 
+      libraryRefreshTrigger: state.libraryRefreshTrigger + 1 
+    }))
+  },
   
   setPomodoroSession: (sessionId, bookId, startTime) => set({
     activePomodoroSessionId: sessionId,
