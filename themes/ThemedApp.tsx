@@ -40,7 +40,6 @@ const ThemedAppContent: React.FC = () => {
         onUploadClick={() => setShowUpload(true)} 
         isSidebarOpen={isSidebarOpen}
         onSidebarToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-        onPomodoroClose={() => setShowPomodoroWidget(true)}
       />
 
       {/* Main Layout */}
