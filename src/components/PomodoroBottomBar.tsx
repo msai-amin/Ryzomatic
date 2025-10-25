@@ -88,7 +88,7 @@ export const PomodoroBottomBar: React.FC<PomodoroBottomBarProps> = ({ onExpand }
   if (isCollapsed) {
     return (
       <div 
-        className="fixed bottom-4 right-4 z-50 transition-all duration-300 sm:right-8 md:right-16 lg:right-32"
+        className="fixed bottom-4 left-4 z-50 transition-all duration-300 sm:left-8 md:left-16 lg:left-32"
         style={{
           backgroundColor: modeInfo.bgColor,
           border: `1px solid ${modeInfo.borderColor}`,
