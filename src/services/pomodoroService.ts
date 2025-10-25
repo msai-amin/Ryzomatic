@@ -105,6 +105,8 @@ class PomodoroService {
 
       if (error) {
         console.error('Failed to stop Pomodoro session:', error)
+        // Clear active session even if there was an error
+        this.clearActiveSession()
         return null
       }
 
@@ -126,6 +128,8 @@ class PomodoroService {
       return null
     } catch (error) {
       console.error('Error stopping Pomodoro session:', error)
+      // Clear active session even if there was an error
+      this.clearActiveSession()
       return null
     }
   }

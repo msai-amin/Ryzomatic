@@ -105,6 +105,13 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
       // Starting timer
       if (user && documentId && mode === 'work') {
         try {
+          // Check if there's already an active session
+          if (activePomodoroSessionId) {
+            console.log('Already have active session, not creating new one')
+            setIsRunning(true)
+            return
+          }
+          
           const session = await pomodoroService.startSession(user.id, documentId, mode)
           if (session) {
             setPomodoroSession(session.id, documentId, Date.now())
@@ -166,7 +173,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
         clearInterval(intervalRef.current)
       }
     }
-  }, [isRunning, timeLeft, updatePomodoroTimer])
+  }, [isRunning, timeLeft])
 
   const handleTimerComplete = async () => {
     setIsRunning(false)
