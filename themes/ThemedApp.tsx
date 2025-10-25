@@ -11,6 +11,7 @@ import { useAchievementToasts } from '../src/components/AchievementToast'
 import { useAppStore } from '../src/store/appStore'
 import { useKeyboardShortcuts } from '../src/hooks/useKeyboardShortcuts'
 import { OnboardingProvider, OnboardingOverlay, ContextualHelp } from '../src/components/onboarding'
+import { backgroundProcessingService } from '../src/services/backgroundProcessingService'
 
 const ThemedAppContent: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
@@ -21,6 +22,18 @@ const ThemedAppContent: React.FC = () => {
   
   // Enable keyboard shortcuts
   useKeyboardShortcuts()
+
+  // Start background processing service
+  useEffect(() => {
+    console.log('ThemedApp: Starting background processing service')
+    backgroundProcessingService.start()
+
+    // Cleanup on unmount
+    return () => {
+      console.log('ThemedApp: Stopping background processing service')
+      backgroundProcessingService.stop()
+    }
+  }, [])
 
 
   return (

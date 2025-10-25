@@ -6,8 +6,11 @@ import { pomodoroService } from '../src/services/pomodoroService'
 import { pomodoroGamificationService, StreakInfo, Achievement } from '../src/services/pomodoroGamificationService'
 import { AchievementPanel } from '../src/components/AchievementPanel'
 import { PomodoroDashboard } from '../src/components/PomodoroDashboard'
+import { RelatedDocumentsPanel } from '../src/components/RelatedDocumentsPanel'
+import { AddRelatedDocumentModal } from '../src/components/AddRelatedDocumentModal'
+import { DocumentPreviewModal } from '../src/components/DocumentPreviewModal'
 import { useTheme } from './ThemeProvider'
-import { userBooks } from '../lib/supabase'
+import { userBooks, documentRelationships, DocumentRelationshipWithDetails } from '../lib/supabase'
 
 interface ThemedSidebarProps {
   isOpen: boolean
@@ -28,16 +31,23 @@ interface DocumentWithProgress {
 }
 
 export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, refreshTrigger }) => {
-  const { currentDocument, user, showPomodoroDashboard, setShowPomodoroDashboard, documents: appDocuments, setCurrentDocument } = useAppStore()
+  const { currentDocument, user, showPomodoroDashboard, setShowPomodoroDashboard, documents: appDocuments, setCurrentDocument, relatedDocuments, setRelatedDocuments, relatedDocumentsRefreshTrigger, refreshRelatedDocuments } = useAppStore()
   const [pomodoroStats, setPomodoroStats] = useState<{ [key: string]: { timeMinutes: number, sessions: number } }>({})
   const [streak, setStreak] = useState<StreakInfo | null>(null)
   const [achievements, setAchievements] = useState<Achievement[]>([])
   const [loading, setLoading] = useState(false)
   const [userDocuments, setUserDocuments] = useState<DocumentWithProgress[]>([])
   
+  // Related Documents state
+  const [relatedDocsLoading, setRelatedDocsLoading] = useState(false)
+  const [showAddRelatedModal, setShowAddRelatedModal] = useState(false)
+  const [showPreviewModal, setShowPreviewModal] = useState(false)
+  const [selectedRelationship, setSelectedRelationship] = useState<DocumentRelationshipWithDetails | null>(null)
+  
   // Collapsible sections state
   const [sectionsExpanded, setSectionsExpanded] = useState({
     library: true,
+    related: true,
     stats: true,
     activity: true
   })
@@ -157,6 +167,34 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
     loadGamificationData()
   }, [user])
 
+  // Load related documents when current document changes
+  useEffect(() => {
+    const loadRelatedDocuments = async () => {
+      if (!currentDocument || !user) {
+        setRelatedDocuments([])
+        return
+      }
+
+      try {
+        setRelatedDocsLoading(true)
+        const { data: relatedDocs, error } = await documentRelationships.getWithDetails(currentDocument.id)
+        
+        if (error) {
+          console.error('Error loading related documents:', error)
+          return
+        }
+
+        setRelatedDocuments(relatedDocs || [])
+      } catch (error) {
+        console.error('Error loading related documents:', error)
+      } finally {
+        setRelatedDocsLoading(false)
+      }
+    }
+
+    loadRelatedDocuments()
+  }, [currentDocument?.id, user, relatedDocumentsRefreshTrigger, setRelatedDocuments])
+
   const toggleSection = (section: keyof typeof sectionsExpanded) => {
     setSectionsExpanded(prev => ({
       ...prev,
@@ -195,6 +233,36 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
     } catch (error) {
       console.error('Error opening document:', error)
     }
+  }
+
+  // Related Documents handlers
+  const handleAddRelatedDocument = () => {
+    if (!currentDocument) return
+    setShowAddRelatedModal(true)
+  }
+
+  const handlePreviewDocument = (relationship: DocumentRelationshipWithDetails) => {
+    setSelectedRelationship(relationship)
+    setShowPreviewModal(true)
+  }
+
+  const handleDeleteRelationship = async (relationshipId: string) => {
+    try {
+      const { error } = await documentRelationships.delete(relationshipId)
+      if (error) {
+        console.error('Error deleting relationship:', error)
+        return
+      }
+      
+      // Refresh related documents
+      refreshRelatedDocuments()
+    } catch (error) {
+      console.error('Error deleting relationship:', error)
+    }
+  }
+
+  const handleRelationshipCreated = () => {
+    refreshRelatedDocuments()
   }
 
   return (
@@ -374,6 +442,39 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
               </div>
             )}
           </div>
+
+          {/* Related Documents Section */}
+          {currentDocument && (
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 
+                  className="text-lg font-semibold"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  Related Documents
+                </h3>
+                <button
+                  onClick={() => toggleSection('related')}
+                  className="p-1 rounded transition-colors"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  {sectionsExpanded.related ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+              </div>
+              
+              {sectionsExpanded.related && (
+                <RelatedDocumentsPanel
+                  relatedDocuments={relatedDocuments}
+                  isLoading={relatedDocsLoading}
+                  onAddRelatedDocument={handleAddRelatedDocument}
+                  onPreviewDocument={handlePreviewDocument}
+                  onDeleteRelationship={handleDeleteRelationship}
+                />
+              )}
+            </div>
+          )}
 
           {/* Productivity Stats Section */}
           <div className="mb-6">
@@ -616,6 +717,34 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           isOpen={showPomodoroDashboard}
           onClose={() => setShowPomodoroDashboard(false)}
         />
+      )}
+
+      {/* Related Documents Modals */}
+      {currentDocument && (
+        <>
+          <AddRelatedDocumentModal
+            isOpen={showAddRelatedModal}
+            onClose={() => setShowAddRelatedModal(false)}
+            sourceDocumentId={currentDocument.id}
+            onRelationshipCreated={handleRelationshipCreated}
+          />
+          
+          {selectedRelationship && (
+            <DocumentPreviewModal
+              isOpen={showPreviewModal}
+              onClose={() => {
+                setShowPreviewModal(false)
+                setSelectedRelationship(null)
+              }}
+              relationship={selectedRelationship}
+              onEditRelationship={(relationshipId) => {
+                // TODO: Implement edit relationship functionality
+                console.log('Edit relationship:', relationshipId)
+              }}
+              onDeleteRelationship={handleDeleteRelationship}
+            />
+          )}
+        </>
       )}
     </>
   )

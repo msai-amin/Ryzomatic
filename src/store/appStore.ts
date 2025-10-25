@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { authService, AuthUser } from '../services/supabaseAuthService'
+import { DocumentRelationshipWithDetails } from '../../lib/supabase'
 
 export interface Highlight {
   id: string
@@ -199,6 +200,10 @@ interface AppState {
   pomodoroWidgetPosition: { x: number; y: number }
   showPomodoroDashboard: boolean
   
+  // Related Documents state
+  relatedDocuments: DocumentRelationshipWithDetails[]
+  relatedDocumentsRefreshTrigger: number
+  
   // Actions
   setUser: (user: AuthUser | null) => void
   setAuthenticated: (authenticated: boolean) => void
@@ -246,6 +251,10 @@ interface AppState {
   // Text selection and AI mode actions
   setSelectedTextContext: (context: TextSelectionContext | null) => void
   setChatMode: (mode: 'general' | 'clarification' | 'further-reading') => void
+  
+  // Related Documents actions
+  setRelatedDocuments: (documents: DocumentRelationshipWithDetails[]) => void
+  refreshRelatedDocuments: () => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -333,6 +342,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Pomodoro widget state
   pomodoroWidgetPosition: { x: 0, y: 0 },
   showPomodoroDashboard: false,
+  
+  // Related Documents state
+  relatedDocuments: [],
+  relatedDocumentsRefreshTrigger: 0,
   
   // Authentication actions
   setUser: (user) => set({ user }),
@@ -655,7 +668,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Text selection and AI mode actions
   setSelectedTextContext: (context) => set({ selectedTextContext: context }),
   
-  setChatMode: (mode) => set({ chatMode: mode })
+  setChatMode: (mode) => set({ chatMode: mode }),
+  
+  // Related Documents actions
+  setRelatedDocuments: (documents) => set({ relatedDocuments: documents }),
+  
+  refreshRelatedDocuments: () => {
+    console.log('AppStore: refreshRelatedDocuments() called, incrementing trigger')
+    set((state) => ({
+      relatedDocumentsRefreshTrigger: state.relatedDocumentsRefreshTrigger + 1
+    }))
+  }
 }))
 
 

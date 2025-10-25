@@ -654,3 +654,141 @@ export const pomodoroSessions = {
   }
 };
 
+// Document Relationships interfaces
+export interface DocumentRelationship {
+  id: string;
+  user_id: string;
+  source_document_id: string;
+  related_document_id: string;
+  relationship_description?: string;
+  relevance_percentage?: number;
+  ai_generated_description?: string;
+  relevance_calculation_status: 'pending' | 'processing' | 'completed' | 'failed';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DocumentRelationshipWithDetails {
+  relationship_id: string;
+  related_document_id: string;
+  related_title: string;
+  related_file_name: string;
+  related_file_type: string;
+  related_total_pages?: number;
+  relationship_description?: string;
+  relevance_percentage?: number;
+  ai_generated_description?: string;
+  relevance_calculation_status: string;
+  created_at: string;
+}
+
+export interface CreateRelationshipData {
+  source_document_id: string;
+  related_document_id: string;
+  relationship_description?: string;
+}
+
+export interface UpdateRelationshipData {
+  relationship_description?: string;
+  relevance_percentage?: number;
+  ai_generated_description?: string;
+  relevance_calculation_status?: 'pending' | 'processing' | 'completed' | 'failed';
+}
+
+// Document Relationships helper functions
+export const documentRelationships = {
+  async list(sourceDocumentId: string) {
+    const { data, error } = await supabase
+      .from('document_relationships')
+      .select('*')
+      .eq('source_document_id', sourceDocumentId)
+      .order('relevance_percentage', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false });
+    return { data, error };
+  },
+
+  async getWithDetails(sourceDocumentId: string) {
+    const { data, error } = await supabase.rpc('get_related_documents_with_details', {
+      source_doc_id: sourceDocumentId
+    });
+    return { data, error };
+  },
+
+  async create(data: CreateRelationshipData) {
+    const { data: result, error } = await supabase
+      .from('document_relationships')
+      .insert({
+        source_document_id: data.source_document_id,
+        related_document_id: data.related_document_id,
+        relationship_description: data.relationship_description,
+        relevance_calculation_status: 'pending'
+      })
+      .select()
+      .single();
+    return { data: result, error };
+  },
+
+  async update(relationshipId: string, data: UpdateRelationshipData) {
+    const { data: result, error } = await supabase
+      .from('document_relationships')
+      .update(data)
+      .eq('id', relationshipId)
+      .select()
+      .single();
+    return { data: result, error };
+  },
+
+  async delete(relationshipId: string) {
+    const { error } = await supabase
+      .from('document_relationships')
+      .delete()
+      .eq('id', relationshipId);
+    return { error };
+  },
+
+  async getStats(userId: string) {
+    const { data, error } = await supabase.rpc('get_document_relationship_stats', {
+      user_uuid: userId
+    });
+    return { data, error };
+  },
+
+  async getPendingCalculations() {
+    const { data, error } = await supabase
+      .from('document_relationships')
+      .select('*')
+      .eq('relevance_calculation_status', 'pending')
+      .order('created_at', { ascending: true })
+      .limit(10);
+    return { data, error };
+  },
+
+  async markAsProcessing(relationshipId: string) {
+    const { error } = await supabase
+      .from('document_relationships')
+      .update({ relevance_calculation_status: 'processing' })
+      .eq('id', relationshipId);
+    return { error };
+  },
+
+  async markAsCompleted(relationshipId: string, relevancePercentage: number, aiDescription?: string) {
+    const { error } = await supabase
+      .from('document_relationships')
+      .update({ 
+        relevance_calculation_status: 'completed',
+        relevance_percentage: relevancePercentage,
+        ai_generated_description: aiDescription
+      })
+      .eq('id', relationshipId);
+    return { error };
+  },
+
+  async markAsFailed(relationshipId: string) {
+    const { error } = await supabase
+      .from('document_relationships')
+      .update({ relevance_calculation_status: 'failed' })
+      .eq('id', relationshipId);
+    return { error };
+  }
+};
+
