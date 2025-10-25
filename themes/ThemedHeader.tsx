@@ -33,12 +33,34 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
   const [showAuth, setShowAuth] = React.useState(false)
   const [showPomodoro, setShowPomodoro] = React.useState(false)
   const pomodoroButtonRef = React.useRef<HTMLButtonElement>(null)
+  const pomodoroDropdownRef = React.useRef<HTMLDivElement>(null)
 
   const { currentTheme } = useTheme()
 
   const handleLogout = async () => {
     await logout()
   }
+
+  // Click outside handler for Pomodoro dropdown
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showPomodoro && 
+          pomodoroDropdownRef.current && 
+          !pomodoroDropdownRef.current.contains(event.target as Node) &&
+          pomodoroButtonRef.current &&
+          !pomodoroButtonRef.current.contains(event.target as Node)) {
+        setShowPomodoro(false)
+      }
+    }
+
+    if (showPomodoro) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showPomodoro])
 
 
   return (
@@ -322,23 +344,18 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
         <TypographySettings onClose={() => setShowSettings(false)} />
       )}
 
-      {/* Pomodoro Timer Modal */}
+      {/* Pomodoro Timer Dropdown */}
       {showPomodoro && currentDocument && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-black bg-opacity-50"
-            onClick={() => setShowPomodoro(false)}
+        <div 
+          ref={pomodoroDropdownRef}
+          className="absolute top-full right-0 mt-2 z-50"
+          style={{ minWidth: '400px' }}
+        >
+          <PomodoroTimer 
+            documentId={currentDocument.id}
+            documentName={currentDocument.name}
+            onClose={() => setShowPomodoro(false)}
           />
-          
-          {/* Pomodoro Timer */}
-          <div className="relative">
-            <PomodoroTimer 
-              documentId={currentDocument.id}
-              documentName={currentDocument.name}
-              onClose={() => setShowPomodoro(false)}
-            />
-          </div>
         </div>
       )}
     </header>

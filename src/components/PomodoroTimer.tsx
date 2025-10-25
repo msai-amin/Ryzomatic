@@ -102,20 +102,31 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
 
   const toggleTimer = useCallback(async () => {
     if (!isRunning) {
-      // Starting timer - create session if user is authenticated and document is available
+      // Starting timer
       if (user && documentId && mode === 'work') {
-        const session = await pomodoroService.startSession(user.id, documentId, mode)
-        if (session) {
-          setPomodoroSession(session.id, session.bookId, Date.now())
+        try {
+          const session = await pomodoroService.startSession(user.id, documentId, mode)
+          if (session) {
+            setPomodoroSession(session.id, documentId, Date.now())
+            console.log('Pomodoro session started:', session.id)
+          }
+        } catch (error) {
+          console.error('Failed to start Pomodoro session:', error)
+          return // Don't start timer if session creation fails
         }
       }
       setIsRunning(true)
     } else {
-      // Pausing timer - save current session
+      // Pausing timer
       if (user && activePomodoroSessionId) {
         const duration = settings.workDuration * 60 - timeLeft
-        await pomodoroService.stopCurrentSession(false) // Mark as incomplete pause
-        setPomodoroSession(null, null, null)
+        try {
+          await pomodoroService.stopCurrentSession(false) // Mark as incomplete
+          setPomodoroSession(null, null, null)
+          console.log('Pomodoro session paused')
+        } catch (error) {
+          console.error('Failed to pause Pomodoro session:', error)
+        }
       }
       setIsRunning(false)
     }
@@ -155,7 +166,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
         clearInterval(intervalRef.current)
       }
     }
-  }, [isRunning, timeLeft])
+  }, [isRunning, timeLeft, updatePomodoroTimer])
 
   const handleTimerComplete = async () => {
     setIsRunning(false)
@@ -163,27 +174,25 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
     // Save completed session to database
     if (user && activePomodoroSessionId && mode === 'work') {
       const duration = settings.workDuration * 60
-      await pomodoroService.stopCurrentSession(true) // Mark as completed
-      setPomodoroSession(null, null, null)
-      
-      // Check for new achievements
       try {
+        await pomodoroService.stopCurrentSession(true) // Mark as completed
+        setPomodoroSession(null, null, null)
+        console.log('Pomodoro session completed:', activePomodoroSessionId)
+        
+        // Check for achievements
         const newAchievements = await pomodoroGamificationService.checkAchievements(user.id, {
           bookId: documentId || undefined,
           mode: 'work',
           completed: true
         })
         
-        // Update streak tracking
         await pomodoroGamificationService.updateStreak(user.id)
         
-        // Show achievement notifications (this would be handled by a parent component)
         if (newAchievements.length > 0) {
           console.log('New achievements unlocked:', newAchievements)
-          // The parent component should handle showing achievement toasts
         }
       } catch (error) {
-        console.error('Error checking achievements:', error)
+        console.error('Error completing Pomodoro session:', error)
       }
     }
     

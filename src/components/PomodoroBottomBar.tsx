@@ -72,12 +72,16 @@ export const PomodoroBottomBar: React.FC<PomodoroBottomBarProps> = ({ onExpand }
   const modeInfo = getModeInfo()
 
   const handleStartPause = () => {
-    if (pomodoroIsRunning) {
-      // Pause timer
-      updatePomodoroTimer(pomodoroTimeLeft, false, pomodoroMode)
+    const { pomodoroTimerToggleRef } = useAppStore.getState()
+    if (pomodoroTimerToggleRef) {
+      pomodoroTimerToggleRef() // Call the timer's toggle function
     } else {
-      // Start timer
-      updatePomodoroTimer(pomodoroTimeLeft, true, pomodoroMode)
+      // Fallback: just update state
+      if (pomodoroIsRunning) {
+        updatePomodoroTimer(pomodoroTimeLeft, false, pomodoroMode)
+      } else {
+        updatePomodoroTimer(pomodoroTimeLeft, true, pomodoroMode)
+      }
     }
   }
 
