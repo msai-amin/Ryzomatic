@@ -361,14 +361,9 @@ class DocumentRelevanceService {
    */
   async calculateAndUpdateRelevance(relationshipId: string): Promise<DocumentSimilarityResult | null> {
     try {
-      // Get the relationship
-      const { data: relationship, error: getError } = await documentRelationships.list('');
+      // Get the relationship by ID directly
+      const { data: relationship, error: getError } = await documentRelationships.get(relationshipId);
       if (getError || !relationship) {
-        throw new Error('Relationship not found');
-      }
-
-      const rel = relationship.find(r => r.id === relationshipId);
-      if (!rel) {
         throw new Error('Relationship not found');
       }
 
@@ -376,7 +371,7 @@ class DocumentRelevanceService {
       await documentRelationships.markAsProcessing(relationshipId);
 
       // Calculate relevance
-      const result = await this.calculateRelevance(rel.source_document_id, rel.related_document_id);
+      const result = await this.calculateRelevance(relationship.source_document_id, relationship.related_document_id);
 
       // Update database
       await documentRelationships.markAsCompleted(

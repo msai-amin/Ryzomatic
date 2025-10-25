@@ -707,6 +707,15 @@ export const documentRelationships = {
     return { data, error };
   },
 
+  async get(relationshipId: string) {
+    const { data, error } = await supabase
+      .from('document_relationships')
+      .select('*')
+      .eq('id', relationshipId)
+      .single();
+    return { data, error };
+  },
+
   async getWithDetails(sourceDocumentId: string) {
     const { data, error } = await supabase.rpc('get_related_documents_with_details', {
       source_doc_id: sourceDocumentId

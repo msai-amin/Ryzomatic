@@ -97,7 +97,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     // Start background relevance calculation
     try {
       // Don't await this - let it run in background
-      documentRelevanceService.calculateAndUpdateRelevance(relationship.id);
+      documentRelevanceService.calculateAndUpdateRelevance(relationship.id).catch(calcError => {
+        console.error('Error in background relevance calculation:', calcError);
+      });
     } catch (calcError) {
       console.error('Error starting relevance calculation:', calcError);
       // Don't fail the request if background calculation fails
