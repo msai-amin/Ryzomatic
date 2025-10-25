@@ -25,7 +25,8 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     libraryRefreshTrigger,
     pomodoroIsRunning,
     pomodoroTimeLeft,
-    hasSeenPomodoroTour
+    hasSeenPomodoroTour,
+    pdfViewer
   } = useAppStore()
   const [showSettings, setShowSettings] = React.useState(false)
   const [showLibrary, setShowLibrary] = React.useState(false)
@@ -186,19 +187,22 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             </>
           )}
           
-          <Tooltip content="Settings" position="bottom">
-            <button
-              data-tour="settings-button"
-              onClick={() => setShowSettings(true)}
-              className="p-2 rounded-lg transition-colors"
-              style={{ color: 'var(--color-text-primary)' }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              aria-label="Settings"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
-          </Tooltip>
+          {/* Settings Button - Only show in Reading Mode */}
+          {pdfViewer.readingMode && (
+            <Tooltip content="Settings" position="bottom">
+              <button
+                data-tour="settings-button"
+                onClick={() => setShowSettings(true)}
+                className="p-2 rounded-lg transition-colors"
+                style={{ color: 'var(--color-text-primary)' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                aria-label="Settings"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
+            </Tooltip>
+          )}
 
           {/* Visual Separator */}
           <div 
