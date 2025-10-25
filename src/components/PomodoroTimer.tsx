@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Play, Pause, RotateCcw, Settings, X, Coffee, BookOpen, Clock } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import { useAppStore } from '../store/appStore'
+import { timerService, TimerState } from '../services/timerService'
 import { pomodoroService } from '../services/pomodoroService'
 import { pomodoroGamificationService } from '../services/pomodoroGamificationService'
 
@@ -24,16 +25,8 @@ interface PomodoroTimerProps {
 }
 
 export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, documentName, onClose }) => {
-  const { 
-    user, 
-    activePomodoroSessionId, 
-    pomodoroTimeLeft,
-    pomodoroIsRunning,
-    pomodoroMode,
-    setPomodoroSession,
-    updatePomodoroTimer,
-    setPomodoroTimerToggleRef
-  } = useAppStore()
+  const { user } = useAppStore()
+  const [timerState, setTimerState] = useState<TimerState>(timerService.getState())
   
   const [settings, setSettings] = useState<PomodoroSettings>({
     workDuration: 25,
@@ -45,16 +38,16 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
     notificationsEnabled: true,
   })
 
-  // Use global state or initialize from settings
-  const [mode, setMode] = useState<TimerMode>(pomodoroMode || 'work')
-  const [timeLeft, setTimeLeft] = useState(pomodoroTimeLeft || settings.workDuration * 60)
-  const [isRunning, setIsRunning] = useState(pomodoroIsRunning || false)
-  const [completedSessions, setCompletedSessions] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
   
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const notificationSoundRef = useRef<HTMLAudioElement | null>(null)
+
+  // Subscribe to timer service
+  useEffect(() => {
+    const unsubscribe = timerService.subscribe(setTimerState)
+    return unsubscribe
+  }, [])
 
   // Initialize notification sound
   useEffect(() => {
@@ -80,202 +73,27 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
     
     notificationSoundRef.current = { play: createBeep } as any
     
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
-    }
   }, [])
 
-  // Sync local state with global state on mount
-  useEffect(() => {
-    if (pomodoroTimeLeft !== null) {
-      setTimeLeft(pomodoroTimeLeft)
-    }
-    if (pomodoroIsRunning !== undefined) {
-      setIsRunning(pomodoroIsRunning)
-    }
-    if (pomodoroMode) {
-      setMode(pomodoroMode)
-    }
-  }, [])
 
   const toggleTimer = useCallback(async () => {
-    if (!isRunning) {
-      // Starting timer
-      if (user && documentId && mode === 'work') {
-        try {
-          // Check if there's already an active session
-          if (activePomodoroSessionId) {
-            console.log('Already have active session, not creating new one')
-            setIsRunning(true)
-            return
-          }
-          
-          const session = await pomodoroService.startSession(user.id, documentId, mode)
-          if (session) {
-            setPomodoroSession(session.id, documentId, Date.now())
-            console.log('Pomodoro session started:', session.id)
-          }
-        } catch (error) {
-          console.error('Failed to start Pomodoro session:', error)
-          return // Don't start timer if session creation fails
-        }
-      }
-      setIsRunning(true)
-    } else {
-      // Pausing timer
-      if (user && activePomodoroSessionId) {
-        const duration = settings.workDuration * 60 - timeLeft
-        try {
-          await pomodoroService.stopCurrentSession(false) // Mark as incomplete
-          setPomodoroSession(null, null, null)
-          console.log('Pomodoro session paused')
-        } catch (error) {
-          console.error('Failed to pause Pomodoro session:', error)
-        }
-      }
-      setIsRunning(false)
-    }
-  }, [isRunning, user, documentId, mode, activePomodoroSessionId, settings.workDuration, timeLeft, setPomodoroSession])
+    await timerService.toggleTimer(user?.id, documentId || undefined)
+  }, [user?.id, documentId])
 
   // Register toggle function for external access
   useEffect(() => {
+    const { setPomodoroTimerToggleRef } = useAppStore.getState()
     setPomodoroTimerToggleRef(toggleTimer)
     return () => setPomodoroTimerToggleRef(null)
-  }, [toggleTimer, setPomodoroTimerToggleRef])
+  }, [toggleTimer])
 
-  // Update global state whenever local state changes
-  useEffect(() => {
-    updatePomodoroTimer(timeLeft, isRunning, mode)
-  }, [timeLeft, isRunning, mode])
-
-  const handleTimerComplete = useCallback(async () => {
-    setIsRunning(false)
-    
-    // Save completed session to database
-    if (user && activePomodoroSessionId && mode === 'work') {
-      const duration = settings.workDuration * 60
-      try {
-        await pomodoroService.stopCurrentSession(true) // Mark as completed
-        setPomodoroSession(null, null, null)
-        console.log('Pomodoro session completed:', activePomodoroSessionId)
-        
-        // Check for achievements
-        const newAchievements = await pomodoroGamificationService.checkAchievements(user.id, {
-          bookId: documentId || undefined,
-          mode: 'work',
-          completed: true
-        })
-        
-        await pomodoroGamificationService.updateStreak(user.id)
-        
-        if (newAchievements.length > 0) {
-          console.log('New achievements unlocked:', newAchievements)
-        }
-      } catch (error) {
-        console.error('Error completing Pomodoro session:', error)
-      }
-    }
-    
-    // Play notification sound
-    if (settings.notificationsEnabled && notificationSoundRef.current) {
-      notificationSoundRef.current.play()
-    }
-
-    // Show browser notification
-    if (settings.notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
-      const title = mode === 'work' ? 'Work Session Complete!' : 'Break Time Over!'
-      const body = mode === 'work' 
-        ? 'Great job! Time for a break.' 
-        : 'Break is over. Ready for another session?'
-      
-      new Notification(title, { body, icon: '/favicon.ico' })
-    }
-
-    // Transition to next mode
-    if (mode === 'work') {
-      setCompletedSessions((prev) => prev + 1)
-      const shouldTakeLongBreak = (completedSessions + 1) % settings.sessionsUntilLongBreak === 0
-      const nextMode: TimerMode = shouldTakeLongBreak ? 'longBreak' : 'shortBreak'
-      setMode(nextMode)
-      setTimeLeft(shouldTakeLongBreak ? settings.longBreakDuration * 60 : settings.shortBreakDuration * 60)
-      
-      if (settings.autoStartBreaks) {
-        setIsRunning(true)
-      }
-    } else {
-      setMode('work')
-      setTimeLeft(settings.workDuration * 60)
-      
-      if (settings.autoStartPomodoros) {
-        setIsRunning(true)
-      }
-    }
-  }, [user, activePomodoroSessionId, mode, settings, documentId, completedSessions, setPomodoroSession])
-
-  // Timer countdown logic
-  useEffect(() => {
-    console.log('Timer useEffect triggered:', { isRunning, timeLeft, hasInterval: !!intervalRef.current })
-    
-    if (isRunning && timeLeft > 0) {
-      console.log('Starting timer countdown from:', timeLeft)
-      intervalRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          console.log('Timer tick:', prev)
-          if (prev <= 1) {
-            handleTimerComplete()
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
-    } else {
-      if (intervalRef.current) {
-        console.log('Clearing timer interval')
-        clearInterval(intervalRef.current)
-      }
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
-    }
-  }, [isRunning, handleTimerComplete]) // Removed timeLeft from dependencies
 
   const resetTimer = async () => {
-    // Stop active session if running
-    if (user && activePomodoroSessionId && isRunning) {
-      await pomodoroService.stopCurrentSession(false) // Mark as incomplete
-      setPomodoroSession(null, null, null)
-    }
-    
-    setIsRunning(false)
-    const duration = mode === 'work' 
-      ? settings.workDuration 
-      : mode === 'shortBreak' 
-        ? settings.shortBreakDuration 
-        : settings.longBreakDuration
-    setTimeLeft(duration * 60)
+    await timerService.resetTimer(user?.id)
   }
 
   const switchMode = async (newMode: TimerMode) => {
-    // Stop active session if switching modes
-    if (user && activePomodoroSessionId && isRunning) {
-      const duration = settings.workDuration * 60 - timeLeft
-      await pomodoroService.stopCurrentSession(false) // Mark as incomplete
-      setPomodoroSession(null, null, null)
-    }
-    
-    setIsRunning(false)
-    setMode(newMode)
-    const duration = newMode === 'work' 
-      ? settings.workDuration 
-      : newMode === 'shortBreak' 
-        ? settings.shortBreakDuration 
-        : settings.longBreakDuration
-    setTimeLeft(duration * 60)
+    timerService.setMode(newMode)
   }
 
   const formatTime = (seconds: number): string => {
@@ -285,16 +103,16 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
   }
 
   const getProgress = (): number => {
-    const totalDuration = mode === 'work' 
+    const totalDuration = timerState.mode === 'work' 
       ? settings.workDuration * 60 
-      : mode === 'shortBreak' 
+      : timerState.mode === 'shortBreak' 
         ? settings.shortBreakDuration * 60 
         : settings.longBreakDuration * 60
-    return ((totalDuration - timeLeft) / totalDuration) * 100
+    return ((totalDuration - timerState.timeLeft) / totalDuration) * 100
   }
 
   const getModeColor = (): string => {
-    switch (mode) {
+    switch (timerState.mode) {
       case 'work':
         return 'var(--color-primary)'
       case 'shortBreak':
@@ -307,7 +125,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
   }
 
   const getModeLabel = (): string => {
-    switch (mode) {
+    switch (timerState.mode) {
       case 'work':
         return 'Focus Time'
       case 'shortBreak':
@@ -330,29 +148,6 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
     requestNotificationPermission()
   }, [])
 
-  // Handle document change - pause and save current session (only when document actually changes)
-  const previousDocumentIdRef = useRef<string | null>(null)
-  
-  useEffect(() => {
-    const handleDocumentChange = async () => {
-      // Only act if document ID actually changed (not on initial mount)
-      if (previousDocumentIdRef.current !== null && 
-          previousDocumentIdRef.current !== documentId &&
-          user && activePomodoroSessionId && isRunning) {
-        // Document changed while timer running - auto-save
-        console.log('Document changed, auto-saving Pomodoro session')
-        const duration = settings.workDuration * 60 - timeLeft
-        await pomodoroService.stopCurrentSession(false)
-        setPomodoroSession(null, null, null)
-        setIsRunning(false)
-      }
-      
-      // Update the ref to current document
-      previousDocumentIdRef.current = documentId || null
-    }
-
-    handleDocumentChange()
-  }, [documentId])
 
   if (isMinimized) {
     return (
@@ -367,7 +162,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
         <Tooltip content="Open Pomodoro Timer" position="left">
           <div className="flex items-center space-x-2">
             <span className="text-lg">🍅</span>
-            <span className="font-mono font-bold text-sm">{formatTime(timeLeft)}</span>
+            <span className="font-mono font-bold text-sm">{formatTime(timerState.timeLeft)}</span>
           </div>
         </Tooltip>
       </div>
@@ -436,8 +231,8 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
                 onClick={() => switchMode('work')}
                 className="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
                 style={{
-                  backgroundColor: mode === 'work' ? getModeColor() : 'var(--color-background)',
-                  color: mode === 'work' ? 'white' : 'var(--color-text-secondary)',
+                  backgroundColor: timerState.mode === 'work' ? getModeColor() : 'var(--color-background)',
+                  color: timerState.mode === 'work' ? 'white' : 'var(--color-text-secondary)',
                 }}
               >
                 <BookOpen className="w-4 h-4 inline mr-1" />
@@ -449,8 +244,8 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
                 onClick={() => switchMode('shortBreak')}
                 className="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
                 style={{
-                  backgroundColor: mode === 'shortBreak' ? getModeColor() : 'var(--color-background)',
-                  color: mode === 'shortBreak' ? 'white' : 'var(--color-text-secondary)',
+                  backgroundColor: timerState.mode === 'shortBreak' ? getModeColor() : 'var(--color-background)',
+                  color: timerState.mode === 'shortBreak' ? 'white' : 'var(--color-text-secondary)',
                 }}
               >
                 <Coffee className="w-4 h-4 inline mr-1" />
@@ -462,8 +257,8 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
                 onClick={() => switchMode('longBreak')}
                 className="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
                 style={{
-                  backgroundColor: mode === 'longBreak' ? getModeColor() : 'var(--color-background)',
-                  color: mode === 'longBreak' ? 'white' : 'var(--color-text-secondary)',
+                  backgroundColor: timerState.mode === 'longBreak' ? getModeColor() : 'var(--color-background)',
+                  color: timerState.mode === 'longBreak' ? 'white' : 'var(--color-text-secondary)',
                 }}
               >
                 <Coffee className="w-4 h-4 inline mr-1" />
@@ -484,7 +279,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
               className="text-6xl font-bold font-mono mb-2"
               style={{ color: getModeColor() }}
             >
-              {formatTime(timeLeft)}
+              {formatTime(timerState.timeLeft)}
             </div>
             
             {/* Progress Bar */}
@@ -504,7 +299,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
 
           {/* Controls */}
           <div className="flex items-center justify-center space-x-4 mb-4">
-            <Tooltip content={isRunning ? "Pause" : "Start"} position="top">
+            <Tooltip content={timerState.isRunning ? "Pause" : "Start"} position="top">
               <button
                 onClick={toggleTimer}
                 className="p-4 rounded-full shadow-lg transition-transform hover:scale-110"
@@ -513,7 +308,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
                   color: 'white',
                 }}
               >
-                {isRunning ? (
+                {timerState.isRunning ? (
                   <Pause className="w-6 h-6" />
                 ) : (
                   <Play className="w-6 h-6" />
@@ -555,13 +350,13 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
               <div style={{ color: 'var(--color-text-secondary)' }}>
                 <span className="font-medium">Sessions:</span>{' '}
                 <span className="font-bold" style={{ color: getModeColor() }}>
-                  {completedSessions}
+                  {timerState.completedSessions}
                 </span>
               </div>
               <div style={{ color: 'var(--color-text-secondary)' }}>
                 <span className="font-medium">Until long break:</span>{' '}
                 <span className="font-bold" style={{ color: getModeColor() }}>
-                  {settings.sessionsUntilLongBreak - (completedSessions % settings.sessionsUntilLongBreak)}
+                  {settings.sessionsUntilLongBreak - (timerState.completedSessions % settings.sessionsUntilLongBreak)}
                 </span>
               </div>
             </div>
