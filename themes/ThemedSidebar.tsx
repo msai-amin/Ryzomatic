@@ -444,37 +444,46 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           </div>
 
           {/* Related Documents Section */}
-          {currentDocument && (
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 
-                  className="text-lg font-semibold"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
-                  Related Documents
-                </h3>
-                <button
-                  onClick={() => toggleSection('related')}
-                  className="p-1 rounded transition-colors"
-                  style={{ color: 'var(--color-text-secondary)' }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  {sectionsExpanded.related ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </button>
-              </div>
-              
-              {sectionsExpanded.related && (
-                <RelatedDocumentsPanel
-                  relatedDocuments={relatedDocuments}
-                  isLoading={relatedDocsLoading}
-                  onAddRelatedDocument={handleAddRelatedDocument}
-                  onPreviewDocument={handlePreviewDocument}
-                  onDeleteRelationship={handleDeleteRelationship}
-                />
-              )}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 
+                className="text-lg font-semibold"
+                style={{ color: 'var(--color-text-primary)' }}
+              >
+                Related Documents
+              </h3>
+              <button
+                onClick={() => toggleSection('related')}
+                className="p-1 rounded transition-colors"
+                style={{ color: 'var(--color-text-secondary)' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                {sectionsExpanded.related ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
             </div>
-          )}
+            
+            {sectionsExpanded.related && (
+              <>
+                {currentDocument ? (
+                  <RelatedDocumentsPanel
+                    relatedDocuments={relatedDocuments}
+                    isLoading={relatedDocsLoading}
+                    onAddRelatedDocument={handleAddRelatedDocument}
+                    onPreviewDocument={handlePreviewDocument}
+                    onDeleteRelationship={handleDeleteRelationship}
+                  />
+                ) : (
+                  <div className="text-center py-6">
+                    <FileText className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--color-text-tertiary)' }} />
+                    <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                      Open a document to see related documents
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
           {/* Productivity Stats Section */}
           <div className="mb-6">
