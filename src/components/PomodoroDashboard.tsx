@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, Calendar, Clock, Target, Trophy, Flame, TrendingUp, BarChart3, PieChart, Activity } from 'lucide-react'
 import { pomodoroGamificationService, Achievement, StreakInfo, AchievementProgress } from '../services/pomodoroGamificationService'
+import { pomodoroService } from '../services/pomodoroService'
 import { useAppStore } from '../store/appStore'
 
 interface PomodoroDashboardProps {
@@ -21,13 +22,21 @@ interface DocumentStats {
   percentage: number
 }
 
+interface PomodoroStats {
+  totalSessions: number
+  totalMinutes: number
+  averageSessionLength: number
+  currentStreak: number
+  weeklyData: WeeklyData[]
+  documentStats: DocumentStats[]
+}
+
 export const PomodoroDashboard: React.FC<PomodoroDashboardProps> = ({ isOpen, onClose }) => {
-  const { user } = useAppStore()
+  const { user, documents } = useAppStore()
   const [achievements, setAchievements] = useState<Achievement[]>([])
   const [streak, setStreak] = useState<StreakInfo | null>(null)
   const [progress, setProgress] = useState<AchievementProgress[]>([])
-  const [weeklyData, setWeeklyData] = useState<WeeklyData[]>([])
-  const [documentStats, setDocumentStats] = useState<DocumentStats[]>([])
+  const [pomodoroStats, setPomodoroStats] = useState<PomodoroStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -35,7 +44,7 @@ export const PomodoroDashboard: React.FC<PomodoroDashboardProps> = ({ isOpen, on
     if (isOpen && user) {
       loadDashboardData()
     }
-  }, [isOpen, user])
+  }, [isOpen, user, documents])
 
   const loadDashboardData = async () => {
     if (!user) return
@@ -44,19 +53,19 @@ export const PomodoroDashboard: React.FC<PomodoroDashboardProps> = ({ isOpen, on
       setLoading(true)
       setError(null)
 
+      // Load gamification data
       const [achievementsData, streakData, progressData] = await Promise.all([
-        pomodoroGamificationService.getUserAchievements(user.id),
-        pomodoroGamificationService.getUserStreak(user.id),
-        pomodoroGamificationService.getAchievementProgress(user.id)
+        pomodoroGamificationService.getUserAchievements(user.id).catch(() => []),
+        pomodoroGamificationService.getUserStreak(user.id).catch(() => null),
+        pomodoroGamificationService.getAchievementProgress(user.id).catch(() => [])
       ])
 
       setAchievements(achievementsData)
       setStreak(streakData)
       setProgress(progressData)
 
-      // Generate mock weekly data for now
-      setWeeklyData(generateMockWeeklyData())
-      setDocumentStats(generateMockDocumentStats())
+      // Load real Pomodoro stats
+      await loadPomodoroStats()
 
     } catch (err) {
       console.error('Error loading dashboard data:', err)
@@ -66,36 +75,87 @@ export const PomodoroDashboard: React.FC<PomodoroDashboardProps> = ({ isOpen, on
     }
   }
 
-  const generateMockWeeklyData = (): WeeklyData[] => {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    return days.map((day, index) => ({
-      day,
-      sessions: Math.floor(Math.random() * 8) + 1,
-      minutes: Math.floor(Math.random() * 200) + 25
-    }))
-  }
+  const loadPomodoroStats = async () => {
+    if (!user) return
 
-  const generateMockDocumentStats = (): DocumentStats[] => {
-    return [
-      { name: 'Research Paper.pdf', sessions: 15, minutes: 375, percentage: 35 },
-      { name: 'Literature Review.docx', sessions: 12, minutes: 300, percentage: 28 },
-      { name: 'Methodology Notes.pdf', sessions: 8, minutes: 200, percentage: 19 },
-      { name: 'Data Analysis.pdf', sessions: 6, minutes: 150, percentage: 14 },
-      { name: 'Conclusion.docx', sessions: 4, minutes: 100, percentage: 4 }
-    ]
+    try {
+      // Get daily stats for the past 7 days
+      const dailyStats = await pomodoroService.getDailyStats(user.id, 7)
+      
+      // Calculate totals
+      const totalSessions = dailyStats.reduce((sum, day) => sum + day.totalSessions, 0)
+      const totalMinutes = dailyStats.reduce((sum, day) => sum + day.totalMinutes, 0)
+      const averageSessionLength = totalSessions > 0 ? Math.round(totalMinutes / totalSessions) : 0
+
+      // Get current streak
+      const currentStreak = streak?.current_streak || 0
+
+      // Format weekly data
+      const weeklyData: WeeklyData[] = dailyStats.map(stat => ({
+        day: new Date(stat.date).toLocaleDateString('en-US', { weekday: 'short' }),
+        sessions: stat.totalSessions,
+        minutes: stat.totalMinutes
+      }))
+
+      // Get document stats
+      const documentStats: DocumentStats[] = []
+      for (const doc of documents) {
+        const bookStats = await pomodoroService.getBookStats(doc.id)
+        if (bookStats) {
+          documentStats.push({
+            name: doc.name,
+            sessions: bookStats.total_sessions,
+            minutes: Math.round(bookStats.total_time_minutes),
+            percentage: totalMinutes > 0 ? Math.round((bookStats.total_time_minutes / totalMinutes) * 100) : 0
+          })
+        }
+      }
+
+      setPomodoroStats({
+        totalSessions,
+        totalMinutes,
+        averageSessionLength,
+        currentStreak,
+        weeklyData,
+        documentStats
+      })
+
+    } catch (error) {
+      console.error('Error loading Pomodoro stats:', error)
+      // Set default values if API fails
+      setPomodoroStats({
+        totalSessions: 0,
+        totalMinutes: 0,
+        averageSessionLength: 0,
+        currentStreak: 0,
+        weeklyData: [],
+        documentStats: []
+      })
+    }
   }
 
   const getTotalSessions = () => {
-    return progress.reduce((sum, p) => sum + p.current_progress, 0)
+    return pomodoroStats?.totalSessions || 0
   }
 
   const getTotalMinutes = () => {
-    return getTotalSessions() * 25 // Assuming 25 minutes per session
+    return pomodoroStats?.totalMinutes || 0
   }
 
   const getAverageSessionLength = () => {
-    const totalSessions = getTotalSessions()
-    return totalSessions > 0 ? Math.round(getTotalMinutes() / totalSessions) : 0
+    return pomodoroStats?.averageSessionLength || 0
+  }
+
+  const getCurrentStreak = () => {
+    return pomodoroStats?.currentStreak || 0
+  }
+
+  const getWeeklyData = () => {
+    return pomodoroStats?.weeklyData || []
+  }
+
+  const getDocumentStats = () => {
+    return pomodoroStats?.documentStats || []
   }
 
   const getStreakStatus = () => {
@@ -229,7 +289,7 @@ export const PomodoroDashboard: React.FC<PomodoroDashboardProps> = ({ isOpen, on
                     </div>
                     <div>
                       <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Current Streak</p>
-                      <p className="text-2xl font-bold">{streak?.current_streak || 0}</p>
+                      <p className="text-2xl font-bold">{getCurrentStreak()}</p>
                     </div>
                   </div>
                 </div>
@@ -242,7 +302,7 @@ export const PomodoroDashboard: React.FC<PomodoroDashboardProps> = ({ isOpen, on
                   <span>This Week</span>
                 </h3>
                 <div className="space-y-3">
-                  {weeklyData.map((day, index) => (
+                  {getWeeklyData().map((day, index) => (
                     <div key={day.day} className="flex items-center space-x-4">
                       <div className="w-12 text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
                         {day.day}
@@ -276,7 +336,7 @@ export const PomodoroDashboard: React.FC<PomodoroDashboardProps> = ({ isOpen, on
                   <span>Document Breakdown</span>
                 </h3>
                 <div className="space-y-3">
-                  {documentStats.map((doc, index) => (
+                  {getDocumentStats().map((doc, index) => (
                     <div key={doc.name} className="flex items-center space-x-4">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
                            style={{ backgroundColor: `hsl(${index * 60}, 70%, 50%)` }}>
