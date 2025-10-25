@@ -31,7 +31,7 @@ interface DocumentWithProgress {
 }
 
 export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, refreshTrigger }) => {
-  const { currentDocument, user, showPomodoroDashboard, setShowPomodoroDashboard, documents: appDocuments, setCurrentDocument, relatedDocuments, setRelatedDocuments, relatedDocumentsRefreshTrigger, refreshRelatedDocuments } = useAppStore()
+  const { currentDocument, user, showPomodoroDashboard, setShowPomodoroDashboard, documents: appDocuments, setCurrentDocument, relatedDocuments, setRelatedDocuments, relatedDocumentsRefreshTrigger, refreshRelatedDocuments, recentlyViewedDocuments } = useAppStore()
   const [pomodoroStats, setPomodoroStats] = useState<{ [key: string]: { timeMinutes: number, sessions: number } }>({})
   const [streak, setStreak] = useState<StreakInfo | null>(null)
   const [achievements, setAchievements] = useState<Achievement[]>([])
@@ -52,73 +52,43 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
     activity: false
   })
 
-  // Load user documents from database
+  // Convert recently viewed documents to display format
   useEffect(() => {
-    console.log('ThemedSidebar: useEffect triggered with dependencies:', { user: !!user, currentDocumentId: currentDocument?.id, refreshTrigger })
+    console.log('ThemedSidebar: Converting recently viewed documents:', recentlyViewedDocuments.length)
     
-    const loadUserDocuments = async () => {
-      if (!user) {
-        console.log('ThemedSidebar: No user, skipping document load')
-        return
+    const documentsWithProgress: DocumentWithProgress[] = recentlyViewedDocuments.map(doc => {
+      // Calculate reading progress - simplified since we don't have current page info
+      let progress = 0
+      // For now, we'll set a default progress or calculate based on content length
+      if (doc.totalPages) {
+        // Estimate progress based on content length vs total pages
+        const avgCharsPerPage = 2000 // Rough estimate
+        const estimatedPagesRead = Math.min(doc.totalPages, Math.floor(doc.content.length / avgCharsPerPage))
+        progress = Math.round((estimatedPagesRead / doc.totalPages) * 100)
       }
       
-      console.log('ThemedSidebar: Loading documents for user:', user.id, 'refreshTrigger:', refreshTrigger)
+      // Calculate estimated reading time (simplified calculation)
+      const readingTimeMinutes = Math.max(1, Math.round(progress * 0.5)) // Rough estimate
+      const readingTime = readingTimeMinutes < 60 
+        ? `${readingTimeMinutes} min` 
+        : `${Math.round(readingTimeMinutes / 60)} hours`
       
-      try {
-        // Test the API call first
-        console.log('ThemedSidebar: Testing userBooks.list API call...')
-        const { data: dbDocuments, error } = await userBooks.list(user.id)
-        console.log('ThemedSidebar: API call completed. Data:', dbDocuments, 'Error:', error)
-        
-        if (error) {
-          console.error('ThemedSidebar: Error loading documents:', error)
-          return
-        }
-        
-        console.log('ThemedSidebar: Loaded documents from database:', dbDocuments?.length || 0, 'documents')
-        
-        if (dbDocuments) {
-          const documentsWithProgress: DocumentWithProgress[] = dbDocuments.map(doc => {
-            // Calculate reading progress based on last_read_page and total_pages
-            let progress = 0
-            if (doc.total_pages && doc.last_read_page) {
-              progress = Math.round((doc.last_read_page / doc.total_pages) * 100)
-            } else if (doc.reading_progress) {
-              progress = Math.round(doc.reading_progress)
-            }
-            
-            // Calculate estimated reading time (simplified calculation)
-            const readingTimeMinutes = Math.max(1, Math.round(progress * 0.5)) // Rough estimate
-            const readingTime = readingTimeMinutes < 60 
-              ? `${readingTimeMinutes} min` 
-              : `${Math.round(readingTimeMinutes / 60)} hours`
-            
-            return {
-              id: doc.id,
-              name: doc.title || doc.file_name || 'Untitled Document',
-              progress,
-              readingTime,
-              isActive: currentDocument?.id === doc.id,
-              type: doc.file_type === 'pdf' ? 'pdf' : 'text',
-              uploadedAt: doc.created_at,
-              totalPages: doc.total_pages,
-              currentPage: doc.last_read_page
-            }
-          })
-          
-          console.log('ThemedSidebar: Setting userDocuments:', documentsWithProgress.length, 'documents')
-          setUserDocuments(documentsWithProgress)
-        } else {
-          console.log('ThemedSidebar: No documents found in database')
-          setUserDocuments([])
-        }
-      } catch (error) {
-        console.error('ThemedSidebar: Error loading user documents:', error)
+      return {
+        id: doc.id,
+        name: doc.name,
+        progress,
+        readingTime,
+        isActive: currentDocument?.id === doc.id,
+        type: doc.type,
+        uploadedAt: doc.uploadedAt.toISOString(),
+        totalPages: doc.totalPages,
+        currentPage: undefined // Not available in Document interface
       }
-    }
+    })
     
-    loadUserDocuments()
-  }, [user, currentDocument?.id, refreshTrigger])
+    console.log('ThemedSidebar: Setting recently viewed documents:', documentsWithProgress.length, 'documents')
+    setUserDocuments(documentsWithProgress)
+  }, [recentlyViewedDocuments, currentDocument?.id])
 
   // Load Pomodoro stats for real documents
   useEffect(() => {
@@ -314,14 +284,14 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
             </button>
           </div>
 
-          {/* Document Library Section */}
+          {/* Recently Viewed Section */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 
                 className="text-lg font-semibold"
                 style={{ color: 'var(--color-text-primary)' }}
               >
-                Document Library
+                Recently Viewed
               </h2>
               <button
                 onClick={() => toggleSection('library')}
@@ -341,7 +311,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
                   <div className="text-center py-8">
                     <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" style={{ color: 'var(--color-text-tertiary)' }} />
                     <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                      No documents yet. Upload your first document to get started!
+                      No recently viewed documents. Open a document to see it here!
                     </p>
                   </div>
                 ) : (

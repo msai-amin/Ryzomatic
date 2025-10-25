@@ -204,6 +204,10 @@ interface AppState {
   relatedDocuments: DocumentRelationshipWithDetails[]
   relatedDocumentsRefreshTrigger: number
   
+  // Recently Viewed Documents state
+  recentlyViewedDocuments: Document[]
+  maxRecentlyViewed: number
+  
   // Actions
   setUser: (user: AuthUser | null) => void
   setAuthenticated: (authenticated: boolean) => void
@@ -255,6 +259,10 @@ interface AppState {
   // Related Documents actions
   setRelatedDocuments: (documents: DocumentRelationshipWithDetails[]) => void
   refreshRelatedDocuments: () => void
+  
+  // Recently Viewed Documents actions
+  addToRecentlyViewed: (document: Document) => void
+  clearRecentlyViewed: () => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -346,6 +354,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Related Documents state
   relatedDocuments: [],
   relatedDocumentsRefreshTrigger: 0,
+  
+  // Recently Viewed Documents state
+  recentlyViewedDocuments: [],
+  maxRecentlyViewed: 8, // Best practice: 5-10 documents
   
   // Authentication actions
   setUser: (user) => set({ user }),
@@ -492,6 +504,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       
       set({ currentDocument: sanitizedDocument });
+      
+      // Add to recently viewed documents
+      get().addToRecentlyViewed(sanitizedDocument);
     } else {
       set({ currentDocument: document });
     }
@@ -678,6 +693,31 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({
       relatedDocumentsRefreshTrigger: state.relatedDocumentsRefreshTrigger + 1
     }))
+  },
+  
+  // Recently Viewed Documents actions
+  addToRecentlyViewed: (document) => {
+    set((state) => {
+      const { recentlyViewedDocuments, maxRecentlyViewed } = state
+      
+      // Remove document if it already exists (to avoid duplicates)
+      const filtered = recentlyViewedDocuments.filter(doc => doc.id !== document.id)
+      
+      // Add document to the beginning of the array
+      const updated = [document, ...filtered]
+      
+      // Keep only the maximum number of recently viewed documents
+      const limited = updated.slice(0, maxRecentlyViewed)
+      
+      console.log(`AppStore: Added document "${document.name}" to recently viewed. Total: ${limited.length}`)
+      
+      return { recentlyViewedDocuments: limited }
+    })
+  },
+  
+  clearRecentlyViewed: () => {
+    console.log('AppStore: Clearing recently viewed documents')
+    set({ recentlyViewedDocuments: [] })
   }
 }))
 
