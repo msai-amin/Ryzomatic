@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Highlighter, X } from 'lucide-react'
-import { AnnotationColorPicker } from '../themes/ThemeProvider'
+import { AnnotationColorPicker } from '../../themes/ThemeProvider'
 import { Tooltip } from './Tooltip'
 
 interface HighlightColorPopoverProps {
