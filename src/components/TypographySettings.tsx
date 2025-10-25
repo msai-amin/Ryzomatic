@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Type, Palette, AlignLeft, AlignJustify, AlignCenter, Space, Eye, Crosshair, Calculator, RefreshCw } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { getCacheStats, clearFormulaCache } from '../services/formulaService'
@@ -66,7 +67,7 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 flex items-start justify-center z-[9999] pt-20 pb-8 px-4 overflow-y-auto" style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}>
       <div className="rounded-xl shadow-xl max-w-2xl w-full mx-4 animate-scale-in my-auto" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -319,7 +320,8 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
