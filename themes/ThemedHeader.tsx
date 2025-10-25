@@ -186,7 +186,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             </>
           )}
           
-          <Tooltip content="Reading Settings" position="bottom">
+          <Tooltip content="Settings" position="bottom">
             <button
               data-tour="settings-button"
               onClick={() => setShowSettings(true)}
@@ -194,7 +194,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
               style={{ color: 'var(--color-text-primary)' }}
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              aria-label="Reading Settings"
+              aria-label="Settings"
             >
               <Settings className="w-5 h-5" />
             </button>
