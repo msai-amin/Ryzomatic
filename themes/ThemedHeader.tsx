@@ -1,9 +1,10 @@
 import React from 'react'
-import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut, Menu, Bot, Sparkles } from 'lucide-react'
+import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut, Menu, Bot, Sparkles, Timer } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { TypographySettings } from '../src/components/TypographySettings'
 import { ModernLibraryModal } from '../src/components/ModernLibraryModal'
 import { AuthModal } from '../src/components/AuthModal'
+import { PomodoroTimer } from '../src/components/PomodoroTimer'
 import { Tooltip } from '../src/components/Tooltip'
 import { useTheme } from './ThemeProvider'
 
@@ -22,11 +23,16 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     logout,
     libraryRefreshTrigger,
     pdfViewer,
-    isChatOpen
+    isChatOpen,
+    pomodoroIsRunning,
+    pomodoroTimeLeft,
+    hasSeenPomodoroTour
   } = useAppStore()
   const [showSettings, setShowSettings] = React.useState(false)
   const [showLibrary, setShowLibrary] = React.useState(false)
   const [showAuth, setShowAuth] = React.useState(false)
+  const [showPomodoro, setShowPomodoro] = React.useState(false)
+  const pomodoroButtonRef = React.useRef<HTMLButtonElement>(null)
 
   const { currentTheme } = useTheme()
 
@@ -179,6 +185,30 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             </Tooltip>
           )}
 
+          {/* Pomodoro Timer Button - Only show when user is authenticated and has a document */}
+          {user && currentDocument && (
+            <Tooltip content={pomodoroIsRunning ? `Timer Running: ${Math.floor((pomodoroTimeLeft || 0) / 60)}:${String((pomodoroTimeLeft || 0) % 60).padStart(2, '0')}` : "Pomodoro Timer - Stay Focused"} position="bottom">
+              <button
+                ref={pomodoroButtonRef}
+                data-tour="pomodoro-button"
+                onClick={() => setShowPomodoro(!showPomodoro)}
+                className={`p-2 rounded-lg transition-all duration-300 text-2xl leading-none relative ${
+                  pomodoroIsRunning ? 'animate-pulse-slow' : ''
+                } ${!hasSeenPomodoroTour ? 'animate-pulse ring-2 ring-blue-500 ring-opacity-50' : ''}`}
+                style={{
+                  backgroundColor: showPomodoro ? 'var(--color-primary-light)' : 'transparent',
+                  border: showPomodoro ? '2px solid var(--color-primary)' : 'none',
+                }}
+                aria-label={pomodoroIsRunning ? `Pomodoro Timer Running: ${Math.floor((pomodoroTimeLeft || 0) / 60)}:${String((pomodoroTimeLeft || 0) % 60).padStart(2, '0')}` : "Open Pomodoro Timer"}
+              >
+                🍅
+                {pomodoroIsRunning && !showPomodoro && (
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+                )}
+              </button>
+            </Tooltip>
+          )}
+
           {/* AI Assistant Button */}
           <Tooltip content="AI Assistant - Ask questions about your documents" position="bottom">
             <button
@@ -290,6 +320,26 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
 
       {showSettings && (
         <TypographySettings onClose={() => setShowSettings(false)} />
+      )}
+
+      {/* Pomodoro Timer Modal */}
+      {showPomodoro && currentDocument && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black bg-opacity-50"
+            onClick={() => setShowPomodoro(false)}
+          />
+          
+          {/* Pomodoro Timer */}
+          <div className="relative">
+            <PomodoroTimer 
+              documentId={currentDocument.id}
+              documentName={currentDocument.name}
+              onClose={() => setShowPomodoro(false)}
+            />
+          </div>
+        </div>
       )}
     </header>
   )
