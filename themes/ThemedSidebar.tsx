@@ -7,7 +7,7 @@ import { pomodoroGamificationService, StreakInfo, Achievement } from '../src/ser
 import { AchievementPanel } from '../src/components/AchievementPanel'
 import { PomodoroDashboard } from '../src/components/PomodoroDashboard'
 import { useTheme } from './ThemeProvider'
-import { documents } from '../lib/supabase'
+import { userBooks } from '../lib/supabase'
 
 interface ThemedSidebarProps {
   isOpen: boolean
@@ -47,7 +47,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
       if (!user) return
       
       try {
-        const { data: dbDocuments, error } = await documents.list(user.id)
+        const { data: dbDocuments, error } = await userBooks.list(user.id)
         
         if (error) {
           console.error('Error loading documents:', error)
@@ -56,10 +56,10 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
         
         if (dbDocuments) {
           const documentsWithProgress: DocumentWithProgress[] = dbDocuments.map(doc => {
-            // Calculate reading progress based on current page and total pages
+            // Calculate reading progress based on last_read_page and total_pages
             let progress = 0
-            if (doc.total_pages && doc.current_page) {
-              progress = Math.round((doc.current_page / doc.total_pages) * 100)
+            if (doc.total_pages && doc.last_read_page) {
+              progress = Math.round((doc.last_read_page / doc.total_pages) * 100)
             } else if (doc.reading_progress) {
               progress = Math.round(doc.reading_progress)
             }
@@ -79,7 +79,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
               type: doc.file_type === 'pdf' ? 'pdf' : 'text',
               uploadedAt: doc.created_at,
               totalPages: doc.total_pages,
-              currentPage: doc.current_page
+              currentPage: doc.last_read_page
             }
           })
           
@@ -154,7 +154,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
       
       if (!documentToLoad) {
         // Load document from database if not in app store
-        const { data: dbDoc, error } = await documents.get(doc.id)
+        const { data: dbDoc, error } = await userBooks.get(doc.id)
         if (error || !dbDoc) {
           console.error('Error loading document:', error)
           return
@@ -164,11 +164,11 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
         documentToLoad = {
           id: dbDoc.id,
           name: dbDoc.title || dbDoc.file_name || 'Untitled Document',
-          content: dbDoc.content || '',
+          content: dbDoc.text_content || '',
           type: dbDoc.file_type === 'pdf' ? 'pdf' : 'text',
           uploadedAt: new Date(dbDoc.created_at),
           totalPages: dbDoc.total_pages,
-          pageTexts: dbDoc.page_texts || [],
+          pageTexts: [], // Will be loaded separately when needed
           highlights: [],
           highlightsLoaded: false
         }
