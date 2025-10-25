@@ -65,8 +65,8 @@ const ThemedAppContent: React.FC = () => {
       )}
 
 
-      {/* Pomodoro Bottom Bar - Always visible when user is authenticated */}
-      {user && (
+      {/* Pomodoro Bottom Bar - Visible when user is authenticated and has uploaded a file */}
+      {user && currentDocument && (
         <PomodoroBottomBar 
           onExpand={() => {
             // Open the full Pomodoro timer in the header
