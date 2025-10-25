@@ -6,7 +6,6 @@ import { ThemedMainContent } from './ThemedMainContent'
 import { DocumentViewer } from '../src/components/DocumentViewer'
 import { ChatPanel } from '../src/components/ChatPanel'
 import { DocumentUpload } from '../src/components/DocumentUpload'
-import { PomodoroFloatingWidget } from '../src/components/PomodoroFloatingWidget'
 import { PomodoroBottomBar } from '../src/components/PomodoroBottomBar'
 import { useAchievementToasts } from '../src/components/AchievementToast'
 import { useAppStore } from '../src/store/appStore'
@@ -16,7 +15,6 @@ import { OnboardingProvider, OnboardingOverlay, ContextualHelp } from '../src/co
 const ThemedAppContent: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [showUpload, setShowUpload] = useState(false)
-  const [showPomodoroWidget, setShowPomodoroWidget] = useState(true)
   const { currentTheme } = useTheme()
   const { isChatOpen, toggleChat, user, currentDocument, pomodoroIsRunning } = useAppStore()
   const { showAchievement, AchievementToastContainer } = useAchievementToasts()
@@ -80,20 +78,6 @@ const ThemedAppContent: React.FC = () => {
         />
       )}
 
-      {/* Pomodoro Floating Widget - Only visible when not expanded and bottom bar is collapsed */}
-      {user && showPomodoroWidget && (
-        <PomodoroFloatingWidget 
-          onExpand={() => {
-            // Hide the floating widget
-            setShowPomodoroWidget(false)
-            // Open the full Pomodoro timer in the header
-            const pomodoroButton = document.querySelector('[data-tour="pomodoro-button"]') as HTMLElement
-            if (pomodoroButton) {
-              pomodoroButton.click()
-            }
-          }}
-        />
-      )}
 
       {/* Achievement Toast Container */}
       <AchievementToastContainer />
