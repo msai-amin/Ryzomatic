@@ -48,11 +48,34 @@ export const HighlightColorPopover: React.FC<HighlightColorPopoverProps> = ({
     if (isOpen && triggerRef.current && popoverRef.current) {
       const triggerRect = triggerRef.current.getBoundingClientRect()
       const popover = popoverRef.current
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
       
-      // Position above the trigger button
+      // Calculate initial position (above the trigger button)
+      let top = triggerRect.top - popover.offsetHeight - 8
+      let left = triggerRect.left + triggerRect.width / 2 - popover.offsetWidth / 2
+      
+      // Adjust horizontal position to stay within viewport
+      if (left < 10) {
+        left = 10
+      } else if (left + popover.offsetWidth > viewportWidth - 10) {
+        left = viewportWidth - popover.offsetWidth - 10
+      }
+      
+      // Adjust vertical position to stay within viewport
+      if (top < 10) {
+        // If not enough space above, position below the trigger
+        top = triggerRect.bottom + 8
+      }
+      
+      // Ensure popover doesn't go below viewport
+      if (top + popover.offsetHeight > viewportHeight - 10) {
+        top = viewportHeight - popover.offsetHeight - 10
+      }
+      
       popover.style.position = 'fixed'
-      popover.style.top = `${triggerRect.top - popover.offsetHeight - 8}px`
-      popover.style.left = `${triggerRect.left + triggerRect.width / 2 - popover.offsetWidth / 2}px`
+      popover.style.top = `${top}px`
+      popover.style.left = `${left}px`
       popover.style.zIndex = '9999'
     }
   }, [isOpen, triggerRef])
