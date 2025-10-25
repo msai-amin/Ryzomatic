@@ -36,7 +36,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
       {currentDocument && (
         <button
           onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
-          className="fixed top-24 right-4 p-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 z-40"
+          className="fixed top-24 right-4 p-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 z-50"
           style={{
             backgroundColor: 'var(--color-primary)',
             color: 'var(--color-text-inverse)',
@@ -45,7 +45,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
           title={isRightSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
           aria-label={isRightSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
         >
-          {isRightSidebarOpen ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+          <ChevronLeft className="w-5 h-5" />
         </button>
       )}
 
@@ -68,7 +68,24 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
               visibility: isRightSidebarOpen ? 'visible' : 'hidden',
             }}
           >
-          <div className="flex items-center justify-between mb-6">
+            {/* Close Button */}
+            <div className="flex justify-end mb-4">
+              <button
+                onClick={() => setIsRightSidebarOpen(false)}
+                className="p-2 rounded-lg transition-all duration-300 hover:scale-110 shadow-md hover:shadow-lg"
+                style={{
+                  backgroundColor: 'var(--color-surface-hover)',
+                  color: 'var(--color-text-primary)',
+                  border: '1px solid var(--color-border)',
+                }}
+                aria-label="Close sidebar"
+                title="Close sidebar"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between mb-6">
             <h2 
               className="text-lg font-semibold"
               style={{ color: 'var(--color-text-primary)' }}
