@@ -102,7 +102,7 @@ const ThemedAppContent: React.FC = () => {
 
       {/* Theme Switcher (for development/testing) */}
       <div 
-        className="fixed top-20 right-4 z-50"
+        className="fixed top-24 right-4 z-50"
         style={{ display: process.env.NODE_ENV === 'development' ? 'block' : 'none' }}
       >
         <ThemeSwitcher />

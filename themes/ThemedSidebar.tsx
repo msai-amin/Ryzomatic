@@ -241,7 +241,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
       {!isOpen && (
         <button
           onClick={onToggle}
-          className="fixed top-20 left-4 z-50 p-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
+          className="fixed top-24 left-4 z-50 p-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
           style={{
             backgroundColor: 'var(--color-primary)',
             color: 'var(--color-text-inverse)',
