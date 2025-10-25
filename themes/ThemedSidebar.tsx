@@ -43,6 +43,8 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
 
   // Load user documents from database
   useEffect(() => {
+    console.log('ThemedSidebar: useEffect triggered with dependencies:', { user: !!user, currentDocumentId: currentDocument?.id, libraryRefreshTrigger })
+    
     const loadUserDocuments = async () => {
       if (!user) {
         console.log('ThemedSidebar: No user, skipping document load')
@@ -52,7 +54,10 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
       console.log('ThemedSidebar: Loading documents for user:', user.id, 'refreshTrigger:', libraryRefreshTrigger)
       
       try {
+        // Test the API call first
+        console.log('ThemedSidebar: Testing userBooks.list API call...')
         const { data: dbDocuments, error } = await userBooks.list(user.id)
+        console.log('ThemedSidebar: API call completed. Data:', dbDocuments, 'Error:', error)
         
         if (error) {
           console.error('ThemedSidebar: Error loading documents:', error)
