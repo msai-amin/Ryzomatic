@@ -677,6 +677,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       setLastRenderedDocId(document.id)
     }
   }, [document.id, lastRenderedDocId])
+
+  // Handle scroll mode changes - reset cache when switching TO continuous mode
+  useEffect(() => {
+    // Only reset when switching TO continuous mode (not FROM it)
+    if (pdfViewer.scrollMode === 'continuous' && !continuousModeRendered) {
+      console.log('🔄 Switching to continuous mode, resetting cache')
+      setContinuousModeRendered(false)
+    }
+  }, [pdfViewer.scrollMode])
   
   // Render all pages (continuous scroll mode)
   useEffect(() => {
@@ -853,7 +862,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     }
 
     renderAllPages()
-  }, [pdfViewer.readingMode, numPages, scale, rotation, continuousModeRendered])
+  }, [pdfViewer.scrollMode, pdfViewer.readingMode, numPages, scale, rotation, continuousModeRendered])
   
   // Force text layer interactivity after any render (additional safety net)
   useEffect(() => {
