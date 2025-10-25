@@ -78,6 +78,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     // Check if relationship already exists
     if (!supabase) {
       console.error('Supabase client not initialized');
+      console.error('Environment variables:', {
+        supabaseUrl: !!supabaseUrl,
+        supabaseAnonKey: !!supabaseAnonKey
+      });
       return res.status(500).json({ error: 'Database not initialized' });
     }
     
@@ -119,7 +123,17 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 
     if (error) {
       console.error('Error creating relationship:', error);
-      return res.status(500).json({ error: 'Failed to create relationship', details: error.message });
+      console.error('Error details:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+      return res.status(500).json({ 
+        error: 'Failed to create relationship', 
+        details: error.message,
+        code: error.code
+      });
     }
     
     console.log('Relationship created successfully:', relationship);
