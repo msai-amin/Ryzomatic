@@ -23,7 +23,8 @@ import {
   MousePointer2,
   Type,
   Upload,
-  Library
+  Library,
+  MoreVertical
 } from 'lucide-react'
 import { useAppStore, Document as DocumentType } from '../store/appStore'
 import { ttsManager } from '../services/ttsManager'
@@ -42,6 +43,8 @@ import { convertMultipleFormulas } from '../services/formulaService'
 import { highlightService, Highlight as HighlightType } from '../services/highlightService'
 import { HighlightColorPicker } from './HighlightColorPicker'
 import { HighlightManagementPanel } from './HighlightManagementPanel'
+import { HighlightColorPopover } from './HighlightColorPopover'
+import { PDFToolbarMoreMenu } from './PDFToolbarMoreMenu'
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 
@@ -309,6 +312,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   } | null>(null)
   const [highlights, setHighlights] = useState<HighlightType[]>([])
   const [isHighlightMode, setIsHighlightMode] = useState(false)
+  const [showHighlightColorPopover, setShowHighlightColorPopover] = useState(false)
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const [currentHighlightColor, setCurrentHighlightColor] = useState('#FFD700')
   const [highlightDragStart, setHighlightDragStart] = useState<{ x: number; y: number; pageNumber: number } | null>(null)
   const [highlightDragCurrent, setHighlightDragCurrent] = useState<{ x: number; y: number } | null>(null)
   const [contextMenu, setContextMenu] = useState<{
@@ -321,6 +327,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   const [showLibrary, setShowLibrary] = useState<boolean>(false)
   const [showUpload, setShowUpload] = useState<boolean>(false)
   const toolbarRef = useRef<HTMLDivElement>(null)
+  const highlightColorButtonRef = useRef<HTMLButtonElement>(null)
+  const moreMenuButtonRef = useRef<HTMLButtonElement>(null)
   const [selectedTextForNote, setSelectedTextForNote] = useState<string>('')
   const [selectionMode, setSelectionMode] = useState(false)
   const [showVoiceSelector, setShowVoiceSelector] = useState(false)
@@ -1088,63 +1096,81 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
   // Process formulas for LaTeX conversion when entering reading mode
   useEffect(() => {
-    const processFormulas = async () => {
-      if (!pdfViewer.readingMode || !typography.renderFormulas || !document.pageTexts) {
-        return
-      }
+    // Debounce formula processing to prevent too frequent conversions
+    const timeoutId = setTimeout(async () => {
+      const processFormulas = async () => {
+        if (!pdfViewer.readingMode || !typography.renderFormulas || !document.pageTexts) {
+          return
+        }
 
-      // Extract formulas from all pages
-      const allFormulas: Array<{ formula: string; isBlock: boolean; marker: string; pageNum: number }> = []
-      
-      document.pageTexts?.forEach((pageText, index) => {
-        // Ensure pageText is a string
-        const safePageText = typeof pageText === 'string' ? pageText : String(pageText || '')
-        const markedFormulas = extractMarkedFormulas(safePageText)
-        markedFormulas.forEach(f => {
-          allFormulas.push({ ...f, pageNum: index + 1 })
-        })
-      })
+        // Prevent multiple simultaneous conversions
+        if (isConvertingFormulas) {
+          return
+        }
 
-      if (allFormulas.length === 0) {
-        return
-      }
-
-      // Convert formulas that aren't already cached
-      setIsConvertingFormulas(true)
-      setFormulaConversionProgress({ current: 0, total: allFormulas.length })
-
-      try {
-        const formulasToConvert = allFormulas.map(f => ({
-          text: f.formula,
-          startIndex: 0,
-          endIndex: f.formula.length,
-          isBlock: f.isBlock,
-          confidence: 1.0,
-        }))
-
-        const latexMap = await convertMultipleFormulas(
-          formulasToConvert,
-          (current, total) => {
-            setFormulaConversionProgress({ current, total })
-          }
-        )
-
-        // Store the LaTeX conversions
-        const newLatexMap = new Map<string, string>()
-        latexMap.forEach((result, formulaText) => {
-          newLatexMap.set(formulaText, result.latex)
-        })
+        // Extract formulas from all pages
+        const allFormulas: Array<{ formula: string; isBlock: boolean; marker: string; pageNum: number }> = []
         
-        setFormulaLatex(newLatexMap)
-      } catch (error) {
-        console.error('Failed to convert formulas:', error)
-      } finally {
-        setIsConvertingFormulas(false)
-      }
-    }
+        document.pageTexts?.forEach((pageText, index) => {
+          // Ensure pageText is a string
+          const safePageText = typeof pageText === 'string' ? pageText : String(pageText || '')
+          const markedFormulas = extractMarkedFormulas(safePageText)
+          markedFormulas.forEach(f => {
+            allFormulas.push({ ...f, pageNum: index + 1 })
+          })
+        })
 
-    processFormulas()
-  }, [pdfViewer.readingMode, typography.renderFormulas, document.pageTexts, document.id])
+        if (allFormulas.length === 0) {
+          return
+        }
+
+        // Filter out formulas that are already converted
+        const formulasToConvert = allFormulas
+          .filter(f => !formulaLatex.has(f.formula))
+          .map(f => ({
+            text: f.formula,
+            startIndex: 0,
+            endIndex: f.formula.length,
+            isBlock: f.isBlock,
+            confidence: 1.0,
+          }))
+
+        if (formulasToConvert.length === 0) {
+          // All formulas are already converted
+          return
+        }
+
+        // Convert formulas that aren't already cached
+        setIsConvertingFormulas(true)
+        setFormulaConversionProgress({ current: 0, total: formulasToConvert.length })
+
+        try {
+          const latexMap = await convertMultipleFormulas(
+            formulasToConvert,
+            (current, total) => {
+              setFormulaConversionProgress({ current, total })
+            }
+          )
+
+          // Store the LaTeX conversions
+          const newLatexMap = new Map(formulaLatex) // Start with existing conversions
+          latexMap.forEach((result, formulaText) => {
+            newLatexMap.set(formulaText, result.latex)
+          })
+          
+          setFormulaLatex(newLatexMap)
+        } catch (error) {
+          console.error('Failed to convert formulas:', error)
+        } finally {
+          setIsConvertingFormulas(false)
+        }
+      }
+
+      processFormulas()
+    }, 500) // 500ms debounce
+
+    return () => clearTimeout(timeoutId)
+  }, [pdfViewer.readingMode, typography.renderFormulas, document.pageTexts, document.id, isConvertingFormulas, formulaLatex])
 
   // Handle OCR retry
   // Handle saving edited text
@@ -2767,6 +2793,30 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               <Highlighter className="w-5 h-5" />
             </button>
 
+            {/* Highlight Color Picker Button */}
+            <button
+              ref={highlightColorButtonRef}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setShowHighlightColorPopover(!showHighlightColorPopover)
+              }}
+              className="p-2 rounded-lg transition-colors"
+              style={{
+                backgroundColor: showHighlightColorPopover ? 'var(--color-primary-light)' : 'transparent',
+                color: showHighlightColorPopover ? 'var(--color-primary)' : 'var(--color-text-primary)'
+              }}
+              onMouseEnter={(e) => {
+                if (!showHighlightColorPopover) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+              }}
+              onMouseLeave={(e) => {
+                if (!showHighlightColorPopover) e.currentTarget.style.backgroundColor = 'transparent'
+              }}
+              title="Highlight Colors"
+            >
+              <Highlighter className="w-5 h-5" />
+            </button>
+
             {/* Highlight Management Panel Button */}
             {highlights.length > 0 && (
               <button
@@ -2820,92 +2870,30 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
           {/* Right controls */}
           <div className="flex items-center gap-2">
-            {/* Library Button */}
+            {/* More Menu Button */}
             <button
+              ref={moreMenuButtonRef}
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                setShowLibrary(true)
+                setShowMoreMenu(!showMoreMenu)
               }}
               className="p-2 rounded-lg transition-colors"
               style={{
-                backgroundColor: 'transparent',
-                color: 'var(--color-text-primary)'
+                backgroundColor: showMoreMenu ? 'var(--color-primary-light)' : 'transparent',
+                color: showMoreMenu ? 'var(--color-primary)' : 'var(--color-text-primary)'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              title="View Library"
+              onMouseEnter={(e) => {
+                if (!showMoreMenu) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+              }}
+              onMouseLeave={(e) => {
+                if (!showMoreMenu) e.currentTarget.style.backgroundColor = 'transparent'
+              }}
+              title="More Options"
             >
-              <Library className="w-5 h-5" />
+              <MoreVertical className="w-5 h-5" />
             </button>
-
-            {/* Upload Button */}
-            <button
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setShowUpload(true)
-              }}
-              className="p-2 rounded-lg transition-colors"
-              style={{
-                backgroundColor: 'var(--color-primary)',
-                color: 'var(--color-text-inverse)'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-primary)'}
-              title="Upload New Document"
-            >
-              <Upload className="w-5 h-5" />
-            </button>
-
-            {/* Separator */}
-            <div className="w-px h-6 mx-2" style={{ backgroundColor: 'var(--color-border)' }} />
-
-            <button
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setShowNotesPanel(!showNotesPanel)
-              }}
-              className="p-2 rounded-lg transition-colors"
-                  style={{
-                    backgroundColor: showNotesPanel ? 'var(--color-primary-light)' : 'transparent',
-                    color: showNotesPanel ? 'var(--color-primary)' : 'var(--color-text-primary)'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!showNotesPanel) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!showNotesPanel) e.currentTarget.style.backgroundColor = 'transparent'
-                  }}
-              title="Notes"
-            >
-              <StickyNote className="w-5 h-5" />
-            </button>
-
-
-                <button
-              onClick={() => setShowVoiceSelector(true)}
-              className="p-2 rounded-lg transition-colors"
-                  style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              title="Select Voice"
-                >
-              <Volume2 className="w-5 h-5" />
-                </button>
-            
-                <button
-              onClick={handleDownload}
-              className="p-2 rounded-lg transition-colors"
-                  style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              title="Download"
-            >
-              <Download className="w-5 h-5" />
-                </button>
-              </div>
+          </div>
             </div>
       </div>
 
@@ -3169,6 +3157,30 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       {showUpload && (
         <DocumentUpload onClose={() => setShowUpload(false)} />
       )}
+
+      {/* Highlight Color Popover */}
+      <HighlightColorPopover
+        isOpen={showHighlightColorPopover}
+        onClose={() => setShowHighlightColorPopover(false)}
+        selectedColor={currentHighlightColor}
+        onColorSelect={setCurrentHighlightColor}
+        triggerRef={highlightColorButtonRef}
+      />
+
+      {/* More Menu */}
+      <PDFToolbarMoreMenu
+        isOpen={showMoreMenu}
+        onClose={() => setShowMoreMenu(false)}
+        onRotate={handleRotate}
+        onLibrary={() => setShowLibrary(true)}
+        onUpload={() => setShowUpload(true)}
+        onNotes={() => setShowNotesPanel(!showNotesPanel)}
+        onDownload={handleDownload}
+        onSearch={() => {/* TODO: Implement search */}}
+        onTTS={() => setShowVoiceSelector(true)}
+        onSettings={() => setShowTypographySettings(true)}
+        triggerRef={moreMenuButtonRef}
+      />
     </div>
   )
 }

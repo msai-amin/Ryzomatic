@@ -1,0 +1,108 @@
+import React, { useState, useEffect } from 'react'
+import { useTheme, ThemeSwitcher } from './ThemeProvider'
+import { ThemedHeader } from './ThemedHeader'
+import { ThemedSidebar } from './ThemedSidebar'
+import { ThemedMainContent } from './ThemedMainContent'
+import { DocumentViewer } from '../src/components/DocumentViewer'
+import { ChatPanel } from '../src/components/ChatPanel'
+import { DocumentUpload } from '../src/components/DocumentUpload'
+import { PomodoroFloatingWidget } from '../src/components/PomodoroFloatingWidget'
+import { useAchievementToasts } from '../src/components/AchievementToast'
+import { useAppStore } from '../src/store/appStore'
+import { useKeyboardShortcuts } from '../src/hooks/useKeyboardShortcuts'
+import { OnboardingProvider, OnboardingOverlay, ContextualHelp } from '../src/components/onboarding'
+
+const ThemedAppContent: React.FC = () => {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [showUpload, setShowUpload] = useState(false)
+  const [showPomodoroWidget, setShowPomodoroWidget] = useState(true)
+  const { currentTheme } = useTheme()
+  const { isChatOpen, toggleChat, user, currentDocument, pomodoroIsRunning } = useAppStore()
+  const { showAchievement, AchievementToastContainer } = useAchievementToasts()
+  
+  // Enable keyboard shortcuts
+  useKeyboardShortcuts()
+
+
+  return (
+    <OnboardingProvider>
+      <div 
+        className="min-h-screen"
+        style={{
+          backgroundColor: 'var(--color-background)',
+          color: 'var(--color-text-primary)',
+          fontFamily: 'var(--font-family-sans)',
+        }}
+      >
+      {/* Header */}
+      <ThemedHeader 
+        onUploadClick={() => setShowUpload(true)} 
+        isSidebarOpen={isSidebarOpen}
+        onSidebarToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+        onPomodoroClose={() => setShowPomodoroWidget(true)}
+      />
+
+      {/* Main Layout */}
+      <div className="flex">
+        {/* Sidebar */}
+        <ThemedSidebar 
+          isOpen={isSidebarOpen} 
+          onToggle={() => setIsSidebarOpen(!isSidebarOpen)} 
+        />
+
+        {/* Main Content */}
+        <ThemedMainContent>
+          <DocumentViewer onUploadClick={() => setShowUpload(true)} />
+        </ThemedMainContent>
+      </div>
+
+      {/* Chat Panel */}
+      {isChatOpen && (
+        <ChatPanel onClose={() => toggleChat()} />
+      )}
+
+      {/* Upload Modal */}
+      {showUpload && (
+        <DocumentUpload onClose={() => setShowUpload(false)} />
+      )}
+
+
+      {/* Pomodoro Floating Widget - Only visible when not expanded */}
+      {user && showPomodoroWidget && (
+        <PomodoroFloatingWidget 
+          onExpand={() => {
+            // Hide the floating widget
+            setShowPomodoroWidget(false)
+            // Open the full Pomodoro timer in the header
+            const pomodoroButton = document.querySelector('[data-tour="pomodoro-button"]') as HTMLElement
+            if (pomodoroButton) {
+              pomodoroButton.click()
+            }
+          }}
+        />
+      )}
+
+      {/* Achievement Toast Container */}
+      <AchievementToastContainer />
+
+      {/* Onboarding System */}
+      <OnboardingOverlay />
+      <ContextualHelp />
+
+      {/* Theme Switcher (for development/testing) */}
+      <div 
+        className="fixed top-20 right-4 z-50"
+        style={{ display: process.env.NODE_ENV === 'development' ? 'block' : 'none' }}
+      >
+        <ThemeSwitcher />
+      </div>
+      </div>
+    </OnboardingProvider>
+  )
+}
+
+export const ThemedApp: React.FC = () => {
+  return <ThemedAppContent />
+}
+
+export default ThemedApp

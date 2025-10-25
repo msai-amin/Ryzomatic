@@ -7,6 +7,7 @@ import { DocumentViewer } from '../src/components/DocumentViewer'
 import { ChatPanel } from '../src/components/ChatPanel'
 import { DocumentUpload } from '../src/components/DocumentUpload'
 import { PomodoroFloatingWidget } from '../src/components/PomodoroFloatingWidget'
+import { PomodoroBottomBar } from '../src/components/PomodoroBottomBar'
 import { useAchievementToasts } from '../src/components/AchievementToast'
 import { useAppStore } from '../src/store/appStore'
 import { useKeyboardShortcuts } from '../src/hooks/useKeyboardShortcuts'
@@ -67,7 +68,20 @@ const ThemedAppContent: React.FC = () => {
       )}
 
 
-      {/* Pomodoro Floating Widget - Only visible when not expanded */}
+      {/* Pomodoro Bottom Bar - Always visible when user is authenticated */}
+      {user && (
+        <PomodoroBottomBar 
+          onExpand={() => {
+            // Open the full Pomodoro timer in the header
+            const pomodoroButton = document.querySelector('[data-tour="pomodoro-button"]') as HTMLElement
+            if (pomodoroButton) {
+              pomodoroButton.click()
+            }
+          }}
+        />
+      )}
+
+      {/* Pomodoro Floating Widget - Only visible when not expanded and bottom bar is collapsed */}
       {user && showPomodoroWidget && (
         <PomodoroFloatingWidget 
           onExpand={() => {

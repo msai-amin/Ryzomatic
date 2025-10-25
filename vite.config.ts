@@ -119,8 +119,9 @@ export default defineConfig(({ mode }) => ({
   },
   server: {
     port: 3001,
-    host: 'localhost', // Switch back to localhost
+    host: 'localhost',
     open: true,
+    strictPort: true, // Don't try other ports if 3001 is busy
     headers: {
       'Cross-Origin-Embedder-Policy': 'unsafe-none',
       'Cross-Origin-Opener-Policy': 'unsafe-none',

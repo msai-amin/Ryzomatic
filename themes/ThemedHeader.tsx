@@ -1,5 +1,5 @@
 import React from 'react'
-import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut, Menu } from 'lucide-react'
+import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut, Menu, Bot, Sparkles } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { TypographySettings } from '../src/components/TypographySettings'
 import { ModernLibraryModal } from '../src/components/ModernLibraryModal'
@@ -26,7 +26,8 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     pomodoroIsRunning,
     pomodoroTimeLeft,
     hasSeenPomodoroTour,
-    pdfViewer
+    pdfViewer,
+    isChatOpen
   } = useAppStore()
   const [showSettings, setShowSettings] = React.useState(false)
   const [showLibrary, setShowLibrary] = React.useState(false)
@@ -203,6 +204,31 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
               </button>
             </Tooltip>
           )}
+
+          {/* AI Assistant Button */}
+          <Tooltip content="AI Assistant - Ask questions about your documents" position="bottom">
+            <button
+              data-tour="ai-assistant-button"
+              onClick={() => toggleChat()}
+              className={`btn-primary flex items-center space-x-2 transition-all duration-200 ${
+                isChatOpen ? 'ring-2 ring-blue-500 ring-opacity-50' : ''
+              }`}
+              style={{
+                backgroundColor: isChatOpen ? 'var(--color-primary-light)' : 'var(--color-primary)',
+                color: 'var(--color-text-inverse)',
+                border: 'none',
+                padding: 'var(--spacing-sm) var(--spacing-md)',
+                borderRadius: 'var(--border-radius-lg)',
+              }}
+              aria-label="Open AI Assistant"
+            >
+              <Bot className="w-4 h-4" />
+              <span>AI Assistant</span>
+              {isChatOpen && (
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              )}
+            </button>
+          </Tooltip>
 
           {/* Visual Separator */}
           <div 

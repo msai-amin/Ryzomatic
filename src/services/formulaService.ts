@@ -22,7 +22,7 @@ interface ConversionResult {
 const CACHE_KEY_PREFIX = 'formula-cache-'
 const CACHE_EXPIRY_DAYS = 30
 const MAX_CACHE_SIZE_MB = 5
-const RATE_LIMIT_MS = 4000 // 15 requests per minute = 4s per request
+const RATE_LIMIT_MS = 2000 // 30 requests per minute = 2s per request for better performance
 
 class FormulaService {
   private lastRequestTime = 0
@@ -180,20 +180,59 @@ Expression: ${formulaText}`
 - Input: "∫ f(x) dx" → Output: \\int f(x) \\, dx
 - Input: "∑(i=1 to n) i" → Output: \\sum_{i=1}^{n} i`
 
-      // Call Gemini API via our API route
-      const response = await fetch('/api/chat/stream', {
+      // Call formula conversion API endpoint
+      const response = await fetch('/api/formula/convert', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           message: prompt,
-          tier: 'free',
-          stream: false,
         }),
       })
 
       if (!response.ok) {
+        // Fallback for development when API is not available
+        if (response.status === 404 && import.meta.env.DEV) {
+          console.warn('Formula conversion API not available in development, using fallback')
+          // Simple fallback conversion for common patterns
+          let latex = formulaText
+          
+          // Basic LaTeX conversions
+          latex = latex.replace(/\^(\d+)/g, '^{$1}') // x^2 -> x^{2}
+          latex = latex.replace(/\^([a-zA-Z])/g, '^{$1}') // x^a -> x^{a}
+          latex = latex.replace(/\^\{([^}]+)\}/g, '^{$1}') // Already correct
+          latex = latex.replace(/\_(\d+)/g, '_{$1}') // x_2 -> x_{2}
+          latex = latex.replace(/\_([a-zA-Z])/g, '_{$1}') // x_a -> x_{a}
+          latex = latex.replace(/\_\{([^}]+)\}/g, '_{$1}') // Already correct
+          latex = latex.replace(/\*(\d+)/g, ' \\cdot $1') // 2*3 -> 2 \cdot 3
+          latex = latex.replace(/\*\*/g, '^') // ** -> ^
+          latex = latex.replace(/\//g, ' \\div ') // / -> \div
+          latex = latex.replace(/\+\+/g, ' \\pm ') // ++ -> \pm
+          latex = latex.replace(/\-\-/g, ' \\mp ') // -- -> \mp
+          latex = latex.replace(/sqrt\(([^)]+)\)/g, '\\sqrt{$1}') // sqrt(x) -> \sqrt{x}
+          latex = latex.replace(/sum\(/g, '\\sum_{') // sum( -> \sum_{
+          latex = latex.replace(/int\(/g, '\\int_{') // int( -> \int_{
+          latex = latex.replace(/pi/g, '\\pi') // pi -> \pi
+          latex = latex.replace(/alpha/g, '\\alpha') // alpha -> \alpha
+          latex = latex.replace(/beta/g, '\\beta') // beta -> \beta
+          latex = latex.replace(/gamma/g, '\\gamma') // gamma -> \gamma
+          latex = latex.replace(/delta/g, '\\delta') // delta -> \delta
+          latex = latex.replace(/epsilon/g, '\\epsilon') // epsilon -> \epsilon
+          latex = latex.replace(/theta/g, '\\theta') // theta -> \theta
+          latex = latex.replace(/lambda/g, '\\lambda') // lambda -> \lambda
+          latex = latex.replace(/mu/g, '\\mu') // mu -> \mu
+          latex = latex.replace(/sigma/g, '\\sigma') // sigma -> \sigma
+          latex = latex.replace(/tau/g, '\\tau') // tau -> \tau
+          latex = latex.replace(/phi/g, '\\phi') // phi -> \phi
+          latex = latex.replace(/omega/g, '\\omega') // omega -> \omega
+          
+          return {
+            latex,
+            confidence: 0.7,
+            fromCache: false,
+          }
+        }
         throw new Error(`API request failed: ${response.statusText}`)
       }
 
@@ -257,25 +296,47 @@ Expression: ${formulaText}`
   ): Promise<Map<string, ConversionResult>> {
     const results = new Map<string, ConversionResult>()
     
-    for (let i = 0; i < formulas.length; i++) {
-      const formula = formulas[i]
-      
-      try {
-        const result = await this.convertFormulaToLatex(formula.text)
-        results.set(formula.text, result)
-        
-        if (onProgress) {
-          onProgress(i + 1, formulas.length)
+    // Process formulas in smaller batches to avoid overwhelming the API
+    const batchSize = 5
+    const batches = []
+    for (let i = 0; i < formulas.length; i += batchSize) {
+      batches.push(formulas.slice(i, i + batchSize))
+    }
+    
+    for (const batch of batches) {
+      const batchPromises = batch.map(async (formula) => {
+        try {
+          const result = await this.convertFormulaToLatex(formula.text)
+          return { formula: formula.text, result }
+        } catch (error) {
+          console.error(`Failed to convert formula "${formula.text}":`, error)
+          return {
+            formula: formula.text,
+            result: {
+              latex: formula.text,
+              confidence: 0.3,
+              fromCache: false,
+            }
+          }
         }
-      } catch (error) {
-        console.error(`Failed to convert formula "${formula.text}":`, error)
-        
-        // Store failed conversion
-        results.set(formula.text, {
-          latex: formula.text,
-          confidence: 0.3,
-          fromCache: false,
-        })
+      })
+      
+      // Wait for all formulas in this batch to complete
+      const batchResults = await Promise.all(batchPromises)
+      
+      // Store results
+      batchResults.forEach(({ formula, result }) => {
+        results.set(formula, result)
+      })
+      
+      // Update progress
+      if (onProgress) {
+        onProgress(results.size, formulas.length)
+      }
+      
+      // Small delay between batches to be respectful to the API
+      if (batches.indexOf(batch) < batches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 100))
       }
     }
     

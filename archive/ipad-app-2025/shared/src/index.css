@@ -1,0 +1,596 @@
+/* PDF.js Text Layer Styles */
+@import 'pdfjs-dist/web/pdf_viewer.css';
+
+/* Theme Variables - Academic Reader Pro Theme 1 */
+:root {
+  /* Primary Colors (Gray theme for black/gray/white UI) */
+  --color-primary: #9ca3af;
+  --color-primary-hover: #6b7280;
+  --color-primary-light: #d1d5db;
+  --color-primary-dark: #374151;
+  
+  /* Secondary Colors (Lighter gray for accents) */
+  --color-secondary: #9ca3af;
+  --color-secondary-hover: #6b7280;
+  --color-secondary-light: #e5e7eb;
+  
+  /* Background Colors (Dark theme) */
+  --color-background: #000000;
+  --color-background-secondary: #111827;
+  --color-background-tertiary: #1f2937;
+  
+  /* Surface Colors (Dark surfaces) */
+  --color-surface: #111827;
+  --color-surface-hover: #1f2937;
+  --color-surface-border: #374151;
+  --color-surface-rgb: 17, 24, 39;
+  
+  /* Text Colors (Light text on dark background) */
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #d1d5db;
+  --color-text-tertiary: #9ca3af;
+  --color-text-inverse: #111827;
+  
+  /* Status Colors */
+  --color-success: #10b981;
+  --color-success-hover: #059669;
+  --color-success-light: #064e3b;
+  --color-warning: #f59e0b;
+  --color-warning-hover: #d97706;
+  --color-warning-light: #78350f;
+  --color-error: #f87171;
+  --color-error-hover: #ef4444;
+  --color-error-light: #7f1d1d;
+  --color-info: #3b82f6;
+  --color-info-hover: #2563eb;
+  
+  /* Highlight Colors (for annotations) */
+  --color-highlight-yellow: #FFD700;
+  --color-highlight-teal: #4ECDC4;
+  --color-highlight-red: #FF6B6B;
+  --color-highlight-blue: #45B7D1;
+  --color-highlight-green: #96CEB4;
+  
+  /* Highlight Background Colors (with opacity) */
+  --color-highlight-yellow-bg: rgba(255, 215, 0, 0.1);
+  --color-highlight-teal-bg: rgba(78, 205, 196, 0.1);
+  --color-highlight-red-bg: rgba(255, 107, 107, 0.1);
+  --color-highlight-blue-bg: rgba(69, 183, 209, 0.1);
+  --color-highlight-green-bg: rgba(150, 206, 180, 0.1);
+  
+  /* Border Colors (Subtle borders on dark background) */
+  --color-border: #4b5563;
+  --color-border-light: #1f2937;
+  --color-border-dark: #6b7280;
+  
+  /* Shadow Colors (Subtle shadows on dark background) */
+  --color-shadow: rgba(0, 0, 0, 0.5);
+  --color-shadow-light: rgba(0, 0, 0, 0.3);
+  --color-shadow-dark: rgba(0, 0, 0, 0.7);
+  
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  --spacing-3xl: 4rem;
+  
+  /* Typography */
+  --font-family-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-family-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  --font-size-4xl: 2.25rem;
+  
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.6;
+  --line-height-relaxed: 1.75;
+  
+  /* Border Radius */
+  --border-radius-none: 0;
+  --border-radius-sm: 0.125rem;
+  --border-radius-md: 0.375rem;
+  --border-radius-lg: 0.5rem;
+  --border-radius-xl: 0.75rem;
+  --border-radius-full: 9999px;
+  
+  /* Shadows */
+  --shadow-none: none;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  
+  /* Breakpoints */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+  
+  /* Component-specific variables */
+  --header-height: 80px;
+  --sidebar-width: 20rem;
+  --main-content-height: calc(100vh - var(--header-height));
+  --floating-button-size: 3.5rem;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Library Modal Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.3s ease-out;
+}
+
+/* Library Modal Z-Index Override */
+.library-modal-overlay {
+  z-index: 9999 !important;
+  position: fixed !important;
+}
+
+/* CRITICAL: PDF Text Layer Alignment - DO NOT MODIFY
+ * These styles ensure perfect alignment between PDF canvas and text selection
+ * Any changes will break text selection accuracy, especially for two-column PDFs
+ */
+.textLayer {
+  position: absolute !important;
+  text-align: initial !important;
+  inset: 0px !important;
+  overflow: hidden !important;
+  opacity: 1 !important;
+  line-height: 1 !important;
+  -webkit-text-size-adjust: none !important;
+  text-size-adjust: none !important;
+  forced-color-adjust: none !important;
+  transform-origin: 0% 0% !important;
+  caret-color: transparent !important;
+  z-index: 2 !important;
+  pointer-events: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  box-sizing: content-box !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  contain: layout style paint !important;
+}
+
+.textLayer > span {
+  position: absolute !important;
+  white-space: pre !important;
+  color: transparent !important;
+  transform-origin: 0% 0% !important;
+  line-height: 1 !important;
+  font-family: sans-serif !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  box-sizing: content-box !important;
+  cursor: text !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  font-smooth: always !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility !important;
+  isolation: isolate !important;
+  will-change: transform !important;
+  z-index: 1 !important;
+  -webkit-touch-callout: default !important;
+  -webkit-user-drag: none !important;
+  -khtml-user-drag: none !important;
+  -moz-user-drag: none !important;
+  -o-user-drag: none !important;
+  user-drag: none !important;
+  display: inline-block !important;
+  vertical-align: baseline !important;
+  text-overflow: clip !important;
+}
+
+.textLayer > span::selection {
+  background: rgba(0, 100, 255, 0.4) !important;
+  color: transparent !important;
+  border-radius: 2px !important;
+}
+
+.textLayer > span::-moz-selection {
+  background: rgba(0, 100, 255, 0.4) !important;
+  color: transparent !important;
+  border-radius: 2px !important;
+}
+
+/* Tooltip animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Pulse animation for active elements */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Subtle bounce animation */
+@keyframes bounce {
+  0%, 20%, 53%, 80%, 100% {
+    transform: translate3d(0,0,0);
+  }
+  40%, 43% {
+    transform: translate3d(0, -4px, 0);
+  }
+  70% {
+    transform: translate3d(0, -2px, 0);
+  }
+  90% {
+    transform: translate3d(0, -1px, 0);
+  }
+}
+
+/* Smooth scale animation */
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Pulse animation class */
+.animate-pulse-slow {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Bounce animation class */
+.animate-bounce-subtle {
+  animation: bounce 1s ease-in-out;
+}
+
+/* Scale in animation class */
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  /* Focus-visible styles for accessibility */
+  button:focus-visible, 
+  a:focus-visible, 
+  input:focus-visible, 
+  textarea:focus-visible, 
+  select:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Skip link for screen readers */
+  .skip-link {
+    position: absolute;
+    top: -40px;
+    left: 6px;
+    background: var(--color-primary);
+    color: var(--color-text-inverse);
+    padding: 8px;
+    text-decoration: none;
+    border-radius: 4px;
+    z-index: 1000;
+  }
+
+  .skip-link:focus {
+    top: 6px;
+  }
+
+  /* Screen reader only content */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .sr-only.focus\:not-sr-only:focus {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: inherit;
+    margin: inherit;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+}
+
+@layer components {
+  /* Typography utilities */
+  .text-heading-1 {
+    font-size: var(--font-size-4xl);
+    font-weight: var(--font-weight-bold);
+    line-height: var(--line-height-tight);
+    letter-spacing: -0.025em;
+  }
+
+  .text-heading-2 {
+    font-size: var(--font-size-3xl);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-tight);
+    letter-spacing: -0.025em;
+  }
+
+  .text-heading-3 {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-tight);
+    letter-spacing: -0.025em;
+  }
+
+  .text-body {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-normal);
+    line-height: var(--line-height-normal);
+    letter-spacing: 0;
+  }
+
+  .text-caption {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-normal);
+    line-height: var(--line-height-normal);
+    letter-spacing: 0;
+  }
+
+  .text-uppercase-label {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    line-height: var(--line-height-normal);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .text-button {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.0;
+    letter-spacing: 0.01em;
+  }
+
+  /* Button components with improved contrast */
+  .btn-primary {
+    @apply font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    background-color: var(--color-primary);
+    color: var(--color-text-inverse);
+    border: none;
+  }
+
+  .btn-primary:hover {
+    background-color: var(--color-primary-hover);
+  }
+
+  .btn-primary:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+  
+  .btn-secondary {
+    @apply font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    background-color: var(--color-surface);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+  }
+
+  .btn-secondary:hover {
+    background-color: var(--color-surface-hover);
+  }
+  
+  .btn-ghost {
+    @apply font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    background-color: transparent;
+    color: var(--color-text-primary);
+    border: none;
+  }
+
+  .btn-ghost:hover {
+    background-color: var(--color-surface-hover);
+  }
+  
+  .input-field {
+    @apply w-full px-3 py-2 rounded-lg transition-colors duration-200;
+    background-color: var(--color-surface);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+  }
+
+  .input-field:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(156, 163, 175, 0.1);
+  }
+  
+  .card {
+    @apply rounded-xl shadow-sm;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+  }
+  
+  .modal-overlay {
+    @apply fixed inset-0 flex items-start justify-center z-50 pt-20 pb-8 px-4 overflow-y-auto;
+    background-color: rgba(0, 0, 0, 0.6);
+  }
+  
+  .modal-content {
+    @apply rounded-xl shadow-xl max-w-2xl w-full mx-4 my-auto;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    max-height: calc(100vh - 160px); /* Account for pt-20 + pb-8 */
+  }
+
+/* NeoReader Terminal Styles */
+.neoreader-terminal {
+  font-family: 'Courier New', monospace;
+  background: #000;
+}
+
+.neoreader-terminal ::selection {
+  background: #00ff88;
+  color: #000;
+}
+
+/* Terminal scrollbar */
+.neoreader-terminal .overflow-y-auto::-webkit-scrollbar {
+  width: 4px;
+}
+
+.neoreader-terminal .overflow-y-auto::-webkit-scrollbar-track {
+  background: #001100;
+}
+
+.neoreader-terminal .overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #00ff88;
+}
+
+/* Landing Page Styles */
+.landing-page {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f8f9fa;
+}
+
+/* Academic Pattern Background */
+.bg-pattern {
+  background-image: radial-gradient(circle at 1px 1px, #e0e0e0 1px, transparent 0);
+  background-size: 2rem 2rem;
+}
+
+/* Grid Pattern Background (legacy support) */
+.grid-pattern {
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Glow Text Effect */
+.glow-text {
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+}
+
+/* Smooth Transitions */
+.landing-page * {
+  transition: all 0.3s ease;
+}
+
+/* Custom Scrollbar for Landing Page */
+.landing-page ::-webkit-scrollbar {
+  width: 8px;
+}
+
+.landing-page ::-webkit-scrollbar-track {
+  background: #f8f9fa;
+}
+
+.landing-page ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.landing-page ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+}
+
+/* Audio Widget Slider Styles */
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.slider::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+

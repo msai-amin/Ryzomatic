@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML Test - Smart Reader</title>
+    <style>
+        body {
+            padding: 20px;
+            background-color: #000000;
+            color: #ffffff;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        .success-box {
+            background-color: #9ca3af;
+            color: #000000;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .info-box {
+            background-color: #111827;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #9ca3af;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="font-size: 2rem; color: #9ca3af; margin-bottom: 20px;">
+        🎉 Smart Reader iPad App - HTML Test
+    </h1>
+    
+    <p style="font-size: 1.2rem; color: #d1d5db; margin-bottom: 30px;">
+        This is a pure HTML test to verify basic functionality works.
+    </p>
+    
+    <div class="success-box">
+        ✅ HTML is working correctly on iPad Pro M4!
+    </div>
+    
+    <div class="info-box">
+        <h2 style="font-size: 1.5rem; color: #ffffff; margin-bottom: 15px;">
+            Platform Information
+        </h2>
+        <div style="color: #d1d5db; line-height: 1.6;">
+            <div>User Agent: <span id="user-agent">Loading...</span></div>
+            <div>Protocol: <span id="protocol">Loading...</span></div>
+            <div>Capacitor: <span id="capacitor">Loading...</span></div>
+            <div>Screen: <span id="screen">Loading...</span></div>
+        </div>
+    </div>
+    
+    <div class="info-box">
+        <h3 style="font-size: 1.3rem; color: #ffffff; margin-bottom: 15px;">
+            Test Results
+        </h3>
+        <ul style="color: #d1d5db; line-height: 1.6; padding-left: 20px;">
+            <li>✅ HTML rendering works</li>
+            <li>✅ CSS styling works</li>
+            <li>✅ JavaScript execution works</li>
+            <li>🔄 Ready for React integration</li>
+        </ul>
+    </div>
+
+    <script>
+        console.log('🚀 HTML test script starting...')
+        
+        // Update platform info
+        document.getElementById('user-agent').textContent = navigator.userAgent.substring(0, 50) + '...'
+        document.getElementById('protocol').textContent = window.location.protocol
+        document.getElementById('capacitor').textContent = window.location.protocol === 'capacitor:' ? 'Yes' : 'No'
+        document.getElementById('screen').textContent = window.screen.width + 'x' + window.screen.height
+        
+        console.log('✅ HTML test completed successfully')
+    </script>
+</body>
+</html>

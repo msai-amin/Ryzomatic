@@ -12,3 +12,7 @@ logs/
 # archive/
 .env.production.local
 .env.supabase
+
+# Build artifacts
+dist/
+.vercel/

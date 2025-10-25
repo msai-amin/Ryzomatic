@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Smart Reader - iPad</title>
+    <meta name="description" content="Smart Reader is an intelligent reading platform for iPad. Streamline your literature reviews, manage citations, and collaborate with peers." />
+    
+    <!-- iOS specific meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Smart Reader">
+    <meta name="format-detection" content="telephone=no">
+    
+    <!-- Very permissive CSP for development to allow Google OAuth -->
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src-elem * 'unsafe-inline'; frame-src *; connect-src *; img-src * data: blob:; style-src * 'unsafe-inline'; font-src * data:; object-src 'none'; base-uri *;">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/production-main.tsx"></script>
+    <!-- Google Identity Services for authentication -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Google API for Drive -->
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+  </body>
+</html>

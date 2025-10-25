@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { FileText, Clock, BookOpen, Tag, Timer, ChevronLeft, ChevronRight, Flame, Trophy, BarChart3, Target } from 'lucide-react'
+import { FileText, Clock, BookOpen, Tag, Timer, ChevronLeft, ChevronRight, Flame, Trophy, BarChart3, Target, Plus, ChevronDown, ChevronUp } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
 import { pomodoroService } from '../src/services/pomodoroService'
 import { pomodoroGamificationService, StreakInfo, Achievement } from '../src/services/pomodoroGamificationService'
 import { AchievementPanel } from '../src/components/AchievementPanel'
 import { PomodoroDashboard } from '../src/components/PomodoroDashboard'
-import { useTheme, AnnotationColorPicker } from './ThemeProvider'
+import { useTheme } from './ThemeProvider'
 
 interface ThemedSidebarProps {
   isOpen: boolean
@@ -15,12 +15,17 @@ interface ThemedSidebarProps {
 
 export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }) => {
   const { currentDocument, user, showPomodoroDashboard, setShowPomodoroDashboard } = useAppStore()
-  const { annotationColors } = useTheme()
-  const [currentHighlightColor, setCurrentHighlightColor] = React.useState('#FFD700')
   const [pomodoroStats, setPomodoroStats] = useState<{ [key: string]: { timeMinutes: number, sessions: number } }>({})
   const [streak, setStreak] = useState<StreakInfo | null>(null)
   const [achievements, setAchievements] = useState<Achievement[]>([])
   const [loading, setLoading] = useState(false)
+  
+  // Collapsible sections state
+  const [sectionsExpanded, setSectionsExpanded] = useState({
+    library: true,
+    stats: true,
+    activity: true
+  })
 
   // Mock data for demonstration
   const mockDocuments = [
@@ -101,6 +106,13 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
     loadGamificationData()
   }, [user])
 
+  const toggleSection = (section: keyof typeof sectionsExpanded) => {
+    setSectionsExpanded(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }))
+  }
+
   return (
     <>
       {/* Toggle Button (visible when sidebar is closed) */}
@@ -152,15 +164,44 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
 
           {/* Document Library Section */}
           <div className="mb-6">
-          <h2 
-            className="text-lg font-semibold mb-4"
-            style={{ color: 'var(--color-text-primary)' }}
-          >
-            Document Library
-          </h2>
-          
-          <div className="space-y-3">
-            {mockDocuments.map((doc) => (
+            <div className="flex items-center justify-between mb-4">
+              <h2 
+                className="text-lg font-semibold"
+                style={{ color: 'var(--color-text-primary)' }}
+              >
+                Document Library
+              </h2>
+              <button
+                onClick={() => toggleSection('library')}
+                className="p-1 rounded transition-colors"
+                style={{ color: 'var(--color-text-secondary)' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                {sectionsExpanded.library ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+            </div>
+            
+            {/* Add New Button - Moved to top */}
+            <div className="mb-4">
+              <button
+                className="w-full flex items-center justify-center space-x-2 p-3 rounded-lg transition-colors"
+                style={{
+                  backgroundColor: 'var(--color-primary)',
+                  color: 'var(--color-text-inverse)',
+                  border: 'none',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-primary)'}
+              >
+                <Plus className="w-4 h-4" />
+                <span className="font-medium">Add New Document</span>
+              </button>
+            </div>
+            
+            {sectionsExpanded.library && (
+              <div className="space-y-3">
+                {mockDocuments.map((doc) => (
               <div
                 key={doc.id}
                 className="p-3 rounded-lg border transition-colors cursor-pointer"
@@ -251,36 +292,47 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
                   />
                 </div>
               </div>
-            ))}
+                ))}
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* Color Coding System */}
-        <div className="mb-6">
-          <AnnotationColorPicker
-            selectedColor={currentHighlightColor}
-            onColorSelect={setCurrentHighlightColor}
-          />
-        </div>
-
-        {/* Enhanced Stats */}
-        <div className="space-y-4" data-tour="sidebar-stats">
-          <div className="flex items-center justify-between">
-            <h3 
-              className="text-lg font-semibold"
-              style={{ color: 'var(--color-text-primary)' }}
-            >
-              Productivity Stats
-            </h3>
-            <button
-              onClick={() => setShowPomodoroDashboard(true)}
-              className="p-1 rounded hover:bg-gray-100 transition-colors"
-              style={{ color: 'var(--color-text-secondary)' }}
-              title="View Analytics Dashboard"
-            >
-              <BarChart3 className="w-4 h-4" />
-            </button>
-          </div>
+          {/* Productivity Stats Section */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 
+                className="text-lg font-semibold"
+                style={{ color: 'var(--color-text-primary)' }}
+              >
+                Productivity Stats
+              </h3>
+              <button
+                onClick={() => toggleSection('stats')}
+                className="p-1 rounded transition-colors"
+                style={{ color: 'var(--color-text-secondary)' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                {sectionsExpanded.stats ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+            </div>
+            
+            {sectionsExpanded.stats && (
+              <div className="space-y-4" data-tour="sidebar-stats">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <BarChart3 className="w-4 h-4" style={{ color: 'var(--color-text-secondary)' }} />
+                    <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Analytics</span>
+                  </div>
+                  <button
+                    onClick={() => setShowPomodoroDashboard(true)}
+                    className="p-1 rounded hover:bg-gray-100 transition-colors"
+                    style={{ color: 'var(--color-text-secondary)' }}
+                    title="View Analytics Dashboard"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                  </button>
+                </div>
           
           {/* Streak Display */}
           {streak && (
@@ -379,19 +431,33 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
               </div>
             </div>
           </div>
-        </div>
+              </div>
+            )}
+          </div>
 
-        {/* Recent Activity */}
-        <div className="mt-6">
-          <h3 
-            className="text-lg font-semibold mb-4"
-            style={{ color: 'var(--color-text-primary)' }}
-          >
-            Recent Activity
-          </h3>
-          
-          <div className="space-y-3">
-            <div className="flex items-center space-x-3">
+          {/* Recent Activity Section */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 
+                className="text-lg font-semibold"
+                style={{ color: 'var(--color-text-primary)' }}
+              >
+                Recent Activity
+              </h3>
+              <button
+                onClick={() => toggleSection('activity')}
+                className="p-1 rounded transition-colors"
+                style={{ color: 'var(--color-text-secondary)' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                {sectionsExpanded.activity ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+            </div>
+            
+            {sectionsExpanded.activity && (
+              <div className="space-y-3">
+                <div className="flex items-center space-x-3">
               <div 
                 className="w-2 h-2 rounded-full"
                 style={{ backgroundColor: 'var(--color-highlight-yellow)' }}
@@ -453,15 +519,16 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
                 </p>
               </div>
             </div>
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* Achievements Panel */}
-        {user && (
-          <div className="mt-6">
-            <AchievementPanel userId={user.id} />
-          </div>
-        )}
+          {/* Achievements Panel */}
+          {user && (
+            <div className="mt-6">
+              <AchievementPanel userId={user.id} />
+            </div>
+          )}
         </div>
       </aside>
 
