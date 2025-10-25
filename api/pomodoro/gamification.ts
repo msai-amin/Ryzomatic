@@ -47,7 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const { data: streak, error: streakError } = await supabase
-        .from('user_streaks')
+        .from('pomodoro_streaks')
         .select('*')
         .eq('user_id', user.id)
         .single()
@@ -89,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const today = new Date().toISOString().split('T')[0]
         
         const { data: existingStreak, error: getError } = await supabase
-          .from('user_streaks')
+          .from('pomodoro_streaks')
           .select('*')
           .eq('user_id', user.id)
           .single()
@@ -115,7 +115,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
 
           const { data: updatedStreak, error: updateError } = await supabase
-            .from('user_streaks')
+            .from('pomodoro_streaks')
             .update({
               current_streak: newCurrentStreak,
               longest_streak: Math.max(existingStreak.longest_streak, newCurrentStreak),
@@ -136,7 +136,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } else {
           // Create new streak
           const { data: newStreak, error: createError } = await supabase
-            .from('user_streaks')
+            .from('pomodoro_streaks')
             .insert({
               user_id: user.id,
               current_streak: 1,
