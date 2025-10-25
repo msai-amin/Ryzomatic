@@ -314,6 +314,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   const [showHighlightColorPopover, setShowHighlightColorPopover] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [currentHighlightColor, setCurrentHighlightColor] = useState('#FFD700')
+  const [isHighlightMode, setIsHighlightMode] = useState(false)
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
@@ -1473,7 +1474,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   }, [contextMenu])
 
   const handleTextSelection = useCallback((event: MouseEvent) => {
-    // REMOVED: Don't skip in reading mode - users should be able to highlight in reading mode too
+    // Only show highlight picker when highlight mode is active
+    if (!isHighlightMode) {
+      setHighlightPickerPosition(null)
+      setSelectedTextInfo(null)
+      return
+    }
 
     const selection = window.getSelection()
     if (!selection || selection.isCollapsed || !selection.rangeCount) {
@@ -1530,7 +1536,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       x: rect.right + 10,
       y: rect.top - 10
     })
-  }, [pdfViewer.scrollMode, pageNumber])
+  }, [pdfViewer.scrollMode, pageNumber, isHighlightMode])
   
   // Handle right-click context menu for AI features
   const handleContextMenuClick = useCallback((event: React.MouseEvent) => {
@@ -2693,26 +2699,63 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             </button>
 
 
+            {/* Highlight Mode Toggle Button */}
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setIsHighlightMode(!isHighlightMode)
+                // Clear any existing selection and popover when toggling mode
+                if (isHighlightMode) {
+                  setHighlightPickerPosition(null)
+                  setSelectedTextInfo(null)
+                  setShowHighlightColorPopover(false)
+                }
+              }}
+              className="p-2 rounded-lg transition-colors relative"
+              style={{
+                backgroundColor: isHighlightMode ? 'var(--color-primary-light)' : 'transparent',
+                color: isHighlightMode ? 'var(--color-primary)' : 'var(--color-text-primary)'
+              }}
+              onMouseEnter={(e) => {
+                if (!isHighlightMode) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+              }}
+              onMouseLeave={(e) => {
+                if (!isHighlightMode) e.currentTarget.style.backgroundColor = 'transparent'
+              }}
+              title={isHighlightMode ? "Exit Highlight Mode" : "Enter Highlight Mode"}
+            >
+              <Palette className="w-5 h-5" />
+              {/* Highlight Mode Marker */}
+              {isHighlightMode && (
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-pulse" />
+              )}
+            </button>
+
             {/* Highlight Color Picker Button */}
             <button
               ref={highlightColorButtonRef}
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                setShowHighlightColorPopover(!showHighlightColorPopover)
+                if (isHighlightMode) {
+                  setShowHighlightColorPopover(!showHighlightColorPopover)
+                }
               }}
               className="p-2 rounded-lg transition-colors"
               style={{
                 backgroundColor: showHighlightColorPopover ? 'var(--color-primary-light)' : 'transparent',
-                color: showHighlightColorPopover ? 'var(--color-primary)' : 'var(--color-text-primary)'
+                color: showHighlightColorPopover ? 'var(--color-primary)' : (isHighlightMode ? 'var(--color-text-primary)' : 'var(--color-text-secondary)'),
+                opacity: isHighlightMode ? 1 : 0.5
               }}
               onMouseEnter={(e) => {
-                if (!showHighlightColorPopover) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                if (!showHighlightColorPopover && isHighlightMode) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
               }}
               onMouseLeave={(e) => {
                 if (!showHighlightColorPopover) e.currentTarget.style.backgroundColor = 'transparent'
               }}
-              title="Highlight Colors"
+              title={isHighlightMode ? "Highlight Colors" : "Enable Highlight Mode first"}
+              disabled={!isHighlightMode}
             >
               <Palette className="w-5 h-5" />
             </button>
@@ -3060,7 +3103,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
       {/* Highlight Color Popover */}
       <HighlightColorPopover
-        isOpen={showHighlightColorPopover}
+        isOpen={showHighlightColorPopover && isHighlightMode}
         onClose={() => setShowHighlightColorPopover(false)}
         selectedColor={currentHighlightColor}
         onColorSelect={setCurrentHighlightColor}
