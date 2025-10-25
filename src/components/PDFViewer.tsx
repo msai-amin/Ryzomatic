@@ -347,6 +347,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   const [isConvertingFormulas, setIsConvertingFormulas] = useState(false)
   const [formulaConversionProgress, setFormulaConversionProgress] = useState({ current: 0, total: 0 })
   const [continuousModeRendered, setContinuousModeRendered] = useState(false)
+  const [lastRenderedDocId, setLastRenderedDocId] = useState<string | null>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -661,10 +662,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     renderPage()
   }, [pageNumber, scale, rotation, pdfViewer.scrollMode, pdfViewer.readingMode, numPages])
 
-  // Reset continuous mode rendered flag when scale/rotation/scrollMode changes
+  // Reset continuous mode rendered flag when scale/rotation changes
   useEffect(() => {
+    // Only reset if scale/rotation changed - don't reset on scrollMode changes
+    // This preserves the cache when switching between modes
     setContinuousModeRendered(false)
-  }, [scale, rotation, pdfViewer.scrollMode])
+  }, [scale, rotation])
+  
+  // Handle document changes - reset cache when document changes
+  useEffect(() => {
+    // Reset if document changed
+    if (document.id !== lastRenderedDocId) {
+      setContinuousModeRendered(false)
+      setLastRenderedDocId(document.id)
+    }
+  }, [document.id, lastRenderedDocId])
   
   // Render all pages (continuous scroll mode)
   useEffect(() => {
@@ -841,7 +853,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     }
 
     renderAllPages()
-  }, [pdfViewer.scrollMode, pdfViewer.readingMode, numPages, scale, rotation])
+  }, [pdfViewer.readingMode, numPages, scale, rotation, continuousModeRendered])
   
   // Force text layer interactivity after any render (additional safety net)
   useEffect(() => {
