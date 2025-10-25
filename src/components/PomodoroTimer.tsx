@@ -242,7 +242,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
         clearInterval(intervalRef.current)
       }
     }
-  }, [isRunning, timeLeft, handleTimerComplete])
+  }, [isRunning, handleTimerComplete]) // Removed timeLeft from dependencies
 
   const resetTimer = async () => {
     // Stop active session if running

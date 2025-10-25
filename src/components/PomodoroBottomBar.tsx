@@ -2,24 +2,24 @@ import React, { useState, useEffect } from 'react'
 import { Play, Pause, Square, Settings, ChevronUp, ChevronDown, Timer } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { Tooltip } from './Tooltip'
+import { timerService, TimerState } from '../services/timerService'
 
 interface PomodoroBottomBarProps {
   onExpand?: () => void
 }
 
 export const PomodoroBottomBar: React.FC<PomodoroBottomBarProps> = ({ onExpand }) => {
-  const { 
-    user, 
-    pomodoroIsRunning, 
-    pomodoroTimeLeft, 
-    pomodoroMode,
-    setPomodoroSession,
-    updatePomodoroTimer,
-    setPomodoroTimerToggleRef
-  } = useAppStore()
+  const { user, currentDocument } = useAppStore()
+  const [timerState, setTimerState] = useState<TimerState>(timerService.getState())
   
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
+
+  // Subscribe to timer service
+  useEffect(() => {
+    const unsubscribe = timerService.subscribe(setTimerState)
+    return unsubscribe
+  }, [])
 
   // Don't render if user is not authenticated
   if (!user) {
@@ -33,7 +33,7 @@ export const PomodoroBottomBar: React.FC<PomodoroBottomBarProps> = ({ onExpand }
   }
 
   const getModeInfo = () => {
-    switch (pomodoroMode) {
+    switch (timerState.mode) {
       case 'work':
         return { 
           label: 'Focus', 
@@ -72,21 +72,11 @@ export const PomodoroBottomBar: React.FC<PomodoroBottomBarProps> = ({ onExpand }
   const modeInfo = getModeInfo()
 
   const handleStartPause = () => {
-    const { pomodoroTimerToggleRef } = useAppStore.getState()
-    if (pomodoroTimerToggleRef) {
-      pomodoroTimerToggleRef() // Call the timer's toggle function
-    } else {
-      // Fallback: just update state
-      if (pomodoroIsRunning) {
-        updatePomodoroTimer(pomodoroTimeLeft, false, pomodoroMode)
-      } else {
-        updatePomodoroTimer(pomodoroTimeLeft, true, pomodoroMode)
-      }
-    }
+    timerService.toggleTimer(user.id, currentDocument?.id)
   }
 
   const handleStop = () => {
-    updatePomodoroTimer(25 * 60, false, 'work')
+    timerService.resetTimer(user.id)
   }
 
   const handleExpand = () => {
@@ -114,7 +104,7 @@ export const PomodoroBottomBar: React.FC<PomodoroBottomBarProps> = ({ onExpand }
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
         >
           <span className="text-lg">{modeInfo.icon}</span>
-          <span className="text-sm font-medium">{formatTime(pomodoroTimeLeft || 0)}</span>
+          <span className="text-sm font-medium">{formatTime(timerState.timeLeft)}</span>
           <ChevronUp className="w-4 h-4" />
         </button>
       </div>
@@ -149,7 +139,7 @@ export const PomodoroBottomBar: React.FC<PomodoroBottomBarProps> = ({ onExpand }
                 className="text-sm"
                 style={{ color: 'var(--color-text-secondary)' }}
               >
-                {pomodoroIsRunning ? 'Running' : 'Paused'}
+                {timerState.isRunning ? 'Running' : 'Paused'}
               </div>
             </div>
           </div>
@@ -160,14 +150,14 @@ export const PomodoroBottomBar: React.FC<PomodoroBottomBarProps> = ({ onExpand }
               className="text-2xl font-mono font-bold"
               style={{ color: modeInfo.color }}
             >
-              {formatTime(pomodoroTimeLeft || 0)}
+              {formatTime(timerState.timeLeft)}
             </span>
           </div>
         </div>
 
         {/* Center - Controls */}
         <div className="flex items-center space-x-2">
-          <Tooltip content={pomodoroIsRunning ? "Pause Timer" : "Start Timer"} position="top">
+          <Tooltip content={timerState.isRunning ? "Pause Timer" : "Start Timer"} position="top">
             <button
               onClick={handleStartPause}
               className="p-2 rounded-lg transition-colors"
@@ -178,7 +168,7 @@ export const PomodoroBottomBar: React.FC<PomodoroBottomBarProps> = ({ onExpand }
               onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
               onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
             >
-              {pomodoroIsRunning ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+              {timerState.isRunning ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
             </button>
           </Tooltip>
 
