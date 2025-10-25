@@ -12,6 +12,7 @@ import { userBooks } from '../lib/supabase'
 interface ThemedSidebarProps {
   isOpen: boolean
   onToggle: () => void
+  refreshTrigger?: number
 }
 
 interface DocumentWithProgress {
@@ -26,8 +27,8 @@ interface DocumentWithProgress {
   currentPage?: number
 }
 
-export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }) => {
-  const { currentDocument, user, showPomodoroDashboard, setShowPomodoroDashboard, documents: appDocuments, setCurrentDocument, libraryRefreshTrigger } = useAppStore()
+export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, refreshTrigger }) => {
+  const { currentDocument, user, showPomodoroDashboard, setShowPomodoroDashboard, documents: appDocuments, setCurrentDocument } = useAppStore()
   const [pomodoroStats, setPomodoroStats] = useState<{ [key: string]: { timeMinutes: number, sessions: number } }>({})
   const [streak, setStreak] = useState<StreakInfo | null>(null)
   const [achievements, setAchievements] = useState<Achievement[]>([])
@@ -43,7 +44,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
 
   // Load user documents from database
   useEffect(() => {
-    console.log('ThemedSidebar: useEffect triggered with dependencies:', { user: !!user, currentDocumentId: currentDocument?.id, libraryRefreshTrigger })
+    console.log('ThemedSidebar: useEffect triggered with dependencies:', { user: !!user, currentDocumentId: currentDocument?.id, refreshTrigger })
     
     const loadUserDocuments = async () => {
       if (!user) {
@@ -51,7 +52,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
         return
       }
       
-      console.log('ThemedSidebar: Loading documents for user:', user.id, 'refreshTrigger:', libraryRefreshTrigger)
+      console.log('ThemedSidebar: Loading documents for user:', user.id, 'refreshTrigger:', refreshTrigger)
       
       try {
         // Test the API call first
@@ -107,7 +108,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle }
     }
     
     loadUserDocuments()
-  }, [user, currentDocument?.id, libraryRefreshTrigger])
+  }, [user, currentDocument?.id, refreshTrigger])
 
   // Load Pomodoro stats for real documents
   useEffect(() => {

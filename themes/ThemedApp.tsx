@@ -16,7 +16,7 @@ const ThemedAppContent: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [showUpload, setShowUpload] = useState(false)
   const { currentTheme } = useTheme()
-  const { isChatOpen, toggleChat, user, currentDocument, pomodoroIsRunning } = useAppStore()
+  const { isChatOpen, toggleChat, user, currentDocument, pomodoroIsRunning, libraryRefreshTrigger } = useAppStore()
   const { showAchievement, AchievementToastContainer } = useAchievementToasts()
   
   // Enable keyboard shortcuts
@@ -45,7 +45,8 @@ const ThemedAppContent: React.FC = () => {
         {/* Sidebar */}
         <ThemedSidebar 
           isOpen={isSidebarOpen} 
-          onToggle={() => setIsSidebarOpen(!isSidebarOpen)} 
+          onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+          refreshTrigger={libraryRefreshTrigger}
         />
 
         {/* Main Content */}
