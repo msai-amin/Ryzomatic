@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabase } from '../../lib/supabase';
-import { documentRelevanceService } from '../../src/services/documentRelevanceService';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
@@ -53,17 +52,22 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   try {
+    console.log('POST /api/documents/relationships - Request body:', req.body);
+    
     const { sourceDocumentId, relatedDocumentId, relationshipDescription, userId } = req.body;
 
     if (!sourceDocumentId || !relatedDocumentId || !userId) {
+      console.log('Missing required fields:', { sourceDocumentId, relatedDocumentId, userId });
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
     // Check if relationship already exists
     if (!supabase) {
+      console.error('Supabase client not initialized');
       return res.status(500).json({ error: 'Database not initialized' });
     }
     
+    console.log('Checking for existing relationship...');
     const { data: existing, error: checkError } = await supabase
       .from('document_relationships')
       .select('id')
@@ -72,43 +76,44 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       .eq('user_id', userId)
       .single();
 
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('Error checking existing relationship:', checkError);
+      return res.status(500).json({ error: 'Failed to check existing relationship' });
+    }
+
     if (existing) {
+      console.log('Relationship already exists');
       return res.status(409).json({ error: 'Relationship already exists' });
     }
 
     // Create new relationship
+    console.log('Creating new relationship...');
+    const insertData = {
+      user_id: userId,
+      source_document_id: sourceDocumentId,
+      related_document_id: relatedDocumentId,
+      relationship_description: relationshipDescription,
+      relevance_calculation_status: 'pending'
+    };
+    console.log('Insert data:', insertData);
+    
     const { data: relationship, error } = await supabase
       .from('document_relationships')
-      .insert({
-        user_id: userId,
-        source_document_id: sourceDocumentId,
-        related_document_id: relatedDocumentId,
-        relationship_description: relationshipDescription,
-        relevance_calculation_status: 'pending'
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (error) {
       console.error('Error creating relationship:', error);
-      return res.status(500).json({ error: 'Failed to create relationship' });
+      return res.status(500).json({ error: 'Failed to create relationship', details: error.message });
     }
-
-    // Start background relevance calculation
-    try {
-      // Don't await this - let it run in background
-      documentRelevanceService.calculateAndUpdateRelevance(relationship.id).catch(calcError => {
-        console.error('Error in background relevance calculation:', calcError);
-      });
-    } catch (calcError) {
-      console.error('Error starting relevance calculation:', calcError);
-      // Don't fail the request if background calculation fails
-    }
+    
+    console.log('Relationship created successfully:', relationship);
 
     return res.status(201).json({ 
       success: true, 
       data: relationship,
-      message: 'Relationship created successfully. Relevance calculation started.'
+      message: 'Relationship created successfully. Relevance calculation will start in background.'
     });
 
   } catch (error) {
