@@ -261,6 +261,21 @@ export const PomodoroFloatingWidget: React.FC<PomodoroFloatingWidgetProps> = ({ 
           <div className="flex justify-center space-x-2">
             {pomodoroIsRunning ? (
               <>
+                <Tooltip content="Pause Timer" position="top">
+                  <button
+                    onClick={() => {
+                      // Pause the timer
+                      updatePomodoroTimer(pomodoroTimeLeft, false, pomodoroMode)
+                    }}
+                    className="p-2 rounded-lg transition-colors"
+                    style={{
+                      backgroundColor: '#f59e0b',
+                      color: 'white'
+                    }}
+                  >
+                    <Pause className="w-4 h-4" />
+                  </button>
+                </Tooltip>
                 <Tooltip content="Stop Timer" position="top">
                   <button
                     onClick={() => {
@@ -278,9 +293,17 @@ export const PomodoroFloatingWidget: React.FC<PomodoroFloatingWidgetProps> = ({ 
                 </Tooltip>
               </>
             ) : (
-              <Tooltip content="Start Timer" position="top">
+              <Tooltip content={pomodoroTimeLeft && pomodoroTimeLeft > 0 ? "Resume Timer" : "Start Timer"} position="top">
                 <button
-                  onClick={() => startPomodoroTimer()}
+                  onClick={() => {
+                    if (pomodoroTimeLeft && pomodoroTimeLeft > 0) {
+                      // Resume paused timer
+                      updatePomodoroTimer(pomodoroTimeLeft, true, pomodoroMode)
+                    } else {
+                      // Start new timer
+                      startPomodoroTimer()
+                    }
+                  }}
                   className="p-2 rounded-lg transition-colors"
                   style={{
                     backgroundColor: '#10b981',
