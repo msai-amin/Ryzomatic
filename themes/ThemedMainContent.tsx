@@ -45,7 +45,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
           title="Show sidebar"
           aria-label="Show sidebar"
         >
-          <ChevronLeft className="w-5 h-5" />
+          <ChevronRight className="w-5 h-5" />
         </button>
       )}
 
@@ -81,7 +81,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                 aria-label="Close sidebar"
                 title="Close sidebar"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronRight className="w-5 h-5" />
               </button>
             </div>
 
