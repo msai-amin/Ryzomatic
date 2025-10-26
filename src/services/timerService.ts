@@ -61,24 +61,29 @@ class TimerService {
   async startTimer(userId?: string, documentId?: string): Promise<void> {
     if (this.state.isRunning) return
 
-    // Start Pomodoro session if user and document are provided
-    if (userId && documentId && this.state.mode === 'work') {
-      try {
-        const session = await pomodoroService.startSession(userId, documentId, this.state.mode)
-        if (session) {
-          console.log('Pomodoro session started:', session.id)
-        }
-      } catch (error) {
-        console.error('Failed to start Pomodoro session:', error)
-        return // Don't start timer if session creation fails
-      }
-    }
-
+    // IMMEDIATE UI UPDATE (optimistic) - update state first for instant feedback
     this.state.isRunning = true
     this.notifyListeners()
 
-    // Start countdown
+    // Start countdown immediately
     this.startCountdown(userId, documentId)
+
+    // Database session creation in background (non-blocking)
+    // This runs async without blocking the UI
+    if (userId && documentId && this.state.mode === 'work') {
+      pomodoroService.startSession(userId, documentId, this.state.mode)
+        .then(session => {
+          if (session) {
+            console.log('Pomodoro session started:', session.id)
+          } else {
+            console.warn('Session creation failed, but timer continues')
+          }
+        })
+        .catch(error => {
+          console.error('Failed to start Pomodoro session:', error)
+          // Timer continues even if DB fails - user experience not interrupted
+        })
+    }
   }
 
   // Pause the timer

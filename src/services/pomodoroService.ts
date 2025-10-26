@@ -49,9 +49,11 @@ class PomodoroService {
     mode: 'work' | 'shortBreak' | 'longBreak'
   ): Promise<PomodoroSessionData | null> {
     try {
-      // Close any existing active session first
+      // Close any existing active session first (non-blocking)
       if (this.activeSessionId) {
-        await this.stopCurrentSession(false) // Mark as incomplete
+        this.stopCurrentSession(false).catch(err => 
+          console.warn('Failed to stop previous session:', err)
+        )
       }
 
       const { data, error } = await pomodoroSessions.startSession(userId, bookId, mode)
