@@ -61,7 +61,9 @@ export const BookCard: React.FC<BookCardProps> = ({
   } = useAppStore();
 
   const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 B';
+    // Handle NaN, undefined, or invalid values
+    if (!bytes || isNaN(bytes) || bytes <= 0) return 'Unknown size';
+    
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -177,7 +179,7 @@ export const BookCard: React.FC<BookCardProps> = ({
   };
 
   const renderMetadata = () => (
-    <div className="flex items-center gap-3 text-xs text-gray-500">
+    <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
       {book.notes_count > 0 && (
         <div className="flex items-center gap-1">
           <MessageSquare className="w-3 h-3" />
@@ -258,7 +260,10 @@ export const BookCard: React.FC<BookCardProps> = ({
 
         {/* Progress bar */}
         <div className="flex-shrink-0 w-24 mr-3">
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div 
+            className="w-full rounded-full h-2"
+            style={{ backgroundColor: 'var(--color-border)' }}
+          >
             <div
               className="h-2 rounded-full transition-all duration-300"
               style={{
@@ -267,7 +272,7 @@ export const BookCard: React.FC<BookCardProps> = ({
               }}
             />
           </div>
-          <div className="text-xs text-gray-500 text-center mt-1">
+          <div className="text-xs text-center mt-1" style={{ color: 'var(--color-text-secondary)' }}>
             {Math.round(book.reading_progress)}%
           </div>
         </div>
@@ -399,11 +404,14 @@ export const BookCard: React.FC<BookCardProps> = ({
 
         {/* Progress bar */}
         <div className="mb-3">
-          <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-            <span>Progress</span>
-            <span>{Math.round(book.reading_progress)}%</span>
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span style={{ color: 'var(--color-text-secondary)' }}>Progress</span>
+            <span style={{ color: 'var(--color-text-secondary)' }}>{Math.round(book.reading_progress)}%</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div 
+            className="w-full rounded-full h-2"
+            style={{ backgroundColor: 'var(--color-border)' }}
+          >
             <div
               className="h-2 rounded-full transition-all duration-300"
               style={{

@@ -219,7 +219,12 @@ export const TagFilter: React.FC<TagFilterProps> = ({
   return (
     <div className={`space-y-2 ${className}`}>
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-gray-700">Filter by Tags</h3>
+        <h3 
+          className="text-sm font-medium"
+          style={{ color: 'var(--color-text-primary)' }}
+        >
+          Filter by Tags
+        </h3>
         {selectedTags.length > 0 && (
           <button
             onClick={onClearAll}
