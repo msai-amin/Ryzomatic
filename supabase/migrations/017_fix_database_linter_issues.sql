@@ -16,6 +16,27 @@ DROP VIEW IF EXISTS public.document_extraction_stats CASCADE;
 -- PART 2: Add SET search_path to Functions (WARNINGS)
 -- =============================================================================
 
+-- Drop and recreate functions with proper search_path settings
+-- We need to DROP first to avoid "cannot change return type" errors
+
+DROP FUNCTION IF EXISTS public.mark_page_highlights_orphaned() CASCADE;
+DROP FUNCTION IF EXISTS public.get_highlight_stats(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.bulk_delete_highlights(UUID[]) CASCADE;
+DROP FUNCTION IF EXISTS public.search_annotations(UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS public.get_annotation_stats(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.get_related_documents_with_details(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.get_document_relationship_stats(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.reset_monthly_vision_counters() CASCADE;
+DROP FUNCTION IF EXISTS public.can_perform_vision_extraction(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.check_pomodoro_achievements(UUID, JSONB) CASCADE;
+DROP FUNCTION IF EXISTS public.update_pomodoro_streak(UUID, DATE) CASCADE;
+DROP FUNCTION IF EXISTS public.get_user_achievements(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.get_user_streak(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.update_tag_usage_count() CASCADE;
+DROP FUNCTION IF EXISTS public.get_collection_hierarchy(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.get_book_highlights(UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.get_library_stats(UUID) CASCADE;
+
 -- Fix mark_page_highlights_orphaned
 CREATE OR REPLACE FUNCTION public.mark_page_highlights_orphaned()
 RETURNS void

@@ -13,8 +13,11 @@ DROP VIEW IF EXISTS public.document_extraction_stats CASCADE;
 -- =============================================================================
 -- PART 2: Add SET search_path to Critical Functions (WARNINGS)
 -- =============================================================================
--- Due to length, only fixing the most critical ones here
--- See full list in migration 017
+-- We need to DROP first to avoid "cannot change return type" errors
+
+DROP FUNCTION IF EXISTS public.check_pomodoro_achievements(UUID, JSONB) CASCADE;
+DROP FUNCTION IF EXISTS public.update_pomodoro_streak(UUID, DATE) CASCADE;
+DROP FUNCTION IF EXISTS public.get_achievement_progress(UUID) CASCADE;
 
 -- Fix check_pomodoro_achievements
 CREATE OR REPLACE FUNCTION public.check_pomodoro_achievements(p_user_id UUID, p_session_data JSONB)
