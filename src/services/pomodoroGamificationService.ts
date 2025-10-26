@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase'
+import { authService } from './supabaseAuthService'
 
 export interface Achievement {
   id: string
@@ -32,6 +33,17 @@ export interface NewAchievement {
 
 class PomodoroGamificationService {
   /**
+   * Get authorization header for API requests
+   */
+  private async getAuthHeader(): Promise<string> {
+    const session = await authService.getSession()
+    if (!session?.access_token) {
+      throw new Error('Not authenticated')
+    }
+    return `Bearer ${session.access_token}`
+  }
+
+  /**
    * Check for new achievements after a Pomodoro session
    */
   async checkAchievements(userId: string, sessionData: {
@@ -40,10 +52,12 @@ class PomodoroGamificationService {
     completed: boolean
   }): Promise<NewAchievement[]> {
     try {
+      const authHeader = await this.getAuthHeader()
       const response = await fetch('/api/pomodoro/gamification', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': authHeader,
         },
         body: JSON.stringify({
           action: 'check-achievements',
@@ -69,10 +83,12 @@ class PomodoroGamificationService {
    */
   async updateStreak(userId: string, sessionDate?: Date): Promise<void> {
     try {
+      const authHeader = await this.getAuthHeader()
       const response = await fetch('/api/pomodoro/gamification', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': authHeader,
         },
         body: JSON.stringify({
           action: 'update-streak'
@@ -92,10 +108,12 @@ class PomodoroGamificationService {
    */
   async getUserAchievements(userId: string): Promise<Achievement[]> {
     try {
+      const authHeader = await this.getAuthHeader()
       const response = await fetch('/api/pomodoro/gamification', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': authHeader,
         },
       })
 
@@ -117,10 +135,12 @@ class PomodoroGamificationService {
    */
   async getUserStreak(userId: string): Promise<StreakInfo | null> {
     try {
+      const authHeader = await this.getAuthHeader()
       const response = await fetch('/api/pomodoro/gamification', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': authHeader,
         },
       })
 
