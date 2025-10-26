@@ -124,24 +124,30 @@ class DocumentRelevanceService {
       }
 
       // Use AI service to analyze the document
-      const analysisPrompt = `
-        Analyze the following document and provide:
-        1. A brief summary (2-3 sentences)
-        2. Key keywords (5-10 most important terms)
-        3. Main topics/subjects (3-5 topics)
-        4. Main themes (2-3 overarching themes)
+      const analysisPrompt = `You are an expert academic document analyzer. Your task is to extract structured information from research documents, papers, books, and notes.
 
-        Document content:
-        ${content.substring(0, 3000)} // Limit content to avoid token limits
+DOCUMENT CONTENT (first 3000 characters):
+${content.substring(0, 3000)}
 
-        Respond in JSON format:
-        {
-          "summary": "Brief summary here",
-          "keywords": ["keyword1", "keyword2", ...],
-          "topics": ["topic1", "topic2", ...],
-          "mainThemes": ["theme1", "theme2", ...]
-        }
-      `;
+ANALYSIS REQUIREMENTS:
+1. Summary: Write 2-3 concise sentences capturing the main argument, methodology, or purpose
+2. Keywords: Extract 5-10 specific technical terms, concepts, or key phrases (not generic words)
+3. Topics: Identify 3-5 specific subject areas or disciplines (e.g., "machine learning", "causal inference", "neuroscience")
+4. Themes: Identify 2-3 overarching themes or research questions (e.g., "interpretability vs performance tradeoff", "real-world applications")
+
+IMPORTANT:
+- Focus on academic/technical content
+- Be specific, not generic
+- Use terminology from the document
+- Output ONLY valid JSON, no additional text
+
+OUTPUT FORMAT (strict JSON):
+{
+  "summary": "Concise 2-3 sentence summary here",
+  "keywords": ["specific_term_1", "specific_term_2", "specific_term_3", ...],
+  "topics": ["specific_topic_1", "specific_topic_2", ...],
+  "mainThemes": ["overarching_theme_1", "overarching_theme_2", ...]
+}`;
 
       const response = await sendMessageToAI(analysisPrompt, content.substring(0, 3000));
       
@@ -256,23 +262,43 @@ class DocumentRelevanceService {
     similarity: number
   ): Promise<string> {
     try {
-      const prompt = `
-        Based on the analysis of two documents, generate a brief description (1-2 sentences) explaining how they are related.
+      const prompt = `You are an expert at identifying relationships between academic documents. Analyze how two documents relate to each other.
 
-        Source Document:
-        - Summary: ${source.summary}
-        - Topics: ${source.topics.join(', ')}
-        - Themes: ${source.mainThemes.join(', ')}
+SOURCE DOCUMENT:
+- Summary: ${source.summary}
+- Topics: ${source.topics.join(', ')}
+- Themes: ${source.mainThemes.join(', ')}
+- Keywords: ${source.keywords.slice(0, 5).join(', ')}
 
-        Related Document:
-        - Summary: ${related.summary}
-        - Topics: ${related.topics.join(', ')}
-        - Themes: ${related.mainThemes.join(', ')}
+RELATED DOCUMENT:
+- Summary: ${related.summary}
+- Topics: ${related.topics.join(', ')}
+- Themes: ${related.mainThemes.join(', ')}
+- Keywords: ${related.keywords.slice(0, 5).join(', ')}
 
-        Similarity Score: ${similarity}%
+COMPUTED SIMILARITY: ${similarity}%
 
-        Generate a concise description of their relationship:
-      `;
+TASK: Generate a precise 1-2 sentence description explaining their relationship.
+
+RELATIONSHIP TYPES TO CONSIDER:
+- Complementary: Documents cover different aspects of the same topic
+- Sequential: One builds upon or extends the other
+- Comparative: Documents present alternative approaches or perspectives
+- Applied: One applies concepts from the other to specific cases
+- Foundational: One provides background/prerequisites for the other
+- Contradictory: Documents present conflicting views or findings
+
+REQUIREMENTS:
+- Be specific: mention actual topics, concepts, or themes they share
+- Indicate the type of relationship
+- Explain why a reader might want to read both
+- Keep it concise (1-2 sentences maximum)
+- Do NOT say "Please upload documents" or similar fallback messages
+
+EXAMPLE OUTPUT:
+"Both documents explore causal reasoning in AI systems, with the source focusing on theoretical frameworks while the related document presents practical applications in robotics. Reading both provides a complete picture from theory to implementation."
+
+YOUR DESCRIPTION:`;
 
       console.log('DocumentRelevanceService: Generating AI description with prompt length:', prompt.length);
       const response = await sendMessageToAI(prompt);
