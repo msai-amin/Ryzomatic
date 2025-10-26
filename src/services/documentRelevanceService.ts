@@ -274,11 +274,22 @@ class DocumentRelevanceService {
         Generate a concise description of their relationship:
       `;
 
+      console.log('DocumentRelevanceService: Generating AI description with prompt length:', prompt.length);
       const response = await sendMessageToAI(prompt);
-      return response.trim();
+      const trimmedResponse = response.trim();
+      
+      console.log('DocumentRelevanceService: AI description generated:', trimmedResponse.substring(0, 100));
+      
+      // Filter out the fallback message
+      if (trimmedResponse.includes('Please upload') || trimmedResponse.includes('would like me to analyze')) {
+        console.warn('DocumentRelevanceService: AI returned fallback message, using default description');
+        return `Documents share ${similarity}% similarity based on content analysis. Both documents cover related topics and themes.`;
+      }
+      
+      return trimmedResponse;
     } catch (error) {
       console.error('DocumentRelevanceService: Error generating AI description:', error);
-      return `Documents share ${similarity}% similarity based on content analysis.`;
+      return `Documents share ${similarity}% similarity based on content analysis. Both documents cover related topics and themes.`;
     }
   }
 
