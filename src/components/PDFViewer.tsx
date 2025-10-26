@@ -1162,14 +1162,34 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           // Ensure pageText is a string
           const safePageText = typeof pageText === 'string' ? pageText : String(pageText || '')
           const markedFormulas = extractMarkedFormulas(safePageText)
+          
+          // Debug: Log formula extraction
+          if (markedFormulas.length > 0) {
+            console.log(`🔍 Formula extraction - Page ${index + 1}:`, {
+              pageText: safePageText.substring(0, 200) + '...',
+              markedFormulas: markedFormulas.map(f => ({
+                formula: f.formula.substring(0, 50) + '...',
+                isBlock: f.isBlock,
+                marker: f.marker.substring(0, 30) + '...'
+              }))
+            })
+          }
+          
           markedFormulas.forEach(f => {
             allFormulas.push({ ...f, pageNum: index + 1 })
           })
         })
 
         if (allFormulas.length === 0) {
+          console.log('🔍 No formulas found in document pages')
           return
         }
+        
+        console.log(`🔍 Found ${allFormulas.length} formulas total`, allFormulas.map(f => ({
+          formula: f.formula.substring(0, 30) + '...',
+          isBlock: f.isBlock,
+          pageNum: f.pageNum
+        })))
 
         // Filter out formulas that are already converted
         const formulasToConvert = allFormulas
@@ -1183,9 +1203,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           }))
 
         if (formulasToConvert.length === 0) {
-          // All formulas are already converted
+          console.log('🔍 All formulas already converted, skipping conversion')
           return
         }
+        
+        console.log(`🔍 Converting ${formulasToConvert.length} formulas`, formulasToConvert.map(f => ({
+          text: f.text.substring(0, 30) + '...',
+          isBlock: f.isBlock
+        })))
 
         // Convert formulas that aren't already cached
         setIsConvertingFormulas(true)
