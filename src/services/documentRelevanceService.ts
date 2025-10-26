@@ -151,8 +151,24 @@ OUTPUT FORMAT (strict JSON):
 
       const response = await sendMessageToAI(analysisPrompt, content.substring(0, 3000));
       
+      console.log('DocumentRelevanceService: AI response received:', response.substring(0, 200));
+      
       try {
-        const analysis = JSON.parse(response);
+        // Try to extract JSON from the response (in case AI adds extra text)
+        let jsonText = response.trim();
+        const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          jsonText = jsonMatch[0];
+        }
+        
+        const analysis = JSON.parse(jsonText);
+        
+        console.log('DocumentRelevanceService: Successfully parsed AI analysis:', {
+          hasSummary: !!analysis.summary,
+          keywordsCount: analysis.keywords?.length || 0,
+          topicsCount: analysis.topics?.length || 0
+        });
+        
         return {
           summary: analysis.summary || 'Unable to generate summary',
           keywords: analysis.keywords || [],
@@ -160,7 +176,8 @@ OUTPUT FORMAT (strict JSON):
           mainThemes: analysis.mainThemes || []
         };
       } catch (parseError) {
-        console.warn('DocumentRelevanceService: Failed to parse AI response, using fallback');
+        console.error('DocumentRelevanceService: Failed to parse AI response:', parseError);
+        console.error('DocumentRelevanceService: Response was:', response);
         return {
           summary: 'Document analysis completed',
           keywords: this.extractKeywordsFallback(content),
@@ -387,6 +404,7 @@ YOUR DESCRIPTION:`;
           await documentRelationships.markAsProcessing(relationship.id);
 
           // Calculate relevance with timeout and retry logic
+          console.log(`DocumentRelevanceService: Starting calculation for relationship ${relationship.id}`);
           const result = await this.calculateRelevanceWithRetry(
             relationship.source_document_id,
             relationship.related_document_id,
@@ -394,6 +412,12 @@ YOUR DESCRIPTION:`;
           );
 
           if (result) {
+            console.log(`DocumentRelevanceService: Got result for relationship ${relationship.id}:`, {
+              relevancePercentage: result.relevancePercentage,
+              hasDescription: !!result.aiDescription,
+              descriptionPreview: result.aiDescription?.substring(0, 100)
+            });
+            
             // Update with results
             await documentRelationships.markAsCompleted(
               relationship.id,
@@ -404,15 +428,19 @@ YOUR DESCRIPTION:`;
             console.log(`DocumentRelevanceService: Completed calculation for relationship ${relationship.id}: ${result.relevancePercentage}%`);
           } else {
             // Mark as failed after retries
+            console.warn(`DocumentRelevanceService: No result returned for relationship ${relationship.id}, marking as failed`);
             await documentRelationships.markAsFailed(relationship.id);
             console.log(`DocumentRelevanceService: Failed calculation for relationship ${relationship.id} after retries`);
           }
 
         } catch (error) {
           console.error(`DocumentRelevanceService: Error processing relationship ${relationship.id}:`, error);
+          console.error('DocumentRelevanceService: Error stack:', error instanceof Error ? error.stack : 'No stack');
           
           // Mark as failed
-          await documentRelationships.markAsFailed(relationship.id);
+          await documentRelationships.markAsFailed(relationship.id).catch(err => {
+            console.error('DocumentRelevanceService: Failed to mark as failed:', err);
+          });
         } finally {
           this.processingQueue.delete(relationship.id);
         }
