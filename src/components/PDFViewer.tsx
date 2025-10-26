@@ -346,8 +346,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   const [formulaLatex, setFormulaLatex] = useState<Map<string, string>>(new Map())
   const [isConvertingFormulas, setIsConvertingFormulas] = useState(false)
   const [formulaConversionProgress, setFormulaConversionProgress] = useState({ current: 0, total: 0 })
-  const [continuousModeRendered, setContinuousModeRendered] = useState(false)
   const [lastRenderedDocId, setLastRenderedDocId] = useState<string | null>(null)
+  
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -416,7 +416,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         pdfDocRef.current = pdf
         setNumPages(pdf.numPages)
         setIsLoading(false)
-        setContinuousModeRendered(false) // Reset to trigger re-render
         console.log('✅ PDF loaded successfully:', pdf.numPages, 'pages')
         console.log('PDF Document Info:', {
           numPages: pdf.numPages,
@@ -662,30 +661,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     renderPage()
   }, [pageNumber, scale, rotation, pdfViewer.scrollMode, pdfViewer.readingMode, numPages])
 
-  // Reset continuous mode rendered flag when scale/rotation changes
-  useEffect(() => {
-    // Only reset if scale/rotation changed - don't reset on scrollMode changes
-    // This preserves the cache when switching between modes
-    setContinuousModeRendered(false)
-  }, [scale, rotation])
-  
-  // Handle document changes - reset cache when document changes
+  // Handle document changes - reset when document changes
   useEffect(() => {
     // Reset if document changed
     if (document.id !== lastRenderedDocId) {
-      setContinuousModeRendered(false)
       setLastRenderedDocId(document.id)
     }
   }, [document.id, lastRenderedDocId])
 
-  // Handle scroll mode changes - reset cache when switching TO continuous mode
-  useEffect(() => {
-    // Only reset when switching TO continuous mode (not FROM it)
-    if (pdfViewer.scrollMode === 'continuous' && !continuousModeRendered) {
-      console.log('🔄 Switching to continuous mode, resetting cache')
-      setContinuousModeRendered(false)
-    }
-  }, [pdfViewer.scrollMode])
   
   // Render all pages (continuous scroll mode)
   useEffect(() => {
@@ -693,13 +676,37 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       return
     }
     if (pdfViewer.readingMode) return // Don't render PDF when in reading mode
-    if (continuousModeRendered) return // Already rendered, skip to avoid re-renders
     
-    console.log('🔄 Continuous mode rendering triggered', {
+    // Always check if we need to re-render by verifying actual DOM state
+    const needsRerender = Array.from({ length: numPages }, (_, i) => i + 1).some(pageNum => {
+      const textLayerDiv = pageTextLayerRefs.current.get(pageNum)
+      const canvas = pageCanvasRefs.current.get(pageNum)
+      
+      // Need to re-render if:
+      // 1. Text layer doesn't exist or is empty
+      // 2. Canvas doesn't exist (DOM element was destroyed)
+      return !textLayerDiv || !canvas || textLayerDiv.children.length === 0
+    })
+    
+    if (!needsRerender) {
+      console.log('🎯 All pages already rendered correctly, skipping')
+      return
+    }
+    
+    // Determine the specific reason for re-rendering
+    const emptyPages = Array.from({ length: numPages }, (_, i) => i + 1).filter(pageNum => {
+      const textLayerDiv = pageTextLayerRefs.current.get(pageNum)
+      const canvas = pageCanvasRefs.current.get(pageNum)
+      return !textLayerDiv || !canvas || textLayerDiv.children.length === 0
+    })
+    const reason = `empty/missing elements on pages: ${emptyPages.join(', ')}`
+    
+    console.log('🔄 Rendering pages for continuous mode:', {
       numPages,
       hasRefs: pageCanvasRefs.current.size > 0,
       scrollMode: pdfViewer.scrollMode,
-      alreadyRendered: continuousModeRendered
+      needsRerender: true,
+      reason
     })
 
     const renderAllPages = async () => {
@@ -858,11 +865,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       }
       
       console.log('🎉 All pages rendered in continuous mode')
-      setContinuousModeRendered(true)
     }
 
     renderAllPages()
-  }, [pdfViewer.scrollMode, pdfViewer.readingMode, numPages, scale, rotation, continuousModeRendered])
+  }, [pdfViewer.readingMode, numPages, scale, rotation])
   
   // Force text layer interactivity after any render (additional safety net)
   useEffect(() => {
@@ -2884,9 +2890,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               numPages && Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
                 <div 
                   key={pageNum} 
-                  className="relative bg-white shadow-2xl" 
+                  className="relative bg-white shadow-2xl mb-4" 
                   data-page-number={pageNum} 
-                  style={{ minHeight: '600px', minWidth: '400px' }}
+                  style={{ 
+                    minHeight: '600px', 
+                    minWidth: '400px'
+                  }}
                   onContextMenu={handleContextMenuClick}
                 >
                   <canvas
@@ -2948,8 +2957,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                         </div>
                       )
                     })}
-            </div>
-              ))
+                  </div>
+                ))
             )}
       </div>
         ) : (
