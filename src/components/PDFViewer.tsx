@@ -685,7 +685,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       // Need to re-render if:
       // 1. Text layer doesn't exist or is empty
       // 2. Canvas doesn't exist (DOM element was destroyed)
-      return !textLayerDiv || !canvas || textLayerDiv.children.length === 0
+      const needsRender = !textLayerDiv || !canvas || textLayerDiv.children.length === 0
+      
+      if (needsRender) {
+        console.log(`🔍 Page ${pageNum} needs render:`, {
+          hasTextLayer: !!textLayerDiv,
+          hasCanvas: !!canvas,
+          textLayerChildren: textLayerDiv?.children.length || 0
+        })
+      }
+      
+      return needsRender
     })
     
     if (!needsRerender) {
@@ -706,7 +716,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       hasRefs: pageCanvasRefs.current.size > 0,
       scrollMode: pdfViewer.scrollMode,
       needsRerender: true,
-      reason
+      reason,
+      canvasRefs: pageCanvasRefs.current.size,
+      textLayerRefs: pageTextLayerRefs.current.size
     })
 
     const renderAllPages = async () => {
@@ -737,9 +749,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         expectedPages: numPages
       })
       
+      console.log(`🎨 Starting to render ${numPages} pages...`)
+      
       for (let pageNum = 1; pageNum <= numPages; pageNum++) {
         const canvas = pageCanvasRefs.current.get(pageNum)
         const textLayerDiv = pageTextLayerRefs.current.get(pageNum)
+        
+        console.log(`🎨 Rendering page ${pageNum}:`, {
+          hasCanvas: !!canvas,
+          hasTextLayer: !!textLayerDiv
+        })
+        
         if (!canvas) {
           console.log(`⏭️ Skipping page ${pageNum} - canvas ref not ready`)
           continue
@@ -856,7 +876,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               textLayerOpacity: textLayerDiv.style.opacity,
               textLayerPointerEvents: textLayerDiv.style.pointerEvents,
               textLayerUserSelect: textLayerDiv.style.userSelect,
-              childSpans: textLayerDiv.children.length
+              childSpans: textLayerDiv.children.length,
+              textLayerHTML: textLayerDiv.innerHTML.substring(0, 100) + '...'
             })
           }
         } catch (error) {
