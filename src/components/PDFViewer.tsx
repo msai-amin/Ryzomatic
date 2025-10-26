@@ -315,7 +315,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   const [showHighlightColorPopover, setShowHighlightColorPopover] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [currentHighlightColor, setCurrentHighlightColor] = useState('#FFD700')
-  const [isHighlightMode, setIsHighlightMode] = useState(false)
+  const [isHighlightMode, setIsHighlightMode] = useState(true) // Auto-enable highlight mode when document loads
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
@@ -2787,24 +2787,22 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                if (isHighlightMode) {
-                  setShowHighlightColorPopover(!showHighlightColorPopover)
-                }
+                setShowHighlightColorPopover(!showHighlightColorPopover)
               }}
               className="p-2 rounded-lg transition-colors"
               style={{
                 backgroundColor: showHighlightColorPopover ? 'var(--color-primary-light)' : 'transparent',
-                color: showHighlightColorPopover ? 'var(--color-primary)' : (isHighlightMode ? 'var(--color-text-primary)' : 'var(--color-text-secondary)'),
-                opacity: isHighlightMode ? 1 : 0.5
+                color: showHighlightColorPopover ? 'var(--color-primary)' : 'var(--color-text-primary)',
+                opacity: 1
               }}
               onMouseEnter={(e) => {
-                if (!showHighlightColorPopover && isHighlightMode) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                if (!showHighlightColorPopover) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
               }}
               onMouseLeave={(e) => {
                 if (!showHighlightColorPopover) e.currentTarget.style.backgroundColor = 'transparent'
               }}
-              title={isHighlightMode ? "Highlight Colors" : "Enable Highlight Mode first"}
-              disabled={!isHighlightMode}
+              title="Highlight Colors"
+              disabled={false}
             >
               <Palette className="w-5 h-5" />
             </button>
@@ -3155,7 +3153,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
       {/* Highlight Color Popover */}
       <HighlightColorPopover
-        isOpen={showHighlightColorPopover && isHighlightMode}
+        isOpen={showHighlightColorPopover}
         onClose={() => setShowHighlightColorPopover(false)}
         selectedColor={currentHighlightColor}
         onColorSelect={setCurrentHighlightColor}
