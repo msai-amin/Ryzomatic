@@ -7,6 +7,7 @@ import { AuthModal } from '../src/components/AuthModal'
 import { PomodoroTimer } from '../src/components/PomodoroTimer'
 import { Tooltip } from '../src/components/Tooltip'
 import { useTheme } from './ThemeProvider'
+import { timerService } from '../src/services/timerService'
 
 interface ThemedHeaderProps {
   onUploadClick: () => void
@@ -26,8 +27,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     isChatOpen,
     pomodoroIsRunning,
     pomodoroTimeLeft,
-    hasSeenPomodoroTour,
-    startPomodoroTimer
+    hasSeenPomodoroTour
   } = useAppStore()
   const [showSettings, setShowSettings] = React.useState(false)
   const [showLibrary, setShowLibrary] = React.useState(false)
@@ -189,7 +189,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             <Tooltip content={pomodoroIsRunning ? `Timer Running: ${Math.floor((pomodoroTimeLeft || 0) / 60)}:${String((pomodoroTimeLeft || 0) % 60).padStart(2, '0')}` : "Pomodoro Timer - Stay Focused"} position="bottom">
               <button
                 data-tour="pomodoro-button"
-                onClick={() => startPomodoroTimer()}
+                onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
                 className={`p-2 rounded-lg transition-all duration-300 text-2xl leading-none relative ${
                   !hasSeenPomodoroTour ? 'animate-pulse ring-2 ring-blue-500 ring-opacity-50' : ''
                 }`}
