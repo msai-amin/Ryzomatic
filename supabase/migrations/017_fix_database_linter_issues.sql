@@ -43,12 +43,12 @@ CREATE OR REPLACE FUNCTION public.mark_page_highlights_orphaned()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
 BEGIN
-  UPDATE highlights
+  UPDATE public.highlights
   SET is_orphaned = true
-  WHERE book_id NOT IN (SELECT id FROM user_books);
+  WHERE book_id NOT IN (SELECT id FROM public.user_books);
 END;
 $$;
 
@@ -61,7 +61,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
 BEGIN
   RETURN QUERY
@@ -69,8 +69,8 @@ BEGIN
     COUNT(DISTINCT h.id) as total_highlights,
     COUNT(DISTINCT h.book_id) as books_with_highlights,
     COUNT(DISTINCT h.id) FILTER (WHERE h.created_at > NOW() - INTERVAL '30 days') as recent_highlights
-  FROM highlights h
-  JOIN user_books ub ON h.book_id = ub.id
+  FROM public.highlights h
+  JOIN public.user_books ub ON h.book_id = ub.id
   WHERE ub.user_id = user_uuid;
 END;
 $$;
@@ -80,12 +80,12 @@ CREATE OR REPLACE FUNCTION public.bulk_delete_highlights(highlight_ids UUID[])
 RETURNS BIGINT
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
 DECLARE
   deleted_count BIGINT;
 BEGIN
-  DELETE FROM highlights
+  DELETE FROM public.highlights
   WHERE id = ANY(highlight_ids);
   
   GET DIAGNOSTICS deleted_count = ROW_COUNT;
@@ -107,7 +107,7 @@ RETURNS TABLE (
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
   SELECT 
     an.id,
@@ -117,8 +117,8 @@ AS $$
     an.position_x,
     an.position_y,
     an.created_at
-  FROM user_notes an
-  JOIN user_books ub ON an.book_id = ub.id
+  FROM public.user_notes an
+  JOIN public.user_books ub ON an.book_id = ub.id
   WHERE ub.user_id = user_uuid
     AND (q IS NULL OR an.content ILIKE '%' || q || '%')
   ORDER BY an.created_at DESC;
@@ -134,14 +134,14 @@ RETURNS TABLE (
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
   SELECT
     COUNT(*) as total_annotations,
     COUNT(DISTINCT an.book_id) as books_with_annotations,
     COUNT(*) FILTER (WHERE an.created_at > NOW() - INTERVAL '30 days') as recent_annotations
-  FROM user_notes an
-  JOIN user_books ub ON an.book_id = ub.id
+  FROM public.user_notes an
+  JOIN public.user_books ub ON an.book_id = ub.id
   WHERE ub.user_id = user_uuid;
 $$;
 
@@ -157,7 +157,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
 BEGIN
   RETURN QUERY
@@ -168,7 +168,7 @@ BEGIN
     dr.relevance_score,
     dr.relationship_type,
     dr.created_at
-  FROM document_relationships dr
+  FROM public.document_relationships dr
   WHERE dr.source_document_id = get_related_documents_with_details.source_document_id
   ORDER BY dr.relevance_score DESC, dr.created_at DESC;
 END;
@@ -183,7 +183,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
 BEGIN
   RETURN QUERY
@@ -191,7 +191,7 @@ BEGIN
     COUNT(*) as total_relationships,
     COUNT(DISTINCT source_document_id) as documents_with_relations,
     AVG(relevance_score) as average_relevance
-  FROM document_relationships dr
+  FROM public.document_relationships dr
   WHERE dr.user_id = user_id_param;
 END;
 $$;
@@ -201,13 +201,13 @@ CREATE OR REPLACE FUNCTION public.reset_monthly_vision_counters()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
 BEGIN
-  DELETE FROM vision_usage
+  DELETE FROM public.vision_usage
   WHERE extraction_date < DATE_TRUNC('month', CURRENT_DATE);
   
-  DELETE FROM document_usage
+  DELETE FROM public.document_usage
   WHERE extraction_date < DATE_TRUNC('month', CURRENT_DATE);
 END;
 $$;
@@ -217,7 +217,7 @@ CREATE OR REPLACE FUNCTION public.can_perform_vision_extraction(user_uuid UUID)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
 DECLARE
   monthly_count BIGINT;
@@ -228,8 +228,8 @@ BEGIN
     COALESCE((metadata->>'tier')::INT, 0),
     COUNT(*)
   INTO tier_limit, monthly_count
-  FROM profiles p
-  LEFT JOIN vision_usage vu ON vu.user_id = user_uuid 
+  FROM public.profiles p
+  LEFT JOIN public.vision_usage vu ON vu.user_id = user_uuid 
     AND DATE_TRUNC('month', vu.extraction_date) = DATE_TRUNC('month', CURRENT_DATE)
   WHERE p.id = user_uuid
   GROUP BY p.metadata;
@@ -255,7 +255,7 @@ CREATE OR REPLACE FUNCTION public.check_pomodoro_achievements(p_user_id UUID, p_
 RETURNS TABLE (achievement_type VARCHAR(50), unlocked BOOLEAN)
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
 DECLARE
   v_mode TEXT;
@@ -271,24 +271,24 @@ BEGIN
   
   -- Check first_steps achievement
   IF NOT EXISTS (
-    SELECT 1 FROM pomodoro_achievements 
+    SELECT 1 FROM public.pomodoro_achievements 
     WHERE user_id = p_user_id AND achievement_type = 'first_steps'
   ) THEN
-    INSERT INTO pomodoro_achievements (user_id, achievement_type)
+    INSERT INTO public.pomodoro_achievements (user_id, achievement_type)
     VALUES (p_user_id, 'first_steps');
     
     RETURN QUERY SELECT 'first_steps'::VARCHAR(50), TRUE;
   END IF;
   
   -- Check consistent_reader achievement (3 sessions same day)
-  IF (SELECT COUNT(*) FROM pomodoro_sessions 
+  IF (SELECT COUNT(*) FROM public.pomodoro_sessions 
       WHERE user_id = p_user_id AND completed = TRUE 
       AND DATE(started_at) = CURRENT_DATE) >= 3 
      AND NOT EXISTS (
-       SELECT 1 FROM pomodoro_achievements 
+       SELECT 1 FROM public.pomodoro_achievements 
        WHERE user_id = p_user_id AND achievement_type = 'consistent_reader'
      ) THEN
-    INSERT INTO pomodoro_achievements (user_id, achievement_type)
+    INSERT INTO public.pomodoro_achievements (user_id, achievement_type)
     VALUES (p_user_id, 'consistent_reader');
     
     RETURN QUERY SELECT 'consistent_reader'::VARCHAR(50), TRUE;
@@ -303,7 +303,7 @@ CREATE OR REPLACE FUNCTION public.update_pomodoro_streak(p_user_id UUID, p_sessi
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
 DECLARE
   v_existing_streak RECORD;
@@ -312,16 +312,16 @@ BEGIN
   v_yesterday := p_session_date - INTERVAL '1 day';
   
   SELECT * INTO v_existing_streak
-  FROM pomodoro_streaks
+  FROM public.pomodoro_streaks
   WHERE user_id = p_user_id;
   
   IF v_existing_streak IS NULL THEN
     -- Create new streak
-    INSERT INTO pomodoro_streaks (user_id, current_streak, longest_streak, last_session_date)
+    INSERT INTO public.pomodoro_streaks (user_id, current_streak, longest_streak, last_session_date)
     VALUES (p_user_id, 1, 1, p_session_date);
   ELSIF v_existing_streak.last_session_date = v_yesterday OR v_existing_streak.last_session_date = p_session_date THEN
     -- Continue streak
-    UPDATE pomodoro_streaks
+    UPDATE public.pomodoro_streaks
     SET 
       current_streak = current_streak + 1,
       longest_streak = GREATEST(longest_streak, current_streak + 1),
@@ -329,7 +329,7 @@ BEGIN
     WHERE user_id = p_user_id;
   ELSE
     -- Reset streak
-    UPDATE pomodoro_streaks
+    UPDATE public.pomodoro_streaks
     SET current_streak = 1, last_session_date = p_session_date
     WHERE user_id = p_user_id;
   END IF;
@@ -345,12 +345,12 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
 BEGIN
   RETURN QUERY
   SELECT pa.achievement_type, pa.unlocked_at, pa.metadata
-  FROM pomodoro_achievements pa
+  FROM public.pomodoro_achievements pa
   WHERE pa.user_id = p_user_id
   ORDER BY pa.unlocked_at DESC;
 END;
@@ -368,7 +368,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
 BEGIN
   RETURN QUERY
@@ -379,7 +379,7 @@ BEGIN
     COALESCE(ps.weekly_goal, 15),
     COALESCE(ps.weekly_progress, 0),
     ps.week_start_date
-  FROM pomodoro_streaks ps
+  FROM public.pomodoro_streaks ps
   WHERE ps.user_id = p_user_id;
 END;
 $$;
@@ -392,13 +392,13 @@ CREATE OR REPLACE FUNCTION public.update_tag_usage_count()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
 BEGIN
-  INSERT INTO tag_usage_counts (tag_name, usage_count)
+  INSERT INTO public.tag_usage_counts (tag_name, usage_count)
   VALUES (NEW.tag_name, 1)
   ON CONFLICT (tag_name) 
-  DO UPDATE SET usage_count = tag_usage_counts.usage_count + 1;
+  DO UPDATE SET usage_count = public.tag_usage_counts.usage_count + 1;
   
   RETURN NEW;
 END;
@@ -415,7 +415,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
 BEGIN
   RETURN QUERY
@@ -426,7 +426,7 @@ BEGIN
       c.parent_id,
       0 as level,
       c.name as path
-    FROM collections c
+    FROM public.collections c
     WHERE c.user_id = user_uuid AND c.parent_id IS NULL
     
     UNION ALL
@@ -437,7 +437,7 @@ BEGIN
       c.parent_id,
       h.level + 1,
       h.path || ' > ' || c.name
-    FROM collections c
+    FROM public.collections c
     JOIN hierarchy h ON c.parent_id = h.id
   )
   SELECT * FROM hierarchy;
@@ -455,15 +455,15 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
 BEGIN
   RETURN QUERY
   SELECT h.id, h.page_number, h.content, h.color, h.created_at
-  FROM highlights h
+  FROM public.highlights h
   WHERE h.book_id = book_uuid
     AND EXISTS (
-      SELECT 1 FROM user_books ub 
+      SELECT 1 FROM public.user_books ub 
       WHERE ub.id = book_uuid AND ub.user_id = user_uuid
     )
   ORDER BY h.page_number, h.created_at;
@@ -480,7 +480,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
 BEGIN
   RETURN QUERY
@@ -489,7 +489,7 @@ BEGIN
     SUM(total_pages) as total_pages,
     SUM(reading_time_minutes) as total_reading_time,
     AVG(progress_percentage) as average_progress
-  FROM user_books
+  FROM public.user_books
   WHERE user_id = user_uuid;
 END;
 $$;
@@ -505,7 +505,7 @@ RETURNS TABLE(
 ) 
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
 BEGIN
   RETURN QUERY
@@ -514,7 +514,7 @@ BEGIN
       'first_steps'::VARCHAR(50) as achievement_type,
       LEAST(COUNT(*), 1) as current_progress,
       1::BIGINT as target_progress
-    FROM pomodoro_sessions 
+    FROM public.pomodoro_sessions 
     WHERE user_id = p_user_id AND completed = true
     
     UNION ALL
@@ -523,7 +523,7 @@ BEGIN
       'consistent_reader'::VARCHAR(50),
       LEAST(COUNT(*), 3),
       3::BIGINT
-    FROM pomodoro_sessions 
+    FROM public.pomodoro_sessions 
     WHERE user_id = p_user_id 
       AND completed = true 
       AND DATE(started_at) = CURRENT_DATE
@@ -534,7 +534,7 @@ BEGIN
       'speed_reader'::VARCHAR(50),
       LEAST(COUNT(*), 50),
       50::BIGINT
-    FROM pomodoro_sessions 
+    FROM public.pomodoro_sessions 
     WHERE user_id = p_user_id AND completed = true
     
     UNION ALL
@@ -543,7 +543,7 @@ BEGIN
       'century_club'::VARCHAR(50),
       LEAST(COUNT(*), 100),
       100::BIGINT
-    FROM pomodoro_sessions 
+    FROM public.pomodoro_sessions 
     WHERE user_id = p_user_id AND completed = true
   )
   SELECT 
@@ -553,7 +553,7 @@ BEGIN
     COALESCE(pa.achievement_type IS NOT NULL, false) as is_unlocked,
     ROUND((pd.current_progress::NUMERIC / pd.target_progress::NUMERIC) * 100, 2) as progress_percentage
   FROM progress_data pd
-  LEFT JOIN pomodoro_achievements pa ON pa.user_id = p_user_id AND pa.achievement_type = pd.achievement_type
+  LEFT JOIN public.pomodoro_achievements pa ON pa.user_id = p_user_id AND pa.achievement_type = pd.achievement_type
   ORDER BY pd.achievement_type;
 END;
 $$;
