@@ -307,8 +307,17 @@ export const AddRelatedDocumentModal: React.FC<AddRelatedDocumentModalProps> = (
             <div>
               <DocumentUpload
                 onClose={() => {
-                  // Handle upload completion differently
-                  console.log('Document upload completed');
+                  // Reset to library tab after upload completes
+                  setActiveTab('library');
+                }}
+                onUploadComplete={(uploadedDocumentId) => {
+                  // Automatically create relationship after upload
+                  console.log('DocumentUpload: Upload completed with ID:', uploadedDocumentId);
+                  setSelectedDocumentId(uploadedDocumentId);
+                  // Close the modal after handling the uploaded document
+                  setTimeout(() => {
+                    onClose();
+                  }, 500);
                 }}
               />
             </div>

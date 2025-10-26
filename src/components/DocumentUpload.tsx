@@ -17,9 +17,10 @@ import { canPerformVisionExtraction } from '../services/visionUsageService'
 
 interface DocumentUploadProps {
   onClose: () => void
+  onUploadComplete?: (documentId: string) => void // Optional callback for when upload completes
 }
 
-export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
+export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploadComplete }) => {
   const { addDocument, setLoading, refreshLibrary } = useAppStore()
   const [dragActive, setDragActive] = useState(false)
   const [showOCRDialog, setShowOCRDialog] = useState(false)
@@ -28,6 +29,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
   const [saveToLibrary, setSaveToLibrary] = useState(true)
   const [userProfile, setUserProfile] = useState<any>({ tier: 'free', credits: 0, ocr_count_monthly: 0 })
   const [extractionProgress, setExtractionProgress] = useState<string>('')
+  const [uploadedDocumentId, setUploadedDocumentId] = useState<string | null>(null)
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -181,6 +183,9 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
         // Either OCR not needed or auto-approved
         addDocument(document)
         
+        // Store document ID for callback
+        setUploadedDocumentId(document.id)
+        
         logger.info('PDF document processed successfully', context, {
           documentId: document.id,
           totalPages,
@@ -282,6 +287,9 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
         
         addDocument(document)
         
+        // Store document ID for callback
+        setUploadedDocumentId(document.id)
+        
         logger.info('Text document processed successfully', context, {
           documentId: document.id,
           contentLength: content.length
@@ -335,6 +343,12 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose }) => {
             }
           }, context);
         }
+      }
+      
+      // Call the upload complete callback if provided
+      if (onUploadComplete && uploadedDocumentId) {
+        console.log('DocumentUpload: Calling onUploadComplete with document:', uploadedDocumentId);
+        onUploadComplete(uploadedDocumentId);
       }
       
       onClose()
