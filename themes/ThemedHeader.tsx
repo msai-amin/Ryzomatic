@@ -65,7 +65,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
 
   return (
     <header 
-      className="sticky top-0 z-40"
+      className="sticky top-0 z-50"
       style={{
         background: 'linear-gradient(180deg, var(--color-surface) 0%, rgba(17, 24, 39, 0.95) 100%)',
         borderBottom: '1px solid var(--color-border)',

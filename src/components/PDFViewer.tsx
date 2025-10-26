@@ -2584,7 +2584,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       {/* PDF Controls */}
       <div 
         ref={toolbarRef}
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${isToolbarStuck ? 'backdrop-blur-md shadow-lg' : 'backdrop-blur-sm shadow-sm'}`}
+        className={`fixed top-[var(--header-height)] left-0 right-0 z-40 transition-all duration-300 ease-in-out ${isToolbarStuck ? 'backdrop-blur-md shadow-lg' : 'backdrop-blur-sm shadow-sm'}`}
         style={{ 
           backgroundColor: 'var(--color-surface)', 
           borderBottom: isToolbarStuck 
