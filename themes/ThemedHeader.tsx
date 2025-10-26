@@ -26,41 +26,18 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     isChatOpen,
     pomodoroIsRunning,
     pomodoroTimeLeft,
-    hasSeenPomodoroTour
+    hasSeenPomodoroTour,
+    startPomodoroTimer
   } = useAppStore()
   const [showSettings, setShowSettings] = React.useState(false)
   const [showLibrary, setShowLibrary] = React.useState(false)
   const [showAuth, setShowAuth] = React.useState(false)
-  const [showPomodoro, setShowPomodoro] = React.useState(false)
-  const pomodoroButtonRef = React.useRef<HTMLButtonElement>(null)
-  const pomodoroDropdownRef = React.useRef<HTMLDivElement>(null)
 
   const { currentTheme } = useTheme()
 
   const handleLogout = async () => {
     await logout()
   }
-
-  // Click outside handler for Pomodoro dropdown
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (showPomodoro && 
-          pomodoroDropdownRef.current && 
-          !pomodoroDropdownRef.current.contains(event.target as Node) &&
-          pomodoroButtonRef.current &&
-          !pomodoroButtonRef.current.contains(event.target as Node)) {
-        setShowPomodoro(false)
-      }
-    }
-
-    if (showPomodoro) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showPomodoro])
 
 
   return (
@@ -207,26 +184,22 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             </Tooltip>
           )}
 
-          {/* Pomodoro Timer Button - Only show when user is authenticated and has a document */}
-          {user && currentDocument && (
+          {/* Pomodoro Timer Button - Only show when user is authenticated, has a document, and Pomodoro is NOT running */}
+          {user && currentDocument && !pomodoroIsRunning && (
             <Tooltip content={pomodoroIsRunning ? `Timer Running: ${Math.floor((pomodoroTimeLeft || 0) / 60)}:${String((pomodoroTimeLeft || 0) % 60).padStart(2, '0')}` : "Pomodoro Timer - Stay Focused"} position="bottom">
               <button
-                ref={pomodoroButtonRef}
                 data-tour="pomodoro-button"
-                onClick={() => setShowPomodoro(!showPomodoro)}
+                onClick={() => startPomodoroTimer()}
                 className={`p-2 rounded-lg transition-all duration-300 text-2xl leading-none relative ${
-                  pomodoroIsRunning ? 'animate-pulse-slow' : ''
-                } ${!hasSeenPomodoroTour ? 'animate-pulse ring-2 ring-blue-500 ring-opacity-50' : ''}`}
+                  !hasSeenPomodoroTour ? 'animate-pulse ring-2 ring-blue-500 ring-opacity-50' : ''
+                }`}
                 style={{
-                  backgroundColor: showPomodoro ? 'var(--color-primary-light)' : 'transparent',
-                  border: showPomodoro ? '2px solid var(--color-primary)' : 'none',
+                  backgroundColor: 'transparent',
+                  border: 'none',
                 }}
                 aria-label={pomodoroIsRunning ? `Pomodoro Timer Running: ${Math.floor((pomodoroTimeLeft || 0) / 60)}:${String((pomodoroTimeLeft || 0) % 60).padStart(2, '0')}` : "Open Pomodoro Timer"}
               >
                 🍅
-                {pomodoroIsRunning && !showPomodoro && (
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                )}
               </button>
             </Tooltip>
           )}
@@ -344,20 +317,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
         <TypographySettings onClose={() => setShowSettings(false)} />
       )}
 
-      {/* Pomodoro Timer Dropdown */}
-      {showPomodoro && currentDocument && (
-        <div 
-          ref={pomodoroDropdownRef}
-          className="absolute top-full right-0 mt-2 z-50"
-          style={{ minWidth: '400px' }}
-        >
-          <PomodoroTimer 
-            documentId={currentDocument.id}
-            documentName={currentDocument.name}
-            onClose={() => setShowPomodoro(false)}
-          />
-        </div>
-      )}
     </header>
   )
 }
