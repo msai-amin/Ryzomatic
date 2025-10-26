@@ -275,11 +275,13 @@ export const LibrarySearchBar: React.FC<LibrarySearchBarProps> = ({
                   setLibraryView({ viewMode: option.value as any });
                   onViewModeChange(option.value as any);
                 }}
-                className={`p-2 rounded-md transition-colors ${
-                  libraryView.viewMode === option.value
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-500 hover:bg-gray-100'
-                }`}
+                className="p-2 rounded-md transition-colors"
+                style={{
+                  backgroundColor: libraryView.viewMode === option.value ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                  color: libraryView.viewMode === option.value ? '#3b82f6' : 'var(--color-text-secondary)',
+                }}
+                onMouseEnter={(e) => libraryView.viewMode !== option.value && (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+                onMouseLeave={(e) => libraryView.viewMode !== option.value && (e.currentTarget.style.backgroundColor = 'transparent')}
                 title={option.label}
               >
                 <Icon className="w-4 h-4" />
@@ -291,11 +293,13 @@ export const LibrarySearchBar: React.FC<LibrarySearchBarProps> = ({
         {/* Filters toggle */}
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
-            showFilters
-              ? 'bg-blue-100 text-blue-700'
-              : 'text-gray-700 hover:bg-gray-100'
-          }`}
+          className="flex items-center gap-2 px-3 py-2 rounded-md transition-colors"
+          style={{
+            backgroundColor: showFilters ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+            color: showFilters ? '#3b82f6' : 'var(--color-text-primary)',
+          }}
+          onMouseEnter={(e) => !showFilters && (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+          onMouseLeave={(e) => !showFilters && (e.currentTarget.style.backgroundColor = 'transparent')}
         >
           <Filter className="w-4 h-4" />
           <span className="text-sm font-medium">Filters</span>
@@ -304,7 +308,13 @@ export const LibrarySearchBar: React.FC<LibrarySearchBarProps> = ({
 
       {/* Filters panel */}
       {showFilters && (
-        <div className="p-4 bg-gray-50 rounded-lg border">
+        <div 
+          className="p-4 rounded-lg border"
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            borderColor: 'var(--color-border)',
+          }}
+        >
           <LibraryFiltersPanel
             filters={libraryView.filters}
             onFiltersChange={(newFilters) => {

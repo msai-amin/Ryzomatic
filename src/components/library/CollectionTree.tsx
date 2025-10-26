@@ -127,10 +127,14 @@ const CollectionNode: React.FC<CollectionNodeProps> = ({
   return (
     <div className="relative">
       <div
-        className={`flex items-center py-1 px-2 rounded-md cursor-pointer group hover:bg-gray-100 transition-colors ${
-          isSelected ? 'bg-blue-100 text-blue-700' : ''
-        }`}
-        style={{ paddingLeft: `${level * 16 + 8}px` }}
+        className="flex items-center py-1 px-2 rounded-md cursor-pointer group transition-colors"
+        style={{ 
+          paddingLeft: `${level * 16 + 8}px`,
+          backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+          color: isSelected ? '#3b82f6' : 'var(--color-text-primary)',
+        }}
+        onMouseEnter={(e) => !isSelected && (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+        onMouseLeave={(e) => !isSelected && (e.currentTarget.style.backgroundColor = 'transparent')}
         onClick={() => onSelect(collection.id)}
         onContextMenu={handleContextMenu}
       >
@@ -140,7 +144,10 @@ const CollectionNode: React.FC<CollectionNodeProps> = ({
             e.stopPropagation();
             onToggle(collection.id);
           }}
-          className="w-4 h-4 flex items-center justify-center mr-1 hover:bg-gray-200 rounded"
+          className="w-4 h-4 flex items-center justify-center mr-1 rounded transition-colors"
+          style={{ color: 'var(--color-text-secondary)' }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface)'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
         >
           {hasChildren ? (
             isExpanded ? (
@@ -175,9 +182,18 @@ const CollectionNode: React.FC<CollectionNodeProps> = ({
             type="text"
             value={editName}
             onChange={(e) => setEditName(e.target.value)}
-            onBlur={handleSaveEdit}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = 'var(--color-border)'
+              handleSaveEdit()
+            }}
             onKeyDown={handleKeyDown}
-            className="flex-1 px-1 py-0.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="flex-1 px-1 py-0.5 text-sm rounded focus:outline-none"
+            style={{
+              border: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-surface)',
+              color: 'var(--color-text-primary)',
+            }}
+            onFocus={(e) => e.currentTarget.style.borderColor = '#3b82f6'}
             onClick={(e) => e.stopPropagation()}
           />
         ) : (
@@ -188,7 +204,7 @@ const CollectionNode: React.FC<CollectionNodeProps> = ({
 
         {/* Book count */}
         {collection.book_count && collection.book_count > 0 && (
-          <span className="text-xs text-gray-500 ml-2">
+          <span className="text-xs ml-2" style={{ color: 'var(--color-text-secondary)' }}>
             ({collection.book_count})
           </span>
         )}
@@ -199,12 +215,15 @@ const CollectionNode: React.FC<CollectionNodeProps> = ({
             e.stopPropagation();
             onToggleFavorite(collection.id, !collection.is_favorite);
           }}
-          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-200 rounded"
+          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded"
+          style={{ color: collection.is_favorite ? '#f59e0b' : 'var(--color-text-secondary)' }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface)'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
         >
           {collection.is_favorite ? (
-            <Star className="w-3 h-3 text-yellow-500 fill-current" />
+            <Star className="w-3 h-3 fill-current" />
           ) : (
-            <StarOff className="w-3 h-3 text-gray-400" />
+            <StarOff className="w-3 h-3" />
           )}
         </button>
 
@@ -214,7 +233,10 @@ const CollectionNode: React.FC<CollectionNodeProps> = ({
             e.stopPropagation();
             setShowContextMenu(!showContextMenu);
           }}
-          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-200 rounded"
+          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded"
+          style={{ color: 'var(--color-text-secondary)' }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface)'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
         >
           <MoreVertical className="w-3 h-3" />
         </button>
@@ -224,25 +246,38 @@ const CollectionNode: React.FC<CollectionNodeProps> = ({
       {showContextMenu && (
         <div
           ref={contextMenuRef}
-          className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border z-50"
+          className="absolute right-0 top-full mt-1 w-48 rounded-lg shadow-lg border z-50"
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            borderColor: 'var(--color-border)',
+          }}
         >
           <button
             onClick={() => handleAction('edit')}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+            style={{ color: 'var(--color-text-primary)' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           >
             <Edit3 className="w-4 h-4" />
             Rename
           </button>
           <button
             onClick={() => handleAction('create')}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+            style={{ color: 'var(--color-text-primary)' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           >
             <Plus className="w-4 h-4" />
             New Subcollection
           </button>
           <button
             onClick={() => handleAction('delete')}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+            style={{ color: '#ef4444' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           >
             <Trash2 className="w-4 h-4" />
             Delete
@@ -348,15 +383,19 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({
     <div className={`space-y-1 ${className}`}>
       {/* All Books option */}
       <div
-        className={`flex items-center py-1 px-2 rounded-md cursor-pointer group hover:bg-gray-100 transition-colors ${
-          selectedCollectionId === null ? 'bg-blue-100 text-blue-700' : ''
-        }`}
+        className="flex items-center py-1 px-2 rounded-md cursor-pointer group transition-colors"
+        style={{
+          backgroundColor: selectedCollectionId === null ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+          color: selectedCollectionId === null ? '#3b82f6' : 'var(--color-text-primary)',
+        }}
+        onMouseEnter={(e) => selectedCollectionId !== null && (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+        onMouseLeave={(e) => selectedCollectionId !== null && (e.currentTarget.style.backgroundColor = 'transparent')}
         onClick={handleSelectAll}
       >
         <div className="w-4 h-4 mr-1" />
-        <Folder className="w-4 h-4 mr-2 text-gray-500" />
+        <Folder className="w-4 h-4 mr-2" style={{ color: 'var(--color-text-secondary)' }} />
         <span className="flex-1 text-sm font-medium">All Books</span>
-        <span className="text-xs text-gray-500">
+        <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
           ({collections.reduce((sum, c) => sum + (c.book_count || 0), 0)})
         </span>
       </div>
@@ -367,7 +406,16 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({
       {/* Create new collection button */}
       <button
         onClick={() => onCreateCollection()}
-        className="w-full flex items-center py-2 px-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+        className="w-full flex items-center py-2 px-2 text-sm rounded-md transition-colors"
+        style={{ color: 'var(--color-text-secondary)' }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+          e.currentTarget.style.color = 'var(--color-text-primary)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent'
+          e.currentTarget.style.color = 'var(--color-text-secondary)'
+        }}
       >
         <Plus className="w-4 h-4 mr-2" />
         New Collection
