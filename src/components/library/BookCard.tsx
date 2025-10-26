@@ -149,7 +149,13 @@ export const BookCard: React.FC<BookCardProps> = ({
           </span>
         ))}
         {remainingCount > 0 && (
-          <span className="px-2 py-1 text-xs text-gray-500 bg-gray-100 rounded-full">
+          <span 
+            className="px-2 py-1 text-xs rounded-full"
+            style={{
+              color: 'var(--color-text-secondary)',
+              backgroundColor: 'var(--color-surface-hover)',
+            }}
+          >
             +{remainingCount}
           </span>
         )}
@@ -161,7 +167,7 @@ export const BookCard: React.FC<BookCardProps> = ({
     if (book.collections.length === 0) return null;
     
     return (
-      <div className="flex items-center gap-1 text-xs text-gray-500">
+      <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
         {book.collections.slice(0, 2).map((collection, index) => (
           <span key={index} className="flex items-center gap-1">
             <span 
@@ -202,11 +208,11 @@ export const BookCard: React.FC<BookCardProps> = ({
   if (viewMode === 'list') {
     return (
       <div
-        className={`flex items-center p-3 rounded-lg border transition-all duration-200 cursor-pointer group ${
-          isSelected 
-            ? 'border-blue-500 bg-blue-50' 
-            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-        } ${className}`}
+        className={`flex items-center p-3 rounded-lg border transition-all duration-200 cursor-pointer group ${className}`}
+        style={{
+          borderColor: isSelected ? '#3b82f6' : 'var(--color-border)',
+          backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+        }}
         onClick={() => onOpen(book)}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -219,11 +225,12 @@ export const BookCard: React.FC<BookCardProps> = ({
               e.stopPropagation();
               onSelect(book.id);
             }}
-            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-              isSelected 
-                ? 'bg-blue-500 border-blue-500 text-white' 
-                : 'border-gray-300 hover:border-gray-400'
-            }`}
+            className="w-4 h-4 rounded border-2 flex items-center justify-center transition-colors"
+            style={{
+              backgroundColor: isSelected ? '#3b82f6' : 'transparent',
+              borderColor: isSelected ? '#3b82f6' : 'var(--color-border)',
+              color: isSelected ? 'white' : 'var(--color-text-secondary)',
+            }}
           >
             {isSelected && <Check className="w-3 h-3" />}
           </button>
@@ -241,12 +248,12 @@ export const BookCard: React.FC<BookCardProps> = ({
         {/* Book info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="font-medium text-gray-900 truncate">{book.title}</h3>
+            <h3 className="font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>{book.title}</h3>
             {book.is_favorite && (
               <Star className="w-4 h-4 text-yellow-500 fill-current" />
             )}
           </div>
-          <div className="flex items-center gap-4 text-sm text-gray-500">
+          <div className="flex items-center gap-4 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
             <span className="uppercase">{book.file_type}</span>
             {book.total_pages && <span>{book.total_pages} pages</span>}
             {book.last_read_at && (
@@ -288,12 +295,17 @@ export const BookCard: React.FC<BookCardProps> = ({
             <button
               onClick={handleToggleFavorite}
               disabled={isUpdating}
-              className="p-1 rounded hover:bg-gray-100 transition-colors"
+              className="p-1 rounded transition-colors"
+              style={{
+                color: book.is_favorite ? '#f59e0b' : 'var(--color-text-secondary)',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
               {book.is_favorite ? (
-                <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                <Star className="w-4 h-4 fill-current" />
               ) : (
-                <StarOff className="w-4 h-4 text-gray-400" />
+                <StarOff className="w-4 h-4" />
               )}
             </button>
           </div>
@@ -301,31 +313,49 @@ export const BookCard: React.FC<BookCardProps> = ({
 
         {/* Context menu */}
         {showContextMenu && (
-          <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border z-50">
+          <div 
+            className="absolute right-0 top-full mt-1 w-48 rounded-lg shadow-lg border z-50"
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              borderColor: 'var(--color-border)',
+            }}
+          >
             <button
               onClick={() => handleAction('edit')}
-              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+              className="w-full px-4 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+              style={{ color: 'var(--color-text-primary)' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
               <Edit3 className="w-4 h-4" />
               Edit
             </button>
             <button
               onClick={() => handleAction('move')}
-              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+              className="w-full px-4 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+              style={{ color: 'var(--color-text-primary)' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
               <Move className="w-4 h-4" />
               Move to Collection
             </button>
             <button
               onClick={() => handleAction('share')}
-              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+              className="w-full px-4 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+              style={{ color: 'var(--color-text-primary)' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
               <Share2 className="w-4 h-4" />
               Share
             </button>
             <button
               onClick={() => handleAction('delete')}
-              className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+              className="w-full px-4 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+              style={{ color: '#ef4444' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
               <Trash2 className="w-4 h-4" />
               Delete
@@ -339,11 +369,11 @@ export const BookCard: React.FC<BookCardProps> = ({
   // Grid and comfortable view
   return (
     <div
-      className={`relative rounded-lg border transition-all duration-200 cursor-pointer group ${
-        isSelected 
-          ? 'border-blue-500 bg-blue-50' 
-          : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
-      } ${className}`}
+      className={`relative rounded-lg border transition-all duration-200 cursor-pointer group ${className}`}
+      style={{
+        borderColor: isSelected ? '#3b82f6' : 'var(--color-border)',
+        backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'var(--color-surface)',
+      }}
       onClick={() => onOpen(book)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -356,11 +386,12 @@ export const BookCard: React.FC<BookCardProps> = ({
             e.stopPropagation();
             onSelect(book.id);
           }}
-          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-            isSelected 
-              ? 'bg-blue-500 border-blue-500 text-white' 
-              : 'border-gray-300 hover:border-gray-400 bg-white/80'
-          }`}
+          className="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors"
+          style={{
+            backgroundColor: isSelected ? '#3b82f6' : 'var(--color-surface)',
+            borderColor: isSelected ? '#3b82f6' : 'var(--color-border)',
+            color: isSelected ? 'white' : 'var(--color-text-secondary)',
+          }}
         >
           {isSelected && <Check className="w-3 h-3" />}
         </button>
@@ -372,19 +403,28 @@ export const BookCard: React.FC<BookCardProps> = ({
           <button
             onClick={handleToggleFavorite}
             disabled={isUpdating}
-            className="p-1 rounded-full bg-white/80 hover:bg-white transition-colors"
+            className="p-1 rounded-full transition-colors"
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              color: book.is_favorite ? '#f59e0b' : 'var(--color-text-secondary)',
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface)'}
           >
             {book.is_favorite ? (
-              <Star className="w-4 h-4 text-yellow-500 fill-current" />
+              <Star className="w-4 h-4 fill-current" />
             ) : (
-              <StarOff className="w-4 h-4 text-gray-400" />
+              <StarOff className="w-4 h-4" />
             )}
           </button>
         </div>
       )}
 
       {/* Book cover placeholder */}
-      <div className="aspect-[3/4] bg-gray-100 rounded-t-lg flex items-center justify-center">
+      <div 
+        className="aspect-[3/4] rounded-t-lg flex items-center justify-center"
+        style={{ backgroundColor: 'var(--color-surface-hover)' }}
+      >
         {book.file_type === 'pdf' ? (
           <FileText className="w-12 h-12 text-red-500" />
         ) : (
@@ -395,8 +435,8 @@ export const BookCard: React.FC<BookCardProps> = ({
       {/* Book info */}
       <div className="p-4">
         <div className="mb-2">
-          <h3 className="font-medium text-gray-900 line-clamp-2 mb-1">{book.title}</h3>
-          <div className="flex items-center gap-2 text-sm text-gray-500">
+          <h3 className="font-medium line-clamp-2 mb-1" style={{ color: 'var(--color-text-primary)' }}>{book.title}</h3>
+          <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
             <span className="uppercase text-xs font-medium">{book.file_type}</span>
             {book.total_pages && <span>• {book.total_pages} pages</span>}
           </div>
@@ -437,7 +477,7 @@ export const BookCard: React.FC<BookCardProps> = ({
         )}
 
         {/* Metadata */}
-        <div className="flex items-center justify-between text-xs text-gray-500">
+        <div className="flex items-center justify-between text-xs" style={{ color: 'var(--color-text-secondary)' }}>
           {renderMetadata()}
           {book.last_read_at && (
             <span className="flex items-center gap-1">
@@ -450,31 +490,49 @@ export const BookCard: React.FC<BookCardProps> = ({
 
       {/* Context menu */}
       {showContextMenu && (
-        <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border z-50">
+        <div 
+          className="absolute right-0 top-full mt-1 w-48 rounded-lg shadow-lg border z-50"
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            borderColor: 'var(--color-border)',
+          }}
+        >
           <button
             onClick={() => handleAction('edit')}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+            style={{ color: 'var(--color-text-primary)' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           >
             <Edit3 className="w-4 h-4" />
             Edit
           </button>
           <button
             onClick={() => handleAction('move')}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+            style={{ color: 'var(--color-text-primary)' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           >
             <Move className="w-4 h-4" />
             Move to Collection
           </button>
           <button
             onClick={() => handleAction('share')}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+            style={{ color: 'var(--color-text-primary)' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           >
             <Share2 className="w-4 h-4" />
             Share
           </button>
           <button
             onClick={() => handleAction('delete')}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+            style={{ color: '#ef4444' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           >
             <Trash2 className="w-4 h-4" />
             Delete
