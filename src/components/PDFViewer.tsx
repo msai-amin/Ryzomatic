@@ -889,7 +889,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     }
 
     renderAllPages()
-  }, [pdfViewer.readingMode, numPages, scale, rotation])
+  }, [pdfViewer.readingMode, pdfViewer.scrollMode, numPages, scale, rotation])
   
   // Force text layer interactivity after any render (additional safety net)
   useEffect(() => {
