@@ -165,6 +165,25 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
     loadRelatedDocuments()
   }, [currentDocument?.id, user, relatedDocumentsRefreshTrigger, setRelatedDocuments])
 
+  // Poll for AI analysis completion (refresh every 5 seconds if any relationship is processing)
+  useEffect(() => {
+    if (!currentDocument || !user) return
+
+    // Check if any relationship is in processing state
+    const hasProcessingRelationships = relatedDocuments.some(
+      rel => rel.relevance_calculation_status === 'processing' || rel.relevance_calculation_status === 'pending'
+    )
+
+    if (!hasProcessingRelationships) return
+
+    const intervalId = setInterval(() => {
+      console.log('RelatedDocuments: Polling for AI analysis updates...')
+      refreshRelatedDocuments()
+    }, 5000) // Poll every 5 seconds
+
+    return () => clearInterval(intervalId)
+  }, [relatedDocuments, currentDocument?.id, user, refreshRelatedDocuments])
+
   const toggleSection = (section: keyof typeof sectionsExpanded) => {
     setSectionsExpanded(prev => ({
       ...prev,
