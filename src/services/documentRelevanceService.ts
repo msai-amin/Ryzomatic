@@ -88,11 +88,17 @@ class DocumentRelevanceService {
       // Calculate similarity
       const similarity = this.calculateSimilarity(sourceAnalysis, relatedAnalysis);
       
-      // Generate AI description
+      // Extract content for relationship description
+      const sourceContent = this.extractDocumentContent(sourceDoc.data);
+      const relatedContent = this.extractDocumentContent(relatedDoc.data);
+      
+      // Generate AI description with content
       const aiDescription = await this.generateRelationshipDescription(
         sourceAnalysis,
         relatedAnalysis,
-        similarity
+        similarity,
+        sourceContent,
+        relatedContent
       );
 
       return {
@@ -276,26 +282,30 @@ OUTPUT FORMAT (strict JSON):
   private async generateRelationshipDescription(
     source: DocumentAnalysis,
     related: DocumentAnalysis,
-    similarity: number
+    similarity: number,
+    sourceContent: string = '',
+    relatedContent: string = ''
   ): Promise<string> {
     try {
-      const prompt = `You are an expert at identifying relationships between academic documents. Analyze how two documents relate to each other.
+      const prompt = `You are an expert at identifying relationships between academic documents. Analyze how two documents relate to each other based on the provided summaries and content excerpts.
 
 SOURCE DOCUMENT:
 - Summary: ${source.summary}
 - Topics: ${source.topics.join(', ')}
 - Themes: ${source.mainThemes.join(', ')}
 - Keywords: ${source.keywords.slice(0, 5).join(', ')}
+- Content excerpt: ${sourceContent.substring(0, 500)}
 
 RELATED DOCUMENT:
 - Summary: ${related.summary}
 - Topics: ${related.topics.join(', ')}
 - Themes: ${related.mainThemes.join(', ')}
 - Keywords: ${related.keywords.slice(0, 5).join(', ')}
+- Content excerpt: ${relatedContent.substring(0, 500)}
 
 COMPUTED SIMILARITY: ${similarity}%
 
-TASK: Generate a precise 1-2 sentence description explaining their relationship.
+TASK: Generate a precise 1-2 sentence description explaining their relationship based on the provided information.
 
 RELATIONSHIP TYPES TO CONSIDER:
 - Complementary: Documents cover different aspects of the same topic
