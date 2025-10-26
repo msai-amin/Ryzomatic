@@ -1,23 +1,10 @@
--- Migration: Fix Database Linter Issues
--- Description: Resolves SECURITY DEFINER views and mutable search_path warnings
+-- QUICK FIX v2: Apply this in Supabase Dashboard SQL Editor
+-- Fixes all database linter warnings by setting search_path to 'public'
+-- Run this entire block as one query
 
 -- =============================================================================
--- PART 1: Remove SECURITY DEFINER from Views (ERRORS)
+-- Drop all functions first to avoid "cannot change return type" errors
 -- =============================================================================
-
--- Note: These views reference tables that don't exist in this project
--- We'll drop them to resolve the linter errors
--- They can be recreated later if needed when the tables are created
-
-DROP VIEW IF EXISTS public.vision_extraction_stats CASCADE;
-DROP VIEW IF EXISTS public.document_extraction_stats CASCADE;
-
--- =============================================================================
--- PART 2: Add SET search_path to Functions (WARNINGS)
--- =============================================================================
-
--- Drop and recreate functions with proper search_path settings
--- We need to DROP first to avoid "cannot change return type" errors
 
 DROP FUNCTION IF EXISTS public.mark_page_highlights_orphaned() CASCADE;
 DROP FUNCTION IF EXISTS public.get_highlight_stats(UUID) CASCADE;
@@ -38,7 +25,10 @@ DROP FUNCTION IF EXISTS public.get_book_highlights(UUID, UUID) CASCADE;
 DROP FUNCTION IF EXISTS public.get_library_stats(UUID) CASCADE;
 DROP FUNCTION IF EXISTS public.get_achievement_progress(UUID) CASCADE;
 
--- Fix mark_page_highlights_orphaned
+-- =============================================================================
+-- Recreate functions with SET search_path = public
+-- =============================================================================
+
 CREATE OR REPLACE FUNCTION public.mark_page_highlights_orphaned()
 RETURNS void
 LANGUAGE plpgsql
@@ -52,7 +42,6 @@ BEGIN
 END;
 $$;
 
--- Fix get_highlight_stats
 CREATE OR REPLACE FUNCTION public.get_highlight_stats(user_uuid UUID)
 RETURNS TABLE (
   total_highlights BIGINT,
@@ -75,7 +64,6 @@ BEGIN
 END;
 $$;
 
--- Fix bulk_delete_highlights
 CREATE OR REPLACE FUNCTION public.bulk_delete_highlights(highlight_ids UUID[])
 RETURNS BIGINT
 LANGUAGE plpgsql
@@ -93,7 +81,6 @@ BEGIN
 END;
 $$;
 
--- Fix search_annotations
 CREATE OR REPLACE FUNCTION public.search_annotations(user_uuid UUID, q TEXT DEFAULT NULL)
 RETURNS TABLE (
   id UUID,
@@ -124,7 +111,6 @@ AS $$
   ORDER BY an.created_at DESC;
 $$;
 
--- Fix get_annotation_stats
 CREATE OR REPLACE FUNCTION public.get_annotation_stats(user_uuid UUID)
 RETURNS TABLE (
   total_annotations BIGINT,
@@ -145,7 +131,6 @@ AS $$
   WHERE ub.user_id = user_uuid;
 $$;
 
--- Fix get_related_documents_with_details
 CREATE OR REPLACE FUNCTION public.get_related_documents_with_details(source_document_id UUID)
 RETURNS TABLE (
   id UUID,
@@ -174,7 +159,6 @@ BEGIN
 END;
 $$;
 
--- Fix get_document_relationship_stats
 CREATE OR REPLACE FUNCTION public.get_document_relationship_stats(user_id_param UUID)
 RETURNS TABLE (
   total_relationships BIGINT,
@@ -196,7 +180,6 @@ BEGIN
 END;
 $$;
 
--- Fix reset_monthly_vision_counters
 CREATE OR REPLACE FUNCTION public.reset_monthly_vision_counters()
 RETURNS void
 LANGUAGE plpgsql
@@ -212,7 +195,6 @@ BEGIN
 END;
 $$;
 
--- Fix can_perform_vision_extraction
 CREATE OR REPLACE FUNCTION public.can_perform_vision_extraction(user_uuid UUID)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -250,7 +232,6 @@ BEGIN
 END;
 $$;
 
--- Fix check_pomodoro_achievements
 CREATE OR REPLACE FUNCTION public.check_pomodoro_achievements(p_user_id UUID, p_session_data JSONB)
 RETURNS TABLE (achievement_type VARCHAR(50), unlocked BOOLEAN)
 LANGUAGE plpgsql
@@ -298,7 +279,6 @@ BEGIN
 END;
 $$;
 
--- Fix update_pomodoro_streak
 CREATE OR REPLACE FUNCTION public.update_pomodoro_streak(p_user_id UUID, p_session_date DATE)
 RETURNS void
 LANGUAGE plpgsql
@@ -336,7 +316,6 @@ BEGIN
 END;
 $$;
 
--- Fix get_user_achievements
 CREATE OR REPLACE FUNCTION public.get_user_achievements(p_user_id UUID)
 RETURNS TABLE (
   achievement_type VARCHAR(50),
@@ -356,7 +335,6 @@ BEGIN
 END;
 $$;
 
--- Fix get_user_streak
 CREATE OR REPLACE FUNCTION public.get_user_streak(p_user_id UUID)
 RETURNS TABLE (
   current_streak INT,
@@ -384,10 +362,6 @@ BEGIN
 END;
 $$;
 
--- Fix get_achievement_progress (already exists, just add SET search_path)
--- This will be handled by the previous fix in migration 016
-
--- Fix update_tag_usage_count
 CREATE OR REPLACE FUNCTION public.update_tag_usage_count()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -404,7 +378,6 @@ BEGIN
 END;
 $$;
 
--- Fix get_collection_hierarchy
 CREATE OR REPLACE FUNCTION public.get_collection_hierarchy(user_uuid UUID)
 RETURNS TABLE (
   id UUID,
@@ -444,7 +417,6 @@ BEGIN
 END;
 $$;
 
--- Fix get_book_highlights
 CREATE OR REPLACE FUNCTION public.get_book_highlights(user_uuid UUID, book_uuid UUID)
 RETURNS TABLE (
   id UUID,
@@ -470,7 +442,6 @@ BEGIN
 END;
 $$;
 
--- Fix get_library_stats
 CREATE OR REPLACE FUNCTION public.get_library_stats(user_uuid UUID)
 RETURNS TABLE (
   total_books BIGINT,
@@ -494,7 +465,6 @@ BEGIN
 END;
 $$;
 
--- Fix get_achievement_progress (from migration 016 but with search_path)
 CREATE OR REPLACE FUNCTION public.get_achievement_progress(p_user_id UUID)
 RETURNS TABLE(
   achievement_type VARCHAR(50),
@@ -580,6 +550,4 @@ GRANT EXECUTE ON FUNCTION public.update_tag_usage_count() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_collection_hierarchy(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_book_highlights(UUID, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_library_stats(UUID) TO authenticated;
-
--- Note: Views were dropped as they referenced non-existent tables
 
