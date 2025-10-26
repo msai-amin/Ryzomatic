@@ -102,7 +102,7 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
                   className={`p-3 rounded-lg border text-left transition-colors ${
                     typography.fontFamily === value
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-300 hover:border-gray-400'
+                      : 'border-gray-300 hover:border-gray-400 text-transparent'
                   }`}
                 >
                   <div className={`text-lg mb-1 ${value === 'serif' ? 'font-serif' : value === 'mono' ? 'font-mono' : 'font-sans'}`}>
@@ -179,7 +179,7 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
                   className={`p-3 rounded-lg border text-center transition-colors ${
                     typography.theme === value
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-300 hover:border-gray-400'
+                      : 'border-gray-300 hover:border-gray-400 text-transparent'
                   }`}
                 >
                   <div className="text-2xl mb-1">{preview}</div>
@@ -207,7 +207,7 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
                   className={`p-3 rounded-lg border text-center transition-colors ${
                     typography.textAlign === value
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-300 hover:border-gray-400'
+                      : 'border-gray-300 hover:border-gray-400 text-transparent'
                   }`}
                 >
                   <Icon className="w-5 h-5 mx-auto mb-1" />
