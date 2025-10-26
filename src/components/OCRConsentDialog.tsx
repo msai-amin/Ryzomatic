@@ -87,10 +87,10 @@ export const OCRConsentDialog: React.FC<OCRConsentDialogProps> = ({
               style={{ color: canAfford && hasOCRsLeft ? 'var(--color-primary)' : '#F59E0B' }}
             />
             <div className="flex-1">
-              <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+              <p className="text-sm font-medium" style={{ color: '#F59E0B', opacity: 0.3 }}>
                 This document appears to be scanned or non-searchable
               </p>
-              <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+              <p className="text-xs mt-1" style={{ color: '#F59E0B', opacity: 0.2 }}>
                 AI-powered OCR can extract text to make it searchable and readable.
               </p>
             </div>
