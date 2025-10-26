@@ -36,6 +36,7 @@ DROP FUNCTION IF EXISTS public.update_tag_usage_count() CASCADE;
 DROP FUNCTION IF EXISTS public.get_collection_hierarchy(UUID) CASCADE;
 DROP FUNCTION IF EXISTS public.get_book_highlights(UUID, UUID) CASCADE;
 DROP FUNCTION IF EXISTS public.get_library_stats(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.get_achievement_progress(UUID) CASCADE;
 
 -- Fix mark_page_highlights_orphaned
 CREATE OR REPLACE FUNCTION public.mark_page_highlights_orphaned()
@@ -493,6 +494,70 @@ BEGIN
 END;
 $$;
 
+-- Fix get_achievement_progress (from migration 016 but with search_path)
+CREATE OR REPLACE FUNCTION public.get_achievement_progress(p_user_id UUID)
+RETURNS TABLE(
+  achievement_type VARCHAR(50),
+  current_progress BIGINT,
+  target_progress BIGINT,
+  is_unlocked BOOLEAN,
+  progress_percentage NUMERIC
+) 
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  RETURN QUERY
+  WITH progress_data AS (
+    SELECT 
+      'first_steps'::VARCHAR(50) as achievement_type,
+      LEAST(COUNT(*), 1) as current_progress,
+      1::BIGINT as target_progress
+    FROM pomodoro_sessions 
+    WHERE user_id = p_user_id AND completed = true
+    
+    UNION ALL
+    
+    SELECT 
+      'consistent_reader'::VARCHAR(50),
+      LEAST(COUNT(*), 3),
+      3::BIGINT
+    FROM pomodoro_sessions 
+    WHERE user_id = p_user_id 
+      AND completed = true 
+      AND DATE(started_at) = CURRENT_DATE
+    
+    UNION ALL
+    
+    SELECT 
+      'speed_reader'::VARCHAR(50),
+      LEAST(COUNT(*), 50),
+      50::BIGINT
+    FROM pomodoro_sessions 
+    WHERE user_id = p_user_id AND completed = true
+    
+    UNION ALL
+    
+    SELECT 
+      'century_club'::VARCHAR(50),
+      LEAST(COUNT(*), 100),
+      100::BIGINT
+    FROM pomodoro_sessions 
+    WHERE user_id = p_user_id AND completed = true
+  )
+  SELECT 
+    pd.achievement_type,
+    pd.current_progress,
+    pd.target_progress,
+    COALESCE(pa.achievement_type IS NOT NULL, false) as is_unlocked,
+    ROUND((pd.current_progress::NUMERIC / pd.target_progress::NUMERIC) * 100, 2) as progress_percentage
+  FROM progress_data pd
+  LEFT JOIN pomodoro_achievements pa ON pa.user_id = p_user_id AND pa.achievement_type = pd.achievement_type
+  ORDER BY pd.achievement_type;
+END;
+$$;
+
 -- =============================================================================
 -- GRANT PERMISSIONS
 -- =============================================================================
@@ -510,6 +575,7 @@ GRANT EXECUTE ON FUNCTION public.check_pomodoro_achievements(UUID, JSONB) TO aut
 GRANT EXECUTE ON FUNCTION public.update_pomodoro_streak(UUID, DATE) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_user_achievements(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_user_streak(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_achievement_progress(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.update_tag_usage_count() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_collection_hierarchy(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_book_highlights(UUID, UUID) TO authenticated;
