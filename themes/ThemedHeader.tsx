@@ -115,7 +115,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
         )}
 
         {/* Actions */}
-        <div className="flex items-center space-x-2 pr-24">
+        <div className="flex items-center space-x-2">
           {/* Search Button */}
           <Tooltip content="Search Documents" position="bottom">
             <button 

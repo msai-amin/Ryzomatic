@@ -25,7 +25,8 @@ import {
   Library,
   Palette,
   Highlighter,
-  MoreVertical
+  MoreVertical,
+  Plus
 } from 'lucide-react'
 import { useAppStore, Document as DocumentType } from '../store/appStore'
 import { ttsManager } from '../services/ttsManager'
@@ -2597,6 +2598,29 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         <div className="flex items-center justify-between p-4">
           {/* Left controls */}
           <div className="flex items-center gap-2">
+            {/* New Document Button */}
+            <button
+              onClick={() => setCurrentDocument(null)}
+              className="p-2 rounded-lg transition-colors"
+              style={{ 
+                color: 'var(--color-text-primary)', 
+                backgroundColor: 'transparent',
+                border: '1px solid var(--color-border)'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              title="Upload New Document"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+
+            {/* Visual Separator */}
+            <div 
+              className="w-px h-6"
+              style={{ backgroundColor: 'var(--color-border)' }}
+              aria-hidden="true"
+            />
+
                 <button
                   onClick={goToFirstPage}
                   disabled={pageNumber <= 1}
