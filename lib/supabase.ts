@@ -718,7 +718,7 @@ export const documentRelationships = {
 
   async getWithDetails(sourceDocumentId: string) {
     const { data, error } = await supabase.rpc('get_related_documents_with_details', {
-      source_doc_id: sourceDocumentId
+      source_document_id: sourceDocumentId
     });
     return { data, error };
   },
