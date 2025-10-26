@@ -214,7 +214,7 @@ interface AppState {
   checkAuth: () => Promise<void>
   logout: () => Promise<void>
   setCurrentDocument: (document: Document | null) => void
-  addDocument: (document: Document) => void
+  addDocument: (document: Document, setAsCurrent?: boolean) => void
   updateDocument: (document: Document) => void
   removeDocument: (id: string) => void
   toggleChat: () => void
@@ -512,11 +512,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
   
-  addDocument: (document) => {
+  addDocument: (document, setAsCurrent = true) => {
     console.log('AppStore: Adding document:', {
       id: document.id,
       name: document.name,
       type: document.type,
+      setAsCurrent,
       hasPageTexts: !!document.pageTexts,
       pageTextsLength: document.pageTexts?.length || 0,
       pageTextsPreview: document.pageTexts?.slice(0, 2).map((text, i) => {
@@ -530,7 +531,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
     set((state) => ({
       documents: [...state.documents, document],
-      currentDocument: document
+      // Only set as current document if explicitly requested (default: true for backward compatibility)
+      ...(setAsCurrent && { currentDocument: document })
     }));
   },
   

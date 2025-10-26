@@ -18,9 +18,10 @@ import { canPerformVisionExtraction } from '../services/visionUsageService'
 interface DocumentUploadProps {
   onClose: () => void
   onUploadComplete?: (documentId: string) => void // Optional callback for when upload completes
+  setAsCurrentDocument?: boolean // Control whether uploaded doc becomes current
 }
 
-export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploadComplete }) => {
+export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploadComplete, setAsCurrentDocument = true }) => {
   const { addDocument, setLoading, refreshLibrary } = useAppStore()
   const [dragActive, setDragActive] = useState(false)
   const [showOCRDialog, setShowOCRDialog] = useState(false)
@@ -181,7 +182,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
         }
         
         // Either OCR not needed or auto-approved
-        addDocument(document)
+        addDocument(document, setAsCurrentDocument)
         
         // Store document ID for callback
         setUploadedDocumentId(document.id)
@@ -285,7 +286,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
           uploadedAt: new Date()
         }
         
-        addDocument(document)
+        addDocument(document, setAsCurrentDocument)
         
         // Store document ID for callback
         setUploadedDocumentId(document.id)
@@ -374,7 +375,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
       setLoading(true);
 
       // Add document with OCR status set to 'pending'
-      addDocument(document);
+      addDocument(document, setAsCurrentDocument);
 
       // Save to library if needed
       if (shouldSave) {
@@ -419,7 +420,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
       document.ocrStatus = 'user_declined';
       
       // Add document anyway (with limited text)
-      addDocument(document);
+      addDocument(document, setAsCurrentDocument);
 
       // Save to library if needed
       if (shouldSave) {

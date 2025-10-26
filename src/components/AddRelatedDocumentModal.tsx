@@ -319,6 +319,7 @@ export const AddRelatedDocumentModal: React.FC<AddRelatedDocumentModalProps> = (
                     onClose();
                   }, 500);
                 }}
+                setAsCurrentDocument={false}
               />
             </div>
           )}
