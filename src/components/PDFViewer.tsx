@@ -699,7 +699,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       return needsRender
     })
     
-    if (!needsRerender) {
+    // If zoom/rotation changed, we need to force re-render even if pages look complete
+    const hasZoomOrRotationChange = scale !== 1 || rotation !== 0 // This will trigger re-render
+    
+    if (!needsRerender && !hasZoomOrRotationChange) {
       console.log('🎯 All pages already rendered correctly, skipping')
       return
     }
