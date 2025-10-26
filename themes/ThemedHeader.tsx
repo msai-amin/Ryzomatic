@@ -7,7 +7,7 @@ import { AuthModal } from '../src/components/AuthModal'
 import { PomodoroTimer } from '../src/components/PomodoroTimer'
 import { Tooltip } from '../src/components/Tooltip'
 import { useTheme } from './ThemeProvider'
-import { timerService } from '../src/services/timerService'
+import { timerService, TimerState } from '../src/services/timerService'
 
 interface ThemedHeaderProps {
   onUploadClick: () => void
@@ -16,6 +16,7 @@ interface ThemedHeaderProps {
 }
 
 export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSidebarOpen, onSidebarToggle }) => {
+  const [timerState, setTimerState] = React.useState<TimerState>(timerService.getState())
   const { 
     toggleChat, 
     currentDocument, 
@@ -38,6 +39,12 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
   const handleLogout = async () => {
     await logout()
   }
+
+  // Subscribe to timer service
+  React.useEffect(() => {
+    const unsubscribe = timerService.subscribe(setTimerState)
+    return unsubscribe
+  }, [])
 
 
   return (
@@ -185,7 +192,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
           )}
 
           {/* Pomodoro Timer Button - Only show when user is authenticated, has a document, and Pomodoro is NOT running */}
-          {user && currentDocument && !pomodoroIsRunning && (
+          {user && currentDocument && !timerState.isRunning && (
             <Tooltip content={pomodoroIsRunning ? `Timer Running: ${Math.floor((pomodoroTimeLeft || 0) / 60)}:${String((pomodoroTimeLeft || 0) % 60).padStart(2, '0')}` : "Pomodoro Timer - Stay Focused"} position="bottom">
               <button
                 data-tour="pomodoro-button"

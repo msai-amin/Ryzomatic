@@ -12,10 +12,12 @@ import { useAppStore } from '../src/store/appStore'
 import { useKeyboardShortcuts } from '../src/hooks/useKeyboardShortcuts'
 import { OnboardingProvider, OnboardingOverlay, ContextualHelp } from '../src/components/onboarding'
 import { backgroundProcessingService } from '../src/services/backgroundProcessingService'
+import { timerService, TimerState } from '../src/services/timerService'
 
 const ThemedAppContent: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [showUpload, setShowUpload] = useState(false)
+  const [timerState, setTimerState] = useState<TimerState>(timerService.getState())
   const { currentTheme } = useTheme()
   const { isChatOpen, toggleChat, user, currentDocument, pomodoroIsRunning, libraryRefreshTrigger } = useAppStore()
   const { showAchievement, AchievementToastContainer } = useAchievementToasts()
@@ -33,6 +35,12 @@ const ThemedAppContent: React.FC = () => {
       console.log('ThemedApp: Stopping background processing service')
       backgroundProcessingService.stop()
     }
+  }, [])
+
+  // Subscribe to timer service
+  useEffect(() => {
+    const unsubscribe = timerService.subscribe(setTimerState)
+    return unsubscribe
   }, [])
 
 
@@ -80,7 +88,7 @@ const ThemedAppContent: React.FC = () => {
 
 
       {/* Pomodoro Bottom Bar - Visible when user is authenticated, has uploaded a file, and Pomodoro IS running */}
-      {user && currentDocument && pomodoroIsRunning && (
+      {user && currentDocument && timerState.isRunning && (
         <PomodoroBottomBar 
           onExpand={() => {
             // Open the full Pomodoro timer in the header
