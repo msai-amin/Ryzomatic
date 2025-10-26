@@ -2213,7 +2213,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               
               <div className={`flex items-center gap-2 text-sm ${themeStyles.text}`}>
                 <BookOpen className="w-4 h-4" />
-                <span>Page {pageNumber} of {numPages}</span>
+                <span>
+                  {pdfViewer.scrollMode === 'single' 
+                    ? `Page ${pageNumber} of ${numPages}` 
+                    : `${numPages} pages total`}
+                </span>
               </div>
               
               {/* Formula conversion indicator */}
@@ -2226,6 +2230,32 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Scroll Mode Toggle */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => updatePDFViewer({ scrollMode: 'single' })}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-l-lg transition-colors ${
+                    pdfViewer.scrollMode === 'single' 
+                      ? `${themeStyles.buttonBg} ${themeStyles.buttonText}` 
+                      : `${themeStyles.text} opacity-60 hover:opacity-80`
+                  }`}
+                  title="One Page Mode"
+                >
+                  One Page
+                </button>
+                <button
+                  onClick={() => updatePDFViewer({ scrollMode: 'continuous' })}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-r-lg transition-colors ${
+                    pdfViewer.scrollMode === 'continuous' 
+                      ? `${themeStyles.buttonBg} ${themeStyles.buttonText}` 
+                      : `${themeStyles.text} opacity-60 hover:opacity-80`
+                  }`}
+                  title="Scrolling Mode"
+                >
+                  Scrolling
+                </button>
+              </div>
+
               {isEditing ? (
                 <>
                   <button
@@ -2282,20 +2312,26 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   </button>
                 </>
               )}
-              <button
-                onClick={goToPreviousPage}
-                disabled={pageNumber <= 1}
-                className={`p-2 ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <button
-                onClick={goToNextPage}
-                disabled={!numPages || pageNumber >= numPages}
-                className={`p-2 ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
+              
+              {/* Page Navigation - Only show in single page mode */}
+              {pdfViewer.scrollMode === 'single' && (
+                <>
+                  <button
+                    onClick={goToPreviousPage}
+                    disabled={pageNumber <= 1}
+                    className={`p-2 ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={goToNextPage}
+                    disabled={!numPages || pageNumber >= numPages}
+                    className={`p-2 ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
