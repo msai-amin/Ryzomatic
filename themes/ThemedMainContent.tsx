@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
 import { useTheme } from './ThemeProvider'
@@ -24,6 +24,20 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
     annotationColors: false,
   })
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
+  const [showExportDropdown, setShowExportDropdown] = useState(false)
+  const exportDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Handle click outside to close export dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
+        setShowExportDropdown(false)
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const toggleSection = (section: keyof typeof sectionsExpanded) => {
     setSectionsExpanded((prev) => ({
@@ -32,9 +46,17 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
     }))
   }
 
-  const handleTemplateSelect = (type: 'cornell' | 'outline' | 'mindmap' | 'chart' | 'boxing') => {
-    console.log('Selected template type:', type)
-    // TODO: Open note editor with selected template
+  const handleTemplateSelect = (type: 'freeform' | 'cornell' | 'outline' | 'mindmap' | 'chart' | 'boxing') => {
+    console.log('Template selected:', type)
+    
+    if (type === 'freeform') {
+      // Open a simple text editor modal or inline editor
+      // TODO: Implement note editor
+      alert('Blank text note editor - to be implemented')
+    } else {
+      // TODO: Open note editor with selected template
+      alert(`Note editor for ${type} - to be implemented`)
+    }
   }
 
   const handleNoteSelected = (note: any) => {
@@ -47,8 +69,10 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
     // The NotesList will auto-refresh when the notes array changes
   }
 
-  const handleExportNotes = async () => {
+  const handleExportNotes = async (format: 'markdown' | 'html' | 'json' | 'text') => {
     if (!currentDocument || !user) return
+    
+    setShowExportDropdown(false)
     
     try {
       const { data: notes } = await notesService.getNotesForBook(user.id, currentDocument.id)
@@ -57,14 +81,23 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
         return
       }
       
-      const markdown = await notesService.exportNotes(notes, 'markdown')
+      const content = await notesService.exportNotes(notes, format, currentDocument.name)
+      
+      // Determine file extension and MIME type
+      const extensions = { markdown: 'md', html: 'html', json: 'json', text: 'txt' }
+      const mimeTypes = {
+        markdown: 'text/markdown',
+        html: 'text/html',
+        json: 'application/json',
+        text: 'text/plain'
+      }
       
       // Download as file
-      const blob = new Blob([markdown], { type: 'text/markdown' })
+      const blob = new Blob([content], { type: mimeTypes[format] })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${currentDocument.name}-notes.md`
+      a.download = `${currentDocument.name}-notes.${extensions[format]}`
       a.click()
       URL.revokeObjectURL(url)
     } catch (error) {
@@ -202,6 +235,29 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
               </Tooltip>
             </div>
 
+            {/* My Notes Section - MOVED TO TOP */}
+            <div className="mb-4">
+              <button
+                onClick={() => toggleSection('myNotes')}
+                className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-opacity-50"
+                style={{
+                  backgroundColor: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                  My Notes
+                </h3>
+                <ChevronRight
+                  className={`w-4 h-4 transition-transform ${sectionsExpanded.myNotes ? 'rotate-90' : ''}`}
+                  style={{ color: 'var(--color-text-primary)' }}
+                />
+              </button>
+              {sectionsExpanded.myNotes && (
+                <NotesList onNoteSelected={handleNoteSelected} />
+              )}
+            </div>
+
             {/* Create Note Section */}
             <div className="mb-4">
               <button
@@ -245,29 +301,6 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
               </button>
               {sectionsExpanded.aiAssisted && (
                 <AIAssistedNotes onNotesGenerated={handleNotesGenerated} />
-              )}
-            </div>
-
-            {/* My Notes Section */}
-            <div className="mb-4">
-              <button
-                onClick={() => toggleSection('myNotes')}
-                className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-opacity-50"
-                style={{
-                  backgroundColor: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                }}
-              >
-                <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                  My Notes
-                </h3>
-                <ChevronRight
-                  className={`w-4 h-4 transition-transform ${sectionsExpanded.myNotes ? 'rotate-90' : ''}`}
-                  style={{ color: 'var(--color-text-primary)' }}
-                />
-              </button>
-              {sectionsExpanded.myNotes && (
-                <NotesList onNoteSelected={handleNoteSelected} />
               )}
             </div>
 
@@ -320,21 +353,66 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
               Quick Actions
             </h3>
             <div className="space-y-2">
-              <button 
-                onClick={handleExportNotes}
-                className="w-full text-left text-sm p-2 rounded transition-colors cursor-pointer"
-                style={{ 
-                  color: 'var(--color-text-primary)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                }}
-              >
-                Export Notes
-              </button>
+              {/* Export Notes Dropdown */}
+              <div className="relative" ref={exportDropdownRef}>
+                <button 
+                  onClick={() => setShowExportDropdown(!showExportDropdown)}
+                  className="w-full text-left text-sm p-2 rounded transition-colors cursor-pointer flex items-center justify-between"
+                  style={{ color: 'var(--color-text-primary)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <span>Export Notes</span>
+                  <ChevronRight className={`w-4 h-4 transition-transform ${showExportDropdown ? 'rotate-90' : ''}`} />
+                </button>
+                
+                {showExportDropdown && (
+                  <div 
+                    className="absolute left-0 mt-1 w-full rounded-lg shadow-lg py-1 z-50"
+                    style={{
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  >
+                    <button 
+                      onClick={() => handleExportNotes('markdown')} 
+                      className="w-full text-left text-sm px-3 py-2 transition-colors"
+                      style={{ color: 'var(--color-text-primary)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      Markdown (.md)
+                    </button>
+                    <button 
+                      onClick={() => handleExportNotes('html')} 
+                      className="w-full text-left text-sm px-3 py-2 transition-colors"
+                      style={{ color: 'var(--color-text-primary)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      HTML (.html)
+                    </button>
+                    <button 
+                      onClick={() => handleExportNotes('json')} 
+                      className="w-full text-left text-sm px-3 py-2 transition-colors"
+                      style={{ color: 'var(--color-text-primary)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      JSON (.json)
+                    </button>
+                    <button 
+                      onClick={() => handleExportNotes('text')} 
+                      className="w-full text-left text-sm px-3 py-2 transition-colors"
+                      style={{ color: 'var(--color-text-primary)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      Plain Text (.txt)
+                    </button>
+                  </div>
+                )}
+              </div>
               <button 
                 onClick={handleGenerateSummary}
                 disabled={isGeneratingSummary}

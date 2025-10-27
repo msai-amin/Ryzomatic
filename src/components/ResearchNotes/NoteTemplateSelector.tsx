@@ -1,9 +1,15 @@
 import React from 'react';
-import { FileText, ListOrdered, Network, Table, Box } from 'lucide-react';
+import { FileText, ListOrdered, Network, Table, Box, FileEdit } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { Tooltip } from '../Tooltip';
 
 const templates = [
+  {
+    type: 'freeform' as const,
+    name: 'Blank Text Note',
+    icon: FileEdit,
+    description: 'Simple freeform text note. Start writing immediately.',
+  },
   {
     type: 'cornell' as const,
     name: 'Cornell Notes',
@@ -37,13 +43,13 @@ const templates = [
 ];
 
 interface NoteTemplateSelectorProps {
-  onSelectTemplate: (type: 'cornell' | 'outline' | 'mindmap' | 'chart' | 'boxing') => void;
+  onSelectTemplate: (type: 'freeform' | 'cornell' | 'outline' | 'mindmap' | 'chart' | 'boxing') => void;
 }
 
 export const NoteTemplateSelector: React.FC<NoteTemplateSelectorProps> = ({ onSelectTemplate }) => {
   const { noteTemplateType, setNoteTemplateType } = useAppStore();
 
-  const handleSelect = (type: 'cornell' | 'outline' | 'mindmap' | 'chart' | 'boxing') => {
+  const handleSelect = (type: 'freeform' | 'cornell' | 'outline' | 'mindmap' | 'chart' | 'boxing') => {
     setNoteTemplateType(type);
     onSelectTemplate(type);
   };

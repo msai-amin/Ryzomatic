@@ -210,7 +210,7 @@ interface AppState {
   
   // Study mode and notes state
   studyMode: boolean
-  noteTemplateType: 'cornell' | 'outline' | 'mindmap' | 'chart' | 'boxing' | null
+  noteTemplateType: 'freeform' | 'cornell' | 'outline' | 'mindmap' | 'chart' | 'boxing' | null
   
   // Actions
   setUser: (user: AuthUser | null) => void
@@ -262,7 +262,7 @@ interface AppState {
   
   // Study mode and notes actions
   setStudyMode: (enabled: boolean) => void
-  setNoteTemplateType: (type: 'cornell' | 'outline' | 'mindmap' | 'chart' | 'boxing' | null) => void
+  setNoteTemplateType: (type: 'freeform' | 'cornell' | 'outline' | 'mindmap' | 'chart' | 'boxing' | null) => void
   
   // Related Documents actions
   setRelatedDocuments: (documents: DocumentRelationshipWithDetails[]) => void
