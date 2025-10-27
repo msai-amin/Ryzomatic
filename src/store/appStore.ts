@@ -208,6 +208,10 @@ interface AppState {
   recentlyViewedDocuments: Document[]
   maxRecentlyViewed: number
   
+  // Study mode and notes state
+  studyMode: boolean
+  noteTemplateType: 'cornell' | 'outline' | 'mindmap' | 'chart' | 'boxing' | null
+  
   // Actions
   setUser: (user: AuthUser | null) => void
   setAuthenticated: (authenticated: boolean) => void
@@ -255,6 +259,10 @@ interface AppState {
   // Text selection and AI mode actions
   setSelectedTextContext: (context: TextSelectionContext | null) => void
   setChatMode: (mode: 'general' | 'clarification' | 'further-reading') => void
+  
+  // Study mode and notes actions
+  setStudyMode: (enabled: boolean) => void
+  setNoteTemplateType: (type: 'cornell' | 'outline' | 'mindmap' | 'chart' | 'boxing' | null) => void
   
   // Related Documents actions
   setRelatedDocuments: (documents: DocumentRelationshipWithDetails[]) => void
@@ -358,6 +366,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Recently Viewed Documents state
   recentlyViewedDocuments: [],
   maxRecentlyViewed: 8, // Best practice: 5-10 documents
+  
+  // Study mode and notes state
+  studyMode: false,
+  noteTemplateType: null,
   
   // Authentication actions
   setUser: (user) => set({ user }),
@@ -686,6 +698,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSelectedTextContext: (context) => set({ selectedTextContext: context }),
   
   setChatMode: (mode) => set({ chatMode: mode }),
+  
+  // Study mode and notes actions
+  setStudyMode: (enabled) => set({ studyMode: enabled }),
+  setNoteTemplateType: (type) => set({ noteTemplateType: type }),
   
   // Related Documents actions
   setRelatedDocuments: (documents) => set({ relatedDocuments: documents }),

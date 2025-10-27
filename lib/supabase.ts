@@ -89,6 +89,9 @@ export interface UserNote {
   content: string;
   position_x?: number;
   position_y?: number;
+  note_type?: 'cornell' | 'outline' | 'mindmap' | 'chart' | 'boxing' | 'freeform';
+  note_metadata?: Record<string, any>; // JSONB field for template-specific data
+  is_ai_generated?: boolean;
   created_at: string;
   updated_at: string;
 }

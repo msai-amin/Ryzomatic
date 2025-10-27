@@ -3,6 +3,10 @@ import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
 import { useTheme } from './ThemeProvider'
 import { ChevronRight, ChevronLeft } from 'lucide-react'
+import { StudyGuidePanel } from '../src/components/ResearchNotes/StudyGuidePanel'
+import { NoteTemplateSelector } from '../src/components/ResearchNotes/NoteTemplateSelector'
+import { AIAssistedNotes } from '../src/components/ResearchNotes/AIAssistedNotes'
+import { NotesList } from '../src/components/ResearchNotes/NotesList'
 
 interface ThemedMainContentProps {
   children?: React.ReactNode
@@ -12,6 +16,34 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
   const { currentDocument } = useAppStore()
   const { annotationColors } = useTheme()
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true)
+  const [sectionsExpanded, setSectionsExpanded] = useState({
+    studyGuide: false,
+    createNote: false,
+    aiAssisted: false,
+    myNotes: false,
+  })
+
+  const toggleSection = (section: keyof typeof sectionsExpanded) => {
+    setSectionsExpanded((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }))
+  }
+
+  const handleTemplateSelect = (type: 'cornell' | 'outline' | 'mindmap' | 'chart' | 'boxing') => {
+    console.log('Selected template type:', type)
+    // TODO: Open note editor with selected template
+  }
+
+  const handleNoteSelected = (note: any) => {
+    console.log('Note selected:', note)
+    // TODO: Open note in editor
+  }
+
+  const handleNotesGenerated = () => {
+    console.log('Notes generated, refreshing list')
+    // The NotesList will auto-refresh when the notes array changes
+  }
 
   return (
     <div 
@@ -86,26 +118,90 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
             </div>
 
             <div className="flex items-center justify-between mb-6">
-            <h2 
-              className="text-lg font-semibold"
-              style={{ color: 'var(--color-text-primary)' }}
-            >
-              Research Notes
-            </h2>
-            <Tooltip content="Create New Note" position="left">
-              <button 
-                className="text-sm px-3 py-1 rounded-full"
+              <h2 
+                className="text-lg font-semibold"
+                style={{ color: 'var(--color-text-primary)' }}
+              >
+                Research Notes
+              </h2>
+            </div>
+
+            {/* Study Guide Section */}
+            <StudyGuidePanel
+              isExpanded={sectionsExpanded.studyGuide}
+              onToggle={() => toggleSection('studyGuide')}
+            />
+
+            {/* Create Note Section */}
+            <div className="mb-4">
+              <button
+                onClick={() => toggleSection('createNote')}
+                className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-opacity-50"
                 style={{
-                  backgroundColor: 'var(--color-primary)',
-                  color: 'var(--color-text-inverse)',
+                  backgroundColor: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
                 }}
               >
-                + New Note
+                <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                  Templates
+                </h3>
+                <ChevronRight
+                  className={`w-4 h-4 transition-transform ${sectionsExpanded.createNote ? 'rotate-90' : ''}`}
+                  style={{ color: 'var(--color-text-primary)' }}
+                />
               </button>
-            </Tooltip>
-          </div>
+              {sectionsExpanded.createNote && (
+                <NoteTemplateSelector onSelectTemplate={handleTemplateSelect} />
+              )}
+            </div>
 
-          {/* Color Legend */}
+            {/* AI-Assisted Notes Section */}
+            <div className="mb-4">
+              <button
+                onClick={() => toggleSection('aiAssisted')}
+                className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-opacity-50"
+                style={{
+                  backgroundColor: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                  AI-Generated Notes
+                </h3>
+                <ChevronRight
+                  className={`w-4 h-4 transition-transform ${sectionsExpanded.aiAssisted ? 'rotate-90' : ''}`}
+                  style={{ color: 'var(--color-text-primary)' }}
+                />
+              </button>
+              {sectionsExpanded.aiAssisted && (
+                <AIAssistedNotes onNotesGenerated={handleNotesGenerated} />
+              )}
+            </div>
+
+            {/* My Notes Section */}
+            <div className="mb-4">
+              <button
+                onClick={() => toggleSection('myNotes')}
+                className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-opacity-50"
+                style={{
+                  backgroundColor: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                  My Notes
+                </h3>
+                <ChevronRight
+                  className={`w-4 h-4 transition-transform ${sectionsExpanded.myNotes ? 'rotate-90' : ''}`}
+                  style={{ color: 'var(--color-text-primary)' }}
+                />
+              </button>
+              {sectionsExpanded.myNotes && (
+                <NotesList onNoteSelected={handleNoteSelected} />
+              )}
+            </div>
+
+            {/* Color Legend */}
           <div className="mb-6">
             <h3 
               className="text-sm font-medium mb-3"

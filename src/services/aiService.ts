@@ -37,14 +37,38 @@ const getGeminiModel = (tier: 'free' | 'pro' | 'premium' | 'enterprise' = 'free'
   return genAI.getGenerativeModel({ model: modelName });
 };
 
+// Load the SQ3R system prompt
+const loadSystemPrompt = async (): Promise<string | null> => {
+  try {
+    const response = await fetch('/system-prompts-gemini25/ComprehensiveSummary.md');
+    if (response.ok) {
+      const content = await response.text();
+      return content;
+    }
+    logger.warn('Could not load SQ3R system prompt', {
+      component: 'AIService',
+      action: 'loadSystemPrompt'
+    });
+    return null;
+  } catch (error) {
+    logger.error('Failed to load SQ3R system prompt', {
+      component: 'AIService',
+      action: 'loadSystemPrompt'
+    }, error as Error);
+    return null;
+  }
+};
+
 export const sendMessageToAI = async (
   message: string, 
   documentContent?: string, 
-  tier: 'free' | 'pro' | 'premium' | 'enterprise' = 'free'
+  tier: 'free' | 'pro' | 'premium' | 'enterprise' = 'free',
+  mode: 'general' | 'study' | 'notes' = 'general'
 ): Promise<string> => {
   const context = {
     component: 'AIService',
-    action: 'sendMessageToAI'
+    action: 'sendMessageToAI',
+    mode
   };
 
   // Validate inputs
@@ -71,6 +95,14 @@ export const sendMessageToAI = async (
   }
 
   return trackPerformance('sendMessageToAI', async () => {
+    // Load SQ3R prompt if in study or notes mode
+    let sq3rPrompt = '';
+    if (mode === 'study' || mode === 'notes') {
+      const systemPrompt = await loadSystemPrompt();
+      if (systemPrompt) {
+        sq3rPrompt = systemPrompt + '\n\n';
+      }
+    }
     // Truncate document content to fit within token limits
     const maxContentLength = 12000;
     let truncatedContent = documentContent;
@@ -95,7 +127,9 @@ export const sendMessageToAI = async (
 
         const model = getGeminiModel(tier);
         
-        const prompt = `You are an AI assistant helping users understand and analyze documents.
+        const baseSystemPrompt = mode === 'study' || mode === 'notes' ? sq3rPrompt : '';
+        
+        const prompt = `${baseSystemPrompt}You are an AI assistant helping users understand and analyze documents.
 
 ${truncatedContent ? 
   `The user has uploaded a document. Here is a portion of the content:\n\n${truncatedContent}\n\n` +
@@ -133,12 +167,14 @@ Please provide a helpful, accurate response:`;
           documentLength: documentContent?.length || 0
         });
 
+        const baseSystemPrompt = mode === 'study' || mode === 'notes' ? sq3rPrompt : '';
+        
         const completion = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
             {
               role: "system",
-              content: `You are an AI assistant helping users understand and analyze documents, with particular expertise in literary and academic analysis.
+              content: `${baseSystemPrompt}You are an AI assistant helping users understand and analyze documents, with particular expertise in literary and academic analysis.
 
 ${truncatedContent ? 
   `The user has uploaded a document. Here is a portion of the content:\n\n${truncatedContent}\n\n` +
