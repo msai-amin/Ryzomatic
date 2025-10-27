@@ -54,6 +54,11 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
 
   const handleFileInput = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
+      // Only allow single file upload
+      if (e.target.files.length > 1) {
+        alert('Multiple file upload is not allowed. Please upload one file at a time.')
+        return
+      }
       await handleFile(e.target.files[0])
     }
   }, [])

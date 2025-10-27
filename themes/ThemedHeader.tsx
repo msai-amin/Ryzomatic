@@ -26,6 +26,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     libraryRefreshTrigger,
     pdfViewer,
     isChatOpen,
+    libraryView,
     pomodoroIsRunning,
     pomodoroTimeLeft,
     hasSeenPomodoroTour
@@ -146,17 +147,27 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                 </button>
               </Tooltip>
 
-              <Tooltip content="Upload New Document" position="bottom">
+              <Tooltip 
+                content={
+                  libraryView.selectedBooks.length > 0 
+                    ? "Please deselect books to upload" 
+                    : "Upload New Document"
+                } 
+                position="bottom"
+              >
                 <button
                   data-tour="upload-button"
                   onClick={onUploadClick}
-                  className="btn-primary flex items-center space-x-2"
+                  disabled={libraryView.selectedBooks.length > 0}
+                  className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     backgroundColor: 'var(--color-primary)',
                     color: 'var(--color-text-inverse)',
                     border: 'none',
                     padding: 'var(--spacing-sm) var(--spacing-md)',
                     borderRadius: 'var(--border-radius-lg)',
+                    opacity: libraryView.selectedBooks.length > 0 ? 0.5 : 1,
+                    cursor: libraryView.selectedBooks.length > 0 ? 'not-allowed' : 'pointer',
                   }}
                   aria-label="Upload New Document"
                 >
