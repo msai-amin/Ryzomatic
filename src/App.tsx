@@ -254,7 +254,12 @@ function App() {
           <div className="text-center py-20">
             <h1 
               className="text-4xl font-bold mb-4"
-              style={{ color: 'var(--color-text-primary)' }}
+              style={{ 
+                color: 'var(--color-text-primary)',
+                fontFamily: "'Space Grotesk', sans-serif",
+                letterSpacing: '0.05em',
+                fontWeight: '700',
+              }}
             >
               ryzomatic
             </h1>

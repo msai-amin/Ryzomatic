@@ -150,7 +150,7 @@ const LandingPage: React.FC = () => {
           <a href="#" className="flex items-center gap-3">
             <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-10 w-10" />
             <div>
-              <p className="text-lg font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>ryzomatic</p>
+              <p className="text-lg font-semibold text-slate-900" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.05em', fontWeight: '600' }}>ryzomatic</p>
             </div>
           </a>
           
@@ -386,7 +386,7 @@ const LandingPage: React.FC = () => {
           <div className="flex items-center gap-3">
             <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-10 w-10" />
             <div>
-              <p className="text-base font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>ryzomatic</p>
+              <p className="text-base font-semibold text-slate-900" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.05em', fontWeight: '600' }}>ryzomatic</p>
             </div>
           </div>
           

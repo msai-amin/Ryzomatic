@@ -18,7 +18,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
         <FileText className="w-12 h-12" style={{ color: 'var(--color-text-inverse)' }} />
       </div>
       
-      <h2 className="text-heading-2 mb-4" style={{ color: 'var(--color-text-primary)' }}>
+      <h2 className="text-heading-2 mb-4" style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.03em', fontWeight: '600' }}>
         Welcome to ryzomatic
       </h2>
       

@@ -84,6 +84,9 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
               style={{
                 backgroundColor: 'var(--color-primary)',
                 color: 'var(--color-text-inverse)',
+                fontFamily: "'Space Grotesk', sans-serif",
+                letterSpacing: '0.05em',
+                fontWeight: '600',
               }}
             >
               ryzomatic
