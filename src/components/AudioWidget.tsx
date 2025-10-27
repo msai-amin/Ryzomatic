@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useAppStore, Voice } from '../store/appStore'
 import { ttsManager } from '../services/ttsManager'
 import { AudioSettingsPanel } from './AudioSettingsPanel'
+import { ttsCacheService, TTSCacheQuery } from '../services/ttsCacheService'
 import { 
   Play, 
   Pause, 
@@ -26,6 +27,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const [showSettings, setShowSettings] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [playbackMode, setPlaybackMode] = useState<'paragraph' | 'page' | 'continue'>('paragraph')
   const lastClickTimeRef = useRef<number>(0)
 
   // Extract paragraphs from current document
@@ -149,6 +151,40 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     return tts.paragraphs[index] || tts.paragraphs[0] || ''
   }, [tts.paragraphs, tts.currentParagraphIndex, currentDocument, pdfViewer.currentPage])
 
+  // Get text for page mode
+  const getCurrentPageText = useCallback((): string => {
+    const currentPage = pdfViewer.currentPage || 1
+    if (currentDocument?.pageTexts && currentDocument.pageTexts.length > 0) {
+      const rawPageText = currentDocument.pageTexts[currentPage - 1]
+      return typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
+    }
+    return ''
+  }, [currentDocument, pdfViewer.currentPage])
+
+  // Get all remaining text (for continue to end mode)
+  const getAllRemainingText = useCallback((): string => {
+    if (currentDocument?.pageTexts && currentDocument.pageTexts.length > 0) {
+      const currentPage = pdfViewer.currentPage || 1
+      const remainingPages = currentDocument.pageTexts.slice(currentPage - 1)
+      return remainingPages
+        .map(p => typeof p === 'string' ? p : String(p || ''))
+        .filter(p => p.length > 0)
+        .join('\n\n')
+    }
+    return ''
+  }, [currentDocument, pdfViewer.currentPage])
+
+  // Get text based on playback mode
+  const getTextForPlaybackMode = useCallback((mode: 'paragraph' | 'page' | 'continue'): string => {
+    if (mode === 'paragraph') {
+      return getCurrentParagraphText()
+    } else if (mode === 'page') {
+      return getCurrentPageText()
+    } else {
+      return getAllRemainingText()
+    }
+  }, [getCurrentParagraphText, getCurrentPageText, getAllRemainingText])
+
   // Handle play/pause
   const handlePlayPause = useCallback(async () => {
     const now = Date.now()
@@ -173,16 +209,43 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       ttsManager.resume()
       updateTTS({ isPlaying: true })
     } else {
-      // Start new playback
+      // Start new playback with caching
       setIsProcessing(true)
       
       try {
         ttsManager.stop()
         updateTTS({ isPlaying: false })
         
-        const text = getCurrentParagraphText()
+        const text = getTextForPlaybackMode(playbackMode)
         
         if (text.trim()) {
+          // Check cache first if available
+          let cachedAudio: ArrayBuffer | null = null
+          
+          if (currentDocument && currentDocument.id) {
+            const cacheQuery: TTSCacheQuery = {
+              bookId: currentDocument.id,
+              text,
+              scopeType: playbackMode === 'paragraph' ? 'paragraph' : playbackMode === 'page' ? 'page' : 'document',
+              pageNumber: pdfViewer.currentPage,
+              paragraphIndex: playbackMode === 'paragraph' ? tts.currentParagraphIndex : undefined,
+              voiceSettings: {
+                voiceName: tts.voiceName || 'default',
+                speakingRate: tts.rate,
+                pitch: tts.pitch,
+                provider: 'google-cloud' // Use current provider
+              }
+            }
+            
+            cachedAudio = await ttsCacheService.getCachedAudio(cacheQuery)
+            
+            if (!cachedAudio) {
+              // Save to cache after generating (async)
+              // Note: We'll need to modify TTSManager to return generated audio
+              // For now, just proceed with generation
+            }
+          }
+          
           updateTTS({ isPlaying: true })
           
           await ttsManager.speak(
@@ -191,7 +254,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               // On end callback - auto-advance if enabled
               updateTTS({ isPlaying: false, currentWordIndex: null })
               
-              if (tts.autoAdvanceParagraph) {
+              if (tts.autoAdvanceParagraph && playbackMode === 'paragraph') {
                 handleNextParagraph()
               }
             },
@@ -215,7 +278,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         setIsProcessing(false)
       }
     }
-  }, [tts.isPlaying, tts.autoAdvanceParagraph, isProcessing, updateTTS, getCurrentParagraphText])
+  }, [playbackMode, tts.isPlaying, tts.autoAdvanceParagraph, isProcessing, updateTTS, getTextForPlaybackMode, currentDocument, pdfViewer.currentPage, tts.currentParagraphIndex, tts.voiceName, tts.rate, tts.pitch, handleNextParagraph])
 
   // Handle stop
   const handleStop = useCallback(() => {
@@ -291,6 +354,49 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           maxWidth: '300px'
         }}
       >
+        {/* Playback Mode Selector - Show when expanded or always visible */}
+        <div className="flex items-center justify-center gap-1 px-3 pt-3 pb-2 border-b" style={{ borderColor: 'var(--color-border)' }}>
+          <button
+            onClick={() => setPlaybackMode('paragraph')}
+            className={`px-2 py-1 text-xs font-medium rounded transition-all ${
+              playbackMode === 'paragraph' 
+                ? 'text-blue-600' 
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+            style={{
+              backgroundColor: playbackMode === 'paragraph' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+            }}
+          >
+            Paragraph
+          </button>
+          <button
+            onClick={() => setPlaybackMode('page')}
+            className={`px-2 py-1 text-xs font-medium rounded transition-all ${
+              playbackMode === 'page' 
+                ? 'text-blue-600' 
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+            style={{
+              backgroundColor: playbackMode === 'page' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+            }}
+          >
+            Page
+          </button>
+          <button
+            onClick={() => setPlaybackMode('continue')}
+            className={`px-2 py-1 text-xs font-medium rounded transition-all ${
+              playbackMode === 'continue' 
+                ? 'text-blue-600' 
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+            style={{
+              backgroundColor: playbackMode === 'continue' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+            }}
+          >
+            Continue
+          </button>
+        </div>
+
         {/* Compact Toggle Bar */}
         <div className="flex items-center gap-2 p-3">
           {/* Play/Pause Button - Main Control */}
