@@ -576,9 +576,29 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-text-inverse)' }} />
             ) : tts.isPlaying ? (
               <Pause className="w-5 h-5" />
+            ) : ttsManager.isPausedState() ? (
+              <Pause className="w-5 h-5" />
             ) : (
               <Play className="w-5 h-5" />
             )}
+          </button>
+
+          {/* Stop Button - Always visible in collapsed state */}
+          <button
+            onClick={handleStop}
+            className="p-2 rounded-full transition-all"
+            style={{ color: 'var(--color-text-primary)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-error-light)'
+              e.currentTarget.style.color = 'var(--color-error)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent'
+              e.currentTarget.style.color = 'var(--color-text-primary)'
+            }}
+            title="Stop"
+          >
+            <Square className="w-4 h-4" />
           </button>
 
           {/* Status Indicator */}
