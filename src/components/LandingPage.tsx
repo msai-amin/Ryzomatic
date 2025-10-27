@@ -210,8 +210,16 @@ const LandingPage: React.FC = () => {
             Research is Not Linear,<br />your tools shouldn't be either.
           </h1>
           
-          <p className="max-w-2xl text-body text-slate-600 md:text-xl">
-            ryzomatic is an intelligent reading platform for academics. Streamline your literature reviews, manage citations, draft manuscripts, and collaborate with peers—all in one immersive workspace.
+          <p className="max-w-3xl text-body text-slate-600 md:text-xl leading-relaxed">
+            ryzomatic is the AI-powered research workspace designed for how you actually think.
+            <br /><br />
+            It transforms your entire library from a pile of PDFs into an intelligent, interconnected network. Our AI assistant reads with you, automatically surfacing hidden connections, contrasting theories, and related concepts from every other document you've added. Simply drag a new paper into the relevance window and watch ryzomatic instantly map its ideas to your entire collection.
+          </p>
+          
+          <p className="max-w-3xl text-body text-slate-600 md:text-lg leading-relaxed">
+            Go deeper with a natural-voice reader that brings articles to life, eliminate clutter with smart document organization, and reclaim your focus with an integrated Pomodoro clock.
+            <br /><br />
+            Stop just reading documents. Start connecting them.
           </p>
           
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
@@ -261,10 +269,17 @@ const LandingPage: React.FC = () => {
         <div className="mx-auto max-w-6xl px-6 py-24">
           <div className="flex flex-col gap-6 text-center">
             <h2 className="text-heading-2 text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
-              A Toolkit Engineered for Academic Excellence
+              Connect Your Ideas, Not Just Your Documents
             </h2>
-            <p className="mx-auto max-w-2xl text-body text-slate-600">
-              ryzomatic transforms scattered notes and sources into a clear, actionable research workflow.
+            <p className="mx-auto max-w-3xl text-body text-slate-600 leading-relaxed">
+              ryzomatic is the AI-powered research workspace designed for how you actually think.
+              <br /><br />
+              It transforms your entire library from a pile of PDFs into an intelligent, interconnected network. Our AI assistant reads with you, automatically surfacing hidden connections, contrasting theories, and related concepts from every other document you've added. Simply drag a new paper into the relevance window and watch ryzomatic instantly map its ideas to your entire collection.
+            </p>
+            <p className="mx-auto max-w-3xl text-body text-slate-600 mt-4 leading-relaxed">
+              Go deeper with a natural-voice reader that brings articles to life, eliminate clutter with smart document organization, and reclaim your focus with an integrated Pomodoro clock.
+              <br /><br />
+              <strong>Stop just reading documents. Start connecting them.</strong>
             </p>
           </div>
           
