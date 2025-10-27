@@ -34,11 +34,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     if (section === 'session') {
+      if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed for session' });
+      }
       return await handleSession(req, res);
     } else if (section === 'stats') {
+      if (req.method !== 'GET') {
+        return res.status(405).json({ error: 'Method not allowed for stats' });
+      }
       return await handleStats(req, res);
     } else if (section === 'gamification') {
-      return await handleGamification(req, res);
+      // Gamification supports both GET and POST
+      if (req.method === 'GET') {
+        return await handleGamificationGet(req, res);
+      } else if (req.method === 'POST') {
+        return await handleGamificationPost(req, res);
+      } else {
+        return res.status(405).json({ error: 'Method not allowed for gamification' });
+      }
     }
   } catch (error: any) {
     console.error('Pomodoro API error:', error);
@@ -108,11 +121,7 @@ async function handleStats(req: VercelRequest, res: VercelResponse) {
   return res.status(200).json({ success: true, stats: data });
 }
 
-async function handleGamification(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
+async function handleGamificationGet(req: VercelRequest, res: VercelResponse) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -123,25 +132,72 @@ async function handleGamification(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: 'Invalid token' });
   }
 
-  const { achievementType, pointsEarned } = req.body;
+  // For GET, return empty arrays (achievements and streak)
+  // This is a simplified response - in production, query from database
+  return res.status(200).json({
+    success: true,
+    achievements: [],
+    streak: {
+      current_streak: 0,
+      longest_streak: 0,
+      last_session_date: null,
+      weekly_goal: 7,
+      weekly_progress: 0,
+      week_start_date: null,
+    },
+  });
+}
 
-  // Update user profile with gamification data
-  const { data, error } = await supabase
-    .from('profiles')
-    .update({
-      metadata: {
-        achievementType,
-        pointsEarned,
-      },
-    })
-    .eq('id', user.id)
-    .select()
-    .single();
-
-  if (error) {
-    return res.status(500).json({ error: error.message });
+async function handleGamificationPost(req: VercelRequest, res: VercelResponse) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  return res.status(200).json({ success: true, profile: data });
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  if (authError || !user) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+
+  const { achievementType, pointsEarned, checkAchievements, updateStreak } = req.body;
+
+  // Handle different gamification actions
+  if (checkAchievements) {
+    // Return empty achievements for now
+    return res.status(200).json({
+      success: true,
+      newAchievements: [],
+    });
+  }
+
+  if (updateStreak) {
+    // Success response - no actual update for now
+    return res.status(200).json({
+      success: true,
+    });
+  }
+
+  // Update user profile with gamification data
+  if (achievementType || pointsEarned !== undefined) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({
+        metadata: {
+          achievementType,
+          pointsEarned,
+        },
+      })
+      .eq('id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.status(200).json({ success: true, profile: data });
+  }
+
+  return res.status(200).json({ success: true });
 }
 
