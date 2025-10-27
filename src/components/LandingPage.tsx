@@ -207,7 +207,7 @@ const LandingPage: React.FC = () => {
           </div>
           
           <h1 className="max-w-4xl text-heading-1 text-slate-900 md:text-6xl" style={{ fontFamily: "'Inter', sans-serif" }}>
-            Reading Reimagined for Academics.
+            Research is Not Linear,<br />your tools shouldn't be either.
           </h1>
           
           <p className="max-w-2xl text-body text-slate-600 md:text-xl">
