@@ -66,6 +66,11 @@ const LandingPage: React.FC = () => {
       title: "Advanced Annotation Tools",
       description: "Highlight, annotate, and tag concepts across all documents. Create study notes that link to specific sections and build your personal research archive.",
       icon: "📝"
+    },
+    {
+      title: "Universal Export Formats",
+      description: "Export your research notes in Markdown, HTML, JSON, or plain text formats. Works seamlessly with Zotero, Notion, Obsidian, and other research platforms.",
+      icon: "💾"
     }
   ];
 
