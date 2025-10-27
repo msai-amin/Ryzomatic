@@ -32,6 +32,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const [savedPosition, setSavedPosition] = useState<TTSPosition | null>(null)
   const lastClickTimeRef = useRef<number>(0)
   const previousDocumentIdRef = useRef<string | null>(null)
+  const isSavingRef = useRef(false)
 
   // Extract paragraphs from current document
   useEffect(() => {
@@ -190,7 +191,9 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
   // Save current playback position to store and database
   const saveCurrentPosition = useCallback(async (documentId: string) => {
-    if (!documentId) return
+    if (!documentId || isSavingRef.current) return
+    
+    isSavingRef.current = true
     
     const position: TTSPosition = {
       page: pdfViewer.currentPage,
@@ -215,6 +218,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         console.error('Failed to save TTS position to database:', error)
       }
     }
+    
+    isSavingRef.current = false
   }, [playbackMode, pdfViewer.currentPage, tts.currentParagraphIndex, user, saveTTSPosition])
 
   // Load saved position from store or database
@@ -293,17 +298,17 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const handleStopRef = useRef<() => void>(() => {})
   
   const handleStop = useCallback(async () => {
-    // Save position before stopping
-    if (currentDocument?.id) {
+    // Save position before stopping (only if actually playing)
+    if (currentDocument?.id && tts.isPlaying) {
       await saveCurrentPosition(currentDocument.id)
     }
     
     ttsManager.stop()
-    updateTTS({ isPlaying: false, currentWordIndex: null })
+    updateTTS({ isPlaying: false, isPaused: false, currentWordIndex: null })
     setCurrentTime(0)
     setDuration(0)
     setIsProcessing(false)
-  }, [updateTTS, currentDocument?.id, saveCurrentPosition])
+  }, [updateTTS, currentDocument?.id, tts.isPlaying, saveCurrentPosition])
   
   handleStopRef.current = handleStop
 
@@ -328,18 +333,18 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         await saveCurrentPosition(currentDocument.id)
       }
       ttsManager.pause()
-      updateTTS({ isPlaying: false })
-    } else if (ttsManager.isPausedState()) {
+      updateTTS({ isPlaying: false, isPaused: true }) // SET PAUSED FLAG
+    } else if (tts.isPaused) { // CHECK STORE PAUSED STATE
       // Resume
       ttsManager.resume()
-      updateTTS({ isPlaying: true })
+      updateTTS({ isPlaying: true, isPaused: false }) // CLEAR PAUSED FLAG
     } else {
       // Start new playback with caching
       setIsProcessing(true)
       
       try {
         ttsManager.stop()
-        updateTTS({ isPlaying: false })
+        updateTTS({ isPlaying: false, isPaused: false }) // Ensure paused is false
         
         const text = getTextForPlaybackMode(playbackMode)
         
@@ -371,7 +376,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             }
           }
           
-          updateTTS({ isPlaying: true })
+          updateTTS({ isPlaying: true, isPaused: false })
           
           await ttsManager.speak(
             text,
@@ -380,7 +385,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               if (currentDocument?.id) {
                 saveCurrentPosition(currentDocument.id)
               }
-              updateTTS({ isPlaying: false, currentWordIndex: null })
+              updateTTS({ isPlaying: false, isPaused: false, currentWordIndex: null })
               
               if (tts.autoAdvanceParagraph && playbackMode === 'paragraph') {
                 handleNextParagraph()
@@ -402,7 +407,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         }
       } catch (error) {
         console.error('AudioWidget: TTS Error:', error)
-        updateTTS({ isPlaying: false })
+        updateTTS({ isPlaying: false, isPaused: false })
         setIsProcessing(false)
       }
     }
@@ -574,9 +579,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           >
             {isProcessing ? (
               <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-text-inverse)' }} />
-            ) : tts.isPlaying ? (
-              <Pause className="w-5 h-5" />
-            ) : ttsManager.isPausedState() ? (
+            ) : (tts.isPlaying || tts.isPaused) ? ( // Show pause if playing OR paused
               <Pause className="w-5 h-5" />
             ) : (
               <Play className="w-5 h-5" />

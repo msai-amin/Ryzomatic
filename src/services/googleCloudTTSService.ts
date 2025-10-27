@@ -66,6 +66,7 @@ class GoogleCloudTTSService {
   private audioPauseTime = 0;
   private onEndCallback: (() => void) | null = null;
   private onWordCallback: ((word: string, charIndex: number) => void) | null = null;
+  private stopRequested: boolean = false;
 
   constructor() {
     // Get API key from environment
@@ -398,6 +399,9 @@ class GoogleCloudTTSService {
 
   async speak(text: string, onEnd?: () => void, onWord?: (word: string, charIndex: number) => void): Promise<void> {
     try {
+      // Reset stop flag for new playback
+      this.stopRequested = false;
+      
       // Stop any current speech
       this.stop();
 
@@ -449,10 +453,22 @@ class GoogleCloudTTSService {
 
     // Play each chunk sequentially
     for (let i = 0; i < chunks.length; i++) {
+      // CHECK FOR STOP REQUEST BEFORE EACH CHUNK
+      if (this.stopRequested) {
+        console.log(`Chunk playback cancelled at ${i + 1}/${chunks.length}`);
+        return; // Exit loop immediately
+      }
+      
       const chunk = chunks[i];
       console.log(`Playing chunk ${i + 1}/${chunks.length} (${chunk.length} chars)`);
       
       const audioBuffer = await this.synthesize(chunk);
+      
+      // CHECK AGAIN AFTER ASYNC SYNTHESIZE
+      if (this.stopRequested) {
+        console.log(`Chunk playback cancelled after synthesis ${i + 1}/${chunks.length}`);
+        return;
+      }
       
       // Only call onEnd for the last chunk
       const isLastChunk = i === chunks.length - 1;
@@ -466,19 +482,13 @@ class GoogleCloudTTSService {
     }
 
     try {
-      // Wait for any currently playing audio to complete
-      if (this.currentAudio && this.isSpeaking()) {
-        await new Promise<void>((resolve) => {
-          const tempOnEnd = this.currentAudio?.onended;
-          this.currentAudio!.onended = () => {
-            if (tempOnEnd) tempOnEnd();
-            resolve();
-          };
-        });
-      }
-      
       // Decode audio data
       const decodedAudio = await this.audioContext.decodeAudioData(audioBuffer);
+      
+      // Check stop flag before starting
+      if (this.stopRequested) {
+        return;
+      }
       
       // Create audio source
       const source = this.audioContext.createBufferSource();
@@ -493,28 +503,30 @@ class GoogleCloudTTSService {
       this.onEndCallback = onEnd || null;
       this.onWordCallback = onWord || null;
       
-      // Set up event handlers
-      source.onended = () => {
-        this.isPaused = false;
-        this.pauseTime = 0;
-        this.startTime = 0;
-        this.audioStartTime = 0;
-        this.audioPauseTime = 0;
-        this.currentAudioBuffer = null;
-        this.currentAudio = null;
-        if (onEnd) onEnd();
-        this.onEndCallback = null;
-        this.onWordCallback = null;
-      };
+      // CRITICAL: Create a Promise that resolves when audio ends
+      const audioEndPromise = new Promise<void>((resolve) => {
+        source.onended = () => {
+          this.isPaused = false;
+          this.pauseTime = 0;
+          this.startTime = 0;
+          this.audioStartTime = 0;
+          this.audioPauseTime = 0;
+          this.currentAudioBuffer = null;
+          this.currentAudio = null;
+          if (onEnd) onEnd();
+          this.onEndCallback = null;
+          this.onWordCallback = null;
+          resolve(); // Resolve promise when audio ends
+        };
+      });
 
       // Start playing and track start time
       this.audioStartTime = this.audioContext.currentTime;
       this.startTime = this.audioContext.currentTime;
       source.start();
       
-      // Note: Word-by-word highlighting is not available with Google Cloud TTS
-      // as it returns pre-rendered audio. For word highlighting, we'd need
-      // to use SSML with word timestamps, which is more complex.
+      // WAIT for audio to complete before returning
+      await audioEndPromise;
       
     } catch (error) {
       console.error('Error playing audio:', error);
@@ -576,6 +588,8 @@ class GoogleCloudTTSService {
 
   stop() {
     console.log('GoogleCloudTTSService.stop() called')
+    this.stopRequested = true; // SET FLAG IMMEDIATELY
+    
     if (this.currentAudio) {
       console.log('GoogleCloudTTSService: Stopping current audio')
       try {

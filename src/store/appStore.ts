@@ -140,6 +140,7 @@ export interface TTSPosition {
 export interface TTSSettings {
   isEnabled: boolean
   isPlaying: boolean
+  isPaused: boolean
   provider: 'native' | 'google-cloud'
   rate: number
   pitch: number
@@ -326,6 +327,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   tts: {
     isEnabled: false,
     isPlaying: false,
+    isPaused: false,
     provider: 'native', // Use native TTS for development (supports word boundaries and progress tracking)
     rate: 0.9, // Slightly slower for more natural speech
     pitch: 1.1, // Slightly higher pitch for more natural sound
