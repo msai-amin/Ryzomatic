@@ -78,7 +78,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
           </Tooltip>
           
           <div className="flex items-center gap-2">
-            <img src="/ryzome-logo.png" alt="ryzome" className="h-6 w-6" />
+            <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-6 w-6" />
             <div 
               className="px-3 py-1 font-bold text-sm rounded-lg"
               style={{
@@ -86,7 +86,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                 color: 'var(--color-text-inverse)',
               }}
             >
-              ryzome
+              ryzomatic
             </div>
           </div>
         </div>

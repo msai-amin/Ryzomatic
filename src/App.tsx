@@ -222,7 +222,7 @@ function App() {
             className="mt-4"
             style={{ color: 'var(--color-text-secondary)' }}
           >
-            Loading ryzome...
+            Loading ryzomatic...
           </p>
         </div>
       </div>
@@ -256,7 +256,7 @@ function App() {
               className="text-4xl font-bold mb-4"
               style={{ color: 'var(--color-text-primary)' }}
             >
-              ryzome
+              ryzomatic
             </h1>
             <p 
               className="text-xl mb-8"

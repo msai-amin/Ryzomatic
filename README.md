@@ -1,4 +1,4 @@
-# ryzome
+# ryzomatic
 
 An intelligent reading platform for academics with AI chat capabilities, built with React, TypeScript, and modern web technologies.
 

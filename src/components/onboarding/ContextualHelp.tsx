@@ -15,7 +15,7 @@ const helpTopics: HelpTopic[] = [
   {
     id: 'getting-started',
     title: 'Getting Started',
-    description: 'Learn the basics of using ryzome',
+    description: 'Learn the basics of using ryzomatic',
     icon: <BookOpen className="w-5 h-5" />,
     category: 'basics',
     steps: [

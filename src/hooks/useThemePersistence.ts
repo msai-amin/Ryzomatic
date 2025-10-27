@@ -10,7 +10,7 @@ export const useThemePersistence = () => {
 
   // Load theme from localStorage on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem('ryzome-theme')
+    const savedTheme = localStorage.getItem('ryzomatic-theme')
     if (savedTheme) {
       try {
         const parsedTheme = JSON.parse(savedTheme)
@@ -23,7 +23,7 @@ export const useThemePersistence = () => {
 
   // Save theme to localStorage when it changes
   useEffect(() => {
-    localStorage.setItem('ryzome-theme', JSON.stringify(theme))
+    localStorage.setItem('ryzomatic-theme', JSON.stringify(theme))
   }, [theme])
 
   return { theme, updateTheme }

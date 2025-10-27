@@ -148,9 +148,9 @@ const LandingPage: React.FC = () => {
       <header className="relative z-20 bg-white/80 backdrop-blur-lg border-b border-slate-200 sticky top-0">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <a href="#" className="flex items-center gap-3">
-            <img src="/ryzome-logo.png" alt="ryzome" className="h-10 w-10" />
+            <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-10 w-10" />
             <div>
-              <p className="text-lg font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>ryzome</p>
+              <p className="text-lg font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>ryzomatic</p>
             </div>
           </a>
           
@@ -211,7 +211,7 @@ const LandingPage: React.FC = () => {
           </h1>
           
           <p className="max-w-2xl text-body text-slate-600 md:text-xl">
-            ryzome is an intelligent reading platform for academics. Streamline your literature reviews, manage citations, draft manuscripts, and collaborate with peers—all in one immersive workspace.
+            ryzomatic is an intelligent reading platform for academics. Streamline your literature reviews, manage citations, draft manuscripts, and collaborate with peers—all in one immersive workspace.
           </p>
           
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
@@ -264,7 +264,7 @@ const LandingPage: React.FC = () => {
               A Toolkit Engineered for Academic Excellence
             </h2>
             <p className="mx-auto max-w-2xl text-body text-slate-600">
-              ryzome transforms scattered notes and sources into a clear, actionable research workflow.
+              ryzomatic transforms scattered notes and sources into a clear, actionable research workflow.
             </p>
           </div>
           
@@ -297,7 +297,7 @@ const LandingPage: React.FC = () => {
               Built for Every Academic Role
             </h2>
             <p className="mx-auto max-w-2xl text-base text-slate-600">
-              Whether you're working on a dissertation, preparing a syllabus, or collaborating on a groundbreaking study, ryzome adapts to your workflow.
+              Whether you're working on a dissertation, preparing a syllabus, or collaborating on a groundbreaking study, ryzomatic adapts to your workflow.
             </p>
           </div>
 
@@ -384,9 +384,9 @@ const LandingPage: React.FC = () => {
       <footer className="bg-slate-50 border-t border-slate-200">
         <div className="mx-auto flex max-w-6xl flex-col gap-12 px-6 py-12 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
-            <img src="/ryzome-logo.png" alt="ryzome" className="h-10 w-10" />
+            <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-10 w-10" />
             <div>
-              <p className="text-base font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>ryzome</p>
+              <p className="text-base font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>ryzomatic</p>
             </div>
           </div>
           

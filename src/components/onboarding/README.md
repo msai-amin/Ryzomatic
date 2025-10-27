@@ -1,4 +1,4 @@
-# ryzome - Onboarding System
+# ryzomatic - Onboarding System
 
 A comprehensive, responsibly designed onboarding system that guides users through the app's features with progressive disclosure and contextual help.
 

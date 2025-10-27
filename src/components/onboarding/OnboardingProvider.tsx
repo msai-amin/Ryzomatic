@@ -53,7 +53,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     // Welcome & Getting Started
     {
       id: 'welcome',
-      title: 'Welcome to ryzome! 🎓',
+      title: 'Welcome to ryzomatic! 🎓',
       description: 'Let\'s take a quick tour to help you get the most out of your reading experience. We\'ll show you the key features step by step.',
       placement: 'center',
       category: 'welcome',

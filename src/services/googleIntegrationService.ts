@@ -126,7 +126,7 @@ class GoogleIntegrationService {
         resource: {
           name: this.READINGS_FOLDER_NAME,
           mimeType: 'application/vnd.google-apps.folder',
-          description: 'PDFs currently being read in ryzome'
+          description: 'PDFs currently being read in ryzomatic'
         },
         fields: 'id'
       });
@@ -155,7 +155,7 @@ class GoogleIntegrationService {
         name: file.name,
         mimeType: 'application/pdf',
         parents: [this.readingsFolderId],
-        description: `Uploaded from ryzome on ${new Date().toISOString()}`
+        description: `Uploaded from ryzomatic on ${new Date().toISOString()}`
       };
 
       const form = new FormData();

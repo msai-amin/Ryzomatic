@@ -36,7 +36,7 @@ export interface UploadOptions {
 
 class GoogleDriveService {
   private folderId: string | null = null;
-  private readonly APP_FOLDER_NAME = 'ryzome';
+  private readonly APP_FOLDER_NAME = 'ryzomatic';
 
   async initialize(): Promise<void> {
     await googleAuthService.initialize();
@@ -60,7 +60,7 @@ class GoogleDriveService {
       }
 
       // Create folder if it doesn't exist
-      const folder = await this.createFolder(this.APP_FOLDER_NAME, 'ryzome app data storage');
+      const folder = await this.createFolder(this.APP_FOLDER_NAME, 'ryzomatic app data storage');
       this.folderId = folder.id;
     } catch (error) {
       console.error('Error ensuring app folder:', error);
@@ -234,13 +234,13 @@ class GoogleDriveService {
     };
   }
 
-  // ryzome specific methods
+  // ryzomatic specific methods
   async saveBook(bookData: any): Promise<DriveFileMetadata> {
     const blob = new Blob([JSON.stringify(bookData)], { type: 'application/json' });
     return await this.uploadFile(blob, {
       name: `${bookData.title}.json`,
       mimeType: 'application/json',
-      description: `ryzome book: ${bookData.title}`,
+      description: `ryzomatic book: ${bookData.title}`,
     });
   }
 
@@ -249,7 +249,7 @@ class GoogleDriveService {
     return await this.uploadFile(blob, {
       name: 'notes.json',
       mimeType: 'application/json',
-      description: 'ryzome notes',
+      description: 'ryzomatic notes',
     });
   }
 
@@ -257,7 +257,7 @@ class GoogleDriveService {
     return await this.uploadFile(audioBlob, {
       name: `${metadata.title}.wav`,
       mimeType: 'audio/wav',
-      description: `ryzome audio: ${metadata.title}`,
+      description: `ryzomatic audio: ${metadata.title}`,
     });
   }
 

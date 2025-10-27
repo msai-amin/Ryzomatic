@@ -31,8 +31,8 @@ export const Header: React.FC = () => {
         <div className="flex items-center justify-between">
           {/* Logo and Title */}
           <div className="flex items-center space-x-3">
-            <img src="/ryzome-logo.png" alt="ryzome" className="h-8 w-8" />
-            <h1 className="text-xl font-semibold text-white">ryzome</h1>
+            <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-8 w-8" />
+            <h1 className="text-xl font-semibold text-white">ryzomatic</h1>
           </div>
 
           {/* Document Info */}
