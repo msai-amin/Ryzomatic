@@ -38,37 +38,37 @@ const LandingPage: React.FC = () => {
 
   const featureCards: FeatureCard[] = [
     {
-      title: "Research Composer",
-      description: "Draft articles, grant proposals, and lecture notes with AI-assisted templates that organize sources and structure arguments.",
-      icon: "📝"
+      title: "Intelligent Document Network",
+      description: "Upload any paper and watch ryzomatic instantly map it to your entire collection. Discover surprising connections between theories, find contrasting views, and surface related research you didn't know you had.",
+      icon: "🌐"
     },
     {
-      title: "Literature Synthesizer",
-      description: "Turn dense papers into concise summaries, annotated bibliographies, and thematic notes for your literature review.",
-      icon: "📚"
+      title: "AI Reading Assistant",
+      description: "Your AI reads alongside you, highlighting key concepts, explaining complex ideas, and answering questions in real-time. It remembers everything from every document—no more searching through old notes.",
+      icon: "🤖"
     },
     {
-      title: "Project Tracker",
-      description: "Monitor research progress, track publication timelines, and manage collaborative projects with clear, visual dashboards.",
-      icon: "📊"
+      title: "Research-Focused Tools",
+      description: "Natural-voice text-to-speech for hands-free learning, smart document organization that groups related papers, and built-in Pomodoro timers to maintain deep focus during intensive research sessions.",
+      icon: "⚡"
     }
   ];
 
   const useCases: UseCase[] = [
     {
-      name: "For Students",
-      description: "Manage coursework, organize research for your thesis, and seamlessly collaborate on group projects.",
-      icon: "🎓"
+      name: "Find the Connection You Missed",
+      description: "Start a paper on neural networks and instantly see all your previous machine learning documents. Watch ryzomatic surface the exact papers that support or challenge your current reading.",
+      icon: "🔗"
     },
     {
-      name: "For Professors",
-      description: "Streamline your research pipeline, prepare engaging lectures, and mentor students effectively within one platform.",
-      icon: "👤"
+      name: "Read Without Losing Context",
+      description: "Ask your AI assistant about a concept and it searches across your entire library. 'Compare this method to Atkinson-Shiffrin' becomes an instant cross-document analysis.",
+      icon: "💡"
     },
     {
-      name: "For Researchers",
-      description: "Accelerate your literature review process, manage citations, and collaborate with co-authors across institutions.",
-      icon: "🔬"
+      name: "Turn PDFs Into a Working Knowledge Base",
+      description: "Every paper you upload becomes part of an interconnected web of ideas. Your next hypothesis might come from a connection only your AI noticed.",
+      icon: "🧠"
     }
   ];
 
