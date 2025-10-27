@@ -48,27 +48,57 @@ const LandingPage: React.FC = () => {
       icon: "🤖"
     },
     {
-      title: "Research-Focused Tools",
-      description: "Natural-voice text-to-speech for hands-free learning, smart document organization that groups related papers, and built-in Pomodoro timers to maintain deep focus during intensive research sessions.",
-      icon: "⚡"
+      title: "Natural-Voice Reader",
+      description: "Listen to papers with premium TTS voices while you multitask. Adjustable speed, pitch, and voice selection let you learn at your own pace—hands-free.",
+      icon: "🎧"
+    },
+    {
+      title: "Smart Document Organization",
+      description: "Automatic tagging, smart collections, and intelligent search help you find exactly what you need from hundreds of papers. Your library becomes a searchable knowledge base.",
+      icon: "📁"
+    },
+    {
+      title: "Integrated Pomodoro Timer",
+      description: "Stay focused during deep research sessions with built-in timing tools. Track productivity, take structured breaks, and maintain mental stamina.",
+      icon: "⏱️"
+    },
+    {
+      title: "Advanced Annotation Tools",
+      description: "Highlight, annotate, and tag concepts across all documents. Create study notes that link to specific sections and build your personal research archive.",
+      icon: "📝"
     }
   ];
 
   const useCases: UseCase[] = [
     {
-      name: "Find the Connection You Missed",
-      description: "Start a paper on neural networks and instantly see all your previous machine learning documents. Watch ryzomatic surface the exact papers that support or challenge your current reading.",
+      name: "Literature Review Made Easy",
+      description: "Starting your thesis? Upload papers as you find them. ryzomatic tracks every citation, finds related studies you might have missed, and helps you synthesize arguments across documents automatically.",
+      icon: "📚"
+    },
+    {
+      name: "Compare Research Findings",
+      description: "Found conflicting results? Ask ryzomatic to show all papers discussing the same methodology. Quickly identify patterns, contradictions, and emerging consensus across your entire library.",
+      icon: "⚖️"
+    },
+    {
+      name: "Hands-Free Learning",
+      description: "Listen to papers during commutes or walks. Natural-voice TTS with highlighting lets you absorb complex material without staring at a screen. Perfect for busy researchers.",
+      icon: "🎧"
+    },
+    {
+      name: "Find Thematic Connections",
+      description: "Is your new paper related to something you read months ago? ryzomatic's AI identifies recurring themes, overlapping concepts, and surprising connections you would have never spotted manually.",
       icon: "🔗"
     },
     {
-      name: "Read Without Losing Context",
-      description: "Ask your AI assistant about a concept and it searches across your entire library. 'Compare this method to Atkinson-Shiffrin' becomes an instant cross-document analysis.",
-      icon: "💡"
+      name: "Build Your Research Archive",
+      description: "Every annotation, highlight, and note becomes part of a searchable knowledge base. Years later, query your entire history: 'Show me everything I've saved about fMRI studies' and get instant results.",
+      icon: "🗄️"
     },
     {
-      name: "Turn PDFs Into a Working Knowledge Base",
-      description: "Every paper you upload becomes part of an interconnected web of ideas. Your next hypothesis might come from a connection only your AI noticed.",
-      icon: "🧠"
+      name: "Collaborative Research Made Simple",
+      description: "Share document collections with lab members. Everyone's annotations are tracked, questions are answered across documents, and you maintain context across team discussions.",
+      icon: "👥"
     }
   ];
 
