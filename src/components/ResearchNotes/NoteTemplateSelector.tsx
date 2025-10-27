@@ -1,7 +1,7 @@
 import React from 'react';
 import { FileText, ListOrdered, Network, Table, Box } from 'lucide-react';
-import { useAppStore } from '../../../store/appStore';
-import { Tooltip } from '../../Tooltip';
+import { useAppStore } from '../../store/appStore';
+import { Tooltip } from '../Tooltip';
 
 const templates = [
   {

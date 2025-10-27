@@ -7,21 +7,24 @@ import { StudyGuidePanel } from '../src/components/ResearchNotes/StudyGuidePanel
 import { NoteTemplateSelector } from '../src/components/ResearchNotes/NoteTemplateSelector'
 import { AIAssistedNotes } from '../src/components/ResearchNotes/AIAssistedNotes'
 import { NotesList } from '../src/components/ResearchNotes/NotesList'
+import { notesService } from '../src/services/notesService'
+import { sendMessageToAI } from '../src/services/aiService'
 
 interface ThemedMainContentProps {
   children?: React.ReactNode
 }
 
 export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }) => {
-  const { currentDocument } = useAppStore()
+  const { currentDocument, user } = useAppStore()
   const { annotationColors } = useTheme()
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true)
   const [sectionsExpanded, setSectionsExpanded] = useState({
     studyGuide: false,
     createNote: false,
-    aiAssisted: false,
+    aiAssisted: true, // Expanded by default
     myNotes: false,
   })
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
 
   const toggleSection = (section: keyof typeof sectionsExpanded) => {
     setSectionsExpanded((prev) => ({
@@ -43,6 +46,66 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
   const handleNotesGenerated = () => {
     console.log('Notes generated, refreshing list')
     // The NotesList will auto-refresh when the notes array changes
+  }
+
+  const handleExportNotes = async () => {
+    if (!currentDocument || !user) return
+    
+    try {
+      const { data: notes } = await notesService.getNotesForBook(user.id, currentDocument.id)
+      if (!notes || notes.length === 0) {
+        alert('No notes to export')
+        return
+      }
+      
+      const markdown = await notesService.exportNotes(notes, 'markdown')
+      
+      // Download as file
+      const blob = new Blob([markdown], { type: 'text/markdown' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${currentDocument.name}-notes.md`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error exporting notes:', error)
+      alert('Failed to export notes')
+    }
+  }
+
+  const handleGenerateSummary = async () => {
+    if (!currentDocument || !user) return
+    
+    setIsGeneratingSummary(true)
+    
+    try {
+      const documentContent = currentDocument.pageTexts?.join('\n\n') || currentDocument.content || ''
+      const summary = await sendMessageToAI(
+        'Please provide a comprehensive summary of this document, highlighting the main points, key arguments, and conclusions.',
+        documentContent,
+        user.tier as any,
+        'general'
+      )
+      
+      // Save as a note
+      await notesService.createNote(
+        user.id,
+        currentDocument.id,
+        1,
+        summary,
+        'freeform',
+        undefined,
+        true
+      )
+      
+      alert('Summary generated and saved to notes!')
+    } catch (error) {
+      console.error('Error generating summary:', error)
+      alert('Failed to generate summary')
+    } finally {
+      setIsGeneratingSummary(false)
+    }
   }
 
   return (
@@ -124,6 +187,20 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
               >
                 Research Notes
               </h2>
+              <Tooltip content="Create New Note" position="left">
+                <button 
+                  onClick={() => {
+                    setSectionsExpanded(prev => ({ ...prev, createNote: true }))
+                  }}
+                  className="text-sm px-3 py-1 rounded-full transition-colors hover:opacity-80"
+                  style={{
+                    backgroundColor: 'var(--color-primary)',
+                    color: 'var(--color-text-inverse)',
+                  }}
+                >
+                  + New Note
+                </button>
+              </Tooltip>
             </div>
 
             {/* Study Guide Section */}
@@ -236,30 +313,39 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
               Quick Actions
             </h3>
             <div className="space-y-2">
-              <Tooltip content="Export all your notes to a file" position="left">
-                <button 
-                  className="w-full text-left text-sm p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
-                  Export Notes
-                </button>
-              </Tooltip>
-              <Tooltip content="AI-generated summary of this document" position="left">
-                <button 
-                  className="w-full text-left text-sm p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
-                  Generate Summary
-                </button>
-              </Tooltip>
-              <Tooltip content="Generate citation in multiple formats" position="left">
-                <button 
-                  className="w-full text-left text-sm p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
-                  Create Citation
-                </button>
-              </Tooltip>
+              <button 
+                onClick={handleExportNotes}
+                className="w-full text-left text-sm p-2 rounded transition-colors cursor-pointer"
+                style={{ 
+                  color: 'var(--color-text-primary)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                }}
+              >
+                Export Notes
+              </button>
+              <button 
+                onClick={handleGenerateSummary}
+                disabled={isGeneratingSummary}
+                className="w-full text-left text-sm p-2 rounded transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ 
+                  color: 'var(--color-text-primary)',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isGeneratingSummary) {
+                    e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                }}
+              >
+                {isGeneratingSummary ? 'Generating...' : 'Generate Summary'}
+              </button>
             </div>
           </div>
           </div>

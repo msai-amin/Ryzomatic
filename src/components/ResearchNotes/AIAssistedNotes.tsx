@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
-import { useAppStore } from '../../../store/appStore';
-import { notesService } from '../../../services/notesService';
-import { Tooltip } from '../../Tooltip';
+import { useAppStore } from '../../store/appStore';
+import { notesService } from '../../services/notesService';
+import { Tooltip } from '../Tooltip';
 
 const noteTypes = [
   { value: 'cornell', label: 'Cornell Notes' },
