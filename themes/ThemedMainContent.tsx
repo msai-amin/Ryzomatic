@@ -3,7 +3,6 @@ import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
 import { useTheme } from './ThemeProvider'
 import { ChevronRight, ChevronLeft } from 'lucide-react'
-import { StudyGuidePanel } from '../src/components/ResearchNotes/StudyGuidePanel'
 import { NoteTemplateSelector } from '../src/components/ResearchNotes/NoteTemplateSelector'
 import { AIAssistedNotes } from '../src/components/ResearchNotes/AIAssistedNotes'
 import { NotesList } from '../src/components/ResearchNotes/NotesList'
@@ -19,10 +18,10 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
   const { annotationColors } = useTheme()
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true)
   const [sectionsExpanded, setSectionsExpanded] = useState({
-    studyGuide: false,
     createNote: false,
     aiAssisted: true, // Expanded by default
     myNotes: false,
+    annotationColors: false,
   })
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
 
@@ -203,12 +202,6 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
               </Tooltip>
             </div>
 
-            {/* Study Guide Section */}
-            <StudyGuidePanel
-              isExpanded={sectionsExpanded.studyGuide}
-              onToggle={() => toggleSection('studyGuide')}
-            />
-
             {/* Create Note Section */}
             <div className="mb-4">
               <button
@@ -220,7 +213,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                 }}
               >
                 <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                  Templates
+                  Template Note Formats
                 </h3>
                 <ChevronRight
                   className={`w-4 h-4 transition-transform ${sectionsExpanded.createNote ? 'rotate-90' : ''}`}
@@ -278,31 +271,45 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
               )}
             </div>
 
-            {/* Color Legend */}
-          <div className="mb-6">
-            <h3 
-              className="text-sm font-medium mb-3"
-              style={{ color: 'var(--color-text-secondary)' }}
-            >
-              Annotation Colors
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              {annotationColors.map((color, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <div 
-                    className="w-4 h-4 rounded-full"
-                    style={{ backgroundColor: color.color }}
-                  />
-                  <span 
-                    className="text-xs"
-                    style={{ color: 'var(--color-text-secondary)' }}
-                  >
-                    {color.name}
-                  </span>
+            {/* Annotation Colors Section */}
+            <div className="mb-4">
+              <button
+                onClick={() => toggleSection('annotationColors')}
+                className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-opacity-50"
+                style={{
+                  backgroundColor: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                  Annotation Colors
+                </h3>
+                <ChevronRight
+                  className={`w-4 h-4 transition-transform ${sectionsExpanded.annotationColors ? 'rotate-90' : ''}`}
+                  style={{ color: 'var(--color-text-primary)' }}
+                />
+              </button>
+              {sectionsExpanded.annotationColors && (
+                <div className="mt-3 px-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    {annotationColors.map((color, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <div 
+                          className="w-4 h-4 rounded-full"
+                          style={{ backgroundColor: color.color }}
+                        />
+                        <span 
+                          className="text-xs"
+                          style={{ color: 'var(--color-text-secondary)' }}
+                        >
+                          {color.name}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
+              )}
             </div>
-          </div>
 
           {/* Quick Actions */}
           <div className="mt-6 pt-6 border-t" style={{ borderColor: 'var(--color-border)' }}>
