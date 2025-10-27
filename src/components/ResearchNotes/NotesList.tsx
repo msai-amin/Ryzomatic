@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Trash2, Eye } from 'lucide-react';
-import { useAppStore } from '../../store/appStore';
+import { useAppStore } from '../store/appStore';
 import { notesService, NoteWithMetadata } from '../../services/notesService';
 
 interface NotesListProps {

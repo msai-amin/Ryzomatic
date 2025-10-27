@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ChevronDown, ChevronRight, BookOpen, Lightbulb, Info } from 'lucide-react';
 
 interface StudyGuidePanelProps {

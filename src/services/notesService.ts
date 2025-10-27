@@ -1,5 +1,5 @@
 // Notes Service for managing research notes with SQ3R framework
-import { userNotes } from '../lib/supabase';
+import { userNotes } from '../../lib/supabase';
 import { sendMessageToAI } from './aiService';
 import { Document } from '../store/appStore';
 
