@@ -301,39 +301,46 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="bg-slate-50 border-y border-slate-200">
-        <div className="mx-auto max-w-6xl px-6 py-24">
-          <div className="flex flex-col gap-6 text-center">
-            <h2 className="text-heading-2 text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
+      <section id="features" className="bg-gradient-to-b from-white to-slate-50">
+        <div className="mx-auto max-w-7xl px-6 py-24 sm:py-32">
+          <div className="flex flex-col gap-4 text-center mb-16">
+            <div className="inline-flex items-center gap-2 rounded-full bg-green-50 px-4 py-1.5 text-sm font-medium text-green-700 mb-4">
+              <span>✨</span>
+              <span>Powerful Features</span>
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold text-slate-900 max-w-3xl mx-auto" style={{ fontFamily: "'Inter', sans-serif" }}>
               Connect Your Ideas, Not Just Your Documents
             </h2>
-            <p className="mx-auto max-w-3xl text-body text-slate-600 leading-relaxed">
-              ryzomatic is the AI-powered research workspace designed for how you actually think.
-              <br /><br />
-              It transforms your entire library from a pile of PDFs into an intelligent, interconnected network. Our AI assistant reads with you, automatically surfacing hidden connections, contrasting theories, and related concepts from every other document you've added. Simply drag a new paper into the relevance window and watch ryzomatic instantly map its ideas to your entire collection.
-            </p>
-            <p className="mx-auto max-w-3xl text-body text-slate-600 mt-4 leading-relaxed">
-              Go deeper with a natural-voice reader that brings articles to life, eliminate clutter with smart document organization, and reclaim your focus with an integrated Pomodoro clock.
-              <br /><br />
-              <strong>Stop just reading documents. Start connecting them.</strong>
+            <p className="mx-auto max-w-2xl text-lg md:text-xl text-slate-600 leading-relaxed mt-4">
+              Everything you need to transform your PDF library into an intelligent research workspace.
             </p>
           </div>
           
-          <div className="mt-16 grid gap-8 md:grid-cols-3">
-            {featureCards.map((feature) => (
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 mt-12">
+            {featureCards.map((feature, index) => (
               <div
                 key={feature.title}
-                className="group rounded-2xl border border-slate-200 bg-white p-8 transition hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/50"
+                className="group relative rounded-xl border border-slate-200 bg-white p-8 transition-all duration-300 hover:border-slate-300 hover:shadow-xl hover:-translate-y-1"
               >
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition group-hover:bg-slate-800 group-hover:text-white text-2xl">
+                {/* Number badge for visual interest */}
+                <div className="absolute -top-4 -left-4 h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">
+                  {index + 1}
+                </div>
+                
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 text-slate-700 transition-all duration-300 group-hover:from-slate-100 group-hover:to-slate-200 group-hover:scale-110 text-3xl mb-4">
                   {feature.icon}
                 </div>
-                <h3 className="mt-6 text-heading-3 text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
+                
+                <h3 className="text-xl font-bold text-slate-900 mb-3" style={{ fontFamily: "'Inter', sans-serif" }}>
                   {feature.title}
                 </h3>
-                <p className="mt-4 text-caption text-slate-600">
+                
+                <p className="text-slate-600 leading-relaxed">
                   {feature.description}
                 </p>
+                
+                {/* Hover accent line */}
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-green-400 to-blue-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
               </div>
             ))}
           </div>
