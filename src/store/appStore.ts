@@ -129,6 +129,14 @@ export interface Voice {
   model?: string // Required for some Google Cloud TTS voices
 }
 
+export interface TTSPosition {
+  page: number
+  paragraphIndex: number
+  timestamp: number
+  mode: 'paragraph' | 'page' | 'continue'
+  progressSeconds: number
+}
+
 export interface TTSSettings {
   isEnabled: boolean
   isPlaying: boolean
@@ -143,6 +151,9 @@ export interface TTSSettings {
   currentParagraphIndex: number | null
   paragraphs: string[]
   autoAdvanceParagraph: boolean
+  documentPositions: {
+    [documentId: string]: TTSPosition
+  }
 }
 
 interface AppState {
@@ -271,6 +282,10 @@ interface AppState {
   // Recently Viewed Documents actions
   addToRecentlyViewed: (document: Document) => void
   clearRecentlyViewed: () => void
+  
+  // TTS position tracking actions
+  saveTTSPosition: (documentId: string, position: TTSPosition) => void
+  loadTTSPosition: (documentId: string) => TTSPosition | null
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -321,7 +336,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     currentWordIndex: null,
     currentParagraphIndex: null,
     paragraphs: [],
-    autoAdvanceParagraph: true
+    autoAdvanceParagraph: true,
+    documentPositions: {}
   },
   chatMessages: [],
   isTyping: false,
@@ -736,6 +752,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   clearRecentlyViewed: () => {
     console.log('AppStore: Clearing recently viewed documents')
     set({ recentlyViewedDocuments: [] })
+  },
+  
+  // TTS position tracking actions
+  saveTTSPosition: (documentId, position) => set((state) => ({
+    tts: {
+      ...state.tts,
+      documentPositions: {
+        ...state.tts.documentPositions,
+        [documentId]: position
+      }
+    }
+  })),
+  
+  loadTTSPosition: (documentId) => {
+    const state = get()
+    return state.tts.documentPositions[documentId] || null
   }
 }))
 

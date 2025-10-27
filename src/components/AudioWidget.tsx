@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { useAppStore, Voice } from '../store/appStore'
+import { useAppStore, Voice, TTSPosition } from '../store/appStore'
 import { ttsManager } from '../services/ttsManager'
 import { AudioSettingsPanel } from './AudioSettingsPanel'
 import { ttsCacheService, TTSCacheQuery } from '../services/ttsCacheService'
+import { supabase } from '../../lib/supabase'
 import { 
   Play, 
   Pause, 
@@ -21,14 +22,16 @@ interface AudioWidgetProps {
 }
 
 export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
-  const { tts, updateTTS, currentDocument, pdfViewer } = useAppStore()
+  const { tts, updateTTS, currentDocument, pdfViewer, user, saveTTSPosition, loadTTSPosition } = useAppStore()
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [playbackMode, setPlaybackMode] = useState<'paragraph' | 'page' | 'continue'>('paragraph')
+  const [savedPosition, setSavedPosition] = useState<TTSPosition | null>(null)
   const lastClickTimeRef = useRef<number>(0)
+  const previousDocumentIdRef = useRef<string | null>(null)
 
   // Extract paragraphs from current document
   useEffect(() => {
@@ -185,16 +188,122 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     }
   }, [getCurrentParagraphText, getCurrentPageText, getAllRemainingText])
 
+  // Save current playback position to store and database
+  const saveCurrentPosition = useCallback(async (documentId: string) => {
+    if (!documentId) return
+    
+    const position: TTSPosition = {
+      page: pdfViewer.currentPage,
+      paragraphIndex: tts.currentParagraphIndex ?? 0,
+      timestamp: Date.now(),
+      mode: playbackMode,
+      progressSeconds: ttsManager.getCurrentTime()
+    }
+    
+    // Save to Zustand store (immediate)
+    saveTTSPosition(documentId, position)
+    
+    // Save to database (async, for persistence across sessions)
+    if (user?.id) {
+      try {
+        await supabase
+          .from('user_books')
+          .update({ tts_last_position: position })
+          .eq('id', documentId)
+          .eq('user_id', user.id)
+      } catch (error) {
+        console.error('Failed to save TTS position to database:', error)
+      }
+    }
+  }, [playbackMode, pdfViewer.currentPage, tts.currentParagraphIndex, user, saveTTSPosition])
+
+  // Load saved position from store or database
+  const loadSavedPosition = useCallback(async (documentId: string) => {
+    if (!documentId) return
+    
+    // Try Zustand store first
+    let position = loadTTSPosition(documentId)
+    
+    // If not in store, fetch from database
+    if (!position && user?.id) {
+      try {
+        const { data } = await supabase
+          .from('user_books')
+          .select('tts_last_position')
+          .eq('id', documentId)
+          .eq('user_id', user.id)
+          .single()
+        
+        if (data?.tts_last_position) {
+          position = data.tts_last_position as TTSPosition
+        }
+      } catch (error) {
+        console.error('Failed to load TTS position from database:', error)
+      }
+    }
+    
+    // Restore position if found
+    if (position) {
+      setPlaybackMode(position.mode)
+      setSavedPosition(position)
+      updateTTS({ 
+        currentParagraphIndex: position.paragraphIndex 
+      })
+      // Note: Page is already set by document viewer
+    }
+  }, [user, updateTTS, loadTTSPosition])
+
+  // Detect document changes and stop audio
+  useEffect(() => {
+    if (currentDocument?.id !== previousDocumentIdRef.current) {
+      // Document switched - stop audio immediately
+      if (tts.isPlaying && previousDocumentIdRef.current) {
+        console.log('🔄 Document changed - stopping audio')
+        
+        // Save position before stopping
+        saveCurrentPosition(previousDocumentIdRef.current)
+        
+        // Stop audio
+        ttsManager.stop()
+        updateTTS({ isPlaying: false, currentWordIndex: null })
+      }
+      
+      // Update ref for next change
+      previousDocumentIdRef.current = currentDocument?.id || null
+      
+      // Load saved position for new document
+      if (currentDocument?.id) {
+        loadSavedPosition(currentDocument.id)
+      }
+    }
+  }, [currentDocument?.id, tts.isPlaying, saveCurrentPosition, loadSavedPosition, updateTTS])
+
+  // Auto-save position every 5 seconds while playing
+  useEffect(() => {
+    if (!tts.isPlaying || !currentDocument?.id) return
+    
+    const interval = setInterval(() => {
+      saveCurrentPosition(currentDocument.id)
+    }, 5000)
+    
+    return () => clearInterval(interval)
+  }, [tts.isPlaying, currentDocument?.id, saveCurrentPosition])
+
   // Handle stop (declared early to avoid circular dependencies)
   const handleStopRef = useRef<() => void>(() => {})
   
-  const handleStop = useCallback(() => {
+  const handleStop = useCallback(async () => {
+    // Save position before stopping
+    if (currentDocument?.id) {
+      await saveCurrentPosition(currentDocument.id)
+    }
+    
     ttsManager.stop()
     updateTTS({ isPlaying: false, currentWordIndex: null })
     setCurrentTime(0)
     setDuration(0)
     setIsProcessing(false)
-  }, [updateTTS])
+  }, [updateTTS, currentDocument?.id, saveCurrentPosition])
   
   handleStopRef.current = handleStop
 
@@ -214,7 +323,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     }
     
     if (tts.isPlaying) {
-      // Pause
+      // Pause (save position)
+      if (currentDocument?.id) {
+        await saveCurrentPosition(currentDocument.id)
+      }
       ttsManager.pause()
       updateTTS({ isPlaying: false })
     } else if (ttsManager.isPausedState()) {
@@ -264,7 +376,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           await ttsManager.speak(
             text,
             () => {
-              // On end callback - auto-advance if enabled
+              // On end callback - save final position
+              if (currentDocument?.id) {
+                saveCurrentPosition(currentDocument.id)
+              }
               updateTTS({ isPlaying: false, currentWordIndex: null })
               
               if (tts.autoAdvanceParagraph && playbackMode === 'paragraph') {
@@ -291,7 +406,24 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         setIsProcessing(false)
       }
     }
-  }, [playbackMode, tts.isPlaying, tts.autoAdvanceParagraph, isProcessing, updateTTS, getTextForPlaybackMode, currentDocument, pdfViewer.currentPage, tts.currentParagraphIndex, tts.voiceName, tts.rate, tts.pitch])
+  }, [playbackMode, tts.isPlaying, tts.autoAdvanceParagraph, isProcessing, updateTTS, getTextForPlaybackMode, currentDocument, pdfViewer.currentPage, tts.currentParagraphIndex, tts.voiceName, tts.rate, tts.pitch, saveCurrentPosition])
+
+  // Handle playback mode change
+  const handlePlaybackModeChange = useCallback((newMode: 'paragraph' | 'page' | 'continue') => {
+    const wasPlaying = tts.isPlaying
+    
+    // Stop current playback (don't restart automatically)
+    if (wasPlaying) {
+      ttsManager.stop()
+      updateTTS({ isPlaying: false })
+    }
+    
+    // Update mode
+    setPlaybackMode(newMode)
+    
+    // User must press play again to start with new mode
+    // This follows industry standards (e.g., Spotify, Audible)
+  }, [tts.isPlaying, updateTTS])
 
   // Store playPause for use in other callbacks
   const handlePlayPauseRef = useRef<() => Promise<void>>(async () => {})
@@ -365,7 +497,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         {/* Playback Mode Selector - Show when expanded or always visible */}
         <div className="flex items-center justify-center gap-1 px-3 pt-3 pb-2 border-b" style={{ borderColor: 'var(--color-border)' }}>
           <button
-            onClick={() => setPlaybackMode('paragraph')}
+            onClick={() => handlePlaybackModeChange('paragraph')}
             className={`px-2 py-1 text-xs font-medium rounded transition-all ${
               playbackMode === 'paragraph' 
                 ? 'text-blue-600' 
@@ -378,7 +510,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             Paragraph
           </button>
           <button
-            onClick={() => setPlaybackMode('page')}
+            onClick={() => handlePlaybackModeChange('page')}
             className={`px-2 py-1 text-xs font-medium rounded transition-all ${
               playbackMode === 'page' 
                 ? 'text-blue-600' 
@@ -391,7 +523,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             Page
           </button>
           <button
-            onClick={() => setPlaybackMode('continue')}
+            onClick={() => handlePlaybackModeChange('continue')}
             className={`px-2 py-1 text-xs font-medium rounded transition-all ${
               playbackMode === 'continue' 
                 ? 'text-blue-600' 
@@ -500,6 +632,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                 className="w-full h-1.5 rounded-full relative cursor-pointer group"
                 style={{ backgroundColor: 'var(--color-border)' }}
               >
+                {/* Current playback progress */}
                 <div
                   className="h-full rounded-full transition-all duration-200"
                   style={{ 
@@ -507,6 +640,17 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                     backgroundColor: 'var(--color-primary)'
                   }}
                 />
+                
+                {/* Saved position marker (if different from current) */}
+                {savedPosition && duration > 0 && savedPosition.progressSeconds && savedPosition.progressSeconds !== currentTime && (
+                  <div
+                    className="absolute top-0 w-1 h-full bg-yellow-400 opacity-60"
+                    style={{ left: `${(savedPosition.progressSeconds / duration) * 100}%` }}
+                    title="Last saved position"
+                  />
+                )}
+                
+                {/* Current position indicator */}
                 <div
                   className="absolute top-0 w-3 h-3 rounded-full transform -translate-y-1/2 transition-transform group-hover:scale-125"
                   style={{ 
