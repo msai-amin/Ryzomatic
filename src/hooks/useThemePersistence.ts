@@ -10,7 +10,7 @@ export const useThemePersistence = () => {
 
   // Load theme from localStorage on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem('smart-reader-theme')
+    const savedTheme = localStorage.getItem('ryzome-theme')
     if (savedTheme) {
       try {
         const parsedTheme = JSON.parse(savedTheme)
@@ -23,7 +23,7 @@ export const useThemePersistence = () => {
 
   // Save theme to localStorage when it changes
   useEffect(() => {
-    localStorage.setItem('smart-reader-theme', JSON.stringify(theme))
+    localStorage.setItem('ryzome-theme', JSON.stringify(theme))
   }, [theme])
 
   return { theme, updateTheme }

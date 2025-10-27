@@ -31,10 +31,8 @@ export const Header: React.FC = () => {
         <div className="flex items-center justify-between">
           {/* Logo and Title */}
           <div className="flex items-center space-x-3">
-            <div className="bg-white text-black px-3 py-1 border border-gray-300 font-bold text-sm">
-              VStyle
-            </div>
-            <h1 className="text-xl font-semibold text-white">NEO_READER</h1>
+            <img src="/ryzome-logo.png" alt="ryzome" className="h-8 w-8" />
+            <h1 className="text-xl font-semibold text-white">ryzome</h1>
           </div>
 
           {/* Document Info */}

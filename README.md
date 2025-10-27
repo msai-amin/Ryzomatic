@@ -1,6 +1,6 @@
-# AI Reader Assistant
+# ryzome
 
-An intelligent document reading assistant with AI chat capabilities, built with React, TypeScript, and modern web technologies.
+An intelligent reading platform for academics with AI chat capabilities, built with React, TypeScript, and modern web technologies.
 
 ## Features
 

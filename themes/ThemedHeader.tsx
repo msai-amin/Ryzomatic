@@ -77,14 +77,17 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             </button>
           </Tooltip>
           
-          <div 
-            className="px-3 py-1 font-bold text-sm rounded-lg"
-            style={{
-              backgroundColor: 'var(--color-primary)',
-              color: 'var(--color-text-inverse)',
-            }}
-          >
-            Academic Reader Pro
+          <div className="flex items-center gap-2">
+            <img src="/ryzome-logo.png" alt="ryzome" className="h-6 w-6" />
+            <div 
+              className="px-3 py-1 font-bold text-sm rounded-lg"
+              style={{
+                backgroundColor: 'var(--color-primary)',
+                color: 'var(--color-text-inverse)',
+              }}
+            >
+              ryzome
+            </div>
           </div>
         </div>
 

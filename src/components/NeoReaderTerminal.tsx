@@ -58,7 +58,7 @@ const NeoReaderTerminal: React.FC = () => {
       <div className="border-b border-green-400 pb-4 mb-6">
         <div className="flex justify-between items-start">
           <div>
-            <div className="text-2xl">VSTYLE//NEO_READER</div>
+            <div className="text-2xl">RYZOME//READER</div>
             <div className="text-green-600 text-sm mt-1">v2.4.7 // ACADEMIC_COGNITIVE_ENGINE</div>
           </div>
           <div className="text-right">

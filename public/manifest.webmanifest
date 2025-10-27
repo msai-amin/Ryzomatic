@@ -1,7 +1,7 @@
 {
-  "name": "Smart Reader",
-  "short_name": "SmartReader",
-  "description": "Your intelligent document reading assistant",
+  "name": "ryzome",
+  "short_name": "ryzome",
+  "description": "Intelligent reading platform for academics",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

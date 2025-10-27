@@ -36,7 +36,7 @@ export interface UploadOptions {
 
 class GoogleDriveService {
   private folderId: string | null = null;
-  private readonly APP_FOLDER_NAME = 'Smart Reader';
+  private readonly APP_FOLDER_NAME = 'ryzome';
 
   async initialize(): Promise<void> {
     await googleAuthService.initialize();
@@ -60,7 +60,7 @@ class GoogleDriveService {
       }
 
       // Create folder if it doesn't exist
-      const folder = await this.createFolder(this.APP_FOLDER_NAME, 'Smart Reader app data storage');
+      const folder = await this.createFolder(this.APP_FOLDER_NAME, 'ryzome app data storage');
       this.folderId = folder.id;
     } catch (error) {
       console.error('Error ensuring app folder:', error);
@@ -234,13 +234,13 @@ class GoogleDriveService {
     };
   }
 
-  // Smart Reader specific methods
+  // ryzome specific methods
   async saveBook(bookData: any): Promise<DriveFileMetadata> {
     const blob = new Blob([JSON.stringify(bookData)], { type: 'application/json' });
     return await this.uploadFile(blob, {
       name: `${bookData.title}.json`,
       mimeType: 'application/json',
-      description: `Smart Reader book: ${bookData.title}`,
+      description: `ryzome book: ${bookData.title}`,
     });
   }
 
@@ -249,7 +249,7 @@ class GoogleDriveService {
     return await this.uploadFile(blob, {
       name: 'notes.json',
       mimeType: 'application/json',
-      description: 'Smart Reader notes',
+      description: 'ryzome notes',
     });
   }
 
@@ -257,7 +257,7 @@ class GoogleDriveService {
     return await this.uploadFile(audioBlob, {
       name: `${metadata.title}.wav`,
       mimeType: 'audio/wav',
-      description: `Smart Reader audio: ${metadata.title}`,
+      description: `ryzome audio: ${metadata.title}`,
     });
   }
 

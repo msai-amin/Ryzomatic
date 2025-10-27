@@ -286,7 +286,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `smart-reader-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `ryzome-backup-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
