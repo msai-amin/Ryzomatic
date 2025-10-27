@@ -466,6 +466,17 @@ class GoogleCloudTTSService {
     }
 
     try {
+      // Wait for any currently playing audio to complete
+      if (this.currentAudio && this.isSpeaking()) {
+        await new Promise<void>((resolve) => {
+          const tempOnEnd = this.currentAudio?.onended;
+          this.currentAudio!.onended = () => {
+            if (tempOnEnd) tempOnEnd();
+            resolve();
+          };
+        });
+      }
+      
       // Decode audio data
       const decodedAudio = await this.audioContext.decodeAudioData(audioBuffer);
       
@@ -515,8 +526,12 @@ class GoogleCloudTTSService {
     if (this.currentAudio && this.audioContext && !this.isPaused) {
       // Calculate how far into the audio we are
       this.pauseTime = this.audioContext.currentTime - this.audioStartTime;
-      this.currentAudio.stop();
-      this.currentAudio.disconnect();
+      try {
+        this.currentAudio.stop();
+        this.currentAudio.disconnect();
+      } catch (e) {
+        // Ignore errors if already stopped
+      }
       this.currentAudio = null;
       this.isPaused = true;
       console.log('GoogleCloudTTSService: Paused at time:', this.pauseTime);
