@@ -3,7 +3,7 @@
  * Two-tier caching system: In-memory (fast) → Database (persistent)
  */
 
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
 
 export interface TTSCacheEntry {
   id: string;
