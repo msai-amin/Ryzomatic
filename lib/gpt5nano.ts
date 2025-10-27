@@ -1,6 +1,9 @@
 import OpenAI from 'openai';
 import { OCR_LIMITS, calculateOCRCredits as calcCredits } from '../src/utils/ocrUtils';
 
+// Re-export OCR_LIMITS for API routes
+export { OCR_LIMITS };
+
 // Initialize OpenAI client for GPT-5 Nano (SERVER-SIDE ONLY)
 // This file should only be imported in API routes, never in browser code
 const openai = new OpenAI({

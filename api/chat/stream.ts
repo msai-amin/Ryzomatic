@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { geminiService } from '../../lib/gemini';
+import { contextBuilder } from '../../lib/contextBuilder';
+import { memoryService } from '../../lib/memoryService';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -78,6 +80,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Get conversation history if conversationId provided
     let conversationHistory: Array<{ role: string; content: string }> = [];
+    let enhancedContext = '';
+    
     if (conversationId) {
       const { data: messages, error: messagesError } = await supabase
         .from('messages')
@@ -88,6 +92,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (!messagesError && messages) {
         conversationHistory = messages;
+      }
+
+      // Check if we should use intelligent memory context
+      const { data: profile_tier } = await supabase
+        .from('profiles')
+        .select('tier')
+        .eq('id', user.id)
+        .single();
+
+      const tier = profile_tier?.tier || 'free';
+      
+      // For pro+ tiers, use intelligent context builder
+      if (['pro', 'premium', 'enterprise'].includes(tier)) {
+        try {
+          const shouldUseMemory = contextBuilder.shouldUseMemoryContext(message);
+          
+          if (shouldUseMemory) {
+            const contextResult = await contextBuilder.buildContext({
+              userId: user.id,
+              query: message,
+              conversationId,
+              documentId,
+              limit: 20,
+            });
+
+            enhancedContext = contextResult.structuredContext.relevantMemories
+              .map(m => `- ${m.type}: ${m.text}`)
+              .join('\n');
+
+            console.log(`[Context Builder] Enhanced context with ${contextResult.structuredContext.relevantMemories.length} memories, ${contextResult.tokenEstimate} tokens`);
+          }
+        } catch (error) {
+          console.error('Error building context:', error);
+          // Fallback to simple history if context building fails
+        }
       }
     }
 
@@ -102,8 +141,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Stream the response
     try {
+      // Augment message with enhanced context if available
+      const messageWithContext = enhancedContext 
+        ? `Previous conversation context:\n${enhancedContext}\n\nUser: ${message}\n\nRespond with fresh insights building on this context.`
+        : message;
+
       for await (const chunk of geminiService.chatStream({
-        message,
+        message: messageWithContext,
         documentContent,
         history: conversationHistory,
         tier: profile.tier,
@@ -182,8 +226,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         responseTime,
         documentId,
         conversationId: finalConversationId,
+        usedMemoryContext: !!enhancedContext,
       },
     });
+
+    // Trigger background memory extraction for this conversation (async)
+    if (finalConversationId && conversationHistory.length >= 4) {
+      // Check if already extracted
+      const { data: existingJob } = await supabase
+        .from('memory_extraction_jobs')
+        .select('*')
+        .eq('conversation_id', finalConversationId)
+        .eq('status', 'completed')
+        .limit(1);
+
+      if (!existingJob || existingJob.length === 0) {
+        // Trigger extraction (don't wait for completion)
+        memoryService.extractAndStoreMemory({
+          conversationId: finalConversationId,
+          userId: user.id,
+          messages: [
+            ...conversationHistory,
+            { role: 'user', content: message },
+            { role: 'assistant', content: fullResponse },
+          ],
+          documentTitle: documentId ? 'Document' : undefined,
+          documentId,
+        }).catch(err => {
+          console.error('Background memory extraction failed:', err);
+        });
+      }
+    }
 
     // Send completion event with conversation ID
     res.write(`data: ${JSON.stringify({ 

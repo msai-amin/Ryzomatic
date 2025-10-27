@@ -47,7 +47,7 @@ export class GeminiService {
     history?: Array<{ role: string; content: string }>,
     documentContent?: string
   ) {
-    const formatted = [];
+    const formatted: Array<{ role: 'user' | 'model'; parts: { text: string }[] }> = [];
 
     // Add document context if provided
     if (documentContent) {
@@ -69,12 +69,12 @@ export class GeminiService {
 
     // Add conversation history
     if (history && history.length > 0) {
-      formatted.push(
-        ...history.map(msg => ({
+      for (const msg of history) {
+        formatted.push({
           role: msg.role === 'user' ? 'user' : 'model',
           parts: [{ text: msg.content }],
-        }))
-      );
+        });
+      }
     }
 
     return formatted;
@@ -243,6 +243,105 @@ ${documentContent.substring(0, 10000)}`;
     }
 
     return questions.slice(0, count);
+  }
+
+  /**
+   * Extract structured memory entities from conversation
+   */
+  async extractMemoryEntities(params: {
+    conversationMessages: Array<{ role: string; content: string }>;
+    documentTitle?: string;
+  }): Promise<{
+    entities: Array<{
+      type: 'concept' | 'question' | 'insight' | 'reference' | 'action' | 'document';
+      text: string;
+      metadata?: Record<string, any>;
+    }>;
+    relationships?: Array<{
+      from: number;
+      to: number;
+      type: 'relates_to' | 'contradicts' | 'supports' | 'cites' | 'explains';
+      strength?: number;
+    }>;
+  }> {
+    const { conversationMessages, documentTitle } = params;
+    const model = this.getModel('free'); // Use cheapest tier for extraction
+
+    const conversationText = conversationMessages
+      .map(msg => `${msg.role}: ${msg.content}`)
+      .join('\n\n');
+
+    const prompt = `Extract semantic entities from this conversation. Focus on:
+- Concepts discussed (academic terms, theories, frameworks, methodologies)
+- Questions asked by the user
+- Insights or conclusions reached
+- Document references (titles, authors, papers)
+- Actions taken (notes created, highlights made, sections read)
+${documentTitle ? `- Note that this conversation is about the document: "${documentTitle}"` : ''}
+
+Output a JSON object with this structure:
+{
+  "entities": [
+    {
+      "type": "concept" | "question" | "insight" | "reference" | "action" | "document",
+      "text": "the entity text (be specific and concise)",
+      "metadata": {
+        // optional metadata like "sourceMessageIndex": 0
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "from": 0, // index in entities array
+      "to": 1, // index in entities array  
+      "type": "relates_to" | "contradicts" | "supports" | "cites" | "explains",
+      "strength": 0.8 // 0.0 to 1.0
+    }
+  ]
+}
+
+Be thorough but concise. Extract 5-15 entities per conversation.
+
+Conversation:
+${conversationText}`;
+
+    try {
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.3,
+          topK: 20,
+          topP: 0.9,
+          maxOutputTokens: 4096,
+          responseMimeType: 'application/json',
+        },
+      });
+
+      const responseText = result.response.text();
+      const parsed = JSON.parse(responseText);
+
+      // Validate and normalize response
+      return {
+        entities: parsed.entities || [],
+        relationships: parsed.relationships || [],
+      };
+    } catch (error) {
+      console.error('Error extracting memory entities:', error);
+      
+      // Fallback: extract basic entities from message text
+      const basicEntities = conversationMessages
+        .filter(msg => msg.role === 'user')
+        .map((msg, idx) => ({
+          type: 'question' as const,
+          text: msg.content.substring(0, 200),
+          metadata: { sourceMessageIndex: idx }
+        }));
+
+      return {
+        entities: basicEntities,
+        relationships: [],
+      };
+    }
   }
 
   /**

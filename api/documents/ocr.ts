@@ -1,8 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
-import { GPT5NanoService } from '../../lib/gpt5nano';
-import { OCR_LIMITS } from '../../src/utils/ocrUtils';
+import { GPT5NanoService, OCR_LIMITS } from '../../lib/gpt5nano';
 import { Readable } from 'stream';
 
 const supabase = createClient(
