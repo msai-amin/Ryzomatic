@@ -39,7 +39,18 @@ export const ChatModal: React.FC<ChatModalProps> = ({ onClose }) => {
 
     try {
       setTyping(true)
-      const response = await sendMessageToAI(userMessage, currentDocument?.content || '', user?.tier || 'free')
+      
+      // Extract text from pageTexts or content
+      let documentContext = ''
+      if (currentDocument) {
+        if (currentDocument.pageTexts && currentDocument.pageTexts.length > 0) {
+          documentContext = currentDocument.pageTexts.join('\n\n')
+        } else if (currentDocument.content && typeof currentDocument.content === 'string') {
+          documentContext = currentDocument.content
+        }
+      }
+      
+      const response = await sendMessageToAI(userMessage, documentContext, user?.tier || 'free')
       addChatMessage({ role: 'assistant', content: response })
     } catch (error) {
       addChatMessage({ 

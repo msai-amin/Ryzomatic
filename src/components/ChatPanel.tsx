@@ -114,7 +114,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ onClose }) => {
       setTyping(true)
       
       // Build context with notes if enabled
-      let documentContext = currentDocument?.content || ''
+      // Extract text from pageTexts or content
+      let documentContext = ''
+      if (currentDocument) {
+        if (currentDocument.pageTexts && currentDocument.pageTexts.length > 0) {
+          // Use pageTexts (array of strings per page)
+          documentContext = currentDocument.pageTexts.join('\n\n')
+        } else if (currentDocument.content && typeof currentDocument.content === 'string') {
+          // Use string content directly
+          documentContext = currentDocument.content
+        }
+      }
       
       if (includeNotes && currentDocument) {
         const relevantNotes = notesIntegrationService.getRelevantNotes(
@@ -125,7 +135,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ onClose }) => {
           const notesContext = notesIntegrationService.formatNotesForAIContext(
             relevantNotes.slice(0, 5) // Limit to 5 most relevant notes
           )
-          documentContext = notesContext + documentContext
+          documentContext = notesContext + '\n\n' + documentContext
         }
       }
       
