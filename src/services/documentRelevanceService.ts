@@ -130,32 +130,28 @@ class DocumentRelevanceService {
       }
 
       // Use AI service to analyze the document
-      const analysisPrompt = `You are an expert academic document analyzer. Your task is to extract structured information from research documents, papers, books, and notes.
+      const analysisPrompt = `You are an expert academic document analyzer. The FULL document content is provided below - analyze it directly.
 
-DOCUMENT CONTENT (first 3000 characters):
-${content.substring(0, 3000)}
+=== DOCUMENT CONTENT (5000 characters) ===
+${content.substring(0, 5000)}
+=== END DOCUMENT CONTENT ===
 
-ANALYSIS REQUIREMENTS:
-1. Summary: Write 2-3 concise sentences capturing the main argument, methodology, or purpose
-2. Keywords: Extract 5-10 specific technical terms, concepts, or key phrases (not generic words)
-3. Topics: Identify 3-5 specific subject areas or disciplines (e.g., "machine learning", "causal inference", "neuroscience")
-4. Themes: Identify 2-3 overarching themes or research questions (e.g., "interpretability vs performance tradeoff", "real-world applications")
+Based on the content above, extract:
 
-IMPORTANT:
-- Focus on academic/technical content
-- Be specific, not generic
-- Use terminology from the document
-- Output ONLY valid JSON, no additional text
+1. SUMMARY: 2-3 sentences capturing the main argument/purpose
+2. KEYWORDS: 5-10 specific technical terms from the document
+3. TOPICS: 3-5 subject areas (e.g., "machine learning", "causal inference")
+4. THEMES: 2-3 overarching themes/questions
 
-OUTPUT FORMAT (strict JSON):
+Return ONLY this JSON (no other text):
 {
-  "summary": "Concise 2-3 sentence summary here",
-  "keywords": ["specific_term_1", "specific_term_2", "specific_term_3", ...],
-  "topics": ["specific_topic_1", "specific_topic_2", ...],
-  "mainThemes": ["overarching_theme_1", "overarching_theme_2", ...]
+  "summary": "...",
+  "keywords": ["...", "..."],
+  "topics": ["...", "..."],
+  "mainThemes": ["...", "..."]
 }`;
 
-      const response = await sendMessageToAI(analysisPrompt, content.substring(0, 3000));
+      const response = await sendMessageToAI(analysisPrompt, content.substring(0, 5000));
       
       console.log('DocumentRelevanceService: AI response received:', response.substring(0, 200));
       
@@ -287,56 +283,71 @@ OUTPUT FORMAT (strict JSON):
     relatedContent: string = ''
   ): Promise<string> {
     try {
-      const prompt = `You are an expert at identifying relationships between academic documents. Analyze how two documents relate to each other based on the provided summaries and content excerpts.
+      const prompt = `You are an expert at analyzing relationships between academic documents. Both documents' content is provided below - analyze them directly.
 
-SOURCE DOCUMENT:
-- Summary: ${source.summary}
-- Topics: ${source.topics.join(', ')}
-- Themes: ${source.mainThemes.join(', ')}
-- Keywords: ${source.keywords.slice(0, 5).join(', ')}
-- Content excerpt: ${sourceContent.substring(0, 500)}
+=== SOURCE DOCUMENT ===
+Summary: ${source.summary}
+Topics: ${source.topics.join(', ')}
+Keywords: ${source.keywords.slice(0, 5).join(', ')}
 
-RELATED DOCUMENT:
-- Summary: ${related.summary}
-- Topics: ${related.topics.join(', ')}
-- Themes: ${related.mainThemes.join(', ')}
-- Keywords: ${related.keywords.slice(0, 5).join(', ')}
-- Content excerpt: ${relatedContent.substring(0, 500)}
+Content (1500 chars):
+${sourceContent.substring(0, 1500)}
+=== END SOURCE ===
 
-COMPUTED SIMILARITY: ${similarity}%
+=== RELATED DOCUMENT ===
+Summary: ${related.summary}
+Topics: ${related.topics.join(', ')}
+Keywords: ${related.keywords.slice(0, 5).join(', ')}
 
-TASK: Generate a precise 1-2 sentence description explaining their relationship based on the provided information.
+Content (1500 chars):
+${relatedContent.substring(0, 1500)}
+=== END RELATED ===
 
-RELATIONSHIP TYPES TO CONSIDER:
-- Complementary: Documents cover different aspects of the same topic
-- Sequential: One builds upon or extends the other
-- Comparative: Documents present alternative approaches or perspectives
-- Applied: One applies concepts from the other to specific cases
-- Foundational: One provides background/prerequisites for the other
-- Contradictory: Documents present conflicting views or findings
+Computed Similarity: ${similarity}%
 
-REQUIREMENTS:
-- Be specific: mention actual topics, concepts, or themes they share
-- Indicate the type of relationship
-- Explain why a reader might want to read both
-- Keep it concise (1-2 sentences maximum)
-- Do NOT say "Please upload documents" or similar fallback messages
+TASK: Write 1-2 sentences explaining how these documents relate. Consider:
 
-EXAMPLE OUTPUT:
-"Both documents explore causal reasoning in AI systems, with the source focusing on theoretical frameworks while the related document presents practical applications in robotics. Reading both provides a complete picture from theory to implementation."
+- Complementary (different aspects of same topic)
+- Sequential (one builds on the other)
+- Comparative (alternative approaches)
+- Applied (theory vs practice)
+- Foundational (prerequisites)
+- Contradictory (conflicting views)
 
-YOUR DESCRIPTION:`;
+Be specific - mention actual topics/concepts they share. If similarity is low (<30%), note they cover different areas but may still provide useful context.
 
-      console.log('DocumentRelevanceService: Generating AI description with prompt length:', prompt.length);
+YOUR DESCRIPTION (1-2 sentences only):`;
+
+      console.log('DocumentRelevanceService: Sending prompt (preview):', prompt.substring(0, 500));
       const response = await sendMessageToAI(prompt);
+      console.log('DocumentRelevanceService: Full AI response:', response);
+      
       const trimmedResponse = response.trim();
-      
-      console.log('DocumentRelevanceService: AI description generated:', trimmedResponse.substring(0, 100));
-      
-      // Filter out the fallback message
-      if (trimmedResponse.includes('Please upload') || trimmedResponse.includes('would like me to analyze')) {
-        console.warn('DocumentRelevanceService: AI returned fallback message, using default description');
-        return `Documents share ${similarity}% similarity based on content analysis. Both documents cover related topics and themes.`;
+
+      // Enhanced fallback detection
+      const fallbackIndicators = [
+        'Please upload',
+        'would like me to analyze',
+        'I need access',
+        'provide the documents',
+        'cannot analyze without',
+        'need the content'
+      ];
+
+      const hasFallback = fallbackIndicators.some(indicator => 
+        trimmedResponse.toLowerCase().includes(indicator.toLowerCase())
+      );
+
+      if (hasFallback) {
+        console.warn('DocumentRelevanceService: AI returned fallback message');
+        // Provide better default based on similarity
+        if (similarity >= 70) {
+          return `These documents are highly related (${similarity}% similarity), covering similar topics in ${source.topics[0] || 'this field'}. Reading both provides comprehensive coverage.`;
+        } else if (similarity >= 40) {
+          return `These documents share moderate overlap (${similarity}% similarity) in topics like ${source.topics[0] || 'the subject area'}. They complement each other's perspectives.`;
+        } else {
+          return `These documents cover different but potentially complementary areas (${similarity}% similarity). They may provide useful context for each other.`;
+        }
       }
       
       return trimmedResponse;
