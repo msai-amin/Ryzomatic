@@ -222,7 +222,7 @@ function App() {
             className="mt-4"
             style={{ color: 'var(--color-text-secondary)' }}
           >
-            Loading Academic Reader Pro...
+            Loading ryzome...
           </p>
         </div>
       </div>
@@ -256,7 +256,7 @@ function App() {
               className="text-4xl font-bold mb-4"
               style={{ color: 'var(--color-text-primary)' }}
             >
-              Academic Reader Pro
+              ryzome
             </h1>
             <p 
               className="text-xl mb-8"

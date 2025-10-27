@@ -16,7 +16,7 @@ export const ThemeSwitcher: React.FC = () => {
     },
     {
       id: 'academic',
-      name: 'Academic Reader Pro',
+      name: 'ryzome',
       description: 'Clean professional research interface',
       icon: Palette,
       preview: 'bg-gray-50 text-gray-900'

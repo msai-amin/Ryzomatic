@@ -19,7 +19,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
       </div>
       
       <h2 className="text-heading-2 mb-4" style={{ color: 'var(--color-text-primary)' }}>
-        Welcome to Academic Reader Pro
+        Welcome to ryzome
       </h2>
       
       <p className="text-center max-w-md mb-12 text-body" style={{ color: 'var(--color-text-secondary)' }}>
