@@ -1,5 +1,6 @@
 import { sendMessageToAI } from './aiService';
 import { userBooks, documentRelationships } from '../../lib/supabase';
+import { supabaseStorageService } from './supabaseStorageService';
 
 export interface DocumentSimilarityResult {
   relevancePercentage: number;
@@ -69,28 +70,45 @@ class DocumentRelevanceService {
     try {
       console.log(`DocumentRelevanceService: Calculating relevance between ${sourceDocId} and ${relatedDocId}`);
 
-      // Get both documents
-      const [sourceDoc, relatedDoc] = await Promise.all([
+      // Get both documents from database
+      const [sourceDocDb, relatedDocDb] = await Promise.all([
         userBooks.get(sourceDocId),
         userBooks.get(relatedDocId)
       ]);
 
-      if (!sourceDoc.data || !relatedDoc.data) {
+      if (!sourceDocDb.data || !relatedDocDb.data) {
         throw new Error('One or both documents not found');
       }
 
-      // Analyze both documents
+      // Get full documents with pageTexts from storage service
+      const [sourceDoc, relatedDoc] = await Promise.all([
+        supabaseStorageService.getBook(sourceDocId),
+        supabaseStorageService.getBook(relatedDocId)
+      ]);
+
+      if (!sourceDoc || !relatedDoc) {
+        throw new Error('Failed to load documents with content');
+      }
+
+      console.log('DocumentRelevanceService: Loaded documents with content:', {
+        sourceId: sourceDoc.id,
+        sourceHasPageTexts: sourceDoc.pageTexts?.length || 0,
+        relatedId: relatedDoc.id,
+        relatedHasPageTexts: relatedDoc.pageTexts?.length || 0
+      });
+
+      // Analyze both documents (pass full document objects, not .data)
       const [sourceAnalysis, relatedAnalysis] = await Promise.all([
-        this.analyzeDocument(sourceDoc.data),
-        this.analyzeDocument(relatedDoc.data)
+        this.analyzeDocument(sourceDoc),
+        this.analyzeDocument(relatedDoc)
       ]);
 
       // Calculate similarity
       const similarity = this.calculateSimilarity(sourceAnalysis, relatedAnalysis);
       
       // Extract content for relationship description
-      const sourceContent = this.extractDocumentContent(sourceDoc.data);
-      const relatedContent = this.extractDocumentContent(relatedDoc.data);
+      const sourceContent = this.extractDocumentContent(sourceDoc);
+      const relatedContent = this.extractDocumentContent(relatedDoc);
       
       // Generate AI description with content
       const aiDescription = await this.generateRelationshipDescription(
@@ -200,16 +218,39 @@ Return ONLY this JSON (no other text):
 
   /**
    * Extract content from document based on type
+   * Note: pageTexts are NOT in the database, they need to be extracted from the PDF
    */
   private extractDocumentContent(document: any): string {
-    if (document.file_type === 'pdf' && document.page_texts) {
-      // For PDFs, use the first few pages of text
-      return document.page_texts.slice(0, 3).join(' ');
-    } else if (document.file_type === 'text' && document.text_content) {
+    try {
+      // Try to get pageTexts from document (if already loaded in memory)
+      if (document.pageTexts && Array.isArray(document.pageTexts) && document.pageTexts.length > 0) {
+        // Use the first few pages of text
+        return document.pageTexts.slice(0, 3).join(' ');
+      }
+      
+      // Fallback: try page_texts (database field name)
+      if (document.page_texts && Array.isArray(document.page_texts) && document.page_texts.length > 0) {
+        return document.page_texts.slice(0, 3).join(' ');
+      }
+      
       // For text files, use the content directly
-      return document.text_content;
+      if (document.file_type === 'text' && document.text_content) {
+        return document.text_content;
+      }
+      
+      console.warn('DocumentRelevanceService: No extractable content found for document:', {
+        id: document.id,
+        file_type: document.file_type,
+        hasPageTexts: !!document.pageTexts,
+        hasPageTextsDb: !!document.page_texts,
+        hasTextContent: !!document.text_content
+      });
+      
+      return '';
+    } catch (error) {
+      console.error('DocumentRelevanceService: Error extracting content:', error);
+      return '';
     }
-    return '';
   }
 
   /**
