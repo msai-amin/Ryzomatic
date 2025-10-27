@@ -206,21 +206,22 @@ const LandingPage: React.FC = () => {
             <span>For Researchers, by Researchers</span>
           </div>
           
-          <h1 className="max-w-4xl text-heading-1 text-slate-900 md:text-6xl" style={{ fontFamily: "'Inter', sans-serif" }}>
+          <h1 className="max-w-4xl text-5xl md:text-7xl font-bold text-slate-900 leading-tight" style={{ fontFamily: "'Inter', sans-serif" }}>
             Research is Not Linear,<br />your tools shouldn't be either.
           </h1>
           
-          <p className="max-w-3xl text-body text-slate-600 md:text-xl leading-relaxed">
-            ryzomatic is the AI-powered research workspace designed for how you actually think.
-            <br /><br />
-            It transforms your entire library from a pile of PDFs into an intelligent, interconnected network. Our AI assistant reads with you, automatically surfacing hidden connections, contrasting theories, and related concepts from every other document you've added. Simply drag a new paper into the relevance window and watch ryzomatic instantly map its ideas to your entire collection.
+          <p className="max-w-2xl text-xl md:text-2xl text-slate-700 leading-relaxed font-medium">
+            The AI-powered research workspace that transforms your PDFs into an interconnected knowledge network.
           </p>
           
-          <p className="max-w-3xl text-body text-slate-600 md:text-lg leading-relaxed">
-            Go deeper with a natural-voice reader that brings articles to life, eliminate clutter with smart document organization, and reclaim your focus with an integrated Pomodoro clock.
-            <br /><br />
-            Stop just reading documents. Start connecting them.
-          </p>
+          <div className="flex flex-col items-center gap-3 text-center mt-8">
+            <p className="text-lg text-slate-600 max-w-xl">
+              Upload a paper. Instantly see how it connects to everything you've ever added.
+            </p>
+            <p className="text-2xl font-semibold text-slate-900 italic max-w-lg">
+              "Stop just reading documents. Start connecting them."
+            </p>
+          </div>
           
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
             <button 
