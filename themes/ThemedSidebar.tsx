@@ -165,7 +165,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
     loadRelatedDocuments()
   }, [currentDocument?.id, user, relatedDocumentsRefreshTrigger, setRelatedDocuments])
 
-  // Poll for AI analysis completion (refresh every 5 seconds if any relationship is processing)
+  // Poll for AI analysis completion (refresh every 10 seconds if any relationship is processing)
   useEffect(() => {
     if (!currentDocument || !user) return
 
@@ -177,9 +177,8 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
     if (!hasProcessingRelationships) return
 
     const intervalId = setInterval(() => {
-      console.log('RelatedDocuments: Polling for AI analysis updates...')
       refreshRelatedDocuments()
-    }, 5000) // Poll every 5 seconds
+    }, 10000) // Poll every 10 seconds (reduced frequency)
 
     return () => clearInterval(intervalId)
   }, [relatedDocuments, currentDocument?.id, user, refreshRelatedDocuments])
