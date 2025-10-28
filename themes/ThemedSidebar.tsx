@@ -44,12 +44,13 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [selectedRelationship, setSelectedRelationship] = useState<DocumentRelationshipWithDetails | null>(null)
   
-  // Collapsible sections state - all expanded by default (compact design)
+  // Collapsible sections state - all collapsed by default
   const [sectionsExpanded, setSectionsExpanded] = useState({
-    library: true,
-    related: true,
-    stats: true,
-    activity: true
+    library: false,
+    related: false,
+    stats: false,
+    activity: false,
+    achievements: false
   })
 
   // Convert recently viewed documents to display format
@@ -711,10 +712,33 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
             )}
           </div>
 
-          {/* Achievements Panel */}
+          {/* Achievements Panel - Collapsible */}
           {user && (
-            <div className="mt-6">
-              <AchievementPanel userId={user.id} />
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <Trophy className="w-5 h-5" style={{ color: '#f59e0b' }} />
+                  <h3 
+                    className="text-lg font-semibold"
+                    style={{ color: 'var(--color-text-primary)' }}
+                  >
+                    Achievements
+                  </h3>
+                </div>
+                <button
+                  onClick={() => toggleSection('achievements')}
+                  className="p-1 rounded transition-colors"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  {sectionsExpanded.achievements ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+              </div>
+              
+              {sectionsExpanded.achievements && (
+                <AchievementPanel userId={user.id} />
+              )}
             </div>
           )}
         </div>
