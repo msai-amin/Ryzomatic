@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
 import { useTheme } from './ThemeProvider'
-import { ChevronRight, ChevronLeft, FileText, Highlighter, Plus, StickyNote } from 'lucide-react'
+import { ChevronRight, ChevronLeft, FileText, Highlighter, Plus, StickyNote, MoreVertical } from 'lucide-react'
 import { NotesList } from '../src/components/ResearchNotes/NotesList'
 import { notesService } from '../src/services/notesService'
 import { highlightService, Highlight } from '../src/services/highlightService'
@@ -20,6 +20,25 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
   const [highlightsLoading, setHighlightsLoading] = useState(false)
   const [notesRefreshTrigger, setNotesRefreshTrigger] = useState(0)
   const [editingNote, setEditingNote] = useState<any>(null)
+  const [showKebabMenu, setShowKebabMenu] = useState(false)
+  const kebabMenuRef = useRef<HTMLDivElement>(null)
+
+  // Close kebab menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (kebabMenuRef.current && !kebabMenuRef.current.contains(event.target as Node)) {
+        setShowKebabMenu(false)
+      }
+    }
+
+    if (showKebabMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showKebabMenu])
 
   // Load highlights when tab is active and document changes
   useEffect(() => {
@@ -139,37 +158,136 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
 
             {/* Tab Navigation */}
             <div className="flex items-center justify-between mb-4">
-              <div className="flex space-x-1 p-1 rounded-lg" style={{ backgroundColor: 'var(--color-surface)' }}>
-                <button
-                  onClick={() => setActiveTab('notes')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    activeTab === 'notes' ? 'shadow-sm' : ''
-                  }`}
-                  style={{
-                    backgroundColor: activeTab === 'notes' ? 'var(--color-primary)' : 'transparent',
-                    color: activeTab === 'notes' ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
-                  }}
-                >
-                  <div className="flex items-center space-x-2">
-                    <StickyNote className="w-4 h-4" />
-                    <span>Notes</span>
-                  </div>
-                </button>
-                <button
-                  onClick={() => setActiveTab('highlights')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    activeTab === 'highlights' ? 'shadow-sm' : ''
-                  }`}
-                  style={{
-                    backgroundColor: activeTab === 'highlights' ? 'var(--color-primary)' : 'transparent',
-                    color: activeTab === 'highlights' ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
-                  }}
-                >
-                  <div className="flex items-center space-x-2">
-                    <Highlighter className="w-4 h-4" />
-                    <span>Highlights</span>
-                  </div>
-                </button>
+              <div className="flex items-center space-x-1">
+                {/* Kebab Menu */}
+                <div className="relative" ref={kebabMenuRef}>
+                  <button
+                    onClick={() => setShowKebabMenu(!showKebabMenu)}
+                    className="p-2 rounded-md transition-colors"
+                    style={{ 
+                      color: 'var(--color-text-secondary)',
+                      backgroundColor: showKebabMenu ? 'var(--color-surface-hover)' : 'transparent'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!showKebabMenu) {
+                        e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!showKebabMenu) {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }
+                    }}
+                    title="More options"
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+                  
+                  {showKebabMenu && (
+                    <div 
+                      className="absolute left-0 mt-2 w-48 rounded-lg shadow-lg border"
+                      style={{
+                        backgroundColor: 'var(--color-surface)',
+                        borderColor: 'var(--color-border)',
+                        zIndex: 1000
+                      }}
+                    >
+                      <div className="py-1">
+                        <button
+                          onClick={() => {
+                            // TODO: Implement notes export
+                            console.log('Export notes');
+                            setShowKebabMenu(false);
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent'
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm transition-colors"
+                          style={{ 
+                            color: 'var(--color-text)'
+                          }}
+                        >
+                          Export Notes
+                        </button>
+                        <button
+                          onClick={() => {
+                            // TODO: Implement notes settings
+                            console.log('Notes settings');
+                            setShowKebabMenu(false);
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent'
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm transition-colors"
+                          style={{ 
+                            color: 'var(--color-text)'
+                          }}
+                        >
+                          Settings
+                        </button>
+                        <button
+                          onClick={() => {
+                            // TODO: Implement notes help
+                            console.log('Notes help');
+                            setShowKebabMenu(false);
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent'
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm transition-colors"
+                          style={{ 
+                            color: 'var(--color-text)'
+                          }}
+                        >
+                          Help
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Tab Buttons */}
+                <div className="flex space-x-1 p-1 rounded-lg" style={{ backgroundColor: 'var(--color-surface)' }}>
+                  <button
+                    onClick={() => setActiveTab('notes')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      activeTab === 'notes' ? 'shadow-sm' : ''
+                    }`}
+                    style={{
+                      backgroundColor: activeTab === 'notes' ? 'var(--color-primary)' : 'transparent',
+                      color: activeTab === 'notes' ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
+                    }}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <StickyNote className="w-4 h-4" />
+                      <span>Notes</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('highlights')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      activeTab === 'highlights' ? 'shadow-sm' : ''
+                    }`}
+                    style={{
+                      backgroundColor: activeTab === 'highlights' ? 'var(--color-primary)' : 'transparent',
+                      color: activeTab === 'highlights' ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
+                    }}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Highlighter className="w-4 h-4" />
+                      <span>Highlights</span>
+                    </div>
+                  </button>
+                </div>
               </div>
               
               {activeTab === 'notes' && (

@@ -4,6 +4,7 @@ import { uploadFile, generateDocumentKey } from '../../lib/s3';
 import formidable from 'formidable';
 import fs from 'fs/promises';
 import { geminiService } from '../../lib/gemini';
+import { documentDescriptionService } from '../../lib/documentDescriptionService';
 
 // Disable body parser for file uploads
 export const config = {
@@ -214,6 +215,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         fileType: file.mimetype,
       },
     });
+
+    // Generate document description (async, non-blocking)
+    if (content && content.length > 100) {
+      documentDescriptionService.generateDescription(document.id, user.id, content)
+        .catch(err => console.error('Error generating description:', err));
+    }
 
     // TODO: Trigger background job for vector embedding
     // This would call Pinecone to create embeddings for the document
