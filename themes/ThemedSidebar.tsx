@@ -306,7 +306,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-2">
-                <History className="w-5 h-5" style={{ color: 'var(--color-text-primary)' }} />
+                <History className="w-5 h-5" style={{ color: '#3b82f6' }} />
                 <h2 
                   className="text-lg font-semibold"
                   style={{ color: 'var(--color-text-primary)' }}
@@ -438,7 +438,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-2">
-                <GitBranch className="w-5 h-5" style={{ color: 'var(--color-text-primary)' }} />
+                <GitBranch className="w-5 h-5" style={{ color: '#10b981' }} />
                 <h3 
                   className="text-lg font-semibold"
                   style={{ color: 'var(--color-text-primary)' }}
@@ -483,7 +483,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-2">
-                <TrendingUp className="w-5 h-5" style={{ color: 'var(--color-text-primary)' }} />
+                <TrendingUp className="w-5 h-5" style={{ color: '#f59e0b' }} />
                 <h3 
                   className="text-lg font-semibold"
                   style={{ color: 'var(--color-text-primary)' }}
@@ -529,7 +529,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
               }}
             >
               <div className="flex items-center space-x-2 mb-2">
-                <Flame className="w-4 h-4" style={{ color: streak.current_streak > 0 ? '#ef4444' : '#6b7280' }} />
+                <Flame className="w-5 h-5" style={{ color: streak.current_streak > 0 ? '#ef4444' : '#9ca3af' }} />
                 <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                   Current Streak
                 </span>
@@ -624,7 +624,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-2">
-                <Activity className="w-5 h-5" style={{ color: 'var(--color-text-primary)' }} />
+                <Activity className="w-5 h-5" style={{ color: '#8b5cf6' }} />
                 <h3 
                   className="text-lg font-semibold"
                   style={{ color: 'var(--color-text-primary)' }}
