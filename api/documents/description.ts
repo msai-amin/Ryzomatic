@@ -1,13 +1,7 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { documentDescriptionService } from '../../lib/documentDescriptionService';
-import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     return handleGet(req, res);
   } else if (req.method === 'POST') {
@@ -22,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-async function handleGet(req: NextApiRequest, res: NextApiResponse) {
+async function handleGet(req: VercelRequest, res: VercelResponse) {
   try {
     const { bookId, userId } = req.query;
 
@@ -42,7 +36,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-async function handlePost(req: NextApiRequest, res: NextApiResponse) {
+async function handlePost(req: VercelRequest, res: VercelResponse) {
   try {
     const { bookId, userId, content } = req.body;
 
@@ -67,7 +61,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-async function handlePut(req: NextApiRequest, res: NextApiResponse) {
+async function handlePut(req: VercelRequest, res: VercelResponse) {
   try {
     const { bookId, userId, userDescription } = req.body;
 
@@ -92,7 +86,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-async function handleDelete(req: NextApiRequest, res: NextApiResponse) {
+async function handleDelete(req: VercelRequest, res: VercelResponse) {
   try {
     const { bookId, userId } = req.query;
 
