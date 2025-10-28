@@ -1,11 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabase';
 import { geminiService } from './gemini';
 import { embeddingService } from './embeddingService';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 export interface DocumentDescription {
   id?: string;
@@ -26,6 +21,11 @@ export class DocumentDescriptionService {
    */
   async getDescription(bookId: string, userId: string): Promise<DocumentDescription | null> {
     try {
+      if (!supabase) {
+        console.error('Supabase not initialized');
+        return null;
+      }
+
       const { data, error } = await supabase
         .from('document_descriptions')
         .select('*')
@@ -49,6 +49,11 @@ export class DocumentDescriptionService {
    */
   async generateDescription(bookId: string, userId: string, content?: string): Promise<DocumentDescription | null> {
     try {
+      if (!supabase) {
+        console.error('Supabase not initialized');
+        return null;
+      }
+
       // Get document content if not provided
       if (!content) {
         const { data: book } = await supabase
@@ -127,6 +132,11 @@ export class DocumentDescriptionService {
    */
   async updateDescription(bookId: string, userId: string, userDescription: string): Promise<DocumentDescription | null> {
     try {
+      if (!supabase) {
+        console.error('Supabase not initialized');
+        return null;
+      }
+
       const existing = await this.getDescription(bookId, userId);
 
       if (existing) {
@@ -170,6 +180,11 @@ export class DocumentDescriptionService {
    */
   async deleteDescription(bookId: string, userId: string): Promise<boolean> {
     try {
+      if (!supabase) {
+        console.error('Supabase not initialized');
+        return false;
+      }
+
       const { error } = await supabase
         .from('document_descriptions')
         .delete()

@@ -1,10 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabase';
 import { embeddingService } from './embeddingService';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 export interface NoteRelationship {
   id?: string;
@@ -27,6 +22,11 @@ export class AutoRelationshipService {
    */
   async detectNoteRelationships(noteId: string, userId: string): Promise<number> {
     try {
+      if (!supabase) {
+        console.error('Supabase not initialized');
+        return 0;
+      }
+
       // Get the note
       const { data: note, error: noteError } = await supabase
         .from('user_notes')

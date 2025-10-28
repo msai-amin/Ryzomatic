@@ -1,11 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabase';
 import { MemoryGraphService, MemoryNode, MemoryEdge, MemoryGraph } from './memoryGraph';
 import { embeddingService } from './embeddingService';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 export interface UnifiedNode {
   id: string;
@@ -45,6 +40,11 @@ export class UnifiedGraphService extends MemoryGraphService {
     maxDepth: number = 2
   ): Promise<UnifiedGraph> {
     try {
+      if (!supabase) {
+        console.error('Supabase not initialized');
+        return { nodes: [], edges: [] };
+      }
+
       const nodes: Map<string, UnifiedNode> = new Map();
       const edges: UnifiedEdge[] = [];
       const processed = new Set<string>([`doc:${documentId}`]);
@@ -199,6 +199,11 @@ export class UnifiedGraphService extends MemoryGraphService {
    */
   async searchAcrossGraphs(userId: string, query: string, limit: number = 20): Promise<UnifiedNode[]> {
     try {
+      if (!supabase) {
+        console.error('Supabase not initialized');
+        return [];
+      }
+
       // Get query embedding
       const queryEmbedding = await embeddingService.embed(query);
       
@@ -302,6 +307,11 @@ export class UnifiedGraphService extends MemoryGraphService {
    */
   async getTimeline(concept: string, userId: string): Promise<TimelineItem[]> {
     try {
+      if (!supabase) {
+        console.error('Supabase not initialized');
+        return [];
+      }
+
       const timeline: TimelineItem[] = [];
 
       // Search for concept across all items
@@ -364,6 +374,11 @@ export class UnifiedGraphService extends MemoryGraphService {
    */
   async getNoteRelationships(noteId: string, userId: string): Promise<Array<UnifiedNode & { relationshipType: string; score?: number }>> {
     try {
+      if (!supabase) {
+        console.error('Supabase not initialized');
+        return [];
+      }
+
       const { data: relationships } = await supabase
         .from('note_relationships')
         .select('*')

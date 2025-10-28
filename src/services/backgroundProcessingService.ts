@@ -1,12 +1,7 @@
 import { documentRelevanceService } from './documentRelevanceService';
 import { autoRelationshipService } from '../../lib/autoRelationshipService';
 import { documentDescriptionService } from '../../lib/documentDescriptionService';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabase } from '../services/supabaseAuthService';
 
 class BackgroundProcessingService {
   private isRunning = false;
