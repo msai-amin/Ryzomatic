@@ -7,6 +7,7 @@ import { DocumentViewer } from '../src/components/DocumentViewer'
 import { ChatPanel } from '../src/components/ChatPanel'
 import { DocumentUpload } from '../src/components/DocumentUpload'
 import { PomodoroBottomBar } from '../src/components/PomodoroBottomBar'
+import { FloatingActionButtons } from '../src/components/FloatingActionButtons'
 import { useAchievementToasts } from '../src/components/AchievementToast'
 import { useAppStore } from '../src/store/appStore'
 import { useKeyboardShortcuts } from '../src/hooks/useKeyboardShortcuts'
@@ -100,6 +101,9 @@ const ThemedAppContent: React.FC = () => {
         />
       )}
 
+
+      {/* Floating Action Buttons */}
+      <FloatingActionButtons />
 
       {/* Achievement Toast Container */}
       <AchievementToastContainer />

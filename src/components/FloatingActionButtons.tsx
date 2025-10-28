@@ -1,0 +1,86 @@
+import React, { useState } from 'react'
+import { StickyNote, Highlighter, Bot } from 'lucide-react'
+import { useAppStore } from '../store/appStore'
+import { Tooltip } from './Tooltip'
+
+export const FloatingActionButtons: React.FC = () => {
+  const { user, currentDocument, toggleChat, pdfViewer } = useAppStore()
+  const [isHovered, setIsHovered] = useState<string | null>(null)
+
+  // Don't show floating buttons if user is not authenticated or no document is loaded
+  if (!user || !currentDocument) {
+    return null
+  }
+
+  const handleQuickNote = () => {
+    // Open notes panel with new note
+    // This would integrate with your note creation modal
+    console.log('Quick note pressed')
+  }
+
+  const handleHighlightMode = () => {
+    // Toggle highlighting mode in PDFViewer
+    // This would set a state to enable highlight selection
+    console.log('Highlight mode toggled')
+  }
+
+  const handleAIChat = () => {
+    toggleChat()
+  }
+
+  const buttons = [
+    {
+      id: 'note',
+      icon: StickyNote,
+      label: 'Quick Note',
+      color: '#3b82f6', // Blue
+      onClick: handleQuickNote,
+    },
+    {
+      id: 'highlight',
+      icon: Highlighter,
+      label: 'Highlight Mode',
+      color: '#f59e0b', // Orange
+      onClick: handleHighlightMode,
+    },
+    {
+      id: 'chat',
+      icon: Bot,
+      label: 'AI Chat',
+      color: '#8b5cf6', // Purple
+      onClick: handleAIChat,
+    },
+  ]
+
+  return (
+    <div 
+      className="fixed bottom-8 right-8 z-40 flex flex-col space-y-3"
+      onMouseLeave={() => setIsHovered(null)}
+    >
+      {buttons.map((button, index) => {
+        const Icon = button.icon
+        const isHovering = isHovered === button.id
+        
+        return (
+          <div key={button.id} className="relative">
+            <Tooltip content={button.label} position="left">
+              <button
+                onClick={button.onClick}
+                onMouseEnter={() => setIsHovered(button.id)}
+                className="w-14 h-14 rounded-full shadow-lg transition-all duration-300 hover:scale-110 hover:shadow-xl flex items-center justify-center"
+                style={{
+                  backgroundColor: button.color,
+                  color: 'white',
+                }}
+                title={button.label}
+              >
+                <Icon className="w-6 h-6" />
+              </button>
+            </Tooltip>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+

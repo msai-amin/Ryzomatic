@@ -44,12 +44,12 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [selectedRelationship, setSelectedRelationship] = useState<DocumentRelationshipWithDetails | null>(null)
   
-  // Collapsible sections state - all collapsed by default
+  // Collapsible sections state - all expanded by default (compact design)
   const [sectionsExpanded, setSectionsExpanded] = useState({
-    library: false,
-    related: false,
-    stats: false,
-    activity: false
+    library: true,
+    related: true,
+    stats: true,
+    activity: true
   })
 
   // Convert recently viewed documents to display format

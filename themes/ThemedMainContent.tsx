@@ -2,12 +2,10 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
 import { useTheme } from './ThemeProvider'
-import { ChevronRight, ChevronLeft } from 'lucide-react'
-import { NoteTemplateSelector } from '../src/components/ResearchNotes/NoteTemplateSelector'
-import { AIAssistedNotes } from '../src/components/ResearchNotes/AIAssistedNotes'
+import { ChevronRight, ChevronLeft, FileText, Highlighter, Plus, StickyNote } from 'lucide-react'
 import { NotesList } from '../src/components/ResearchNotes/NotesList'
 import { notesService } from '../src/services/notesService'
-import { sendMessageToAI } from '../src/services/aiService'
+import { highlightService, Highlight } from '../src/services/highlightService'
 
 interface ThemedMainContentProps {
   children?: React.ReactNode
@@ -15,129 +13,41 @@ interface ThemedMainContentProps {
 
 export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }) => {
   const { currentDocument, user } = useAppStore()
-  const { annotationColors } = useTheme()
-  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true)
-  const [sectionsExpanded, setSectionsExpanded] = useState({
-    createNote: false,
-    aiAssisted: true, // Expanded by default
-    myNotes: false,
-    annotationColors: false,
-  })
-  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
-  const [showExportDropdown, setShowExportDropdown] = useState(false)
-  const exportDropdownRef = useRef<HTMLDivElement>(null)
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<'notes' | 'highlights'>('notes')
+  const [highlights, setHighlights] = useState<Highlight[]>([])
+  const [highlightsLoading, setHighlightsLoading] = useState(false)
 
-  // Handle click outside to close export dropdown
+  // Load highlights when tab is active and document changes
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
-        setShowExportDropdown(false)
+    if (!currentDocument || !user || activeTab !== 'highlights') return
+
+    const loadHighlights = async () => {
+      setHighlightsLoading(true)
+      try {
+        const bookHighlights = await highlightService.getHighlights(currentDocument.id, {
+          includeOrphaned: false
+        })
+        setHighlights(bookHighlights)
+      } catch (error) {
+        console.error('Error loading highlights:', error)
+        setHighlights([])
+      } finally {
+        setHighlightsLoading(false)
       }
     }
-    
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
-  const toggleSection = (section: keyof typeof sectionsExpanded) => {
-    setSectionsExpanded((prev) => ({
-      ...prev,
-      [section]: !prev[section],
-    }))
-  }
-
-  const handleTemplateSelect = (type: 'freeform' | 'cornell' | 'outline' | 'mindmap' | 'chart' | 'boxing') => {
-    console.log('Template selected:', type)
-    
-    if (type === 'freeform') {
-      // Open a simple text editor modal or inline editor
-      // TODO: Implement note editor
-      alert('Blank text note editor - to be implemented')
-    } else {
-      // TODO: Open note editor with selected template
-      alert(`Note editor for ${type} - to be implemented`)
-    }
-  }
+    loadHighlights()
+  }, [currentDocument?.id, user, activeTab])
 
   const handleNoteSelected = (note: any) => {
     console.log('Note selected:', note)
     // TODO: Open note in editor
   }
 
-  const handleNotesGenerated = () => {
-    console.log('Notes generated, refreshing list')
-    // The NotesList will auto-refresh when the notes array changes
-  }
-
-  const handleExportNotes = async (format: 'markdown' | 'html' | 'json' | 'text') => {
-    if (!currentDocument || !user) return
-    
-    setShowExportDropdown(false)
-    
-    try {
-      const { data: notes } = await notesService.getNotesForBook(user.id, currentDocument.id)
-      if (!notes || notes.length === 0) {
-        alert('No notes to export')
-        return
-      }
-      
-      const content = await notesService.exportNotes(notes, format, currentDocument.name)
-      
-      // Determine file extension and MIME type
-      const extensions = { markdown: 'md', html: 'html', json: 'json', text: 'txt' }
-      const mimeTypes = {
-        markdown: 'text/markdown',
-        html: 'text/html',
-        json: 'application/json',
-        text: 'text/plain'
-      }
-      
-      // Download as file
-      const blob = new Blob([content], { type: mimeTypes[format] })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${currentDocument.name}-notes.${extensions[format]}`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch (error) {
-      console.error('Error exporting notes:', error)
-      alert('Failed to export notes')
-    }
-  }
-
-  const handleGenerateSummary = async () => {
-    if (!currentDocument || !user) return
-    
-    setIsGeneratingSummary(true)
-    
-    try {
-      const documentContent = currentDocument.pageTexts?.join('\n\n') || currentDocument.content || ''
-      const summary = await sendMessageToAI(
-        'Please provide a comprehensive summary of this document, highlighting the main points, key arguments, and conclusions.',
-        documentContent,
-        user.tier as any,
-        'general'
-      )
-      
-      // Save as a note
-      await notesService.createNote(
-        user.id,
-        currentDocument.id,
-        1,
-        summary,
-        'freeform',
-        undefined,
-        true
-      )
-      
-      alert('Summary generated and saved to notes!')
-    } catch (error) {
-      console.error('Error generating summary:', error)
-      alert('Failed to generate summary')
-    } finally {
-      setIsGeneratingSummary(false)
-    }
+  const handleJumpToPage = (pageNumber: number) => {
+    // This will be handled by the PDFViewer component
+    console.log('Jump to page:', pageNumber)
   }
 
   return (
@@ -212,227 +122,135 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
               </button>
             </div>
 
-            <div className="flex items-center justify-between mb-6">
-              <h2 
-                className="text-lg font-semibold"
-                style={{ color: 'var(--color-text-primary)' }}
-              >
-                Research Notes
-              </h2>
-              <Tooltip content="Create New Note" position="left">
-                <button 
-                  onClick={() => {
-                    setSectionsExpanded(prev => ({ ...prev, createNote: true }))
-                  }}
-                  className="text-sm px-3 py-1 rounded-full transition-colors hover:opacity-80"
+            {/* Tab Navigation */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex space-x-1 p-1 rounded-lg" style={{ backgroundColor: 'var(--color-surface)' }}>
+                <button
+                  onClick={() => setActiveTab('notes')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    activeTab === 'notes' ? 'shadow-sm' : ''
+                  }`}
                   style={{
-                    backgroundColor: 'var(--color-primary)',
-                    color: 'var(--color-text-inverse)',
+                    backgroundColor: activeTab === 'notes' ? 'var(--color-primary)' : 'transparent',
+                    color: activeTab === 'notes' ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
                   }}
                 >
-                  + New Note
-                </button>
-              </Tooltip>
-            </div>
-
-            {/* My Notes Section - MOVED TO TOP */}
-            <div className="mb-4">
-              <button
-                onClick={() => toggleSection('myNotes')}
-                className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-opacity-50"
-                style={{
-                  backgroundColor: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                }}
-              >
-                <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                  My Notes
-                </h3>
-                <ChevronRight
-                  className={`w-4 h-4 transition-transform ${sectionsExpanded.myNotes ? 'rotate-90' : ''}`}
-                  style={{ color: 'var(--color-text-primary)' }}
-                />
-              </button>
-              {sectionsExpanded.myNotes && (
-                <NotesList onNoteSelected={handleNoteSelected} />
-              )}
-            </div>
-
-            {/* Create Note Section */}
-            <div className="mb-4">
-              <button
-                onClick={() => toggleSection('createNote')}
-                className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-opacity-50"
-                style={{
-                  backgroundColor: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                }}
-              >
-                <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                  Template Note Formats
-                </h3>
-                <ChevronRight
-                  className={`w-4 h-4 transition-transform ${sectionsExpanded.createNote ? 'rotate-90' : ''}`}
-                  style={{ color: 'var(--color-text-primary)' }}
-                />
-              </button>
-              {sectionsExpanded.createNote && (
-                <NoteTemplateSelector onSelectTemplate={handleTemplateSelect} />
-              )}
-            </div>
-
-            {/* AI-Assisted Notes Section */}
-            <div className="mb-4">
-              <button
-                onClick={() => toggleSection('aiAssisted')}
-                className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-opacity-50"
-                style={{
-                  backgroundColor: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                }}
-              >
-                <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                  AI-Generated Notes
-                </h3>
-                <ChevronRight
-                  className={`w-4 h-4 transition-transform ${sectionsExpanded.aiAssisted ? 'rotate-90' : ''}`}
-                  style={{ color: 'var(--color-text-primary)' }}
-                />
-              </button>
-              {sectionsExpanded.aiAssisted && (
-                <AIAssistedNotes onNotesGenerated={handleNotesGenerated} />
-              )}
-            </div>
-
-            {/* Annotation Colors Section */}
-            <div className="mb-4">
-              <button
-                onClick={() => toggleSection('annotationColors')}
-                className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-opacity-50"
-                style={{
-                  backgroundColor: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                }}
-              >
-                <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                  Annotation Colors
-                </h3>
-                <ChevronRight
-                  className={`w-4 h-4 transition-transform ${sectionsExpanded.annotationColors ? 'rotate-90' : ''}`}
-                  style={{ color: 'var(--color-text-primary)' }}
-                />
-              </button>
-              {sectionsExpanded.annotationColors && (
-                <div className="mt-3 px-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    {annotationColors.map((color, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <div 
-                          className="w-4 h-4 rounded-full"
-                          style={{ backgroundColor: color.color }}
-                        />
-                        <span 
-                          className="text-xs"
-                          style={{ color: 'var(--color-text-secondary)' }}
-                        >
-                          {color.name}
-                        </span>
-                      </div>
-                    ))}
+                  <div className="flex items-center space-x-2">
+                    <StickyNote className="w-4 h-4" />
+                    <span>Notes</span>
                   </div>
+                </button>
+                <button
+                  onClick={() => setActiveTab('highlights')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    activeTab === 'highlights' ? 'shadow-sm' : ''
+                  }`}
+                  style={{
+                    backgroundColor: activeTab === 'highlights' ? 'var(--color-primary)' : 'transparent',
+                    color: activeTab === 'highlights' ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
+                  }}
+                >
+                  <div className="flex items-center space-x-2">
+                    <Highlighter className="w-4 h-4" />
+                    <span>Highlights</span>
+                  </div>
+                </button>
+              </div>
+              
+              {activeTab === 'notes' && (
+                <Tooltip content="Create New Note" position="left">
+                  <button 
+                    onClick={() => {
+                      // Open notes panel with empty note
+                    }}
+                    className="p-2 rounded-lg transition-colors hover:opacity-80"
+                    style={{
+                      backgroundColor: 'var(--color-primary)',
+                      color: 'var(--color-text-inverse)',
+                    }}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </Tooltip>
+              )}
+            </div>
+
+            {/* Tab Content */}
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+              {activeTab === 'notes' ? (
+                <NotesList onNoteSelected={handleNoteSelected} />
+              ) : (
+                <div className="space-y-2">
+                  {highlightsLoading ? (
+                    <div className="text-center py-8">
+                      <div className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                        Loading highlights...
+                      </div>
+                    </div>
+                  ) : highlights.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Highlighter className="w-12 h-12 mx-auto mb-4 opacity-50" style={{ color: 'var(--color-text-tertiary)' }} />
+                      <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                        No highlights yet. Select text to highlight!
+                      </p>
+                    </div>
+                  ) : (
+                    // Group highlights by page
+                    Array.from(
+                      new Set(highlights.map(h => h.page_number))
+                    ).sort((a, b) => a - b).map(pageNum => {
+                      const pageHighlights = highlights.filter(h => h.page_number === pageNum)
+                      return (
+                        <div key={pageNum} className="mb-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 
+                              className="text-sm font-semibold"
+                              style={{ color: 'var(--color-text-primary)' }}
+                            >
+                              Page {pageNum}
+                            </h3>
+                            <button
+                              onClick={() => handleJumpToPage(pageNum)}
+                              className="text-xs text-blue-500 hover:text-blue-600 transition-colors"
+                            >
+                              Jump to page →
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            {pageHighlights.map((highlight) => (
+                              <div
+                                key={highlight.id}
+                                className="p-3 rounded-lg border transition-colors hover:shadow-sm"
+                                style={{
+                                  backgroundColor: 'var(--color-surface)',
+                                  borderColor: 'var(--color-border)',
+                                }}
+                              >
+                                <div className="flex items-start justify-between mb-2">
+                                  <div 
+                                    className="w-3 h-3 rounded"
+                                    style={{ backgroundColor: highlight.color_hex }}
+                                  />
+                                  <div className="text-xs ml-2" style={{ color: 'var(--color-text-tertiary)' }}>
+                                    {new Date(highlight.created_at).toLocaleDateString()}
+                                  </div>
+                                </div>
+                                <div 
+                                  className="text-sm line-clamp-2"
+                                  style={{ color: 'var(--color-text-primary)' }}
+                                >
+                                  {highlight.highlighted_text}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
                 </div>
               )}
             </div>
-
-          {/* Quick Actions */}
-          <div className="mt-6 pt-6 border-t" style={{ borderColor: 'var(--color-border)' }}>
-            <h3 
-              className="text-sm font-medium mb-3"
-              style={{ color: 'var(--color-text-secondary)' }}
-            >
-              Quick Actions
-            </h3>
-            <div className="space-y-2">
-              {/* Export Notes Dropdown */}
-              <div className="relative" ref={exportDropdownRef}>
-                <button 
-                  onClick={() => setShowExportDropdown(!showExportDropdown)}
-                  className="w-full text-left text-sm p-2 rounded transition-colors cursor-pointer flex items-center justify-between"
-                  style={{ color: 'var(--color-text-primary)' }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  <span>Export Notes</span>
-                  <ChevronRight className={`w-4 h-4 transition-transform ${showExportDropdown ? 'rotate-90' : ''}`} />
-                </button>
-                
-                {showExportDropdown && (
-                  <div 
-                    className="absolute left-0 mt-1 w-full rounded-lg shadow-lg py-1 z-50"
-                    style={{
-                      backgroundColor: 'var(--color-surface)',
-                      border: '1px solid var(--color-border)',
-                    }}
-                  >
-                    <button 
-                      onClick={() => handleExportNotes('markdown')} 
-                      className="w-full text-left text-sm px-3 py-2 transition-colors"
-                      style={{ color: 'var(--color-text-primary)' }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                    >
-                      Markdown (.md)
-                    </button>
-                    <button 
-                      onClick={() => handleExportNotes('html')} 
-                      className="w-full text-left text-sm px-3 py-2 transition-colors"
-                      style={{ color: 'var(--color-text-primary)' }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                    >
-                      HTML (.html)
-                    </button>
-                    <button 
-                      onClick={() => handleExportNotes('json')} 
-                      className="w-full text-left text-sm px-3 py-2 transition-colors"
-                      style={{ color: 'var(--color-text-primary)' }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                    >
-                      JSON (.json)
-                    </button>
-                    <button 
-                      onClick={() => handleExportNotes('text')} 
-                      className="w-full text-left text-sm px-3 py-2 transition-colors"
-                      style={{ color: 'var(--color-text-primary)' }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                    >
-                      Plain Text (.txt)
-                    </button>
-                  </div>
-                )}
-              </div>
-              <button 
-                onClick={handleGenerateSummary}
-                disabled={isGeneratingSummary}
-                className="w-full text-left text-sm p-2 rounded transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ 
-                  color: 'var(--color-text-primary)',
-                }}
-                onMouseEnter={(e) => {
-                  if (!isGeneratingSummary) {
-                    e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                }}
-              >
-                {isGeneratingSummary ? 'Generating...' : 'Generate Summary'}
-              </button>
-            </div>
-          </div>
           </div>
         </div>
       )}
