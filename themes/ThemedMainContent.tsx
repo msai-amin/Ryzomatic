@@ -189,14 +189,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
           }}
         >
           {/* Sidebar Content */}
-          <div 
-            className="p-8"
-            style={{
-              opacity: isRightSidebarOpen ? 1 : 0,
-              transition: 'opacity 0.3s ease-in-out',
-              visibility: isRightSidebarOpen ? 'visible' : 'hidden',
-            }}
-          >
+          <div className="p-8">
             {/* Close Button */}
             <div className="flex justify-end mb-4">
               <button
