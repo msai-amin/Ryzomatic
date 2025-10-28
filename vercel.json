@@ -2,11 +2,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "ignore": [
-    "api/documents/description.ts",
-    "api/graph/query.ts",
-    "api/notes/relationships.ts"
-  ],
   "rewrites": [
     {
       "source": "/api/:path*",

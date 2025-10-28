@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { memoryService } from '../../lib/memoryService';
+import { unifiedGraphService } from '../../lib/unifiedGraphService';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -41,8 +42,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return await handleExtract(req, res, user.id);
     } else if (action === 'query') {
       return await handleQuery(req, res, user.id);
+    } else if (action === 'graph' || action === 'search' || action === 'timeline' || action === 'noteRelationships') {
+      return await handleGraphQuery(req, res, user.id, action);
     } else {
-      return res.status(400).json({ error: 'Invalid action. Must be "extract" or "query"' });
+      return res.status(400).json({ error: 'Invalid action. Must be "extract", "query", "graph", "search", "timeline", or "noteRelationships"' });
     }
   } catch (error: any) {
     console.error('Memory API error:', error);
@@ -150,5 +153,95 @@ async function handleQuery(req: VercelRequest, res: VercelResponse, userId: stri
     memories,
     count: memories.length,
   });
+}
+
+/**
+ * Handle graph-related queries
+ */
+async function handleGraphQuery(req: VercelRequest, res: VercelResponse, userId: string, action: string) {
+  try {
+    if (action === 'graph') {
+      // Get document-centric graph
+      const { documentId, depth } = req.body;
+      
+      if (!documentId) {
+        return res.status(400).json({ error: 'documentId is required' });
+      }
+
+      const graph = await unifiedGraphService.getDocumentCentricGraph(
+        documentId,
+        userId,
+        depth || 2
+      );
+
+      return res.status(200).json({
+        success: true,
+        data: graph
+      });
+    }
+
+    if (action === 'search') {
+      // Search across graphs
+      const { query, limit } = req.body;
+
+      if (!query) {
+        return res.status(400).json({ error: 'query is required' });
+      }
+
+      const results = await unifiedGraphService.searchAcrossGraphs(
+        userId,
+        query,
+        limit || 20
+      );
+
+      return res.status(200).json({
+        success: true,
+        data: results,
+        count: results.length
+      });
+    }
+
+    if (action === 'timeline') {
+      // Get timeline for a concept
+      const { concept } = req.body;
+
+      if (!concept) {
+        return res.status(400).json({ error: 'concept is required' });
+      }
+
+      const timeline = await unifiedGraphService.getTimeline(concept, userId);
+
+      return res.status(200).json({
+        success: true,
+        data: timeline,
+        count: timeline.length
+      });
+    }
+
+    if (action === 'noteRelationships') {
+      // Get note relationships
+      const { noteId } = req.body;
+
+      if (!noteId) {
+        return res.status(400).json({ error: 'noteId is required' });
+      }
+
+      const relationships = await unifiedGraphService.getNoteRelationships(noteId, userId);
+
+      return res.status(200).json({
+        success: true,
+        data: relationships,
+        count: relationships.length
+      });
+    }
+
+    return res.status(400).json({ error: 'Invalid graph action' });
+  } catch (error: any) {
+    console.error('Graph query error:', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: error.message,
+    });
+  }
 }
 

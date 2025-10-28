@@ -1,5 +1,6 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
+import { documentDescriptionService } from '../../lib/documentDescriptionService';
 
 // Create Supabase client for serverless functions
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -25,7 +26,7 @@ const supabase = supabaseUrl && supabaseKey
     })
   : null;
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     return handleGet(req, res);
   } else if (req.method === 'POST') {
@@ -40,10 +41,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-async function handleGet(req: NextApiRequest, res: NextApiResponse) {
+async function handleGet(req: VercelRequest, res: VercelResponse) {
   try {
-    const { sourceDocumentId, userId } = req.query;
+    const { sourceDocumentId, userId, bookId, action } = req.query;
 
+    // Handle document description requests
+    if (action === 'getDescription' && bookId && userId) {
+      const description = await documentDescriptionService.getDescription(
+        bookId as string,
+        userId as string
+      );
+      return res.status(200).json({ data: description });
+    }
+
+    // Handle document description by combined description
+    if (action === 'getCombinedDescription' && bookId && userId) {
+      const description = await documentDescriptionService.getCombinedDescription(
+        bookId as string,
+        userId as string
+      );
+      return res.status(200).json({ data: { description } });
+    }
+
+    // Original functionality: Get related documents
     if (!sourceDocumentId || !userId) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
@@ -74,11 +94,24 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-async function handlePost(req: NextApiRequest, res: NextApiResponse) {
+async function handlePost(req: VercelRequest, res: VercelResponse) {
   try {
     console.log('POST /api/documents/relationships - Request body:', req.body);
     
-    const { sourceDocumentId, relatedDocumentId, relationshipDescription, userId } = req.body;
+    const { sourceDocumentId, relatedDocumentId, relationshipDescription, userId, bookId, content, action } = req.body;
+
+    // Handle document description generation
+    if (action === 'generateDescription' && bookId && userId) {
+      const description = await documentDescriptionService.generateDescription(
+        bookId,
+        userId,
+        content
+      );
+      if (!description) {
+        return res.status(500).json({ error: 'Failed to generate description' });
+      }
+      return res.status(200).json({ data: description });
+    }
 
     if (!sourceDocumentId || !relatedDocumentId || !userId) {
       console.log('Missing required fields:', { sourceDocumentId, relatedDocumentId, userId });
@@ -160,9 +193,25 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-async function handlePatch(req: NextApiRequest, res: NextApiResponse) {
+async function handlePatch(req: VercelRequest, res: VercelResponse) {
   try {
-    const { relationshipId } = req.query;
+    const { relationshipId, bookId, userId, userDescription, action } = req.query;
+
+    // Handle document description update
+    if (action === 'updateDescription' && bookId && userId) {
+      const body = req.body as any;
+      const description = await documentDescriptionService.updateDescription(
+        bookId as string,
+        userId as string,
+        body.userDescription
+      );
+      if (!description) {
+        return res.status(500).json({ error: 'Failed to update description' });
+      }
+      return res.status(200).json({ data: description });
+    }
+
+    // Original functionality: Update relationship
     const { relationshipDescription, relevancePercentage, aiGeneratedDescription, relevanceCalculationStatus } = req.body;
 
     if (!relationshipId) {
@@ -207,10 +256,23 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-async function handleDelete(req: NextApiRequest, res: NextApiResponse) {
+async function handleDelete(req: VercelRequest, res: VercelResponse) {
   try {
-    const { relationshipId } = req.query;
+    const { relationshipId, bookId, userId, action } = req.query;
 
+    // Handle document description deletion
+    if (action === 'deleteDescription' && bookId && userId) {
+      const success = await documentDescriptionService.deleteDescription(
+        bookId as string,
+        userId as string
+      );
+      if (!success) {
+        return res.status(500).json({ error: 'Failed to delete description' });
+      }
+      return res.status(200).json({ success: true });
+    }
+
+    // Original functionality: Delete relationship
     if (!relationshipId) {
       return res.status(400).json({ error: 'Missing relationship ID' });
     }

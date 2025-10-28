@@ -30,9 +30,15 @@ export const DocumentGraphViewer: React.FC<DocumentGraphViewerProps> = ({
   const loadGraph = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(
-        `/api/graph/query?documentId=${documentId}&userId=${userId}&depth=${maxDepth}`
-      );
+      const response = await fetch('/api/memory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'graph',
+          documentId,
+          depth: maxDepth
+        })
+      });
       const result = await response.json();
       
       if (result.data) {
