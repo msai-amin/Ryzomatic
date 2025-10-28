@@ -97,6 +97,11 @@ export const NotesList: React.FC<NotesListProps> = ({ onNoteSelected, refreshTri
           >
             <div className="flex items-start justify-between mb-2">
               <div className="flex-1">
+                {(note.note_metadata as any)?.title ? (
+                  <div className="text-sm font-semibold mb-1" style={{ color: 'var(--color-text-primary)' }}>
+                    {(note.note_metadata as any).title}
+                  </div>
+                ) : null}
                 <div className="text-xs font-medium mb-1" style={{ color: 'var(--color-text-primary)' }}>
                   {note.note_type ? note.note_type.charAt(0).toUpperCase() + note.note_type.slice(1) : 'Note'} - Page {note.page_number}
                 </div>

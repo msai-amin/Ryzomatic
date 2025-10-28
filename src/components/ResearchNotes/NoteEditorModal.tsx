@@ -18,13 +18,18 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   onDelete
 }) => {
   const [content, setContent] = useState('');
+  const [title, setTitle] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (note) {
       setContent(note.content || '');
+      // Extract title from note_metadata if it exists
+      const metadata = note.note_metadata as any;
+      setTitle(metadata?.title || '');
     }
   }, [note]);
 
@@ -42,8 +47,16 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
 
     setIsSaving(true);
     try {
+      // Update metadata with title
+      const existingMetadata = (note.note_metadata || {}) as any;
+      const updatedMetadata = {
+        ...existingMetadata,
+        title: title.trim() || undefined
+      };
+
       const { error } = await notesService.updateNote(note.id, {
-        content
+        content,
+        note_metadata: updatedMetadata
       });
 
       if (error) {
@@ -129,20 +142,48 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 p-4 overflow-y-auto">
-          <textarea
-            ref={textareaRef}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Start typing your note..."
-            className="w-full h-full resize-none focus:outline-none"
-            style={{
-              backgroundColor: 'transparent',
-              color: 'var(--color-text-primary)',
-              minHeight: '300px'
-            }}
-            autoFocus
-          />
+        <div className="flex-1 p-4 overflow-y-auto space-y-4">
+          {/* Title Input */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+              Title (optional)
+            </label>
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter note title..."
+              className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-opacity-50"
+              style={{
+                backgroundColor: 'var(--color-background)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)'
+              }}
+            />
+          </div>
+
+          {/* Content Textarea */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+              Content
+            </label>
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Start typing your note..."
+              className="w-full resize-none focus:outline-none rounded-lg border"
+              style={{
+                backgroundColor: 'var(--color-background)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)',
+                minHeight: '300px',
+                padding: '12px'
+              }}
+              autoFocus
+            />
+          </div>
         </div>
 
         {/* Footer */}
