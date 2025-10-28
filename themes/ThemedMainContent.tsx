@@ -6,6 +6,7 @@ import { ChevronRight, ChevronLeft, FileText, Highlighter, Plus, StickyNote } fr
 import { NotesList } from '../src/components/ResearchNotes/NotesList'
 import { notesService } from '../src/services/notesService'
 import { highlightService, Highlight } from '../src/services/highlightService'
+import { NoteEditorModal } from '../src/components/ResearchNotes/NoteEditorModal'
 
 interface ThemedMainContentProps {
   children?: React.ReactNode
@@ -18,6 +19,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
   const [highlights, setHighlights] = useState<Highlight[]>([])
   const [highlightsLoading, setHighlightsLoading] = useState(false)
   const [notesRefreshTrigger, setNotesRefreshTrigger] = useState(0)
+  const [editingNote, setEditingNote] = useState<any>(null)
 
   // Load highlights when tab is active and document changes
   useEffect(() => {
@@ -44,6 +46,18 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
   const handleNoteSelected = (note: any) => {
     console.log('Note selected:', note)
     // TODO: Open note in editor
+  }
+
+  const handleEditorClose = () => {
+    setEditingNote(null)
+  }
+
+  const handleEditorSave = async () => {
+    setNotesRefreshTrigger(prev => prev + 1)
+  }
+
+  const handleEditorDelete = async () => {
+    setNotesRefreshTrigger(prev => prev + 1)
   }
 
   const handleJumpToPage = (pageNumber: number) => {
@@ -166,7 +180,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                       
                       try {
                         // Create a new blank note
-                        const { error } = await notesService.createNote(
+                        const { data, error } = await notesService.createNote(
                           user.id,
                           currentDocument.id,
                           1, // Default to page 1
@@ -182,6 +196,10 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                           console.log('New note created successfully');
                           // Trigger refresh of notes list
                           setNotesRefreshTrigger(prev => prev + 1);
+                          // Open the editor for the new note
+                          if (data) {
+                            setEditingNote(data);
+                          }
                         }
                       } catch (error) {
                         console.error('Exception creating note:', error);
@@ -278,6 +296,15 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
           </div>
         </div>
       )}
+      
+      {/* Note Editor Modal */}
+      <NoteEditorModal
+        isOpen={!!editingNote}
+        onClose={handleEditorClose}
+        note={editingNote}
+        onSave={handleEditorSave}
+        onDelete={handleEditorDelete}
+      />
     </div>
   )
 }
