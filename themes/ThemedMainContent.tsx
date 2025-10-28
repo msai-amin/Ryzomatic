@@ -2,11 +2,13 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
 import { useTheme } from './ThemeProvider'
-import { ChevronRight, ChevronLeft, FileText, Highlighter, Plus, StickyNote, MoreVertical } from 'lucide-react'
+import { ChevronRight, ChevronLeft, FileText, Highlighter, Plus, StickyNote, MoreVertical, Download } from 'lucide-react'
 import { NotesList } from '../src/components/ResearchNotes/NotesList'
 import { notesService } from '../src/services/notesService'
 import { highlightService, Highlight } from '../src/services/highlightService'
 import { NoteEditorModal } from '../src/components/ResearchNotes/NoteEditorModal'
+import { NoteTemplateSettings } from '../src/components/NoteTemplateSettings'
+import { NoteTemplateHelpModal } from '../src/components/NoteTemplateHelpModal'
 
 interface ThemedMainContentProps {
   children?: React.ReactNode
@@ -21,6 +23,11 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
   const [notesRefreshTrigger, setNotesRefreshTrigger] = useState(0)
   const [editingNote, setEditingNote] = useState<any>(null)
   const [showKebabMenu, setShowKebabMenu] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [showHelpModal, setShowHelpModal] = useState(false)
+  const [exportFormat, setExportFormat] = useState<'markdown' | 'html' | 'json' | 'text'>('markdown')
+  const [isExporting, setIsExporting] = useState(false)
   const kebabMenuRef = useRef<HTMLDivElement>(null)
 
   // Close kebab menu when clicking outside
@@ -82,6 +89,57 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
   const handleJumpToPage = (pageNumber: number) => {
     // This will be handled by the PDFViewer component
     console.log('Jump to page:', pageNumber)
+  }
+
+  const handleExportNotes = async () => {
+    if (!user || !currentDocument) {
+      console.error('Cannot export: missing user or document')
+      return
+    }
+
+    setIsExporting(true)
+    setShowKebabMenu(false)
+    setShowExportModal(false)
+
+    try {
+      // Get all notes for current document
+      const { data: notes, error } = await notesService.getNotesForBook(user.id, currentDocument.id)
+      
+      if (error) {
+        console.error('Error fetching notes:', error)
+        alert('Failed to export notes. Please try again.')
+        return
+      }
+
+      if (!notes || notes.length === 0) {
+        alert('No notes to export for this document.')
+        return
+      }
+
+      // Export notes in selected format
+      const exportedContent = await notesService.exportNotes(notes, exportFormat, currentDocument.name)
+      
+      // Create blob and download
+      const blob = new Blob([exportedContent], { 
+        type: exportFormat === 'html' ? 'text/html' : 
+              exportFormat === 'json' ? 'application/json' :
+              'text/plain' 
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${currentDocument.name.replace(/[^a-z0-9]/gi, '_')}-notes.${exportFormat === 'markdown' ? 'md' : exportFormat}`
+      a.click()
+      URL.revokeObjectURL(url)
+
+      // Success notification
+      console.log('Notes exported successfully')
+    } catch (error) {
+      console.error('Error exporting notes:', error)
+      alert('Failed to export notes. Please try again.')
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   return (
@@ -198,28 +256,29 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                       <div className="py-1">
                         <button
                           onClick={() => {
-                            // TODO: Implement notes export
-                            console.log('Export notes');
-                            setShowKebabMenu(false);
+                            setShowExportModal(true)
+                            setShowKebabMenu(false)
                           }}
+                          disabled={isExporting}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.backgroundColor = 'transparent'
                           }}
-                          className="w-full px-4 py-2 text-left text-sm transition-colors"
+                          className="w-full px-4 py-2 text-left text-sm transition-colors flex items-center space-x-2"
                           style={{ 
-                            color: 'var(--color-text)'
+                            color: 'var(--color-text)',
+                            opacity: isExporting ? 0.5 : 1
                           }}
                         >
-                          Export Notes
+                          <Download className="w-4 h-4" />
+                          <span>{isExporting ? 'Exporting...' : 'Export Notes'}</span>
                         </button>
                         <button
                           onClick={() => {
-                            // TODO: Implement notes settings
-                            console.log('Notes settings');
-                            setShowKebabMenu(false);
+                            setShowSettingsModal(true)
+                            setShowKebabMenu(false)
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
@@ -236,9 +295,8 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                         </button>
                         <button
                           onClick={() => {
-                            // TODO: Implement notes help
-                            console.log('Notes help');
-                            setShowKebabMenu(false);
+                            setShowHelpModal(true)
+                            setShowKebabMenu(false)
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
@@ -425,6 +483,84 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
         note={editingNote}
         onSave={handleEditorSave}
         onDelete={handleEditorDelete}
+      />
+
+      {/* Export Modal */}
+      {showExportModal && user && currentDocument && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+          onClick={() => setShowExportModal(false)}
+        >
+          <div 
+            className="w-full max-w-md rounded-lg shadow-xl p-6"
+            style={{ backgroundColor: 'var(--color-surface)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>
+              Export Notes
+            </h3>
+            <p className="text-sm mb-4" style={{ color: 'var(--color-text-secondary)' }}>
+              Choose a format to export your notes from "{currentDocument.name}"
+            </p>
+            
+            <div className="space-y-2 mb-6">
+              {(['markdown', 'html', 'json', 'text'] as const).map((format) => (
+                <label
+                  key={format}
+                  className="flex items-center space-x-2 p-3 rounded-md cursor-pointer hover:bg-gray-100 transition-colors"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  <input
+                    type="radio"
+                    name="exportFormat"
+                    value={format}
+                    checked={exportFormat === format}
+                    onChange={() => setExportFormat(format)}
+                  />
+                  <span className="text-sm font-medium capitalize">{format} Format</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                style={{ 
+                  backgroundColor: 'var(--color-surface-hover)',
+                  color: 'var(--color-text-secondary)',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExportNotes}
+                disabled={isExporting}
+                className="flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center space-x-2"
+                style={{ 
+                  backgroundColor: 'var(--color-primary)',
+                  color: 'var(--color-text-inverse)',
+                  opacity: isExporting ? 0.7 : 1,
+                }}
+              >
+                {isExporting ? 'Exporting...' : <><Download className="w-4 h-4" /> <span>Export</span></>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      <NoteTemplateSettings
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+      />
+
+      {/* Help Modal */}
+      <NoteTemplateHelpModal
+        isOpen={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
       />
     </div>
   )
