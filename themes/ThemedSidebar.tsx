@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { FileText, Clock, BookOpen, Tag, Timer, ChevronLeft, ChevronRight, Flame, Trophy, BarChart3, Target, Plus, ChevronDown, ChevronUp } from 'lucide-react'
+import { FileText, Clock, BookOpen, Tag, Timer, ChevronLeft, ChevronRight, Flame, Trophy, BarChart3, Target, Plus, ChevronDown, ChevronUp, History, GitBranch, TrendingUp, Activity } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
 import { pomodoroService } from '../src/services/pomodoroService'
@@ -305,12 +305,15 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           {/* Recently Viewed Section */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 
-                className="text-lg font-semibold"
-                style={{ color: 'var(--color-text-primary)' }}
-              >
-                Recently Viewed
-              </h2>
+              <div className="flex items-center space-x-2">
+                <History className="w-5 h-5" style={{ color: 'var(--color-text-primary)' }} />
+                <h2 
+                  className="text-lg font-semibold"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  Recently Viewed
+                </h2>
+              </div>
               <button
                 onClick={() => toggleSection('library')}
                 className="p-1 rounded transition-colors"
@@ -434,12 +437,15 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           {/* Related Documents Section */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 
-                className="text-lg font-semibold"
-                style={{ color: 'var(--color-text-primary)' }}
-              >
-                Related Documents
-              </h3>
+              <div className="flex items-center space-x-2">
+                <GitBranch className="w-5 h-5" style={{ color: 'var(--color-text-primary)' }} />
+                <h3 
+                  className="text-lg font-semibold"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  Related Documents
+                </h3>
+              </div>
               <button
                 onClick={() => toggleSection('related')}
                 className="p-1 rounded transition-colors"
@@ -476,12 +482,15 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           {/* Productivity Stats Section */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 
-                className="text-lg font-semibold"
-                style={{ color: 'var(--color-text-primary)' }}
-              >
-                Productivity Stats
-              </h3>
+              <div className="flex items-center space-x-2">
+                <TrendingUp className="w-5 h-5" style={{ color: 'var(--color-text-primary)' }} />
+                <h3 
+                  className="text-lg font-semibold"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  Productivity Stats
+                </h3>
+              </div>
               <button
                 onClick={() => toggleSection('stats')}
                 className="p-1 rounded transition-colors"
@@ -614,12 +623,15 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           {/* Recent Activity Section */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 
-                className="text-lg font-semibold"
-                style={{ color: 'var(--color-text-primary)' }}
-              >
-                Recent Activity
-              </h3>
+              <div className="flex items-center space-x-2">
+                <Activity className="w-5 h-5" style={{ color: 'var(--color-text-primary)' }} />
+                <h3 
+                  className="text-lg font-semibold"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  Recent Activity
+                </h3>
+              </div>
               <button
                 onClick={() => toggleSection('activity')}
                 className="p-1 rounded transition-colors"
