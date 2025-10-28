@@ -17,6 +17,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
   const [activeTab, setActiveTab] = useState<'notes' | 'highlights'>('notes')
   const [highlights, setHighlights] = useState<Highlight[]>([])
   const [highlightsLoading, setHighlightsLoading] = useState(false)
+  const [notesRefreshTrigger, setNotesRefreshTrigger] = useState(0)
 
   // Load highlights when tab is active and document changes
   useEffect(() => {
@@ -160,8 +161,31 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
               {activeTab === 'notes' && (
                 <Tooltip content="Create New Note" position="left">
                   <button 
-                    onClick={() => {
-                      // Open notes panel with empty note
+                    onClick={async () => {
+                      if (!user || !currentDocument) return;
+                      
+                      try {
+                        // Create a new blank note
+                        const { error } = await notesService.createNote(
+                          user.id,
+                          currentDocument.id,
+                          1, // Default to page 1
+                          '', // Empty content initially
+                          'freeform', // Simple text note
+                          {}, // No metadata
+                          false // Not AI generated
+                        );
+                        
+                        if (error) {
+                          console.error('Error creating note:', error);
+                        } else {
+                          console.log('New note created successfully');
+                          // Trigger refresh of notes list
+                          setNotesRefreshTrigger(prev => prev + 1);
+                        }
+                      } catch (error) {
+                        console.error('Exception creating note:', error);
+                      }
                     }}
                     className="p-2 rounded-lg transition-colors hover:opacity-80"
                     style={{
@@ -178,7 +202,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
             {/* Tab Content */}
             <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
               {activeTab === 'notes' ? (
-                <NotesList onNoteSelected={handleNoteSelected} />
+                <NotesList onNoteSelected={handleNoteSelected} refreshTrigger={notesRefreshTrigger} />
               ) : (
                 <div className="space-y-2">
                   {highlightsLoading ? (

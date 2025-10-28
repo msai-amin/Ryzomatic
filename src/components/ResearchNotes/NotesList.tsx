@@ -5,16 +5,17 @@ import { notesService, NoteWithMetadata } from '../../services/notesService';
 
 interface NotesListProps {
   onNoteSelected: (note: NoteWithMetadata) => void;
+  refreshTrigger?: number;
 }
 
-export const NotesList: React.FC<NotesListProps> = ({ onNoteSelected }) => {
+export const NotesList: React.FC<NotesListProps> = ({ onNoteSelected, refreshTrigger }) => {
   const { user, currentDocument } = useAppStore();
   const [notes, setNotes] = useState<NoteWithMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadNotes();
-  }, [currentDocument?.id]);
+  }, [currentDocument?.id, refreshTrigger]);
 
   const loadNotes = async () => {
     if (!currentDocument || !user) {
