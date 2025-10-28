@@ -163,24 +163,27 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                 <div className="relative" ref={kebabMenuRef}>
                   <button
                     onClick={() => setShowKebabMenu(!showKebabMenu)}
-                    className="p-2 rounded-md transition-colors"
+                    className="p-2 rounded-md transition-all hover:scale-105"
                     style={{ 
                       color: 'var(--color-text-secondary)',
-                      backgroundColor: showKebabMenu ? 'var(--color-surface-hover)' : 'transparent'
+                      backgroundColor: showKebabMenu ? 'var(--color-primary)' : 'var(--color-surface)',
+                      border: '1px solid var(--color-border)'
                     }}
                     onMouseEnter={(e) => {
                       if (!showKebabMenu) {
                         e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                        e.currentTarget.style.color = 'var(--color-text-primary)'
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!showKebabMenu) {
-                        e.currentTarget.style.backgroundColor = 'transparent'
+                        e.currentTarget.style.backgroundColor = 'var(--color-surface)'
+                        e.currentTarget.style.color = 'var(--color-text-secondary)'
                       }
                     }}
                     title="More options"
                   >
-                    <MoreVertical className="w-4 h-4" />
+                    <MoreVertical className="w-5 h-5" />
                   </button>
                   
                   {showKebabMenu && (
@@ -256,7 +259,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                 </div>
                 
                 {/* Tab Buttons */}
-                <div className="flex space-x-1 p-1 rounded-lg" style={{ backgroundColor: 'var(--color-surface)' }}>
+                <div className="flex space-x-1 p-1 rounded-lg ml-1" style={{ backgroundColor: 'var(--color-surface)' }}>
                   <button
                     onClick={() => setActiveTab('notes')}
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
