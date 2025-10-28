@@ -329,7 +329,7 @@ Return ONLY this JSON (no other text):
 === SOURCE DOCUMENT ===
 Summary: ${source.summary}
 Topics: ${source.topics.join(', ')}
-Keywords: ${source.keywords.slice(0, 5).join(', ')}
+Keywords: ${source.keywords.slice(0, 10).join(', ')}
 
 Content (1500 chars):
 ${sourceContent.substring(0, 1500)}
@@ -338,7 +338,7 @@ ${sourceContent.substring(0, 1500)}
 === RELATED DOCUMENT ===
 Summary: ${related.summary}
 Topics: ${related.topics.join(', ')}
-Keywords: ${related.keywords.slice(0, 5).join(', ')}
+Keywords: ${related.keywords.slice(0, 10).join(', ')}
 
 Content (1500 chars):
 ${relatedContent.substring(0, 1500)}
@@ -346,18 +346,16 @@ ${relatedContent.substring(0, 1500)}
 
 Computed Similarity: ${similarity}%
 
-TASK: Write 1-2 sentences explaining how these documents relate. Consider:
+TASK: Provide a detailed relationship analysis in JSON format. Return ONLY valid JSON (no other text):
 
-- Complementary (different aspects of same topic)
-- Sequential (one builds on the other)
-- Comparative (alternative approaches)
-- Applied (theory vs practice)
-- Foundational (prerequisites)
-- Contradictory (conflicting views)
+{
+  "overview": "2-3 sentences on how these documents relate (complementary/sequential/comparative/applied/foundational/contradictory). Be specific - mention actual topics/concepts they share. If similarity is low (<30%), note they cover different areas but may still provide useful context.",
+  "sharedTopics": ["List 3-5 specific topics", "concepts or subject areas", "both documents cover"],
+  "keyConnections": ["2-3 specific ways", "the documents complement or relate to each other"],
+  "readingRecommendation": "1 sentence on how to use these documents together for best learning/insight"
+}
 
-Be specific - mention actual topics/concepts they share. If similarity is low (<30%), note they cover different areas but may still provide useful context.
-
-YOUR DESCRIPTION (1-2 sentences only):`;
+Important: Return ONLY the JSON object above, nothing else.`;
 
       console.log('DocumentRelevanceService: Sending prompt (preview):', prompt.substring(0, 500));
       const response = await sendMessageToAI(prompt);
@@ -382,20 +380,89 @@ YOUR DESCRIPTION (1-2 sentences only):`;
       if (hasFallback) {
         console.warn('DocumentRelevanceService: AI returned fallback message');
         // Provide better default based on similarity
-        if (similarity >= 70) {
-          return `These documents are highly related (${similarity}% similarity), covering similar topics in ${source.topics[0] || 'this field'}. Reading both provides comprehensive coverage.`;
-        } else if (similarity >= 40) {
-          return `These documents share moderate overlap (${similarity}% similarity) in topics like ${source.topics[0] || 'the subject area'}. They complement each other's perspectives.`;
-        } else {
-          return `These documents cover different but potentially complementary areas (${similarity}% similarity). They may provide useful context for each other.`;
-        }
+        const fallbackAnalysis = {
+          overview: similarity >= 70 
+            ? `These documents are highly related (${similarity}% similarity), covering similar topics in ${source.topics[0] || 'this field'}. Reading both provides comprehensive coverage.`
+            : similarity >= 40
+            ? `These documents share moderate overlap (${similarity}% similarity) in topics like ${source.topics[0] || 'the subject area'}. They complement each other's perspectives.`
+            : `These documents cover different but potentially complementary areas (${similarity}% similarity). They may provide useful context for each other.`,
+          sharedTopics: this.findCommonTopics(source.topics, related.topics),
+          keyConnections: [
+            `${source.topics[0] || 'The topics'} are explored from different perspectives in these documents`,
+            similarity >= 50 ? 'These documents build upon complementary ideas' : 'These documents may provide valuable context for each other'
+          ],
+          readingRecommendation: similarity >= 70 
+            ? 'Read together to gain comprehensive understanding of shared topics'
+            : 'Consider reading in sequence to explore different aspects of related themes',
+          rawAnalysis: {
+            sourceKeywords: source.keywords,
+            relatedKeywords: related.keywords,
+            commonKeywords: this.findCommonKeywords(source.keywords, related.keywords),
+            sourceTopics: source.topics,
+            relatedTopics: related.topics,
+            commonTopics: this.findCommonTopics(source.topics, related.topics)
+          }
+        };
+        return JSON.stringify(fallbackAnalysis);
       }
       
-      return trimmedResponse;
+      // Try to parse JSON from response
+      try {
+        let jsonText = trimmedResponse;
+        const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          jsonText = jsonMatch[0];
+        }
+        
+        const parsed = JSON.parse(jsonText);
+        
+        // Enrich with raw analysis data
+        const enrichedAnalysis = {
+          ...parsed,
+          rawAnalysis: {
+            sourceKeywords: source.keywords,
+            relatedKeywords: related.keywords,
+            commonKeywords: this.findCommonKeywords(source.keywords, related.keywords),
+            sourceTopics: source.topics,
+            relatedTopics: related.topics,
+            commonTopics: this.findCommonTopics(source.topics, related.topics)
+          }
+        };
+        
+        return JSON.stringify(enrichedAnalysis);
+      } catch (parseError) {
+        console.error('DocumentRelevanceService: Failed to parse AI response as JSON:', parseError);
+        // Return plain text as fallback
+        return trimmedResponse;
+      }
     } catch (error) {
       console.error('DocumentRelevanceService: Error generating AI description:', error);
       return `Documents share ${similarity}% similarity based on content analysis. Both documents cover related topics and themes.`;
     }
+  }
+
+  /**
+   * Find common topics between two document analyses
+   */
+  private findCommonTopics(topics1: string[], topics2: string[]): string[] {
+    const lowerTopics1 = topics1.map(t => t.toLowerCase());
+    const lowerTopics2 = topics2.map(t => t.toLowerCase());
+    
+    return topics1.filter(topic => 
+      lowerTopics2.includes(topic.toLowerCase())
+    );
+  }
+
+  /**
+   * Find common keywords between two document analyses
+   */
+  private findCommonKeywords(keywords1: string[], keywords2: string[]): string[] {
+    const lowerKeywords1 = keywords1.map(k => k.toLowerCase());
+    const lowerKeywords2 = keywords2.map(k => k.toLowerCase());
+    
+    return keywords1.filter(keyword => 
+      lowerKeywords2.includes(keyword.toLowerCase())
+    );
   }
 
   /**

@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Calendar, Clock, Edit3, Trash2, ExternalLink, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import { X, FileText, Calendar, Clock, Edit3, Trash2, ExternalLink, AlertCircle, CheckCircle, Loader, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { DocumentRelationshipWithDetails, userBooks } from '../../lib/supabase';
 import { Tooltip } from './Tooltip';
+import { 
+  parseRelationshipDescription, 
+  getOverviewText, 
+  getSharedTopics, 
+  getKeyConnections, 
+  getReadingRecommendation,
+  getRawAnalysis 
+} from '../utils/relationshipAnalysisParser';
 
 interface DocumentPreviewModalProps {
   isOpen: boolean;
@@ -23,6 +31,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const [documentContent, setDocumentContent] = useState<string>('');
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   // Load document content when modal opens
   useEffect(() => {
@@ -239,21 +248,124 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               {/* Relationship Description */}
               {(relationship.relationship_description || relationship.ai_generated_description) && (
                 <div className="p-4 rounded-lg border" style={{ borderColor: 'var(--color-border)' }}>
-                  <h3 className="font-medium mb-3">Relationship Description</h3>
-                  <div className="space-y-3 text-sm">
-                    {relationship.relationship_description && (
-                      <div>
-                        <p className="font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>Your Description:</p>
-                        <p style={{ color: 'var(--color-text-primary)' }}>{relationship.relationship_description}</p>
-                      </div>
-                    )}
-                    {relationship.ai_generated_description && (
-                      <div>
-                        <p className="font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>AI Analysis:</p>
-                        <p style={{ color: 'var(--color-text-primary)' }}>{relationship.ai_generated_description}</p>
-                      </div>
-                    )}
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-medium">Relationship Analysis</h3>
+                    <button
+                      onClick={() => setShowDetails(!showDetails)}
+                      className="text-xs flex items-center space-x-1 transition-colors"
+                      style={{ color: 'var(--color-text-secondary)' }}
+                    >
+                      <span>{showDetails ? 'Hide Details' : 'Show Details'}</span>
+                      {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </button>
                   </div>
+                  
+                  {(() => {
+                    const parsed = parseRelationshipDescription(relationship.ai_generated_description || relationship.relationship_description);
+                    
+                    if (parsed.isStructured) {
+                      const data = parsed.data as any;
+                      const sharedTopics = getSharedTopics(relationship.ai_generated_description);
+                      const keyConnections = getKeyConnections(relationship.ai_generated_description);
+                      const readingRec = getReadingRecommendation(relationship.ai_generated_description);
+                      const rawAnalysis = getRawAnalysis(relationship.ai_generated_description);
+                      
+                      return (
+                        <div className="space-y-4 text-sm">
+                          {/* Overview */}
+                          <div>
+                            <p className="font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Overview</p>
+                            <p style={{ color: 'var(--color-text-primary)' }}>{data.overview}</p>
+                          </div>
+                          
+                          {/* Collapsible Details */}
+                          {showDetails && (
+                            <div className="space-y-3 pt-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                              {/* Shared Topics */}
+                              {sharedTopics.length > 0 && (
+                                <div>
+                                  <p className="font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Shared Topics</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {sharedTopics.map((topic, idx) => (
+                                      <span
+                                        key={idx}
+                                        className="px-2 py-1 rounded text-xs"
+                                        style={{
+                                          backgroundColor: 'var(--color-primary-light)',
+                                          color: 'var(--color-primary)'
+                                        }}
+                                      >
+                                        {topic}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Key Connections */}
+                              {keyConnections.length > 0 && (
+                                <div>
+                                  <p className="font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Key Connections</p>
+                                  <ul className="list-disc list-inside space-y-1" style={{ color: 'var(--color-text-primary)' }}>
+                                    {keyConnections.map((connection, idx) => (
+                                      <li key={idx}>{connection}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              
+                              {/* Reading Recommendation */}
+                              {readingRec && (
+                                <div>
+                                  <p className="font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Reading Recommendation</p>
+                                  <p style={{ color: 'var(--color-text-primary)' }}>{readingRec}</p>
+                                </div>
+                              )}
+                              
+                              {/* Raw Analysis Data */}
+                              {rawAnalysis.commonKeywords && rawAnalysis.commonKeywords.length > 0 && (
+                                <div className="pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                                  <p className="font-medium mb-2 text-xs" style={{ color: 'var(--color-text-secondary)' }}>Common Keywords</p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {rawAnalysis.commonKeywords.slice(0, 8).map((keyword, idx) => (
+                                      <span
+                                        key={idx}
+                                        className="px-1.5 py-0.5 rounded text-xs"
+                                        style={{
+                                          backgroundColor: 'var(--color-surface-hover)',
+                                          color: 'var(--color-text-secondary)'
+                                        }}
+                                      >
+                                        {keyword}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    } else {
+                      // Plain text fallback
+                      return (
+                        <div className="space-y-3 text-sm">
+                          {relationship.relationship_description && (
+                            <div>
+                              <p className="font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>Your Description:</p>
+                              <p style={{ color: 'var(--color-text-primary)' }}>{relationship.relationship_description}</p>
+                            </div>
+                          )}
+                          {relationship.ai_generated_description && (
+                            <div>
+                              <p className="font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>AI Analysis:</p>
+                              <p style={{ color: 'var(--color-text-primary)' }}>{relationship.ai_generated_description}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                  })()}
                 </div>
               )}
             </div>
