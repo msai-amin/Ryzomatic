@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react'
-import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut, Menu, Bot, Sparkles, Timer, Home, Sidebar as SidebarIcon } from 'lucide-react'
+import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut, Menu, Bot, Sparkles, Timer, Home, Sidebar as SidebarIcon, HelpCircle, Volume2, X } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { TypographySettings } from '../src/components/TypographySettings'
 import { GeneralSettings } from '../src/components/GeneralSettings'
@@ -35,6 +35,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
   } = useAppStore()
   const [showSettings, setShowSettings] = React.useState(false)
   const [showGeneralSettings, setShowGeneralSettings] = React.useState(false)
+  const [showHelp, setShowHelp] = React.useState(false)
   const [showLibrary, setShowLibrary] = React.useState(false)
   const [showAuth, setShowAuth] = React.useState(false)
   const [showMenu, setShowMenu] = React.useState(false)
@@ -173,6 +174,25 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                   >
                     <Settings className="w-4 h-4" />
                     <span>Settings</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowHelp(true)
+                      setShowMenu(false)
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm transition-colors flex items-center space-x-2"
+                    style={{ 
+                      color: 'var(--color-text-primary)'
+                    }}
+                  >
+                    <HelpCircle className="w-4 h-4" />
+                    <span>Help</span>
                   </button>
                   {user && (
                     <>
@@ -484,6 +504,193 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
 
       {showGeneralSettings && (
         <GeneralSettings isOpen={showGeneralSettings} onClose={() => setShowGeneralSettings(false)} />
+      )}
+
+      {showHelp && (
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center pt-20 pb-8 px-4 overflow-y-auto" 
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
+        >
+          <div 
+            className="rounded-xl shadow-xl max-w-4xl w-full mx-4 animate-scale-in my-auto" 
+            style={{ 
+              backgroundColor: 'var(--color-surface)', 
+              border: '1px solid var(--color-border)' 
+            }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--color-border)' }}>
+              <h2 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                Help & Features Guide
+              </h2>
+              <button
+                onClick={() => setShowHelp(false)}
+                className="transition-colors"
+                style={{ color: 'var(--color-text-secondary)' }}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-primary)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* AI Assistant */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <Bot className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
+                    <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                      AI Assistant
+                    </h3>
+                  </div>
+                  <div className="space-y-3 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                    <p>Ask questions about your documents and get intelligent answers powered by AI.</p>
+                    <div className="space-y-2">
+                      <h4 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>How to use:</h4>
+                      <ul className="list-disc list-inside space-y-1 ml-2">
+                        <li>Click the "AI Assistant" button in the header</li>
+                        <li>Type your question about the current document</li>
+                        <li>Get instant answers with relevant context</li>
+                        <li>Ask follow-up questions for deeper understanding</li>
+                      </ul>
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>Example questions:</h4>
+                      <ul className="list-disc list-inside space-y-1 ml-2">
+                        <li>"What are the main points of this chapter?"</li>
+                        <li>"Explain this concept in simpler terms"</li>
+                        <li>"What does this paragraph mean?"</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pomodoro Timer */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <Timer className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
+                    <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                      Pomodoro Timer
+                    </h3>
+                  </div>
+                  <div className="space-y-3 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                    <p>Stay focused and productive with timed work sessions and breaks.</p>
+                    <div className="space-y-2">
+                      <h4 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>How to use:</h4>
+                      <ul className="list-disc list-inside space-y-1 ml-2">
+                        <li>Click the 🍅 tomato icon in the header</li>
+                        <li>Start a 25-minute work session</li>
+                        <li>Take 5-minute breaks between sessions</li>
+                        <li>After 4 sessions, take a 15-minute long break</li>
+                      </ul>
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>Features:</h4>
+                      <ul className="list-disc list-inside space-y-1 ml-2">
+                        <li>Customizable work and break durations</li>
+                        <li>Auto-start options for breaks and sessions</li>
+                        <li>Progress tracking and achievements</li>
+                        <li>Notifications when sessions end</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Text-to-Speech */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <Volume2 className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
+                    <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                      Text-to-Speech (TTS)
+                    </h3>
+                  </div>
+                  <div className="space-y-3 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                    <p>Listen to your documents with natural-sounding voices for better comprehension.</p>
+                    <div className="space-y-2">
+                      <h4 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>How to use:</h4>
+                      <ul className="list-disc list-inside space-y-1 ml-2">
+                        <li>Open a document and click the speaker icon</li>
+                        <li>Choose your preferred voice and settings</li>
+                        <li>Click play to start reading</li>
+                        <li>Adjust speed, pitch, and volume as needed</li>
+                      </ul>
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>Features:</h4>
+                      <ul className="list-disc list-inside space-y-1 ml-2">
+                        <li>Multiple voice options (Native & Google Cloud)</li>
+                        <li>Word highlighting as it reads</li>
+                        <li>Auto-advance through paragraphs</li>
+                        <li>Customizable reading speed and voice settings</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Note Taking */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <FileText className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
+                    <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                      Note Taking
+                    </h3>
+                  </div>
+                  <div className="space-y-3 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                    <p>Take structured notes with multiple templates designed for different learning styles.</p>
+                    <div className="space-y-2">
+                      <h4 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>How to use:</h4>
+                      <ul className="list-disc list-inside space-y-1 ml-2">
+                        <li>Click the "+" button next to Notes in the right sidebar</li>
+                        <li>Choose from 6 different note templates</li>
+                        <li>Set a default template in Settings</li>
+                        <li>Export notes in multiple formats</li>
+                      </ul>
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>Note Templates:</h4>
+                      <ul className="list-disc list-inside space-y-1 ml-2">
+                        <li><strong>Freeform:</strong> Simple text notes</li>
+                        <li><strong>Cornell:</strong> Cue column + Notes + Summary</li>
+                        <li><strong>Outline:</strong> Hierarchical structure</li>
+                        <li><strong>Mind Map:</strong> Central topic with branches</li>
+                        <li><strong>Chart:</strong> Comparison tables</li>
+                        <li><strong>Boxing:</strong> Grouped concepts in boxes</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Tips */}
+              <div className="mt-8 p-4 rounded-lg" style={{ backgroundColor: 'var(--color-background)' }}>
+                <h3 className="text-lg font-semibold mb-3" style={{ color: 'var(--color-text-primary)' }}>
+                  💡 Quick Tips
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                  <div>
+                    <h4 className="font-medium mb-2" style={{ color: 'var(--color-text-primary)' }}>Keyboard Shortcuts:</h4>
+                    <ul className="space-y-1">
+                      <li>• Press <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">M</kbd> for Reading Mode</li>
+                      <li>• Press <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">Space</kbd> to play/pause TTS</li>
+                      <li>• Press <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">Esc</kbd> to close modals</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 className="font-medium mb-2" style={{ color: 'var(--color-text-primary)' }}>Best Practices:</h4>
+                    <ul className="space-y-1">
+                      <li>• Use Pomodoro for focused reading sessions</li>
+                      <li>• Combine TTS with note-taking for better retention</li>
+                      <li>• Ask AI questions while reading for deeper understanding</li>
+                      <li>• Try different note templates for different content types</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
     </header>
