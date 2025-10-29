@@ -41,7 +41,7 @@ export const FloatingActionButtons: React.FC = () => {
 
   return (
     <div 
-      className="fixed bottom-40 right-8 z-40 flex flex-col space-y-3"
+      className="fixed bottom-40 right-8 z-60 flex flex-col space-y-3"
       onMouseLeave={() => setIsHovered(null)}
     >
       {buttons.map((button, index) => {
