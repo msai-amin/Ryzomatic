@@ -25,7 +25,6 @@ import {
   Library,
   Palette,
   Highlighter,
-  MoreVertical,
   Plus
 } from 'lucide-react'
 import { useAppStore, Document as DocumentType } from '../store/appStore'
@@ -46,7 +45,7 @@ import { highlightService, Highlight as HighlightType } from '../services/highli
 import { HighlightColorPicker } from './HighlightColorPicker'
 import { HighlightManagementPanel } from './HighlightManagementPanel'
 import { HighlightColorPopover } from './HighlightColorPopover'
-import { PDFToolbarMoreMenu } from './PDFToolbarMoreMenu'
+import { notesService } from '../services/notesService'
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 
@@ -270,7 +269,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     setSelectedTextContext,
     setChatMode,
     toggleChat,
-    isChatOpen
+    isChatOpen,
+    user
   } = useAppStore()
   
   // Get document from store (which is sanitized)
@@ -314,7 +314,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   } | null>(null)
   const [highlights, setHighlights] = useState<HighlightType[]>([])
   const [showHighlightColorPopover, setShowHighlightColorPopover] = useState(false)
-  const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [currentHighlightColor, setCurrentHighlightColor] = useState('#FFD700')
   const [isHighlightMode, setIsHighlightMode] = useState(true) // Auto-enable highlight mode when document loads
   const [contextMenu, setContextMenu] = useState<{
@@ -328,7 +327,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   const [showUpload, setShowUpload] = useState<boolean>(false)
   const toolbarRef = useRef<HTMLDivElement>(null)
   const highlightColorButtonRef = useRef<HTMLButtonElement>(null)
-  const moreMenuButtonRef = useRef<HTMLButtonElement>(null)
   const [selectedTextForNote, setSelectedTextForNote] = useState<string>('')
   const [selectionMode, setSelectionMode] = useState(false)
   const [showVoiceSelector, setShowVoiceSelector] = useState(false)
@@ -1423,12 +1421,70 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     }
   }
 
-  const handleDownload = useCallback(() => {
-    const link = window.document.createElement('a')
-    link.href = URL.createObjectURL(new Blob([document.pdfData as BlobPart], { type: 'application/pdf' }))
-    link.download = document.name
-    link.click()
-  }, [document])
+  const handleDownload = useCallback(async () => {
+    if (!user || !document) return
+
+    try {
+      // Download the PDF file
+      const pdfLink = window.document.createElement('a')
+      pdfLink.href = URL.createObjectURL(new Blob([document.pdfData as BlobPart], { type: 'application/pdf' }))
+      pdfLink.download = document.name
+      pdfLink.click()
+
+      // Get notes for this document
+      const { data: notesData } = await notesService.getNotesForBook(user.id, document.id)
+      const notes = notesData || []
+
+      // Create notes file content
+      if (notes.length > 0 || highlights.length > 0) {
+        let notesContent = `# Notes and Highlights for ${document.name}\n\n`
+        notesContent += `Generated on: ${new Date().toLocaleString()}\n\n`
+        
+        // Add highlights section
+        if (highlights.length > 0) {
+          notesContent += `## Highlights\n\n`
+          highlights.forEach((highlight, idx) => {
+            notesContent += `### Highlight ${idx + 1} (Page ${highlight.page_number})\n`
+            notesContent += `**Text:** ${highlight.text}\n`
+            notesContent += `**Color:** ${highlight.color_hex}\n`
+            if (highlight.note_text) {
+              notesContent += `**Note:** ${highlight.note_text}\n`
+            }
+            notesContent += `**Date:** ${new Date(highlight.created_at).toLocaleString()}\n\n`
+          })
+        }
+
+        // Add notes section
+        if (notes.length > 0) {
+          notesContent += `## Notes\n\n`
+          notes.forEach((note, idx) => {
+            notesContent += `### Note ${idx + 1} (Page ${note.page_number})\n`
+            notesContent += `**Type:** ${note.note_type}\n`
+            notesContent += `**Content:**\n${note.content}\n`
+            notesContent += `**Date:** ${new Date(note.created_at).toLocaleString()}\n\n`
+          })
+        }
+
+        // Download notes file
+        const notesBlob = new Blob([notesContent], { type: 'text/markdown' })
+        const notesLink = window.document.createElement('a')
+        notesLink.href = URL.createObjectURL(notesBlob)
+        notesLink.download = `${document.name.replace(/\.pdf$/i, '')}-notes-and-highlights.md`
+        
+        // Trigger download after a small delay to ensure PDF download starts first
+        setTimeout(() => {
+          notesLink.click()
+        }, 300)
+      }
+    } catch (error) {
+      console.error('Error downloading file with notes:', error)
+      // Fallback to just downloading PDF if notes retrieval fails
+      const link = window.document.createElement('a')
+      link.href = URL.createObjectURL(new Blob([document.pdfData as BlobPart], { type: 'application/pdf' }))
+      link.download = document.name
+      link.click()
+    }
+  }, [document, user, highlights])
 
   const toggleScrollMode = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -2948,28 +3004,23 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
           {/* Right controls */}
           <div className="flex items-center gap-2">
-            {/* More Menu Button */}
+            {/* Download Button */}
             <button
-              ref={moreMenuButtonRef}
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                setShowMoreMenu(!showMoreMenu)
+                handleDownload()
               }}
               className="p-2 rounded-lg transition-colors"
               style={{
-                backgroundColor: showMoreMenu ? 'var(--color-primary-light)' : 'transparent',
-                color: showMoreMenu ? 'var(--color-primary)' : 'var(--color-text-primary)'
+                backgroundColor: 'transparent',
+                color: 'var(--color-text-primary)'
               }}
-              onMouseEnter={(e) => {
-                if (!showMoreMenu) e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-              }}
-              onMouseLeave={(e) => {
-                if (!showMoreMenu) e.currentTarget.style.backgroundColor = 'transparent'
-              }}
-              title="More Options"
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              title="Download PDF with highlights and notes"
             >
-              <MoreVertical className="w-5 h-5" />
+              <Download className="w-5 h-5" />
             </button>
           </div>
             </div>
@@ -3248,20 +3299,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         triggerRef={highlightColorButtonRef}
       />
 
-      {/* More Menu */}
-      <PDFToolbarMoreMenu
-        isOpen={showMoreMenu}
-        onClose={() => setShowMoreMenu(false)}
-        onRotate={handleRotate}
-        onLibrary={() => setShowLibrary(true)}
-        onUpload={() => setShowUpload(true)}
-        onNotes={() => setShowNotesPanel(!showNotesPanel)}
-        onDownload={handleDownload}
-        onSearch={() => {/* TODO: Implement search */}}
-        onTTS={() => setShowVoiceSelector(true)}
-        onSettings={() => setShowTypographySettings(true)}
-        triggerRef={moreMenuButtonRef}
-      />
     </div>
   )
 }
