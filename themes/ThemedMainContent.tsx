@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
 import { useTheme } from './ThemeProvider'
-import { ChevronRight, ChevronLeft, FileText, Highlighter, Plus, StickyNote, MoreVertical, Download } from 'lucide-react'
+import { ChevronRight, ChevronLeft, FileText, Highlighter, Plus, StickyNote, MoreVertical, Download, FileStack } from 'lucide-react'
 import { NotesList } from '../src/components/ResearchNotes/NotesList'
 import { notesService } from '../src/services/notesService'
 import { highlightService, Highlight } from '../src/services/highlightService'
@@ -312,17 +312,20 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                 {/* Tab Buttons */}
                 <div className="flex space-x-1 p-1 rounded-lg ml-1" style={{ backgroundColor: 'var(--color-surface)' }}>
                   <button
-                    onClick={() => setActiveTab('notes')}
+                    onClick={() => {
+                      setActiveTab('notes');
+                      setIsRightSidebarOpen(!isRightSidebarOpen);
+                    }}
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                      activeTab === 'notes' ? 'shadow-sm' : ''
+                      activeTab === 'notes' && isRightSidebarOpen ? 'shadow-sm' : ''
                     }`}
                     style={{
-                      backgroundColor: activeTab === 'notes' ? 'var(--color-primary)' : 'transparent',
-                      color: activeTab === 'notes' ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
+                      backgroundColor: activeTab === 'notes' && isRightSidebarOpen ? 'var(--color-primary)' : 'transparent',
+                      color: activeTab === 'notes' && isRightSidebarOpen ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
                     }}
                   >
                     <div className="flex items-center space-x-2">
-                      <StickyNote className="w-4 h-4" />
+                      <FileStack className="w-4 h-4" />
                       <span>Notes</span>
                     </div>
                   </button>
