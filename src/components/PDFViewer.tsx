@@ -2734,6 +2734,26 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               <Plus className="w-5 h-5" />
             </button>
 
+            {/* Download Button */}
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                handleDownload()
+              }}
+              className="p-2 rounded-lg transition-colors"
+              style={{ 
+                color: 'var(--color-text-primary)', 
+                backgroundColor: 'transparent',
+                border: '1px solid var(--color-border)'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              title="Download PDF with highlights and notes"
+            >
+              <Download className="w-5 h-5" />
+            </button>
+
             {/* Visual Separator */}
             <div 
               className="w-px h-6"
@@ -3002,27 +3022,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             </button>
           </div>
 
-          {/* Right controls */}
-          <div className="flex items-center gap-2">
-            {/* Download Button */}
-            <button
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                handleDownload()
-              }}
-              className="p-2 rounded-lg transition-colors"
-              style={{
-                backgroundColor: 'transparent',
-                color: 'var(--color-text-primary)'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              title="Download PDF with highlights and notes"
-            >
-              <Download className="w-5 h-5" />
-            </button>
-          </div>
             </div>
       </div>
 
