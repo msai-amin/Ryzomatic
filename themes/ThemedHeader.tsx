@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react'
 import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut, Menu, Bot, Sparkles, Timer, Home, Sidebar as SidebarIcon } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { TypographySettings } from '../src/components/TypographySettings'
+import { GeneralSettings } from '../src/components/GeneralSettings'
 import { ModernLibraryModal } from '../src/components/ModernLibraryModal'
 import { AuthModal } from '../src/components/AuthModal'
 import { PomodoroTimer } from '../src/components/PomodoroTimer'
@@ -32,6 +33,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     hasSeenPomodoroTour
   } = useAppStore()
   const [showSettings, setShowSettings] = React.useState(false)
+  const [showGeneralSettings, setShowGeneralSettings] = React.useState(false)
   const [showLibrary, setShowLibrary] = React.useState(false)
   const [showAuth, setShowAuth] = React.useState(false)
   const [showMenu, setShowMenu] = React.useState(false)
@@ -154,7 +156,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                   </button>
                   <button
                     onClick={() => {
-                      setShowSettings(true)
+                      setShowGeneralSettings(true)
                       setShowMenu(false)
                     }}
                     onMouseEnter={(e) => {
@@ -477,6 +479,10 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
 
       {showSettings && (
         <TypographySettings onClose={() => setShowSettings(false)} />
+      )}
+
+      {showGeneralSettings && (
+        <GeneralSettings isOpen={showGeneralSettings} onClose={() => setShowGeneralSettings(false)} />
       )}
 
     </header>
