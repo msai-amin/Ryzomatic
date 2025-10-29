@@ -13,9 +13,13 @@ export const FloatingActionButtons: React.FC = () => {
   }
 
   const handleQuickNote = () => {
-    // Open notes panel with new note
-    // This would integrate with your note creation modal
-    console.log('Quick note pressed')
+    // Dispatch custom event to trigger quick note creation
+    // ThemedMainContent will listen to this event and create a freeform note
+    window.dispatchEvent(new CustomEvent('quickNoteRequested', {
+      detail: {
+        noteType: 'freeform' // Always freeform for quick note button
+      }
+    }))
   }
 
   const handleAIChat = () => {

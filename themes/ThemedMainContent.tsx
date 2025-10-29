@@ -15,7 +15,7 @@ interface ThemedMainContentProps {
 }
 
 export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }) => {
-  const { currentDocument, user, isRightSidebarOpen, setIsRightSidebarOpen } = useAppStore()
+  const { currentDocument, user, isRightSidebarOpen, setIsRightSidebarOpen, pdfViewer } = useAppStore()
   const [activeTab, setActiveTab] = useState<'notes' | 'highlights'>('notes')
   const [highlights, setHighlights] = useState<Highlight[]>([])
   const [highlightsLoading, setHighlightsLoading] = useState(false)
@@ -68,9 +68,51 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
     loadHighlights()
   }, [currentDocument?.id, user, activeTab])
 
+  // Listen for quick note requests from FloatingActionButtons
+  useEffect(() => {
+    const handleQuickNoteRequest = async (event: CustomEvent) => {
+      if (!user || !currentDocument) return
+
+      try {
+        const { data, error } = await notesService.createNote(
+          user.id,
+          currentDocument.id,
+          pdfViewer?.currentPage || 1, // Use current page if available
+          '', // Empty content initially
+          'freeform', // Always freeform for quick note
+          {}, // No metadata
+          false // Not AI generated
+        )
+
+        if (error) {
+          console.error('Error creating quick note:', error)
+        } else {
+          console.log('Quick note created successfully')
+          // Open the sidebar to notes tab
+          setIsRightSidebarOpen(true)
+          setActiveTab('notes')
+          // Trigger refresh of notes list
+          setNotesRefreshTrigger(prev => prev + 1)
+          // Open the editor for the new note
+          if (data) {
+            setEditingNote(data)
+          }
+        }
+      } catch (error) {
+        console.error('Exception creating quick note:', error)
+      }
+    }
+
+    window.addEventListener('quickNoteRequested', handleQuickNoteRequest as EventListener)
+
+    return () => {
+      window.removeEventListener('quickNoteRequested', handleQuickNoteRequest as EventListener)
+    }
+  }, [user, currentDocument, pdfViewer?.currentPage, setIsRightSidebarOpen, setNotesRefreshTrigger, setEditingNote, setActiveTab])
+
   const handleNoteSelected = (note: any) => {
     console.log('Note selected:', note)
-    // TODO: Open note in editor
+    setEditingNote(note)
   }
 
   const handleEditorClose = () => {
