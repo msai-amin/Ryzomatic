@@ -15,8 +15,7 @@ interface ThemedMainContentProps {
 }
 
 export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }) => {
-  const { currentDocument, user } = useAppStore()
-  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false)
+  const { currentDocument, user, isRightSidebarOpen, setIsRightSidebarOpen } = useAppStore()
   const [activeTab, setActiveTab] = useState<'notes' | 'highlights'>('notes')
   const [highlights, setHighlights] = useState<Highlight[]>([])
   const [highlightsLoading, setHighlightsLoading] = useState(false)

@@ -4,7 +4,7 @@ import { useAppStore } from '../store/appStore'
 import { Tooltip } from './Tooltip'
 
 export const FloatingActionButtons: React.FC = () => {
-  const { user, currentDocument, toggleChat, pdfViewer } = useAppStore()
+  const { user, currentDocument, toggleChat, pdfViewer, isRightSidebarOpen } = useAppStore()
   const [isHovered, setIsHovered] = useState<string | null>(null)
 
   // Don't show floating buttons if user is not authenticated or no document is loaded
@@ -41,7 +41,10 @@ export const FloatingActionButtons: React.FC = () => {
 
   return (
     <div 
-      className="fixed bottom-40 right-8 z-60 flex flex-col space-y-3"
+      className="fixed bottom-40 z-60 flex flex-col space-y-3"
+      style={{
+        right: isRightSidebarOpen ? '288px' : '2rem', // 280px sidebar + 8px gap when open, 32px default
+      }}
       onMouseLeave={() => setIsHovered(null)}
     >
       {buttons.map((button, index) => {

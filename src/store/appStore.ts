@@ -168,6 +168,7 @@ interface AppState {
   
   // UI state
   isChatOpen: boolean
+  isRightSidebarOpen: boolean
   isLoading: boolean
   
   // Text selection and AI context
@@ -234,6 +235,7 @@ interface AppState {
   updateDocument: (document: Document) => void
   removeDocument: (id: string) => void
   toggleChat: () => void
+  setIsRightSidebarOpen: (open: boolean) => void
   setLoading: (loading: boolean) => void
   updateTypography: (settings: Partial<TypographySettings>) => void
   updateTheme: (settings: Partial<ThemeSettings>) => void
@@ -296,6 +298,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   currentDocument: null,
   documents: [],
   isChatOpen: false,
+  isRightSidebarOpen: false,
   isLoading: false,
   typography: {
     fontFamily: 'serif',
@@ -594,6 +597,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   })),
   
   toggleChat: () => set((state) => ({ isChatOpen: !state.isChatOpen })),
+  
+  setIsRightSidebarOpen: (open) => set({ isRightSidebarOpen: open }),
   
   setLoading: (loading) => set({ isLoading: loading }),
   

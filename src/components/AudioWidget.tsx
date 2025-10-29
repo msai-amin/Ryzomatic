@@ -22,7 +22,7 @@ interface AudioWidgetProps {
 }
 
 export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
-  const { tts, updateTTS, currentDocument, pdfViewer, user, saveTTSPosition, loadTTSPosition } = useAppStore()
+  const { tts, updateTTS, currentDocument, pdfViewer, user, saveTTSPosition, loadTTSPosition, isRightSidebarOpen } = useAppStore()
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
@@ -487,8 +487,9 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     <>
       {/* Toggle Bar - Always Visible */}
       <div 
-        className={`fixed bottom-4 right-4 z-60 transition-all duration-300 ${className}`}
+        className={`fixed bottom-4 z-60 transition-all duration-300 ${className}`}
         style={{
+          right: isRightSidebarOpen ? '284px' : '1rem', // 280px sidebar + 4px gap when open, 16px default
           backgroundColor: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
           borderRadius: '12px',
