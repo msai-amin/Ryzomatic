@@ -350,49 +350,51 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                 </div>
               </div>
               
-              <Tooltip content="Create New Note" position="left">
-                <button 
-                  onClick={async () => {
-                    if (!user || !currentDocument) return;
-                    
-                    try {
-                      // Create a new blank note
-                      const { data, error } = await notesService.createNote(
-                        user.id,
-                        currentDocument.id,
-                        1, // Default to page 1
-                        '', // Empty content initially
-                        'freeform', // Simple text note
-                        {}, // No metadata
-                        false // Not AI generated
-                      );
+              <div style={{ paddingRight: '0.5rem' }}>
+                <Tooltip content="Create New Note" position="left">
+                  <button 
+                    onClick={async () => {
+                      if (!user || !currentDocument) return;
                       
-                      if (error) {
-                        console.error('Error creating note:', error);
-                      } else {
-                        console.log('New note created successfully');
-                        // Trigger refresh of notes list
-                        setNotesRefreshTrigger(prev => prev + 1);
-                        // Switch to notes tab if not already there
-                        setActiveTab('notes');
-                        // Open the editor for the new note
-                        if (data) {
-                          setEditingNote(data);
+                      try {
+                        // Create a new blank note
+                        const { data, error } = await notesService.createNote(
+                          user.id,
+                          currentDocument.id,
+                          1, // Default to page 1
+                          '', // Empty content initially
+                          'freeform', // Simple text note
+                          {}, // No metadata
+                          false // Not AI generated
+                        );
+                        
+                        if (error) {
+                          console.error('Error creating note:', error);
+                        } else {
+                          console.log('New note created successfully');
+                          // Trigger refresh of notes list
+                          setNotesRefreshTrigger(prev => prev + 1);
+                          // Switch to notes tab if not already there
+                          setActiveTab('notes');
+                          // Open the editor for the new note
+                          if (data) {
+                            setEditingNote(data);
+                          }
                         }
+                      } catch (error) {
+                        console.error('Exception creating note:', error);
                       }
-                    } catch (error) {
-                      console.error('Exception creating note:', error);
-                    }
-                  }}
-                  className="p-2 rounded-lg transition-colors hover:opacity-80 mr-2"
-                  style={{
-                    backgroundColor: 'var(--color-primary)',
-                    color: 'var(--color-text-inverse)',
-                  }}
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </Tooltip>
+                    }}
+                    className="p-2 rounded-lg transition-colors hover:opacity-80"
+                    style={{
+                      backgroundColor: 'var(--color-primary)',
+                      color: 'var(--color-text-inverse)',
+                    }}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </Tooltip>
+              </div>
             </div>
 
             {/* Tab Content */}
