@@ -183,7 +183,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
         <div 
           className="transition-all duration-300 ease-in-out overflow-y-auto"
           style={{
-            width: isRightSidebarOpen ? '320px' : '0px',
+            width: isRightSidebarOpen ? '280px' : '0px',
             backgroundColor: 'var(--color-surface)',
             borderLeft: isRightSidebarOpen ? '1px solid var(--color-border)' : 'none',
             height: 'calc(100vh - var(--header-height))',
@@ -192,7 +192,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
           }}
         >
           {/* Sidebar Content */}
-          <div className="p-8">
+          <div className="p-6">
             {/* Close Button */}
             <div className="flex justify-end mb-4">
               <button
