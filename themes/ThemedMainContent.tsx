@@ -211,7 +211,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
             </div>
 
             {/* Tab Navigation */}
-            <div className="flex items-center justify-start gap-2 mb-4">
+            <div className="flex items-center justify-between mb-4 pr-2">
               <div className="flex items-center space-x-1">
                 {/* Kebab Menu */}
                 <div className="relative" ref={kebabMenuRef}>
