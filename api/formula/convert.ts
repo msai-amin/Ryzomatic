@@ -16,8 +16,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { message } = req.body;
 
-    if (!message) {
-      return res.status(400).json({ error: 'Message is required' });
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Valid message string is required' });
+    }
+
+    // Limit message length to prevent abuse
+    if (message.length > 1000) {
+      return res.status(400).json({ error: 'Message too long (max 1000 characters)' });
     }
 
     // Use Gemini service directly for formula conversion
@@ -28,7 +33,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     if (!response) {
-      return res.status(500).json({ error: 'Failed to generate response' });
+      console.error('Formula conversion: Empty response from Gemini');
+      // Return the original message as fallback
+      return res.status(200).json({ 
+        response: message,
+        success: true,
+        fallback: true
+      });
     }
 
     // Clean up the response to extract just the LaTeX
@@ -52,6 +63,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // If latex is empty after cleaning, return original message
+    if (!latex) {
+      latex = message;
+    }
+
     return res.status(200).json({ 
       response: latex,
       success: true 
@@ -59,9 +75,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   } catch (error: any) {
     console.error('Formula conversion error:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      details: error.message 
+    
+    // Return a fallback response instead of failing completely
+    const { message } = req.body;
+    return res.status(200).json({ 
+      response: message || '',
+      success: true,
+      fallback: true,
+      error: error.message
     });
   }
 }

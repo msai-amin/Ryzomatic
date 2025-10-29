@@ -60,16 +60,26 @@ class BackgroundProcessingService {
 
   private async processMissingDescriptions() {
     try {
+      // First, get all book IDs that already have descriptions
+      const { data: existingDescriptions } = await supabase
+        .from('document_descriptions')
+        .select('book_id');
+
+      const existingBookIds = existingDescriptions?.map(d => d.book_id) || [];
+
       // Get documents without descriptions
-      const { data: books, error } = await supabase
+      let query = supabase
         .from('user_books')
         .select('id, user_id, text_content')
-        .not('id', 'in', supabase
-          .from('document_descriptions')
-          .select('book_id')
-        )
         .not('text_content', 'is', null)
         .limit(10);
+
+      // Only add the not.in filter if there are existing descriptions
+      if (existingBookIds.length > 0) {
+        query = query.not('id', 'in', `(${existingBookIds.join(',')})`);
+      }
+
+      const { data: books, error } = await query;
 
       if (error || !books) return;
 
@@ -84,15 +94,25 @@ class BackgroundProcessingService {
 
   private async processNoteRelationships() {
     try {
+      // First, get all note IDs that already have relationships
+      const { data: existingRelationships } = await supabase
+        .from('note_relationships')
+        .select('note_id');
+
+      const existingNoteIds = existingRelationships?.map(r => r.note_id) || [];
+
       // Get notes without relationships
-      const { data: notes, error } = await supabase
+      let query = supabase
         .from('user_notes')
         .select('id, user_id')
-        .not('id', 'in', supabase
-          .from('note_relationships')
-          .select('note_id')
-        )
         .limit(10);
+
+      // Only add the not.in filter if there are existing relationships
+      if (existingNoteIds.length > 0) {
+        query = query.not('id', 'in', `(${existingNoteIds.join(',')})`);
+      }
+
+      const { data: notes, error } = await query;
 
       if (error || !notes) return;
 
