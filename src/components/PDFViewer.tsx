@@ -2715,8 +2715,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             : '0 2px 8px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08)'
         }}
       >
-        <div className="flex items-center justify-start gap-4 p-4">
-          {/* Left Section: Document Actions & Navigation */}
+        <div className="flex items-center justify-center gap-4 p-4">
+          {/* Center Section: All Controls */}
           <div className="flex items-center gap-2">
             {/* Group 1: Document Actions */}
             <div className="flex items-center gap-2">
