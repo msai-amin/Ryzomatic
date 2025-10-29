@@ -1,5 +1,5 @@
-import React from 'react'
-import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut, Menu, Bot, Sparkles, Timer } from 'lucide-react'
+import React, { useRef, useEffect } from 'react'
+import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut, Menu, Bot, Sparkles, Timer, Home, Sidebar as SidebarIcon } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { TypographySettings } from '../src/components/TypographySettings'
 import { ModernLibraryModal } from '../src/components/ModernLibraryModal'
@@ -34,12 +34,31 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
   const [showSettings, setShowSettings] = React.useState(false)
   const [showLibrary, setShowLibrary] = React.useState(false)
   const [showAuth, setShowAuth] = React.useState(false)
+  const [showMenu, setShowMenu] = React.useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   const { currentTheme } = useTheme()
 
   const handleLogout = async () => {
     await logout()
   }
+  
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false)
+      }
+    }
+
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showMenu])
 
   // Subscribe to timer service
   React.useEffect(() => {
@@ -62,20 +81,139 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
       <div className="flex items-center justify-between h-full">
         {/* Logo and Title */}
         <div className="flex items-center space-x-4">
-          <Tooltip content="Toggle Sidebar" position="bottom">
+          <div className="relative" ref={menuRef}>
             <button 
-              onClick={onSidebarToggle}
+              onClick={() => setShowMenu(!showMenu)}
               className="p-2 rounded-lg transition-colors"
               style={{
                 color: 'var(--color-text-primary)',
+                backgroundColor: showMenu ? 'var(--color-surface-hover)' : 'transparent',
               }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              aria-label={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
+              onMouseEnter={(e) => {
+                if (!showMenu) {
+                  e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!showMenu) {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                }
+              }}
+              title="Menu"
             >
               <Menu className="w-5 h-5" />
             </button>
-          </Tooltip>
+            
+            {showMenu && (
+              <div 
+                className="absolute left-0 mt-2 w-56 rounded-lg shadow-lg border"
+                style={{
+                  backgroundColor: 'var(--color-surface)',
+                  borderColor: 'var(--color-border)',
+                  zIndex: 1000
+                }}
+              >
+                <div className="py-1">
+                  <button
+                    onClick={() => {
+                      window.location.href = '/'
+                      setShowMenu(false)
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm transition-colors flex items-center space-x-2"
+                    style={{ 
+                      color: 'var(--color-text-primary)'
+                    }}
+                  >
+                    <Home className="w-4 h-4" />
+                    <span>Home</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      onSidebarToggle()
+                      setShowMenu(false)
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm transition-colors flex items-center space-x-2"
+                    style={{ 
+                      color: 'var(--color-text-primary)'
+                    }}
+                  >
+                    <SidebarIcon className="w-4 h-4" />
+                    <span>{isSidebarOpen ? 'Close Sidebar' : 'Open Sidebar'}</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSettings(true)
+                      setShowMenu(false)
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm transition-colors flex items-center space-x-2"
+                    style={{ 
+                      color: 'var(--color-text-primary)'
+                    }}
+                  >
+                    <Settings className="w-4 h-4" />
+                    <span>Settings</span>
+                  </button>
+                  {user && (
+                    <>
+                      <div className="border-t my-1" style={{ borderColor: 'var(--color-border)' }}>
+                        <div className="px-4 py-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                          <div className="flex items-center space-x-2 mb-2">
+                            <User className="w-4 h-4" />
+                            <span className="font-medium" style={{ color: 'var(--color-text-primary)' }}>Account</span>
+                          </div>
+                          <div className="text-xs mt-2" style={{ color: 'var(--color-text-secondary)' }}>
+                            {user.full_name || user.email}
+                          </div>
+                          {user.tier && (
+                            <div className="text-xs mt-1" style={{ color: 'var(--color-primary)' }}>
+                              {user.tier.toUpperCase()} Plan
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          handleLogout()
+                          setShowMenu(false)
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent'
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm transition-colors flex items-center space-x-2"
+                        style={{ 
+                          color: '#ef4444'
+                        }}
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>Sign Out</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           
           <div className="flex items-center gap-2">
             <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-6 w-6" />
