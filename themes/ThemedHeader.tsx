@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react'
 import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut, Menu, Bot, Sparkles, Timer, Home, Sidebar as SidebarIcon, HelpCircle, Volume2, X } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import { useAppStore } from '../src/store/appStore'
 import { TypographySettings } from '../src/components/TypographySettings'
 import { GeneralSettings } from '../src/components/GeneralSettings'
@@ -506,7 +507,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
         <GeneralSettings isOpen={showGeneralSettings} onClose={() => setShowGeneralSettings(false)} />
       )}
 
-      {showHelp && (
+      {showHelp && createPortal(
         <div 
           className="fixed inset-0 z-[9999] flex items-center justify-center px-4 overflow-y-auto" 
           style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
@@ -690,7 +691,8 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </header>
