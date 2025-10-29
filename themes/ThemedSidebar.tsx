@@ -284,7 +284,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           height: 'calc(100vh - var(--header-height))',
           transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
           marginLeft: isOpen ? '0' : 'calc(-1 * var(--sidebar-width))',
-          zIndex: 40,
+          zIndex: 50,
           position: 'sticky',
           top: 'var(--header-height)',
         }}

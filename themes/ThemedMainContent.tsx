@@ -189,6 +189,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
             height: 'calc(100vh - var(--header-height))',
             position: 'sticky',
             top: 'var(--header-height)',
+            zIndex: 50,
           }}
         >
           {/* Sidebar Content */}
