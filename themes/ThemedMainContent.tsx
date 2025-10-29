@@ -357,7 +357,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
               </Tooltip>
               
               {/* Tab Buttons */}
-              <div className="flex space-x-1 p-1 rounded-lg" style={{ backgroundColor: 'var(--color-surface)' }}>
+              <div className="flex flex-col space-y-1 p-1 rounded-lg" style={{ backgroundColor: 'var(--color-surface)' }}>
                 <button
                   onClick={() => {
                     setActiveTab('notes');
