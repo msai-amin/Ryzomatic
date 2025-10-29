@@ -2722,14 +2722,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setCurrentDocument(null)}
-                className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
+                className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center shrink-0"
                 style={{ 
                   color: 'var(--color-text-primary)', 
-                  backgroundColor: 'transparent',
+                  backgroundColor: 'var(--color-surface-hover)',
                   border: '1px solid var(--color-border)'
                 }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
                 title="Upload New Document"
               >
                 <Plus className="w-5 h-5" />
@@ -2740,7 +2740,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   e.stopPropagation()
                   handleDownload()
                 }}
-                className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
+                className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center shrink-0"
                 style={{ 
                   color: 'var(--color-text-primary)', 
                   backgroundColor: 'transparent',
