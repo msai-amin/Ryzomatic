@@ -211,152 +211,8 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
             </div>
 
             {/* Tab Navigation */}
-            <div className="flex items-center space-x-2 mb-4">
-              {/* Kebab Menu */}
-              <div className="relative" ref={kebabMenuRef}>
-                <button
-                  onClick={() => setShowKebabMenu(!showKebabMenu)}
-                  className="p-2 rounded-md transition-all hover:scale-105"
-                  style={{ 
-                    color: 'var(--color-text-secondary)',
-                    backgroundColor: showKebabMenu ? 'var(--color-primary)' : 'var(--color-surface)',
-                    border: '1px solid var(--color-border)'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!showKebabMenu) {
-                      e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                      e.currentTarget.style.color = 'var(--color-text-primary)'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!showKebabMenu) {
-                      e.currentTarget.style.backgroundColor = 'var(--color-surface)'
-                      e.currentTarget.style.color = 'var(--color-text-secondary)'
-                    }
-                  }}
-                  title="More options"
-                >
-                  <MoreVertical className="w-5 h-5" />
-                </button>
-                
-                {showKebabMenu && (
-                  <div 
-                    className="absolute left-0 mt-2 w-48 rounded-lg shadow-lg border"
-                    style={{
-                      backgroundColor: 'var(--color-surface)',
-                      borderColor: 'var(--color-border)',
-                      zIndex: 1000
-                    }}
-                  >
-                    <div className="py-1">
-                      <button
-                        onClick={() => {
-                          setShowExportModal(true)
-                          setShowKebabMenu(false)
-                        }}
-                        disabled={isExporting}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent'
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm transition-colors flex items-center space-x-2"
-                        style={{ 
-                          color: 'var(--color-text)',
-                          opacity: isExporting ? 0.5 : 1
-                        }}
-                      >
-                        <Download className="w-4 h-4" />
-                        <span>{isExporting ? 'Exporting...' : 'Export Notes'}</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowSettingsModal(true)
-                          setShowKebabMenu(false)
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent'
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm transition-colors"
-                        style={{ 
-                          color: 'var(--color-text)'
-                        }}
-                      >
-                        Settings
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowHelpModal(true)
-                          setShowKebabMenu(false)
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent'
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm transition-colors"
-                        style={{ 
-                          color: 'var(--color-text)'
-                        }}
-                      >
-                        Help
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              {/* Plus Button */}
-              <Tooltip content="Create New Note" position="left">
-                <button 
-                  onClick={async () => {
-                    if (!user || !currentDocument) return;
-                    
-                    try {
-                      // Create a new blank note
-                      const { data, error } = await notesService.createNote(
-                        user.id,
-                        currentDocument.id,
-                        1, // Default to page 1
-                        '', // Empty content initially
-                        'freeform', // Simple text note
-                        {}, // No metadata
-                        false // Not AI generated
-                      );
-                      
-                      if (error) {
-                        console.error('Error creating note:', error);
-                      } else {
-                        console.log('New note created successfully');
-                        // Trigger refresh of notes list
-                        setNotesRefreshTrigger(prev => prev + 1);
-                        // Switch to notes tab if not already there
-                        setActiveTab('notes');
-                        // Open the editor for the new note
-                        if (data) {
-                          setEditingNote(data);
-                        }
-                      }
-                    } catch (error) {
-                      console.error('Exception creating note:', error);
-                    }
-                  }}
-                  className="p-2 rounded-lg transition-colors hover:opacity-80"
-                  style={{
-                    backgroundColor: 'var(--color-primary)',
-                    color: 'var(--color-text-inverse)',
-                  }}
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </Tooltip>
-              
-              {/* Tab Buttons */}
+            <div className="flex items-start justify-between mb-4">
+              {/* Left: Navigation Tabs */}
               <div className="flex flex-col space-y-1 p-1 rounded-lg" style={{ backgroundColor: 'var(--color-surface)' }}>
                 <button
                   onClick={() => {
@@ -391,6 +247,153 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                     <span>Highlights</span>
                   </div>
                 </button>
+              </div>
+              
+              {/* Right: Action Buttons */}
+              <div className="flex items-center space-x-2">
+                {/* Plus Button */}
+                <Tooltip content="Create New Note" position="left">
+                  <button 
+                    onClick={async () => {
+                      if (!user || !currentDocument) return;
+                      
+                      try {
+                        // Create a new blank note
+                        const { data, error } = await notesService.createNote(
+                          user.id,
+                          currentDocument.id,
+                          1, // Default to page 1
+                          '', // Empty content initially
+                          'freeform', // Simple text note
+                          {}, // No metadata
+                          false // Not AI generated
+                        );
+                        
+                        if (error) {
+                          console.error('Error creating note:', error);
+                        } else {
+                          console.log('New note created successfully');
+                          // Trigger refresh of notes list
+                          setNotesRefreshTrigger(prev => prev + 1);
+                          // Switch to notes tab if not already there
+                          setActiveTab('notes');
+                          // Open the editor for the new note
+                          if (data) {
+                            setEditingNote(data);
+                          }
+                        }
+                      } catch (error) {
+                        console.error('Exception creating note:', error);
+                      }
+                    }}
+                    className="p-2 rounded-lg transition-colors hover:opacity-80"
+                    style={{
+                      backgroundColor: 'var(--color-primary)',
+                      color: 'var(--color-text-inverse)',
+                    }}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </Tooltip>
+                
+                {/* Kebab Menu */}
+                <div className="relative" ref={kebabMenuRef}>
+                  <button
+                    onClick={() => setShowKebabMenu(!showKebabMenu)}
+                    className="p-2 rounded-md transition-all hover:scale-105"
+                    style={{ 
+                      color: 'var(--color-text-secondary)',
+                      backgroundColor: showKebabMenu ? 'var(--color-primary)' : 'var(--color-surface)',
+                      border: '1px solid var(--color-border)'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!showKebabMenu) {
+                        e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                        e.currentTarget.style.color = 'var(--color-text-primary)'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!showKebabMenu) {
+                        e.currentTarget.style.backgroundColor = 'var(--color-surface)'
+                        e.currentTarget.style.color = 'var(--color-text-secondary)'
+                      }
+                    }}
+                    title="More options"
+                  >
+                    <MoreVertical className="w-5 h-5" />
+                  </button>
+                  
+                  {showKebabMenu && (
+                    <div 
+                      className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg border"
+                      style={{
+                        backgroundColor: 'var(--color-surface)',
+                        borderColor: 'var(--color-border)',
+                        zIndex: 1000
+                      }}
+                    >
+                      <div className="py-1">
+                        <button
+                          onClick={() => {
+                            setShowExportModal(true)
+                            setShowKebabMenu(false)
+                          }}
+                          disabled={isExporting}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent'
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm transition-colors flex items-center space-x-2"
+                          style={{ 
+                            color: 'var(--color-text)',
+                            opacity: isExporting ? 0.5 : 1
+                          }}
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>{isExporting ? 'Exporting...' : 'Export Notes'}</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowSettingsModal(true)
+                            setShowKebabMenu(false)
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent'
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm transition-colors"
+                          style={{ 
+                            color: 'var(--color-text)'
+                          }}
+                        >
+                          Settings
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowHelpModal(true)
+                            setShowKebabMenu(false)
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent'
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm transition-colors"
+                          style={{ 
+                            color: 'var(--color-text)'
+                          }}
+                        >
+                          Help
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
