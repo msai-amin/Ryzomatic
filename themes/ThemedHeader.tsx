@@ -30,7 +30,8 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     libraryView,
     pomodoroIsRunning,
     pomodoroTimeLeft,
-    hasSeenPomodoroTour
+    hasSeenPomodoroTour,
+    setCurrentDocument
   } = useAppStore()
   const [showSettings, setShowSettings] = React.useState(false)
   const [showGeneralSettings, setShowGeneralSettings] = React.useState(false)
@@ -118,7 +119,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                 <div className="py-1">
                   <button
                     onClick={() => {
-                      window.location.href = '/'
+                      setCurrentDocument(null)
                       setShowMenu(false)
                     }}
                     onMouseEnter={(e) => {
@@ -133,7 +134,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                     }}
                   >
                     <Home className="w-4 h-4" />
-                    <span>Home</span>
+                    <span>Close Document</span>
                   </button>
                   <button
                     onClick={() => {
