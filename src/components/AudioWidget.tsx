@@ -487,7 +487,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     <>
       {/* Toggle Bar - Always Visible */}
       <div 
-        className={`fixed bottom-4 right-4 z-30 transition-all duration-300 ${className}`}
+        className={`fixed bottom-4 right-4 z-60 transition-all duration-300 ${className}`}
         style={{
           backgroundColor: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
