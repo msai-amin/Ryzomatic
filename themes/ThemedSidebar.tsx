@@ -287,7 +287,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           top: 'var(--header-height)',
         }}
       >
-        <div className="p-4">
+        <div className="p-4 pt-6">
           {/* Close Button */}
           <div className="flex justify-end mb-4">
             <button
