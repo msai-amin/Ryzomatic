@@ -2722,7 +2722,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setCurrentDocument(null)}
-                className="p-2 rounded-lg transition-colors"
+                className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
                 style={{ 
                   color: 'var(--color-text-primary)', 
                   backgroundColor: 'transparent',
@@ -2740,7 +2740,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   e.stopPropagation()
                   handleDownload()
                 }}
-                className="p-2 rounded-lg transition-colors"
+                className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
                 style={{ 
                   color: 'var(--color-text-primary)', 
                   backgroundColor: 'transparent',
@@ -2767,7 +2767,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 <button
                   onClick={goToFirstPage}
                   disabled={pageNumber <= 1}
-              className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-9 h-9 flex items-center justify-center"
                   style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -2778,7 +2778,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 <button
               onClick={goToPreviousPage}
                   disabled={pageNumber <= 1}
-              className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-9 h-9 flex items-center justify-center"
                   style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -2806,7 +2806,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 <button
                   onClick={goToNextPage}
               disabled={!numPages || pageNumber >= numPages}
-              className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-9 h-9 flex items-center justify-center"
                   style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -2817,7 +2817,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 <button
                   onClick={goToLastPage}
               disabled={!numPages || pageNumber >= numPages}
-              className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-9 h-9 flex items-center justify-center"
                   style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -2834,7 +2834,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             <div className="flex items-center gap-2">
               <button
               onClick={handleZoomOut}
-              className="p-2 rounded-lg transition-colors"
+              className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
                   style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -2847,7 +2847,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             </span>
               <button
               onClick={handleZoomIn}
-              className="p-2 rounded-lg transition-colors"
+              className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
                   style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -2865,7 +2865,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             <div className="flex items-center gap-2">
               <button
                 onClick={handleRotate}
-                className="p-2 rounded-lg transition-colors"
+                className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
                 style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -2911,7 +2911,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   e.stopPropagation()
                   setSelectionMode(!selectionMode)
                 }}
-                className="p-2 rounded-lg transition-colors"
+                className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
                 style={{
                   backgroundColor: selectionMode ? 'var(--color-primary-light)' : 'transparent',
                   color: selectionMode ? 'var(--color-primary)' : 'var(--color-text-primary)'
@@ -2940,7 +2940,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   setShowHighlightColorPopover(false)
                 }
               }}
-              className="p-2 rounded-lg transition-colors relative"
+              className="p-2 rounded-lg transition-colors relative w-9 h-9 flex items-center justify-center"
               style={{
                 backgroundColor: isHighlightMode ? 'var(--color-primary-light)' : 'transparent',
                 color: isHighlightMode ? 'var(--color-primary)' : 'var(--color-text-primary)'
@@ -2968,7 +2968,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 e.stopPropagation()
                 setShowHighlightColorPopover(!showHighlightColorPopover)
               }}
-              className="p-2 rounded-lg transition-colors"
+              className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
               style={{
                 backgroundColor: showHighlightColorPopover ? 'var(--color-primary-light)' : 'transparent',
                 color: showHighlightColorPopover ? 'var(--color-primary)' : 'var(--color-text-primary)',
@@ -3025,7 +3025,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 e.stopPropagation()
                 toggleReadingMode()
               }}
-              className="p-2 rounded-lg transition-colors"
+              className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
               style={{
                 backgroundColor: pdfViewer.readingMode ? 'var(--color-primary-light)' : 'transparent',
                 color: pdfViewer.readingMode ? 'var(--color-primary)' : 'var(--color-text-primary)'
