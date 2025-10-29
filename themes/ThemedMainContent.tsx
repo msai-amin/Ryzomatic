@@ -181,11 +181,14 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
       {/* Right Sidebar - Only show if there's a current document */}
       {currentDocument && (
         <div 
-          className="transition-all duration-300 ease-in-out overflow-y-auto relative"
+          className="transition-all duration-300 ease-in-out overflow-y-auto"
           style={{
             width: isRightSidebarOpen ? '320px' : '0px',
             backgroundColor: 'var(--color-surface)',
             borderLeft: isRightSidebarOpen ? '1px solid var(--color-border)' : 'none',
+            height: 'calc(100vh - var(--header-height))',
+            position: 'sticky',
+            top: 'var(--header-height)',
           }}
         >
           {/* Sidebar Content */}

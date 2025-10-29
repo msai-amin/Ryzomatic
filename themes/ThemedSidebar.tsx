@@ -274,15 +274,17 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
       )}
 
       <aside 
-        className="overflow-y-auto transition-transform duration-300 ease-in-out sticky top-0"
+        className="overflow-y-auto transition-transform duration-300 ease-in-out"
         style={{
           width: 'var(--sidebar-width)',
           background: 'linear-gradient(180deg, var(--color-surface) 0%, rgba(17, 24, 39, 0.98) 100%)',
           borderRight: '1px solid var(--color-border)',
-          height: '100vh',
+          height: 'calc(100vh - var(--header-height))',
           transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
           marginLeft: isOpen ? '0' : 'calc(-1 * var(--sidebar-width))',
           zIndex: 40,
+          position: 'sticky',
+          top: 'var(--header-height)',
         }}
       >
         <div className="p-4">
