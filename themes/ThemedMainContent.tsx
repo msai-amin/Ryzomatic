@@ -384,7 +384,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                       console.error('Exception creating note:', error);
                     }
                   }}
-                  className="p-2 rounded-lg transition-colors hover:opacity-80"
+                  className="p-2 rounded-lg transition-colors hover:opacity-80 mr-2"
                   style={{
                     backgroundColor: 'var(--color-primary)',
                     color: 'var(--color-text-inverse)',
