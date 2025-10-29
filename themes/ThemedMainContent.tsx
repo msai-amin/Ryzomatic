@@ -211,8 +211,8 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
             </div>
 
             {/* Tab Navigation */}
-            <div className="flex items-center justify-between mb-4 pr-6">
-              <div className="flex items-center space-x-1">
+            <div className="flex items-center mb-4">
+              <div className="flex items-center space-x-1 flex-1">
                 {/* Kebab Menu */}
                 <div className="relative" ref={kebabMenuRef}>
                   <button
@@ -350,7 +350,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                 </div>
               </div>
               
-              <div style={{ paddingRight: '0.5rem' }}>
+              <div style={{ marginRight: '1rem' }}>
                 <Tooltip content="Create New Note" position="left">
                   <button 
                     onClick={async () => {
