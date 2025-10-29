@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { StickyNote, Highlighter, Bot } from 'lucide-react'
+import { StickyNote, Bot } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { Tooltip } from './Tooltip'
 
@@ -18,12 +18,6 @@ export const FloatingActionButtons: React.FC = () => {
     console.log('Quick note pressed')
   }
 
-  const handleHighlightMode = () => {
-    // Toggle highlighting mode in PDFViewer
-    // This would set a state to enable highlight selection
-    console.log('Highlight mode toggled')
-  }
-
   const handleAIChat = () => {
     toggleChat()
   }
@@ -37,13 +31,6 @@ export const FloatingActionButtons: React.FC = () => {
       onClick: handleQuickNote,
     },
     {
-      id: 'highlight',
-      icon: Highlighter,
-      label: 'Highlight Mode',
-      color: '#f59e0b', // Orange
-      onClick: handleHighlightMode,
-    },
-    {
       id: 'chat',
       icon: Bot,
       label: 'AI Chat',
@@ -54,7 +41,7 @@ export const FloatingActionButtons: React.FC = () => {
 
   return (
     <div 
-      className="fixed bottom-8 right-8 z-40 flex flex-col space-y-3"
+      className="fixed bottom-40 right-8 z-40 flex flex-col space-y-3"
       onMouseLeave={() => setIsHovered(null)}
     >
       {buttons.map((button, index) => {
