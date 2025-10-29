@@ -508,7 +508,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
 
       {showHelp && (
         <div 
-          className="fixed inset-0 z-[9999] flex items-center justify-center pt-20 pb-8 px-4 overflow-y-auto" 
+          className="fixed inset-0 z-[9999] flex items-center justify-center px-4 overflow-y-auto" 
           style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
         >
           <div 
