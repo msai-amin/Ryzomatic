@@ -370,7 +370,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                             color: 'var(--color-text)'
                           }}
                         >
-                          Settings
+                          Note Settings
                         </button>
                         <button
                           onClick={() => {
