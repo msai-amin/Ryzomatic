@@ -229,35 +229,32 @@ function App() {
     )
   }
 
-  // Show Landing Page if requested (check this BEFORE auth check)
-  console.log('showLandingPage state:', showLandingPage)
-  if (showLandingPage || (!isAuthenticated && isInitialized)) {
-    console.log('Rendering LandingPage component')
-    return <LandingPage />
-  }
-
-  // Show auth modal if not authenticated
+  // Show landing page if user is not authenticated (allowing modal to open from it)
   if (!isAuthenticated) {
-    // Prevents main UI from being shown if not authenticated, always show LandingPage instead
-    return null; // Redundant; guarded by above, but ensures NO fallback path
+    return (
+      <div className="min-h-screen">
+        <LandingPage />
+        <AuthModal 
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onAuthSuccess={handleAuthSuccess}
+        />
+      </div>
+    );
   }
 
   // Show NeoReader Terminal if requested
-  console.log('showNeoReader state:', showNeoReader)
-  console.log('isInitialized state:', isInitialized)
   if (showNeoReader) {
-    console.log('Rendering NeoReaderTerminal component')
-    return <NeoReaderTerminal />
+    return <NeoReaderTerminal />;
   }
 
-
-  // Show main app if authenticated - use ThemedApp for consistent production/development UI
+  // Show main app if authenticated
   return (
     <ThemeProvider>
       <a href="#main-content" className="skip-link">Skip to main content</a>
       <ThemedApp />
     </ThemeProvider>
-  )
+  );
 }
 
 export default App
