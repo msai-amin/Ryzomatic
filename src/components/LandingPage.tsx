@@ -31,7 +31,7 @@ interface LandingPageProps {
   onShowAuthModal?: () => void;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onShowAuthModal }) => {
+const LandingPage: React.FC = () => {
   const { isAuthenticated, user } = useAppStore();
 
   const navigation: NavigationItem[] = [
@@ -157,17 +157,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ onShowAuthModal }) => {
   ];
 
   const handleSignIn = () => {
-    if (onShowAuthModal) onShowAuthModal();
-    // else: fallback
+    window.location.href = '/?auth=true';
   };
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
       window.location.href = '/';
-    } else if (onShowAuthModal) {
-      onShowAuthModal();
+    } else {
+      window.location.href = '/?auth=true';
     }
-    // else: fallback
   };
 
   const handleGoToApp = () => {

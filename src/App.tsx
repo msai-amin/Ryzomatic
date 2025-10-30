@@ -204,24 +204,23 @@ function App() {
     setIsAuthModalOpen(false)
   }
 
+  // Parse auth intent from URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const wantsAuth = urlParams.get('auth') === 'true';
+
   // Show loading while checking auth
   if (!isInitialized) {
     return (
       <div 
         className="min-h-screen flex items-center justify-center"
-        style={{
-          backgroundColor: 'var(--color-background)',
-        }}
+        style={{ backgroundColor: 'var(--color-background)' }}
       >
         <div className="text-center">
           <div 
             className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto"
             style={{ borderColor: 'var(--color-primary)' }}
           ></div>
-          <p 
-            className="mt-4"
-            style={{ color: 'var(--color-text-secondary)' }}
-          >
+          <p className="mt-4" style={{ color: 'var(--color-text-secondary)' }}>
             Loading ryzomatic...
           </p>
         </div>
@@ -229,18 +228,27 @@ function App() {
     )
   }
 
-  // Show landing page if user is not authenticated (allowing modal to open from it)
+  // Auth full-page panel (not modal) if ?auth=true and not authenticated
+  if (!isAuthenticated && wantsAuth) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-slate-200">
+        <div className="mb-8 flex items-center gap-3">
+          <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-12 w-12" />
+          <h1 className="text-4xl font-bold tracking-wide" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>ryzomatic</h1>
+        </div>
+        <AuthModal isOpen={true}
+            onClose={() => window.location.href = '/'}
+            onAuthSuccess={handleAuthSuccess}
+        />
+      </div>
+    );
+  }
+
+  // Show landing page if not authenticated and not in auth flow
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen">
-        <LandingPage onShowAuthModal={() => setIsAuthModalOpen(true)} />
-        {isAuthModalOpen && (
-          <AuthModal 
-            isOpen={isAuthModalOpen}
-            onClose={() => setIsAuthModalOpen(false)}
-            onAuthSuccess={handleAuthSuccess}
-          />
-        )}
+        <LandingPage />
       </div>
     );
   }
