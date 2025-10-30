@@ -231,15 +231,73 @@ function App() {
   // Auth full-page panel (not modal) if ?auth=true and not authenticated
   if (!isAuthenticated && wantsAuth) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-slate-200">
-        <div className="mb-8 flex items-center gap-3">
+      <div className="min-h-screen relative flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-slate-200 overflow-hidden">
+        {/* Creative background branding */}
+        <div className="pointer-events-none select-none absolute inset-0 z-0 flex items-center justify-center">
+          {/* Centered giant, blurred text */}
+          <span
+            style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontSize: 'min(16vw, 11rem)',
+              color: 'rgba(100, 116, 139, 0.10)',
+              letterSpacing: '.05em',
+              fontWeight: 800,
+              userSelect: 'none',
+              filter: 'blur(3px)',
+              textAlign: 'center',
+              lineHeight: 1.08,
+              zIndex: 0,
+              position: 'absolute',
+              top: '45%',
+              left: 0,
+              width: '100%',
+              transform: 'translateY(-50%)',
+            }}
+          >
+            ryzomatic
+          </span>
+          {/* Top left accent logo */}
+          <img
+            src="/ryzomatic-logo.png"
+            alt="ryzomatic logo background"
+            style={{
+              position: 'absolute',
+              top: '-2vw',
+              left: '-7vw',
+              width: '20vw',
+              opacity: 0.07,
+              transform: 'rotate(-18deg)',
+              filter: 'blur(1.5px)',
+              zIndex: 0,
+            }}
+          />
+          {/* Bottom right accent logo */}
+          <img
+            src="/ryzomatic-logo.png"
+            alt="ryzomatic logo background 2"
+            style={{
+              position: 'absolute',
+              bottom: '-4vw',
+              right: '-8vw',
+              width: '24vw',
+              opacity: 0.07,
+              transform: 'rotate(19deg)',
+              filter: 'blur(2px)',
+              zIndex: 0,
+            }}
+          />
+        </div>
+        {/* Foreground: logo + modal */}
+        <div className="relative z-10 mb-6 flex items-center gap-3">
           <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-12 w-12" />
           <h1 className="text-4xl font-bold tracking-wide" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>ryzomatic</h1>
         </div>
-        <AuthModal isOpen={true}
+        <div className="relative z-10">
+          <AuthModal isOpen={true}
             onClose={() => window.location.href = '/'}
             onAuthSuccess={handleAuthSuccess}
-        />
+          />
+        </div>
       </div>
     );
   }
