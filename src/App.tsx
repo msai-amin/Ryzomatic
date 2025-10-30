@@ -231,64 +231,15 @@ function App() {
 
   // Show Landing Page if requested (check this BEFORE auth check)
   console.log('showLandingPage state:', showLandingPage)
-  if (showLandingPage) {
+  if (showLandingPage || (!isAuthenticated && isInitialized)) {
     console.log('Rendering LandingPage component')
     return <LandingPage />
   }
 
   // Show auth modal if not authenticated
   if (!isAuthenticated) {
-    return (
-      <div 
-        className="min-h-screen"
-        style={{
-          backgroundColor: 'var(--color-background)',
-        }}
-      >
-        <ThemedHeader 
-          onUploadClick={() => {}} 
-          isSidebarOpen={true}
-          onSidebarToggle={() => {}}
-        />
-        <main className="container mx-auto px-4 py-6">
-          <div className="text-center py-20">
-            <h1 
-              className="text-4xl font-bold mb-4"
-              style={{ 
-                color: 'var(--color-text-primary)',
-                fontFamily: "'Space Grotesk', sans-serif",
-                letterSpacing: '0.05em',
-                fontWeight: '700',
-              }}
-            >
-              ryzomatic
-            </h1>
-            <p 
-              className="text-xl mb-8"
-              style={{ color: 'var(--color-text-secondary)' }}
-            >
-              Your intelligent document reading assistant
-            </p>
-            <button
-              onClick={() => setIsAuthModalOpen(true)}
-              className="px-8 py-3 rounded-lg text-lg font-semibold transition-colors"
-              style={{
-                backgroundColor: 'var(--color-primary)',
-                color: 'var(--color-text-inverse)',
-              }}
-            >
-              GET STARTED
-            </button>
-          </div>
-        </main>
-        
-        <AuthModal 
-          isOpen={isAuthModalOpen}
-          onClose={() => setIsAuthModalOpen(false)}
-          onAuthSuccess={handleAuthSuccess}
-        />
-      </div>
-    )
+    // Prevents main UI from being shown if not authenticated, always show LandingPage instead
+    return null; // Redundant; guarded by above, but ensures NO fallback path
   }
 
   // Show NeoReader Terminal if requested
