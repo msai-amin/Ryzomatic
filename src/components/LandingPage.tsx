@@ -27,7 +27,11 @@ interface PricingTier {
   popular?: boolean;
 }
 
-const LandingPage: React.FC = () => {
+interface LandingPageProps {
+  onShowAuthModal?: () => void;
+}
+
+const LandingPage: React.FC<LandingPageProps> = ({ onShowAuthModal }) => {
   const { isAuthenticated, user } = useAppStore();
 
   const navigation: NavigationItem[] = [
@@ -153,15 +157,17 @@ const LandingPage: React.FC = () => {
   ];
 
   const handleSignIn = () => {
-    window.location.href = '/?auth=true';
+    if (onShowAuthModal) onShowAuthModal();
+    // else: fallback
   };
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
       window.location.href = '/';
-    } else {
-      window.location.href = '/?auth=true';
+    } else if (onShowAuthModal) {
+      onShowAuthModal();
     }
+    // else: fallback
   };
 
   const handleGoToApp = () => {

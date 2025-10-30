@@ -233,12 +233,14 @@ function App() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen">
-        <LandingPage />
-        <AuthModal 
-          isOpen={isAuthModalOpen}
-          onClose={() => setIsAuthModalOpen(false)}
-          onAuthSuccess={handleAuthSuccess}
-        />
+        <LandingPage onShowAuthModal={() => setIsAuthModalOpen(true)} />
+        {isAuthModalOpen && (
+          <AuthModal 
+            isOpen={isAuthModalOpen}
+            onClose={() => setIsAuthModalOpen(false)}
+            onAuthSuccess={handleAuthSuccess}
+          />
+        )}
       </div>
     );
   }
