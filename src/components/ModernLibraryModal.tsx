@@ -175,6 +175,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
         totalPages: bookData.totalPages,
         lastReadPage: bookData.lastReadPage,
         pageTexts: sanitizePageTexts(bookData.pageTexts), // CRITICAL: Include pageTexts for TTS functionality
+        cleanedPageTexts: bookData.cleanedPageTexts || undefined, // Include cleaned texts for TTS in reading mode
       };
 
       // Set the current document and close the library

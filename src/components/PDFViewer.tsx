@@ -51,6 +51,7 @@ import { HighlightColorPopover } from './HighlightColorPopover'
 import { notesService } from '../services/notesService'
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
+import { supabase } from '../../lib/supabase'
 
 // PDF.js will be imported dynamically
 
@@ -1091,6 +1092,54 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     }
   }, [])
 
+  // Load cleaned text from database when document loads
+  useEffect(() => {
+    const loadCleanedTexts = async () => {
+      if (!document?.id || !user?.id) return
+      
+      try {
+        const { data, error } = await supabase
+          .from('user_books')
+          .select('page_texts_cleaned')
+          .eq('id', document.id)
+          .eq('user_id', user.id)
+          .single()
+        
+        if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+          console.error('Error loading cleaned texts:', error)
+          return
+        }
+        
+        if (data?.page_texts_cleaned && Array.isArray(data.page_texts_cleaned)) {
+          // Convert array format to object format { [pageNum: number]: string }
+          const cleanedTextsObj: { [pageNum: number]: string } = {}
+          data.page_texts_cleaned.forEach((cleanedText: string | null, index: number) => {
+            if (cleanedText) {
+              cleanedTextsObj[index + 1] = cleanedText // 0-indexed to 1-indexed
+            }
+          })
+          
+          // Only update if we have cleaned texts
+          if (Object.keys(cleanedTextsObj).length > 0) {
+            setCleanedPageTexts(cleanedTextsObj)
+            
+            // Also update currentDocument in store
+            setCurrentDocument({
+              ...document,
+              cleanedPageTexts: data.page_texts_cleaned
+            })
+            
+            console.log(`✅ Loaded ${Object.keys(cleanedTextsObj).length} cleaned page(s) from database`)
+          }
+        }
+      } catch (error) {
+        console.error('Error loading cleaned texts from database:', error)
+      }
+    }
+    
+    loadCleanedTexts()
+  }, [document?.id, user?.id, setCurrentDocument])
+
   // Cleanup TTS on unmount
   useEffect(() => {
     return () => {
@@ -1590,10 +1639,69 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       }
 
       setCleanedPageTexts(newCleanedTexts)
+      
+      // Save cleaned text to database
+      const cleanedCount = Object.keys(newCleanedTexts).length
+      if (cleanedCount > 0 && document?.id && user?.id) {
+        try {
+          // Convert cleanedPageTexts object { [pageNum: number]: string } to array format
+          // Create array with same length as pageTexts, using cleaned text where available
+          const totalPages = document.pageTexts?.length || numPages || 0
+          const cleanedTextsArray: string[] = new Array(totalPages).fill(null)
+          
+          // Fill in cleaned texts at their respective page indices (1-indexed to 0-indexed)
+          Object.entries(newCleanedTexts).forEach(([pageNum, cleanedText]) => {
+            const pageIndex = parseInt(pageNum, 10) - 1
+            if (pageIndex >= 0 && pageIndex < totalPages && cleanedText) {
+              cleanedTextsArray[pageIndex] = cleanedText
+            }
+          })
+          
+          // Get existing cleaned texts from database to preserve pages that weren't cleaned in this batch
+          const { data: existingBook } = await supabase
+            .from('user_books')
+            .select('page_texts_cleaned')
+            .eq('id', document.id)
+            .eq('user_id', user.id)
+            .single()
+          
+          // Merge with existing cleaned texts (preserve previously cleaned pages)
+          if (existingBook?.page_texts_cleaned) {
+            existingBook.page_texts_cleaned.forEach((existingText: string | null, index: number) => {
+              if (existingText && (!cleanedTextsArray[index] || cleanedTextsArray[index] === null)) {
+                cleanedTextsArray[index] = existingText
+              }
+            })
+          }
+          
+          // Update database with merged cleaned texts
+          const { error: updateError } = await supabase
+            .from('user_books')
+            .update({ page_texts_cleaned: cleanedTextsArray })
+            .eq('id', document.id)
+            .eq('user_id', user.id)
+          
+          if (updateError) {
+            console.error('Failed to save cleaned text to database:', updateError)
+            // Don't throw - user already sees cleaned text in UI, this is just persistence
+          } else {
+            console.log(`✅ Saved cleaned text for ${cleanedCount} page(s) to database`)
+            
+            // Update currentDocument in store to include cleaned texts
+            setCurrentDocument({
+              ...document,
+              cleanedPageTexts: cleanedTextsArray
+            })
+          }
+        } catch (dbError) {
+          console.error('Error saving cleaned text to database:', dbError)
+          // Continue even if database save fails - cleaned text is still in state
+        }
+      }
+      
       setShowCleanupModal(false)
 
       // Show success notification
-      const cleanedCount = Object.keys(newCleanedTexts).length
       if (cleanedCount > 0) {
         // Simple success feedback - could be enhanced with toast notification
         console.log(`Successfully cleaned ${cleanedCount} page(s)`)
@@ -1605,21 +1713,74 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       setIsCleaning(false)
       setCleaningProgress({ current: 0, total: 0 })
     }
-  }, [document, pageNumber, numPages, cleanedPageTexts])
+  }, [document, pageNumber, numPages, cleanedPageTexts, user, setCurrentDocument])
 
   // Restore original text for a page
-  const handleRestoreOriginal = useCallback((pageNum: number) => {
+  const handleRestoreOriginal = useCallback(async (pageNum: number) => {
     setCleanedPageTexts(prev => {
       const newTexts = { ...prev }
       delete newTexts[pageNum]
       return newTexts
     })
-  }, [])
+    
+    // Also remove from database
+    if (document?.id && user?.id) {
+      try {
+        const { data: existingBook } = await supabase
+          .from('user_books')
+          .select('page_texts_cleaned')
+          .eq('id', document.id)
+          .eq('user_id', user.id)
+          .single()
+        
+        if (existingBook?.page_texts_cleaned) {
+          const cleanedTextsArray = [...existingBook.page_texts_cleaned]
+          const pageIndex = pageNum - 1
+          if (pageIndex >= 0 && pageIndex < cleanedTextsArray.length) {
+            cleanedTextsArray[pageIndex] = null
+            
+            await supabase
+              .from('user_books')
+              .update({ page_texts_cleaned: cleanedTextsArray })
+              .eq('id', document.id)
+              .eq('user_id', user.id)
+            
+            // Update currentDocument in store
+            setCurrentDocument({
+              ...document,
+              cleanedPageTexts: cleanedTextsArray
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Error removing cleaned text from database:', error)
+      }
+    }
+  }, [document, user, setCurrentDocument])
 
   // Restore all original text
-  const handleRestoreAllOriginal = useCallback(() => {
+  const handleRestoreAllOriginal = useCallback(async () => {
     setCleanedPageTexts({})
-  }, [])
+    
+    // Also remove from database
+    if (document?.id && user?.id) {
+      try {
+        await supabase
+          .from('user_books')
+          .update({ page_texts_cleaned: null })
+          .eq('id', document.id)
+          .eq('user_id', user.id)
+        
+        // Update currentDocument in store
+        setCurrentDocument({
+          ...document,
+          cleanedPageTexts: undefined
+        })
+      } catch (error) {
+        console.error('Error removing all cleaned text from database:', error)
+      }
+    }
+  }, [document, user, setCurrentDocument])
 
   const handleAddNote = useCallback((text: string) => {
     setSelectedTextForNote(text)

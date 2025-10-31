@@ -36,86 +36,143 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
   // Extract paragraphs from current document
   useEffect(() => {
-    if (currentDocument) {
-      console.log('🔍 AudioWidget: Processing document', {
-        documentId: currentDocument.id,
-        hasPageTexts: !!currentDocument.pageTexts,
-        pageTextsLength: currentDocument.pageTexts?.length || 0
+    if (!currentDocument) {
+      // Clear paragraphs if no document
+      updateTTS({ paragraphs: [], currentParagraphIndex: 0 })
+      return
+    }
+    
+    console.log('🔍 AudioWidget: Processing document', {
+      documentId: currentDocument.id,
+      hasPageTexts: !!currentDocument.pageTexts,
+      pageTextsLength: currentDocument.pageTexts?.length || 0,
+      hasCleanedPageTexts: !!currentDocument.cleanedPageTexts,
+      cleanedPageTextsLength: currentDocument.cleanedPageTexts?.length || 0,
+      readingMode: pdfViewer.readingMode,
+      previousDocumentId: previousDocumentIdRef.current
+    });
+    
+    // CRITICAL: Ensure we're processing the current document, not a stale one
+    // If document ID changed but paragraphs extraction hasn't reset yet, wait
+    const currentDocId = currentDocument.id
+    if (previousDocumentIdRef.current && previousDocumentIdRef.current !== currentDocId) {
+      console.log('🔍 AudioWidget: Document ID changed, waiting for reset')
+      // The document change useEffect will reset paragraphs, so return early here
+      return
+    }
+    
+    let text = ''
+    
+    // In reading mode, prioritize cleaned text if available
+    // Check if cleanedPageTexts exists, has length > 0, AND has at least one non-null entry
+    const hasCleanedTexts = pdfViewer.readingMode && 
+      currentDocument.cleanedPageTexts && 
+      currentDocument.cleanedPageTexts.length > 0 &&
+      currentDocument.cleanedPageTexts.some(text => text !== null && text !== undefined && text.length > 0)
+    
+    // In reading mode, if we don't have pageTexts yet, wait for them to load
+    // This prevents using old paragraphs from previous document
+    if (pdfViewer.readingMode && !hasCleanedTexts && (!currentDocument.pageTexts || currentDocument.pageTexts.length === 0)) {
+      console.log('🔍 AudioWidget: Waiting for pageTexts or cleanedPageTexts in reading mode')
+      // Reset paragraphs to empty to clear old ones
+      updateTTS({ paragraphs: [], currentParagraphIndex: 0 })
+      return
+    }
+    
+    const useCleanedText = hasCleanedTexts
+    const sourceTexts = useCleanedText ? currentDocument.cleanedPageTexts : currentDocument.pageTexts
+    const sourceType = useCleanedText ? 'cleanedPageTexts' : 'pageTexts'
+    
+    console.log('🔍 AudioWidget: Text source decision', {
+      readingMode: pdfViewer.readingMode,
+      hasCleanedPageTexts: !!currentDocument.cleanedPageTexts,
+      cleanedPageTextsLength: currentDocument.cleanedPageTexts?.length || 0,
+      hasNonNullCleanedText: currentDocument.cleanedPageTexts?.some(text => text !== null && text !== undefined && text.length > 0) || false,
+      useCleanedText,
+      sourceType,
+      documentId: currentDocument.id
+    })
+    
+    // Priority: cleanedPageTexts (in reading mode) > pageTexts (for PDFs) > string content (for text files)
+    // For PDFs, content is ArrayBuffer (binary data), so we must use pageTexts or cleanedPageTexts
+    if (sourceTexts && sourceTexts.length > 0) {
+      console.log(`🔍 AudioWidget: Processing ${sourceType}`, {
+        pageTextsTypes: sourceTexts.map((text, i) => ({
+          index: i,
+          type: typeof text,
+          isString: typeof text === 'string',
+          value: (String(text).substring(0, 100) + (String(text).length > 100 ? '...' : ''))
+        }))
       });
       
-      let text = ''
+      // Ensure all pageTexts elements are strings before joining
+      // Filter out null values (pages that don't have cleaned text)
+      const safePageTexts = sourceTexts
+        .map(pageText => {
+          if (pageText === null || pageText === undefined) return null
+          return typeof pageText === 'string' ? pageText : String(pageText || '')
+        })
+        .filter((pageText): pageText is string => pageText !== null && pageText.length > 0)
       
-      // Priority: pageTexts (for PDFs) > string content (for text files)
-      // For PDFs, content is ArrayBuffer (binary data), so we must use pageTexts
-      if (currentDocument.pageTexts && currentDocument.pageTexts.length > 0) {
-        console.log('🔍 AudioWidget: Processing pageTexts', {
-          pageTextsTypes: currentDocument.pageTexts.map((text, i) => ({
-            index: i,
-            type: typeof text,
-            isString: typeof text === 'string',
-            value: (String(text).substring(0, 100) + (String(text).length > 100 ? '...' : ''))
-          }))
+      text = safePageTexts.join('\n\n')
+      console.log('🔍 AudioWidget: Joined text', { textType: typeof text, textLength: text.length, sourceType });
+    } else if (currentDocument.content && typeof currentDocument.content === 'string') {
+      // Fallback to string content only if pageTexts is not available
+      // Check that it's actually a valid string (not "[object ArrayBuffer]")
+      const contentStr = String(currentDocument.content);
+      if (contentStr && !contentStr.startsWith('[object ') && contentStr.length > 10) {
+        console.log('🔍 AudioWidget: Using string content (no pageTexts available)', {
+          contentType: typeof currentDocument.content,
+          textLength: contentStr.length
         });
-        
-        // Ensure all pageTexts elements are strings before joining
-        const safePageTexts = currentDocument.pageTexts.map(pageText => 
-          typeof pageText === 'string' ? pageText : String(pageText || '')
-        )
-        text = safePageTexts.join('\n\n')
-        console.log('🔍 AudioWidget: Joined text', { textType: typeof text, textLength: text.length });
-      } else if (currentDocument.content && typeof currentDocument.content === 'string') {
-        // Fallback to string content only if pageTexts is not available
-        // Check that it's actually a valid string (not "[object ArrayBuffer]")
-        const contentStr = String(currentDocument.content);
-        if (contentStr && !contentStr.startsWith('[object ') && contentStr.length > 10) {
-          console.log('🔍 AudioWidget: Using string content (no pageTexts available)', {
-            contentType: typeof currentDocument.content,
-            textLength: contentStr.length
-          });
-          text = contentStr;
-        } else {
-          console.warn('🔍 AudioWidget: Content appears to be invalid (likely ArrayBuffer converted to string), skipping');
-        }
-      }
-      
-      if (text) {
-        // Ensure text is a string before splitting
-        const safeText = typeof text === 'string' ? text : String(text || '')
-        
-        console.log('🔍 AudioWidget: About to split text', {
-          originalTextType: typeof text,
-          originalTextValue: text.substring(0, 200) + (text.length > 200 ? '...' : ''),
-          safeTextType: typeof safeText,
-          safeTextLength: safeText.length,
-          safeTextValue: safeText.substring(0, 200) + (safeText.length > 200 ? '...' : ''),
-          isString: typeof safeText === 'string'
-        });
-        
-        // Additional safety check
-        if (typeof safeText !== 'string') {
-          console.error('🔍 AudioWidget: safeText is not a string!', {
-            type: typeof safeText,
-            value: safeText,
-            constructor: (safeText as any)?.constructor?.name
-          });
-          return;
-        }
-        
-        // Split by double newlines (paragraph breaks) or periods followed by newlines
-        const paragraphs = safeText
-          .split(/\n\n+/)
-          .map(p => p.trim())
-          .filter(p => p.length > 0)
-        
-        console.log('🔍 AudioWidget: Split successful', {
-          paragraphsCount: paragraphs.length,
-          paragraphsTypes: paragraphs.map((p, i) => ({ index: i, type: typeof p, value: (String(p).substring(0, 50) + (String(p).length > 50 ? '...' : '')) }))
-        });
-        
-        updateTTS({ paragraphs, currentParagraphIndex: 0 })
+        text = contentStr;
+      } else {
+        console.warn('🔍 AudioWidget: Content appears to be invalid (likely ArrayBuffer converted to string), skipping');
       }
     }
-  }, [currentDocument?.id, updateTTS])
+    
+    if (text) {
+      // Ensure text is a string before splitting
+      const safeText = typeof text === 'string' ? text : String(text || '')
+      
+      console.log('🔍 AudioWidget: About to split text', {
+        originalTextType: typeof text,
+        originalTextValue: text.substring(0, 200) + (text.length > 200 ? '...' : ''),
+        safeTextType: typeof safeText,
+        safeTextLength: safeText.length,
+        safeTextValue: safeText.substring(0, 200) + (safeText.length > 200 ? '...' : ''),
+        isString: typeof safeText === 'string'
+      });
+      
+      // Additional safety check
+      if (typeof safeText !== 'string') {
+        console.error('🔍 AudioWidget: safeText is not a string!', {
+          type: typeof safeText,
+          value: safeText,
+          constructor: (safeText as any)?.constructor?.name
+        });
+        return;
+      }
+      
+      // Split by double newlines (paragraph breaks) or periods followed by newlines
+      const paragraphs = safeText
+        .split(/\n\n+/)
+        .map(p => p.trim())
+        .filter(p => p.length > 0)
+      
+      console.log('🔍 AudioWidget: Split successful', {
+        paragraphsCount: paragraphs.length,
+        paragraphsTypes: paragraphs.map((p, i) => ({ index: i, type: typeof p, value: (String(p).substring(0, 50) + (String(p).length > 50 ? '...' : '')) }))
+      });
+      
+      updateTTS({ paragraphs, currentParagraphIndex: 0 })
+      console.log('🔍 AudioWidget: Paragraphs updated for document', currentDocument.id, 'from', sourceType)
+    } else {
+      // No text available - clear paragraphs
+      console.log('🔍 AudioWidget: No text available, clearing paragraphs')
+      updateTTS({ paragraphs: [], currentParagraphIndex: 0 })
+    }
+  }, [currentDocument?.id, currentDocument?.cleanedPageTexts, currentDocument?.pageTexts, pdfViewer.readingMode, updateTTS])
 
   // Update current time and duration from TTS manager
   useEffect(() => {
@@ -140,31 +197,88 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     if (tts.paragraphs.length === 0) {
       // Fallback to page text if no paragraphs
       const currentPage = pdfViewer.currentPage || 1
+      
+      // In reading mode, prioritize cleaned text if available
+      if (pdfViewer.readingMode && 
+          currentDocument?.cleanedPageTexts && 
+          currentDocument.cleanedPageTexts.length > 0 &&
+          currentPage - 1 < currentDocument.cleanedPageTexts.length) {
+        const cleanedText = currentDocument.cleanedPageTexts[currentPage - 1]
+        if (cleanedText && cleanedText !== null && cleanedText !== undefined && cleanedText.length > 0) {
+          return typeof cleanedText === 'string' ? cleanedText : String(cleanedText || '')
+        }
+      }
+      
+      // Fallback to original page text
       if (currentDocument?.pageTexts && currentDocument.pageTexts.length > 0) {
         const rawPageText = currentDocument.pageTexts[currentPage - 1]
-        return typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
+        if (rawPageText) {
+          return typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
+        }
       }
       return currentDocument?.content || ''
     }
     
     const index = tts.currentParagraphIndex ?? 0
     return tts.paragraphs[index] || tts.paragraphs[0] || ''
-  }, [tts.paragraphs, tts.currentParagraphIndex, currentDocument, pdfViewer.currentPage])
+  }, [tts.paragraphs, tts.currentParagraphIndex, currentDocument, pdfViewer.currentPage, pdfViewer.readingMode])
 
   // Get text for page mode
   const getCurrentPageText = useCallback((): string => {
     const currentPage = pdfViewer.currentPage || 1
+    
+    // In reading mode, prioritize cleaned text if available
+    // Check if we have cleaned text for this specific page
+    if (pdfViewer.readingMode && 
+        currentDocument?.cleanedPageTexts && 
+        currentDocument.cleanedPageTexts.length > 0 &&
+        currentPage - 1 < currentDocument.cleanedPageTexts.length) {
+      const cleanedText = currentDocument.cleanedPageTexts[currentPage - 1]
+      if (cleanedText && cleanedText !== null && cleanedText !== undefined && cleanedText.length > 0) {
+        console.log('🔍 AudioWidget: Using cleaned text for page', currentPage)
+        return typeof cleanedText === 'string' ? cleanedText : String(cleanedText || '')
+      }
+    }
+    
+    // Fallback to original page text
     if (currentDocument?.pageTexts && currentDocument.pageTexts.length > 0) {
       const rawPageText = currentDocument.pageTexts[currentPage - 1]
-      return typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
+      if (rawPageText) {
+        console.log('🔍 AudioWidget: Using original text for page', currentPage)
+        return typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
+      }
     }
     return ''
-  }, [currentDocument, pdfViewer.currentPage])
+  }, [currentDocument, pdfViewer.currentPage, pdfViewer.readingMode])
 
   // Get all remaining text (for continue to end mode)
   const getAllRemainingText = useCallback((): string => {
+    const currentPage = pdfViewer.currentPage || 1
+    
+    // In reading mode, prioritize cleaned text if available
+    if (pdfViewer.readingMode && currentDocument?.cleanedPageTexts && currentDocument.cleanedPageTexts.length > 0) {
+      const remainingCleanedPages = currentDocument.cleanedPageTexts.slice(currentPage - 1)
+      const cleanedText = remainingCleanedPages
+        .map((p, index) => {
+          // Use cleaned text if available, fallback to original
+          if (p) {
+            return typeof p === 'string' ? p : String(p || '')
+          } else {
+            // Fallback to original text for this page
+            const originalPage = currentDocument.pageTexts?.[currentPage - 1 + index]
+            return originalPage ? (typeof originalPage === 'string' ? originalPage : String(originalPage || '')) : ''
+          }
+        })
+        .filter(p => p.length > 0)
+        .join('\n\n')
+      
+      if (cleanedText) {
+        return cleanedText
+      }
+    }
+    
+    // Fallback to original page texts
     if (currentDocument?.pageTexts && currentDocument.pageTexts.length > 0) {
-      const currentPage = pdfViewer.currentPage || 1
       const remainingPages = currentDocument.pageTexts.slice(currentPage - 1)
       return remainingPages
         .map(p => typeof p === 'string' ? p : String(p || ''))
@@ -172,7 +286,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         .join('\n\n')
     }
     return ''
-  }, [currentDocument, pdfViewer.currentPage])
+  }, [currentDocument, pdfViewer.currentPage, pdfViewer.readingMode])
 
   // Get text based on playback mode
   const getTextForPlaybackMode = useCallback((mode: 'paragraph' | 'page' | 'continue'): string => {
@@ -269,6 +383,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         updateTTS({ isPlaying: false, currentWordIndex: null })
       }
       
+      // CRITICAL: Reset paragraphs immediately when document changes
+      // This ensures old paragraphs don't persist
+      updateTTS({ paragraphs: [], currentParagraphIndex: 0, currentWordIndex: null })
+      
       // Update ref for next change
       previousDocumentIdRef.current = currentDocument?.id || null
       
@@ -323,7 +441,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       return
     }
     
-    if (tts.isPlaying) {
+    if (tts.isPlaying || ttsManager.isSpeaking()) {
       // Pause (save position)
       if (currentDocument?.id) {
         await saveCurrentPosition(currentDocument.id)
@@ -573,7 +691,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             title={
               isProcessing 
                 ? "Processing..." 
-                : tts.isPlaying 
+                : (tts.isPlaying || (ttsManager.isSpeaking() && !ttsManager.isPausedState()))
                   ? "Pause" 
                   : (tts.isPaused || ttsManager.isPausedState())
                     ? "Resume"
@@ -582,7 +700,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           >
             {isProcessing ? (
               <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-text-inverse)' }} />
-            ) : tts.isPlaying ? ( // Show pause icon only when actively playing
+            ) : tts.isPlaying || (ttsManager.isSpeaking() && !ttsManager.isPausedState()) ? ( // Show pause icon when actively playing
               <Pause className="w-5 h-5" />
             ) : ( // Show play icon when paused or stopped (so user can resume or start)
               <Play className="w-5 h-5" />

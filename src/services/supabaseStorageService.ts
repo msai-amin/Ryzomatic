@@ -14,6 +14,7 @@ export interface SavedBook {
   fileData?: ArrayBuffer | string | Blob;
   pdfDataBase64?: string;
   pageTexts?: string[];
+  cleanedPageTexts?: string[]; // Cleaned text for TTS in reading mode
   notes?: Note[];
   googleDriveId?: string;
   syncedAt?: Date;
@@ -353,7 +354,8 @@ class SupabaseStorageService {
         syncedAt: new Date(data.updated_at),
         s3_key: data.s3_key,
         text_content: data.text_content,
-        reading_progress: data.reading_progress
+        reading_progress: data.reading_progress,
+        cleanedPageTexts: data.page_texts_cleaned || undefined  // Include cleaned texts if available
       };
 
       // NEW: Download from S3 if s3_key exists

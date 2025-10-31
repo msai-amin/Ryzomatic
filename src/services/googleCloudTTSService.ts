@@ -59,6 +59,7 @@ class GoogleCloudTTSService {
   private audioContext: AudioContext | null = null;
   private currentAudio: AudioBufferSourceNode | null = null;
   private isPaused = false;
+  private speakingActive = false; // Track if we're actively in a speak operation (including between chunks)
   private pauseTime = 0;
   private startTime = 0;
   private currentAudioBuffer: AudioBuffer | null = null;
@@ -412,6 +413,8 @@ class GoogleCloudTTSService {
         this.stopRequested = false;
       }
       
+      // Mark that we're starting a speak operation
+      this.speakingActive = true;
       console.log('GoogleCloudTTSService.speak: stopRequested =', this.stopRequested, 'after stop(), ready to start playback');
 
       // Auto-select a voice if none is selected
@@ -431,8 +434,12 @@ class GoogleCloudTTSService {
         console.log(`Text too long (${text.length} chars), splitting into chunks...`);
         await this.speakInChunks(text, MAX_TEXT_LENGTH, onEnd, onWord);
       }
+      
+      // Clear speaking flag when done
+      this.speakingActive = false;
     } catch (error) {
       console.error('Error speaking text:', error);
+      this.speakingActive = false;
       throw error;
     }
   }
@@ -466,7 +473,27 @@ class GoogleCloudTTSService {
       // CHECK FOR STOP REQUEST BEFORE EACH CHUNK
       if (this.stopRequested) {
         console.log(`Chunk playback cancelled at ${i + 1}/${chunks.length}, stopRequested = ${this.stopRequested}`);
+        this.speakingActive = false;
         return; // Exit loop immediately
+      }
+      
+      // CHECK FOR PAUSE REQUEST - if paused, wait until resumed
+      if (this.isPaused) {
+        console.log(`Chunk playback paused at ${i + 1}/${chunks.length}, waiting for resume...`);
+        // Wait for resume - we'll continue the loop when resume is called
+        // The resume() method will handle creating a new source from currentAudioBuffer
+        // For now, we'll just skip to the next iteration check
+        while (this.isPaused && !this.stopRequested) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        if (this.stopRequested) {
+          console.log(`Chunk playback cancelled after pause ${i + 1}/${chunks.length}`);
+          this.speakingActive = false;
+          return;
+        }
+        // If we get here, resume() was called and we should continue
+        // Note: resume() will handle playing the current chunk, so we skip it here
+        continue;
       }
       
       const chunk = chunks[i];
@@ -477,13 +504,35 @@ class GoogleCloudTTSService {
       // CHECK AGAIN AFTER ASYNC SYNTHESIZE
       if (this.stopRequested) {
         console.log(`Chunk playback cancelled after synthesis ${i + 1}/${chunks.length}`);
+        this.speakingActive = false;
         return;
+      }
+      
+      // CHECK FOR PAUSE REQUEST AFTER SYNTHESIS
+      if (this.isPaused) {
+        console.log(`Chunk paused after synthesis ${i + 1}/${chunks.length}`);
+        // Store the audio buffer for resume
+        const decodedAudio = await this.audioContext!.decodeAudioData(audioBuffer);
+        this.currentAudioBuffer = decodedAudio;
+        // Wait for resume
+        while (this.isPaused && !this.stopRequested) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        if (this.stopRequested) {
+          console.log(`Chunk playback cancelled after pause during synthesis ${i + 1}/${chunks.length}`);
+          this.speakingActive = false;
+          return;
+        }
+        // Resume will handle playing this chunk
+        continue;
       }
       
       // Only call onEnd for the last chunk
       const isLastChunk = i === chunks.length - 1;
       await this.playAudio(audioBuffer, isLastChunk ? onEnd : undefined, onWord);
     }
+    
+    this.speakingActive = false;
   }
 
   private async playAudio(audioBuffer: ArrayBuffer, onEnd?: () => void, onWord?: (word: string, charIndex: number) => void): Promise<void> {
@@ -597,18 +646,27 @@ class GoogleCloudTTSService {
   }
 
   pause() {
-    if (this.currentAudio && this.audioContext && !this.isPaused) {
-      // Calculate how far into the audio we are
-      this.pauseTime = this.audioContext.currentTime - this.audioStartTime;
-      try {
-        this.currentAudio.stop();
-        this.currentAudio.disconnect();
-      } catch (e) {
-        // Ignore errors if already stopped
+    // Allow pause if we have current audio OR if we're actively speaking (even between chunks)
+    if ((this.currentAudio || this.speakingActive) && this.audioContext && !this.isPaused) {
+      // If we have current audio, pause it and calculate pause time
+      if (this.currentAudio) {
+        this.pauseTime = this.audioContext.currentTime - this.audioStartTime;
+        try {
+          this.currentAudio.stop();
+          this.currentAudio.disconnect();
+        } catch (e) {
+          // Ignore errors if already stopped
+        }
+        this.currentAudio = null;
+      } else {
+        // We're between chunks - set pause time to indicate we're paused
+        // The pauseTime will be used when we resume to continue from the current chunk
+        this.pauseTime = this.audioContext.currentTime - this.audioStartTime;
       }
-      this.currentAudio = null;
       this.isPaused = true;
-      console.log('GoogleCloudTTSService: Paused at time:', this.pauseTime);
+      console.log('GoogleCloudTTSService: Paused at time:', this.pauseTime, 'speakingActive:', this.speakingActive);
+    } else {
+      console.log('GoogleCloudTTSService: Cannot pause - currentAudio:', !!this.currentAudio, 'speakingActive:', this.speakingActive, 'isPaused:', this.isPaused);
     }
   }
 
@@ -657,6 +715,10 @@ class GoogleCloudTTSService {
       
       this.isPaused = false;
       console.log('GoogleCloudTTSService: Resumed successfully from', this.pauseTime, 'seconds');
+    } else if (this.isPaused && this.speakingActive && !this.currentAudioBuffer) {
+      // We're paused between chunks - just clear the pause flag and let speakInChunks continue
+      console.log('GoogleCloudTTSService: Resuming from pause between chunks');
+      this.isPaused = false;
     }
   }
 
@@ -676,6 +738,7 @@ class GoogleCloudTTSService {
       this.currentAudio = null;
     }
     this.isPaused = false;
+    this.speakingActive = false;
     this.pauseTime = 0;
     this.startTime = 0;
     this.audioStartTime = 0;
@@ -687,7 +750,7 @@ class GoogleCloudTTSService {
   }
 
   isSpeaking(): boolean {
-    return this.currentAudio !== null && !this.isPaused;
+    return (this.currentAudio !== null || this.speakingActive) && !this.isPaused;
   }
 
   isPausedState(): boolean {

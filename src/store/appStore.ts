@@ -36,6 +36,7 @@ export interface Document {
   pdfData?: ArrayBuffer | string | Blob // Support ArrayBuffer, blob URL, and Blob
   totalPages?: number
   pageTexts?: string[]
+  cleanedPageTexts?: string[] // Array of cleaned text for each page (for TTS in reading mode)
   // OCR properties
   needsOCR?: boolean
   ocrStatus?: 'not_needed' | 'pending' | 'processing' | 'completed' | 'failed' | 'user_declined'
