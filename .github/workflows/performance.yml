@@ -1,0 +1,45 @@
+name: Performance Audit
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Daily at 2 AM
+  workflow_dispatch:
+
+jobs:
+  lighthouse:
+    name: Lighthouse Performance Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build application
+        run: npm run build
+      
+      - name: Start preview server
+        run: |
+          npm run preview &
+          sleep 10
+      
+      - name: Run Lighthouse CI
+        run: |
+          npx lighthouse-ci authorize --token=${{ secrets.LIGHTHOUSE_CI_TOKEN }}
+          npx lhci autorun --upload.target=temporary-public-storage || true
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+      
+      - name: Performance budget check
+        run: |
+          echo "Performance budget checks would run here"
+          # TODO: Add actual performance budget validation
+

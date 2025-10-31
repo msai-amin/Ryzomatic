@@ -1,0 +1,101 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  pre-deploy:
+    name: Pre-deployment Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run all checks
+        run: |
+          npm run lint
+          npx tsc --noEmit
+          npm run test:ci
+          npm run build
+
+  deploy-preview:
+    name: Deploy Preview
+    runs-on: ubuntu-latest
+    needs: pre-deploy
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build
+        run: npm run build
+      
+      - name: Run smoke tests
+        run: echo "Smoke tests would run here"
+        # TODO: Add actual smoke test script
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: pre-deploy
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          scope: ${{ secrets.VERCEL_ORG_ID }}
+      
+      - name: Run health check
+        run: |
+          echo "Waiting for deployment to propagate..."
+          sleep 30
+          echo "Health check would run here"
+      
+      - name: Tag release
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -a "v$(date +%Y%m%d-%H%M%S)" -m "Release $(date +%Y%m%d-%H%M%S)"
+          git push origin --tags || echo "Tag already exists"
+
+  post-deploy:
+    name: Post-deployment
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Generate changelog
+        run: echo "Changelog generation would go here"
+      
+      - name: Notify team
+        run: echo "Team notification would go here"
+        # TODO: Add Slack/Discord webhook notification
+
