@@ -304,50 +304,6 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Features Showcase Section */}
-      <section className="bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-24">
-          <div className="flex flex-col gap-6 text-center mb-12">
-            <h2 className="text-4xl md:text-5xl font-bold text-slate-900 max-w-3xl mx-auto" style={{ fontFamily: "'Inter', sans-serif" }}>
-              See ryzomatic in Action
-            </h2>
-            <p className="mx-auto max-w-2xl text-lg text-slate-600 leading-relaxed">
-              Watch how ryzomatic transforms your research workflow with intelligent connections and seamless organization.
-            </p>
-          </div>
-          
-          <div className="relative w-full max-w-5xl mx-auto">
-            <div className="w-full rounded-2xl overflow-hidden shadow-2xl" style={{ backgroundColor: '#f8f9fa' }}>
-              <video
-                className="w-full h-auto"
-                autoPlay
-                muted
-                loop
-                playsInline
-                preload="metadata"
-                style={{
-                  display: 'block',
-                  maxWidth: '100%',
-                  height: 'auto',
-                  mixBlendMode: 'multiply',
-                  opacity: 0.95,
-                }}
-              >
-                <source src="/videos/features-showcase.mp4" type="video/mp4" />
-                {/* Fallback for browsers that don't support video */}
-                <div className="flex items-center justify-center h-full" style={{ minHeight: '400px' }}>
-                  <div className="text-center">
-                    <div className="text-6xl mb-4">📚</div>
-                    <span className="text-slate-500 text-lg font-medium">Product Demo</span>
-                    <p className="text-slate-400 text-sm mt-2">Your academic workspace awaits</p>
-                  </div>
-                </div>
-              </video>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Features Section */}
       <section id="features" className="bg-gradient-to-b from-white to-slate-50">
         <div className="mx-auto max-w-7xl px-6 py-24 sm:py-32">
@@ -405,6 +361,36 @@ const LandingPage: React.FC = () => {
             <p className="mx-auto max-w-2xl text-base text-slate-600">
               Whether you're working on a dissertation, preparing a syllabus, or collaborating on a groundbreaking study, ryzomatic adapts to your workflow.
             </p>
+          </div>
+
+          <div className="relative mt-12 w-full max-w-5xl mx-auto">
+            <div className="w-full rounded-2xl overflow-hidden shadow-2xl" style={{ backgroundColor: '#f8f9fa' }}>
+              <video
+                className="w-full h-auto"
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                style={{
+                  display: 'block',
+                  maxWidth: '100%',
+                  height: 'auto',
+                  mixBlendMode: 'multiply',
+                  opacity: 0.95,
+                }}
+              >
+                <source src="/videos/features-showcase.mp4" type="video/mp4" />
+                {/* Fallback for browsers that don't support video */}
+                <div className="flex items-center justify-center h-full" style={{ minHeight: '400px' }}>
+                  <div className="text-center">
+                    <div className="text-6xl mb-4">📚</div>
+                    <span className="text-slate-500 text-lg font-medium">Product Demo</span>
+                    <p className="text-slate-400 text-sm mt-2">Your academic workspace awaits</p>
+                  </div>
+                </div>
+              </video>
+            </div>
           </div>
 
           <div className="mt-16 grid gap-8 md:grid-cols-3">
