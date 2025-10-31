@@ -599,4 +599,338 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
+/* Chat Message Markdown Styling */
+.chat-message-content {
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+
+.markdown-content {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.2;
+}
+
+.markdown-content h1 {
+  font-size: 1.5em;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 0.3em;
+}
+
+.markdown-content h2 {
+  font-size: 1.3em;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 0.3em;
+}
+
+.markdown-content h3 {
+  font-size: 1.1em;
+}
+
+.markdown-content h4 {
+  font-size: 1em;
+}
+
+.markdown-content p {
+  margin: 0.75em 0;
+  line-height: 1.6;
+}
+
+.markdown-content p:first-child {
+  margin-top: 0;
+}
+
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin: 0.75em 0;
+  padding-left: 1.5em;
+}
+
+.markdown-content li {
+  margin: 0.25em 0;
+  line-height: 1.5;
+}
+
+.markdown-content ul {
+  list-style-type: disc;
+}
+
+.markdown-content ol {
+  list-style-type: decimal;
+}
+
+.markdown-content li > ul,
+.markdown-content li > ol {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+.markdown-content code {
+  background-color: rgba(156, 163, 175, 0.2);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.85em;
+  font-family: var(--font-family-mono), 'Courier New', monospace;
+  color: var(--color-text-primary);
+  word-break: break-word;
+}
+
+.markdown-content pre {
+  background-color: var(--color-background-secondary);
+  color: var(--color-text-primary);
+  padding: 0;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 0.75em 0;
+  border: 1px solid var(--color-border);
+  position: relative;
+}
+
+.markdown-content pre code {
+  background-color: transparent;
+  padding: 0;
+  color: inherit;
+  border-radius: 0;
+  font-size: 0.875em;
+  line-height: 1.5;
+  display: block;
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+/* Code Block Wrapper Styles */
+.code-block-wrapper {
+  margin: 0.75em 0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-background-secondary);
+}
+
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--color-background-tertiary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.code-language {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  font-family: var(--font-family-mono);
+  letter-spacing: 0.05em;
+}
+
+.code-copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background-color: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 0.25rem;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-family-sans);
+}
+
+.code-copy-btn:hover {
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  border-color: var(--color-primary);
+}
+
+.code-copy-btn:active {
+  transform: scale(0.95);
+}
+
+.code-copy-btn svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2;
+}
+
+.code-copy-btn.copied {
+  background-color: var(--color-success);
+  color: white;
+  border-color: var(--color-success);
+}
+
+.code-copy-btn.copied .copy-text {
+  color: white;
+}
+
+.markdown-content blockquote {
+  border-left: 3px solid var(--color-primary);
+  padding-left: 1rem;
+  margin: 0.75em 0;
+  padding-top: 0.5em;
+  padding-bottom: 0.5em;
+  font-style: italic;
+  color: var(--color-text-secondary);
+  background-color: rgba(156, 163, 175, 0.05);
+  border-radius: 0 0.25rem 0.25rem 0;
+}
+
+.markdown-content a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: opacity 0.2s ease;
+}
+
+.markdown-content a:hover {
+  opacity: 0.8;
+}
+
+.markdown-content strong {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75em 0;
+  overflow-x: auto;
+  display: block;
+}
+
+.markdown-content table thead {
+  background-color: var(--color-background-tertiary);
+}
+
+.markdown-content table th,
+.markdown-content table td {
+  border: 1px solid var(--color-border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.markdown-content table th {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.markdown-content table td {
+  color: var(--color-text-secondary);
+}
+
+.markdown-content table tbody tr:nth-child(even) {
+  background-color: rgba(156, 163, 175, 0.05);
+}
+
+.markdown-content table tbody tr:hover {
+  background-color: rgba(156, 163, 175, 0.1);
+}
+
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 1.5em 0;
+}
+
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.375rem;
+  margin: 0.75em 0;
+}
+
+.markdown-content del {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.markdown-content mark {
+  background-color: var(--color-highlight-yellow-bg);
+  color: var(--color-text-primary);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.125rem;
+}
+
+/* Override Prism theme for dark backgrounds */
+.chat-message-content .token.comment,
+.chat-message-content .token.prolog,
+.chat-message-content .token.doctype,
+.chat-message-content .token.cdata {
+  color: #6b7280;
+}
+
+.chat-message-content .token.punctuation {
+  color: #d1d5db;
+}
+
+.chat-message-content .token.property,
+.chat-message-content .token.tag,
+.chat-message-content .token.boolean,
+.chat-message-content .token.number,
+.chat-message-content .token.constant,
+.chat-message-content .token.symbol,
+.chat-message-content .token.deleted {
+  color: #f87171;
+}
+
+.chat-message-content .token.selector,
+.chat-message-content .token.attr-name,
+.chat-message-content .token.string,
+.chat-message-content .token.char,
+.chat-message-content .token.builtin,
+.chat-message-content .token.inserted {
+  color: #4ade80;
+}
+
+.chat-message-content .token.operator,
+.chat-message-content .token.entity,
+.chat-message-content .token.url,
+.chat-message-content .language-css .token.string,
+.chat-message-content .style .token.string {
+  color: #60a5fa;
+}
+
+.chat-message-content .token.atrule,
+.chat-message-content .token.attr-value,
+.chat-message-content .token.keyword {
+  color: #a78bfa;
+}
+
+.chat-message-content .token.function,
+.chat-message-content .token.class-name {
+  color: #fbbf24;
+}
+
+.chat-message-content .token.regex,
+.chat-message-content .token.important,
+.chat-message-content .token.variable {
+  color: #f97316;
+}
+
 
