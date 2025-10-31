@@ -1503,11 +1503,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           notesContent += `## Highlights\n\n`
           highlights.forEach((highlight, idx) => {
             notesContent += `### Highlight ${idx + 1} (Page ${highlight.page_number})\n`
-            notesContent += `**Text:** ${highlight.text}\n`
+            notesContent += `**Text:** ${highlight.highlighted_text}\n`
             notesContent += `**Color:** ${highlight.color_hex}\n`
-            if (highlight.note_text) {
-              notesContent += `**Note:** ${highlight.note_text}\n`
-            }
             notesContent += `**Date:** ${new Date(highlight.created_at).toLocaleString()}\n\n`
           })
         }

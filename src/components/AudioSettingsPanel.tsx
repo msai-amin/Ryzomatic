@@ -47,21 +47,32 @@ export const AudioSettingsPanel: React.FC<AudioSettingsPanelProps> = ({ isOpen, 
   // Handle voice preview
   const handleVoicePreview = useCallback(async () => {
     try {
+      // Check if anything is currently playing (store state or actual TTSManager state)
+      if (tts.isPlaying || ttsManager.isSpeaking()) {
+        ttsManager.stop()
+        updateTTS({ isPlaying: false, isPaused: false })
+        return
+      }
+
       const currentProvider = ttsManager.getCurrentProvider()
       if (currentProvider && tts.voice) {
-        // Stop any current speech
-        currentProvider.stop()
+        // Stop any existing playback and update store
+        ttsManager.stop()
+        updateTTS({ isPlaying: true, isPaused: false })
         
         // Preview the current voice with a sample text
         const previewText = "Hello! This is how I sound when reading your documents."
-        await currentProvider.speak(previewText, () => {
+        await ttsManager.speak(previewText, () => {
+          // Update store when preview ends
           console.log('Voice preview completed')
+          updateTTS({ isPlaying: false, isPaused: false })
         })
       }
     } catch (error) {
       console.error('Error previewing voice:', error)
+      updateTTS({ isPlaying: false, isPaused: false })
     }
-  }, [tts.voice])
+  }, [tts.voice, tts.isPlaying, updateTTS])
 
   if (!isOpen) return null
 

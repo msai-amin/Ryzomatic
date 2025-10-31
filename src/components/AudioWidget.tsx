@@ -174,6 +174,33 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     }
   }, [currentDocument?.id, currentDocument?.cleanedPageTexts, currentDocument?.pageTexts, pdfViewer.readingMode, updateTTS])
 
+  // Sync store state with TTSManager's actual state periodically
+  useEffect(() => {
+    const syncState = () => {
+      const actualIsSpeaking = ttsManager.isSpeaking()
+      const actualIsPaused = ttsManager.isPausedState()
+      
+      // Sync if there's a mismatch between store and actual state
+      if (actualIsSpeaking && !tts.isPlaying && !actualIsPaused) {
+        // TTSManager is playing but store says it's not - update store
+        updateTTS({ isPlaying: true, isPaused: false })
+      } else if (!actualIsSpeaking && tts.isPlaying && !actualIsPaused) {
+        // TTSManager is not playing but store says it is - update store
+        updateTTS({ isPlaying: false, isPaused: false })
+      } else if (actualIsPaused && !tts.isPaused) {
+        // TTSManager is paused but store doesn't know - update store
+        updateTTS({ isPlaying: false, isPaused: true })
+      } else if (!actualIsPaused && tts.isPaused && !actualIsSpeaking) {
+        // TTSManager is not paused but store says it is - update store
+        updateTTS({ isPlaying: false, isPaused: false })
+      }
+    }
+    
+    // Sync state every 500ms
+    const interval = setInterval(syncState, 500)
+    return () => clearInterval(interval)
+  }, [tts.isPlaying, tts.isPaused, updateTTS])
+
   // Update current time and duration from TTS manager
   useEffect(() => {
     const updateTime = () => {

@@ -603,9 +603,9 @@ class GoogleCloudTTSService {
           resolve(); // Resolve promise when audio ends
         };
         
-        // Handle errors during playback
-        source.onerror = (error) => {
-          console.error('Audio source error:', error);
+        // Handle errors during playback (addEventListener is the correct API)
+        source.addEventListener('error', (event) => {
+          console.error('Audio source error:', event);
           this.isPaused = false;
           this.pauseTime = 0;
           this.startTime = 0;
@@ -616,7 +616,7 @@ class GoogleCloudTTSService {
           this.onEndCallback = null;
           this.onWordCallback = null;
           reject(new Error('Audio playback error'));
-        };
+        });
       });
 
       // Start playing and track start time

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Volume2, Play, Pause, Check } from 'lucide-react';
 import { ttsManager } from '../services/ttsManager';
-import { Voice as StoreVoice } from '../store/appStore';
+import { Voice as StoreVoice, useAppStore } from '../store/appStore';
 
 interface Voice {
   name: string;
@@ -25,11 +25,11 @@ export const VoiceSelector: React.FC<VoiceSelectorProps> = ({
   onVoiceSelect,
   currentVoice
 }) => {
+  const { tts, updateTTS } = useAppStore();
   const [voices, setVoices] = useState<Voice[]>([]);
   const [naturalVoices, setNaturalVoices] = useState<{ female: Voice[]; male: Voice[] }>({ female: [], male: [] });
   const [selectedVoice, setSelectedVoice] = useState<Voice | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [previewText, setPreviewText] = useState("Hello! I'm here to help you find the perfect voice for reading. This is a natural conversation that will help you evaluate how I sound. I hope you find a voice that feels comfortable and pleasant to listen to.");
 
   useEffect(() => {
@@ -169,21 +169,26 @@ export const VoiceSelector: React.FC<VoiceSelectorProps> = ({
   };
 
   const handlePreview = async (voice: Voice) => {
-    if (isPlaying) {
+    // Check if anything is currently playing (store state or actual TTSManager state)
+    if (tts.isPlaying || ttsManager.isSpeaking()) {
       ttsManager.stop();
-      setIsPlaying(false);
+      updateTTS({ isPlaying: false, isPaused: false });
       return;
     }
 
     try {
-      setIsPlaying(true);
+      // Stop any existing playback and update store
+      ttsManager.stop();
+      updateTTS({ isPlaying: true, isPaused: false });
+      
       ttsManager.setVoice(voice);
       await ttsManager.speak(previewText, () => {
-        setIsPlaying(false);
+        // Update store when preview ends
+        updateTTS({ isPlaying: false, isPaused: false });
       });
     } catch (error) {
       console.error('Error playing voice preview:', error);
-      setIsPlaying(false);
+      updateTTS({ isPlaying: false, isPaused: false });
     }
   };
 
@@ -273,8 +278,8 @@ export const VoiceSelector: React.FC<VoiceSelectorProps> = ({
                 disabled={!selectedVoice || isLoading}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                {isPlaying ? 'Stop' : 'Preview'}
+                {(tts.isPlaying || ttsManager.isSpeaking()) ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                {(tts.isPlaying || ttsManager.isSpeaking()) ? 'Stop' : 'Preview'}
               </button>
             </div>
           </div>

@@ -71,16 +71,29 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ isOpen, onClos
 
   const handleVoicePreview = async () => {
     try {
+      // Check if anything is currently playing (store state or actual TTSManager state)
+      if (tts.isPlaying || ttsManager.isSpeaking()) {
+        ttsManager.stop();
+        updateTTS({ isPlaying: false, isPaused: false });
+        return;
+      }
+
       const currentProvider = ttsManager.getCurrentProvider();
       if (currentProvider && tts.voice) {
-        currentProvider.stop();
+        // Stop any existing playback and update store
+        ttsManager.stop();
+        updateTTS({ isPlaying: true, isPaused: false });
+        
         const previewText = "Hello! This is how I sound when reading your documents.";
-        await currentProvider.speak(previewText, () => {
+        await ttsManager.speak(previewText, () => {
+          // Update store when preview ends
           console.log('Voice preview completed');
+          updateTTS({ isPlaying: false, isPaused: false });
         });
       }
     } catch (error) {
       console.error('Error previewing voice:', error);
+      updateTTS({ isPlaying: false, isPaused: false });
     }
   };
 
