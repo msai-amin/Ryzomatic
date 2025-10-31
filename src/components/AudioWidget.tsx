@@ -330,7 +330,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       }
       ttsManager.pause()
       updateTTS({ isPlaying: false, isPaused: true }) // SET PAUSED FLAG
-    } else if (tts.isPaused) { // CHECK STORE PAUSED STATE
+    } else if (tts.isPaused || ttsManager.isPausedState()) { // CHECK STORE PAUSED STATE OR TTS MANAGER STATE
       // Resume
       try {
         await ttsManager.resume()
@@ -575,16 +575,16 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                 ? "Processing..." 
                 : tts.isPlaying 
                   ? "Pause" 
-                  : ttsManager.isPausedState()
+                  : (tts.isPaused || ttsManager.isPausedState())
                     ? "Resume"
                     : "Play"
             }
           >
             {isProcessing ? (
               <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-text-inverse)' }} />
-            ) : (tts.isPlaying || tts.isPaused) ? ( // Show pause if playing OR paused
+            ) : tts.isPlaying ? ( // Show pause icon only when actively playing
               <Pause className="w-5 h-5" />
-            ) : (
+            ) : ( // Show play icon when paused or stopped (so user can resume or start)
               <Play className="w-5 h-5" />
             )}
           </button>
