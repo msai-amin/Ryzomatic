@@ -169,6 +169,12 @@
   position: fixed !important;
 }
 
+/* Menu Dropdown Z-Index Override */
+.menu-dropdown {
+  z-index: 99999 !important;
+  position: fixed !important;
+}
+
 /* CRITICAL: PDF Text Layer Alignment - DO NOT MODIFY
  * These styles ensure perfect alignment between PDF canvas and text selection
  * Any changes will break text selection accuracy, especially for two-column PDFs

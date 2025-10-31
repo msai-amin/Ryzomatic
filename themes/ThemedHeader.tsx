@@ -40,6 +40,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
   const [showLibrary, setShowLibrary] = React.useState(false)
   const [showAuth, setShowAuth] = React.useState(false)
   const [showMenu, setShowMenu] = React.useState(false)
+  const [menuPosition, setMenuPosition] = React.useState({ top: 0, left: 0 })
   const menuRef = useRef<HTMLDivElement>(null)
 
   const { currentTheme } = useTheme()
@@ -48,10 +49,38 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     await logout()
   }
   
+  // Update menu position when it opens or when scrolling/resizing
+  useEffect(() => {
+    const updateMenuPosition = () => {
+      if (menuRef.current) {
+        const rect = menuRef.current.getBoundingClientRect()
+        setMenuPosition({
+          top: rect.bottom + 8,
+          left: rect.left
+        })
+      }
+    }
+
+    if (showMenu) {
+      updateMenuPosition()
+      window.addEventListener('scroll', updateMenuPosition, true)
+      window.addEventListener('resize', updateMenuPosition)
+    }
+
+    return () => {
+      window.removeEventListener('scroll', updateMenuPosition, true)
+      window.removeEventListener('resize', updateMenuPosition)
+    }
+  }, [showMenu])
+
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      const target = event.target as HTMLElement
+      const isClickInsideMenu = menuRef.current?.contains(target)
+      const isClickOnMenuDropdown = target.closest('[data-menu-dropdown]')
+      
+      if (!isClickInsideMenu && !isClickOnMenuDropdown) {
         setShowMenu(false)
       }
     }
@@ -88,7 +117,14 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
         <div className="flex items-center space-x-4">
           <div className="relative" ref={menuRef}>
             <button 
-              onClick={() => setShowMenu(!showMenu)}
+              onClick={() => {
+                // If sidebar is open, close it first
+                if (isSidebarOpen) {
+                  onSidebarToggle()
+                }
+                // Toggle menu
+                setShowMenu(!showMenu)
+              }}
               className="p-2 rounded-lg transition-colors"
               style={{
                 color: 'var(--color-text-primary)',
@@ -109,13 +145,15 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
               <Menu className="w-5 h-5" />
             </button>
             
-            {showMenu && (
+            {showMenu && createPortal(
               <div 
-                className="absolute left-0 mt-2 w-56 rounded-lg shadow-lg border"
+                data-menu-dropdown
+                className="fixed w-56 rounded-lg shadow-lg border menu-dropdown"
                 style={{
                   backgroundColor: 'var(--color-surface)',
                   borderColor: 'var(--color-border)',
-                  zIndex: 1000
+                  top: `${menuPosition.top}px`,
+                  left: `${menuPosition.left}px`,
                 }}
               >
                 <div className="py-1">
@@ -235,7 +273,8 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                     </>
                   )}
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
           
