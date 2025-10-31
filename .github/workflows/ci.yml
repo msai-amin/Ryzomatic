@@ -22,6 +22,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
+      - name: Install optional dependencies
+        run: npm install --force
+      
       - name: Run ESLint
         run: npm run lint
       
@@ -44,6 +47,9 @@ jobs:
       
       - name: Install dependencies
         run: npm ci
+      
+      - name: Install optional dependencies
+        run: npm install --force
       
       - name: Run tests with coverage
         run: npm run test:ci
@@ -109,6 +115,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
+      - name: Install optional dependencies
+        run: npm install --force
+      
       - name: Build application
         run: npm run build
       
@@ -134,6 +143,9 @@ jobs:
       
       - name: Install dependencies
         run: npm ci
+      
+      - name: Install optional dependencies
+        run: npm install --force
       
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
