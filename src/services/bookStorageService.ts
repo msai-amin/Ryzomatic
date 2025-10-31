@@ -90,7 +90,7 @@ export class BookStorageService {
         
         // Fallback to API endpoint if Supabase Storage fails (uses full s3Key with 'books/' prefix)
         try {
-          const urlResponse = await fetch('/api/books/storage', {
+          const urlResponse = await fetch('/api/books', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -184,7 +184,7 @@ export class BookStorageService {
         
         // Fallback to API endpoint if Supabase Storage fails
         try {
-          const response = await fetch('/api/books/access', {
+          const response = await fetch('/api/books', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -247,7 +247,7 @@ export class BookStorageService {
     try {
       logger.info('Deleting book from S3', context);
 
-      const response = await fetch('/api/books/access', {
+      const response = await fetch('/api/books', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -282,7 +282,7 @@ export class BookStorageService {
    */
   async bookExists(s3Key: string, userId: string): Promise<boolean> {
     try {
-      const response = await fetch('/api/books/access', {
+      const response = await fetch('/api/books', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -315,12 +315,17 @@ export class BookStorageService {
    * (if needed for streaming or progressive loading)
    */
   async getSignedUrl(s3Key: string, userId: string, expiresIn: number = 3600): Promise<string> {
-    const response = await fetch('/api/books/get-signed-url', {
+    const response = await fetch('/api/books', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ s3Key, userId, expiresIn })
+      body: JSON.stringify({ 
+        operation: 'GET_DOWNLOAD_URL',
+        s3Key, 
+        userId, 
+        expiresIn 
+      })
     });
 
     const { signedUrl } = await response.json();

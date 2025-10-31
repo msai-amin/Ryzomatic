@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { uploadFile } from '../../lib/s3.js';
+import { getDownloadUrl, deleteFile, fileExists, uploadFile } from '../../lib/s3.js';
 
 // Initialize S3 client
 const s3Client = new S3Client({
@@ -14,24 +14,33 @@ const s3Client = new S3Client({
 
 const BUCKET_NAME = process.env.AWS_S3_BUCKET || 'smart-reader-documents';
 
-type StorageOperation = 'GET_UPLOAD_URL' | 'DIRECT_UPLOAD';
+type BookOperation = 
+  | 'GET_UPLOAD_URL' 
+  | 'DIRECT_UPLOAD' 
+  | 'GET_DOWNLOAD_URL' 
+  | 'DELETE' 
+  | 'CHECK_EXISTS';
 
-interface StorageRequest {
-  operation: StorageOperation;
+interface BookRequest {
+  operation: BookOperation;
   s3Key: string;
   userId: string;
+  expiresIn?: number;
   contentType?: string;
   fileData?: number[]; // ArrayBuffer sent as array
   metadata?: Record<string, string>;
 }
 
 /**
- * Unified Book Storage Endpoint - Handles Upload Operations
- * POST /api/books/storage
+ * Unified Books API Endpoint - Handles All Book Storage and Access Operations
+ * POST /api/books
  * 
  * Supports:
  * - GET_UPLOAD_URL: Returns presigned URL for client-side upload
  * - DIRECT_UPLOAD: Server-side upload for small files
+ * - GET_DOWNLOAD_URL: Returns signed URL for downloading
+ * - DELETE: Deletes file from S3
+ * - CHECK_EXISTS: Verifies file existence
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -39,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { operation, s3Key, userId, contentType, fileData, metadata } = req.body as StorageRequest;
+    const { operation, s3Key, userId, expiresIn = 3600, contentType, fileData, metadata } = req.body as BookRequest;
 
     // Validate required fields
     if (!operation || !s3Key || !userId) {
@@ -60,14 +69,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'DIRECT_UPLOAD':
         return await handleDirectUpload(res, s3Key, contentType || 'application/pdf', fileData, metadata);
 
+      case 'GET_DOWNLOAD_URL':
+        return await handleGetDownloadUrl(res, s3Key, expiresIn);
+
+      case 'DELETE':
+        return await handleDelete(res, s3Key);
+
+      case 'CHECK_EXISTS':
+        return await handleCheckExists(res, s3Key);
+
       default:
         return res.status(400).json({ error: `Unknown operation: ${operation}` });
     }
 
   } catch (error: any) {
-    console.error('Storage API error:', error);
+    console.error('Books API error:', error);
     return res.status(500).json({ 
-      error: 'Storage operation failed',
+      error: 'Book operation failed',
       message: error.message 
     });
   }
@@ -143,6 +161,80 @@ async function handleDirectUpload(
     console.error('Direct upload error:', error);
     return res.status(500).json({ 
       error: 'Upload failed',
+      message: error.message 
+    });
+  }
+}
+
+/**
+ * Generate signed URL for downloading file
+ */
+async function handleGetDownloadUrl(
+  res: VercelResponse,
+  s3Key: string,
+  expiresIn: number
+): Promise<VercelResponse> {
+  try {
+    const signedUrl = await getDownloadUrl(s3Key, expiresIn);
+
+    return res.status(200).json({
+      success: true,
+      signedUrl,
+      expiresIn
+    });
+
+  } catch (error: any) {
+    console.error('Get download URL error:', error);
+    return res.status(500).json({ 
+      error: 'Failed to generate download URL',
+      message: error.message 
+    });
+  }
+}
+
+/**
+ * Delete file from S3
+ */
+async function handleDelete(
+  res: VercelResponse,
+  s3Key: string
+): Promise<VercelResponse> {
+  try {
+    await deleteFile(s3Key);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Book deleted successfully'
+    });
+
+  } catch (error: any) {
+    console.error('Delete error:', error);
+    return res.status(500).json({ 
+      error: 'Delete failed',
+      message: error.message 
+    });
+  }
+}
+
+/**
+ * Check if file exists in S3
+ */
+async function handleCheckExists(
+  res: VercelResponse,
+  s3Key: string
+): Promise<VercelResponse> {
+  try {
+    const exists = await fileExists(s3Key);
+
+    return res.status(200).json({
+      success: true,
+      exists
+    });
+
+  } catch (error: any) {
+    console.error('Check exists error:', error);
+    return res.status(500).json({ 
+      error: 'Check failed',
       message: error.message 
     });
   }
