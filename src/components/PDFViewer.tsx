@@ -25,7 +25,9 @@ import {
   Library,
   Palette,
   Highlighter,
-  Plus
+  Plus,
+  Sparkles,
+  RotateCcw
 } from 'lucide-react'
 import { useAppStore, Document as DocumentType } from '../store/appStore'
 import { ttsManager } from '../services/ttsManager'
@@ -36,6 +38,7 @@ import { LibraryModal } from './LibraryModal'
 import { DocumentUpload } from './DocumentUpload'
 import { VoiceSelector } from './VoiceSelector'
 import { TypographySettings } from './TypographySettings'
+import { TextCleanupModal } from './TextCleanupModal'
 import { storageService } from '../services/storageService'
 import { OCRBanner, OCRStatusBadge } from './OCRStatusBadge'
 import { FormulaRenderer, FormulaPlaceholder } from './FormulaRenderer'
@@ -346,6 +349,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   const [isConvertingFormulas, setIsConvertingFormulas] = useState(false)
   const [formulaConversionProgress, setFormulaConversionProgress] = useState({ current: 0, total: 0 })
   const [lastRenderedDocId, setLastRenderedDocId] = useState<string | null>(null)
+  
+  // Text cleanup state
+  const [showCleanupModal, setShowCleanupModal] = useState(false)
+  const [isCleaning, setIsCleaning] = useState(false)
+  const [cleanedPageTexts, setCleanedPageTexts] = useState<{ [pageNum: number]: string }>({})
+  const [cleaningProgress, setCleaningProgress] = useState({ current: 0, total: 0 })
   
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   
@@ -1499,7 +1508,112 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     updatePDFViewer({ readingMode: !pdfViewer.readingMode })
   }, [pdfViewer.readingMode, updatePDFViewer])
 
+  // Handle text cleanup
+  const handleTextCleanup = useCallback(async (
+    preferences: {
+      reorganizeParagraphs: boolean
+      removeFormulae: boolean
+      removeFootnotes: boolean
+      removeSideNotes: boolean
+      removeHeadersFooters: boolean
+      simplifyFormatting: boolean
+      reorganizationStyle: 'logical' | 'chronological' | 'topic-based'
+    },
+    applyToAllPages: boolean
+  ) => {
+    setIsCleaning(true)
+    setCleaningProgress({ current: 0, total: 0 })
 
+    try {
+      const pagesToClean = applyToAllPages && numPages
+        ? Array.from({ length: numPages }, (_, i) => i + 1)
+        : [pageNumber]
+
+      setCleaningProgress({ current: 0, total: pagesToClean.length })
+
+      const newCleanedTexts: { [pageNum: number]: string } = { ...cleanedPageTexts }
+
+      // Process pages sequentially to avoid overwhelming the API
+      for (let i = 0; i < pagesToClean.length; i++) {
+        const pageNum = pagesToClean[i]
+        const rawPageText = document.pageTexts?.[pageNum - 1]
+        
+        if (!rawPageText) {
+          console.warn(`No text found for page ${pageNum}`)
+          continue
+        }
+
+        // Ensure pageText is a string
+        const pageText = typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
+
+        if (!pageText.trim()) {
+          console.warn(`Empty text for page ${pageNum}`)
+          continue
+        }
+
+        try {
+          // Call cleanup API
+          const response = await fetch('/api/text/cleanup', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              text: pageText,
+              preferences,
+            }),
+          })
+
+          if (!response.ok) {
+            throw new Error(`Cleanup API error: ${response.statusText}`)
+          }
+
+          const data = await response.json()
+
+          if (data.success && data.cleanedText) {
+            newCleanedTexts[pageNum] = data.cleanedText
+          } else {
+            console.warn(`Cleanup failed for page ${pageNum}, using original text`)
+          }
+        } catch (error) {
+          console.error(`Error cleaning page ${pageNum}:`, error)
+          // Continue with next page instead of failing completely
+        }
+
+        setCleaningProgress({ current: i + 1, total: pagesToClean.length })
+      }
+
+      setCleanedPageTexts(newCleanedTexts)
+      setShowCleanupModal(false)
+
+      // Show success notification
+      const cleanedCount = Object.keys(newCleanedTexts).length
+      if (cleanedCount > 0) {
+        // Simple success feedback - could be enhanced with toast notification
+        console.log(`Successfully cleaned ${cleanedCount} page(s)`)
+      }
+    } catch (error) {
+      console.error('Text cleanup error:', error)
+      alert('Failed to clean text. Please try again.')
+    } finally {
+      setIsCleaning(false)
+      setCleaningProgress({ current: 0, total: 0 })
+    }
+  }, [document, pageNumber, numPages, cleanedPageTexts])
+
+  // Restore original text for a page
+  const handleRestoreOriginal = useCallback((pageNum: number) => {
+    setCleanedPageTexts(prev => {
+      const newTexts = { ...prev }
+      delete newTexts[pageNum]
+      return newTexts
+    })
+  }, [])
+
+  // Restore all original text
+  const handleRestoreAllOriginal = useCallback(() => {
+    setCleanedPageTexts({})
+  }, [])
 
   const handleAddNote = useCallback((text: string) => {
     setSelectedTextForNote(text)
@@ -2052,7 +2166,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         pageText = String(rawPageText);
       }
       
-      const currentPageText = isEditing && editedTexts[pageNum] ? editedTexts[pageNum] : pageText
+      // Priority: cleaned text > edited text > original page text
+      const currentPageText = cleanedPageTexts[pageNum] 
+        ? cleanedPageTexts[pageNum]
+        : (isEditing && editedTexts[pageNum] ? editedTexts[pageNum] : pageText)
       
       // Ensure currentPageText is a string with additional safety
       let safePageText: string;
@@ -2311,6 +2428,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   <span>Converting formulas... {formulaConversionProgress.current}/{formulaConversionProgress.total}</span>
                 </div>
               )}
+              
+              {/* Text cleanup progress indicator */}
+              {isCleaning && cleaningProgress.total > 0 && (
+                <div className="flex items-center gap-2 text-xs opacity-70 px-3 py-1 rounded-lg" style={{ backgroundColor: 'var(--color-background-secondary)', color: 'var(--color-text-secondary)' }}>
+                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent" />
+                  <span>Cleaning text... {cleaningProgress.current}/{cleaningProgress.total}</span>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -2394,6 +2519,23 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   >
                     <Type className="w-5 h-5" />
                   </button>
+                  <button
+                    onClick={() => setShowCleanupModal(true)}
+                    className={`p-2 ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} rounded-lg transition-colors`}
+                    title="Clean Up Text"
+                  >
+                    <Sparkles className="w-5 h-5" />
+                  </button>
+                  {/* Restore Original button - only show if any pages are cleaned */}
+                  {Object.keys(cleanedPageTexts).length > 0 && (
+                    <button
+                      onClick={handleRestoreAllOriginal}
+                      className={`p-2 ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} rounded-lg transition-colors`}
+                      title="Restore Original Text"
+                    >
+                      <RotateCcw className="w-5 h-5" />
+                    </button>
+                  )}
                 </>
               )}
               
@@ -2500,6 +2642,16 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                       >
                         <FileText className="w-5 h-5" />
                       </button>
+                      {/* Restore Original button for this page if it's been cleaned */}
+                      {cleanedPageTexts[pageNum] && (
+                        <button
+                          onClick={() => handleRestoreOriginal(pageNum)}
+                          className={`p-2 rounded-lg transition-all ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} hover:shadow-sm`}
+                          title="Restore original text for this page"
+                        >
+                          <RotateCcw className="w-5 h-5" />
+                        </button>
+                      )}
                     </div>
                     
                     {/* Page content - show textarea if editing this specific page */}
@@ -2604,6 +2756,16 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 >
                   <FileText className="w-5 h-5" />
                 </button>
+                {/* Restore Original button for this page if it's been cleaned */}
+                {cleanedPageTexts[pageNumber] && (
+                  <button
+                    onClick={() => handleRestoreOriginal(pageNumber)}
+                    className={`p-2 rounded-lg transition-all ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} hover:shadow-sm`}
+                    title="Restore original text for this page"
+                  >
+                    <RotateCcw className="w-5 h-5" />
+                  </button>
+                )}
               </div>
               
               {/* Page content - show textarea if editing this specific page */}
@@ -2682,6 +2844,18 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         {/* Typography Settings Modal */}
         {showTypographySettings && (
           <TypographySettings onClose={() => setShowTypographySettings(false)} />
+        )}
+
+        {/* Text Cleanup Modal */}
+        {showCleanupModal && (
+          <TextCleanupModal
+            onClose={() => setShowCleanupModal(false)}
+            onApply={handleTextCleanup}
+            isProcessing={isCleaning}
+            currentPageNumber={pageNumber}
+            totalPages={numPages || 0}
+            scrollMode={pdfViewer.scrollMode}
+          />
         )}
       </div>
     )
