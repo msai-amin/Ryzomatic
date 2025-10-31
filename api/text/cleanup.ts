@@ -1,13 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-
-// Lazy import geminiService to avoid module load errors
-let geminiServicePromise: Promise<any> | null = null;
-async function getGeminiService() {
-  if (!geminiServicePromise) {
-    geminiServicePromise = import('../../lib/gemini').then(module => module.geminiService);
-  }
-  return geminiServicePromise;
-}
+import { geminiService } from '../../lib/gemini';
 
 interface CleanupPreferences {
   reorganizeParagraphs: boolean;
@@ -181,7 +173,6 @@ ${text}`;
       // Use Gemini service with free tier (gemini-2.5-flash-lite)
       let response: string;
       try {
-        const geminiService = await getGeminiService();
         response = await geminiService.chat({
           message: ttsPrompt,
           tier: 'free', // Uses gemini-2.5-flash-lite
@@ -293,7 +284,6 @@ ${text}`;
     // Use Gemini service with free tier (gemini-2.5-flash-lite)
     let response: string;
     try {
-      const geminiService = await getGeminiService();
       response = await geminiService.chat({
         message: prompt,
         tier: 'free', // Uses gemini-2.5-flash-lite
