@@ -19,22 +19,38 @@ interface CleanupPreferences {
  * This endpoint doesn't require authentication as it's used internally in reading mode
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Enable CORS
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
   try {
-    const { text, preferences } = req.body;
+    // Enable CORS
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    // Parse body if needed (Vercel should auto-parse, but let's be safe)
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch (parseError) {
+        console.error('Failed to parse request body:', parseError);
+        return res.status(400).json({ 
+          cleanedText: '',
+          success: false,
+          fallback: true,
+          error: 'Invalid JSON in request body' 
+        });
+      }
+    }
+
+    const { text, preferences } = body || {};
 
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ error: 'Valid text string is required' });
@@ -329,13 +345,36 @@ ${text}`;
       message: error?.message,
       stack: error?.stack,
       name: error?.name,
-      body: req.body ? { hasText: !!req.body.text, hasPreferences: !!req.body.preferences } : 'no body'
+      type: typeof error,
+      body: req.body ? { 
+        hasText: !!req.body.text, 
+        hasPreferences: !!req.body.preferences,
+        bodyType: typeof req.body
+      } : 'no body',
+      method: req.method,
+      url: req.url
     });
     
-    // Return original text as fallback instead of failing completely
-    const { text } = req.body;
-    const fallbackText = text || '';
+    // Try to get text from body as fallback
+    let fallbackText = '';
+    try {
+      const body = req.body || {};
+      if (typeof body === 'string') {
+        try {
+          const parsed = JSON.parse(body);
+          fallbackText = parsed?.text || '';
+        } catch {
+          // Ignore parse errors
+        }
+      } else if (body && typeof body.text === 'string') {
+        fallbackText = body.text;
+      }
+    } catch {
+      // Ignore errors in fallback extraction
+    }
     
+    // Always return 200 with fallback instead of 500
+    // This prevents the API from returning 500 errors
     return res.status(200).json({ 
       cleanedText: fallbackText,
       success: true,
