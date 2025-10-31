@@ -34,7 +34,7 @@ export async function startOCRProcessing(
   authToken: string
 ): Promise<OCRProcessResponse> {
   try {
-    const response = await fetch('/api/documents/ocr', {
+    const response = await fetch('/api/documents?action=ocr-process', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -77,7 +77,7 @@ export async function checkOCRStatus(
   authToken: string
 ): Promise<OCRStatusResponse | null> {
   try {
-    const response = await fetch(`/api/documents/ocr-status?documentId=${documentId}`, {
+    const response = await fetch(`/api/documents?action=ocr-status&documentId=${documentId}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${authToken}`,

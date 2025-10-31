@@ -301,48 +301,15 @@ export async function reprocessPagesWithVision(
   }
 
   try {
-    logger.info('Calling vision extraction API', context, {
+    logger.info('Vision extraction not yet implemented, skipping', context, {
       pageNumbers,
       count: pageNumbers.length
     })
 
-    // Call server-side vision extraction endpoint
-    const response = await fetch('/api/documents/vision-extract', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${options.authToken}`
-      },
-      body: JSON.stringify({
-        documentId: options.documentId,
-        pageNumbers,
-        s3Key: options.s3Key
-      })
-    })
-
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.message || `Vision API returned ${response.status}`)
-    }
-
-    const data = await response.json()
-    
-    logger.info('Vision extraction API completed', context, {
-      successCount: data.metadata?.successCount || 0,
-      failedCount: data.metadata?.failedCount || 0,
-      tokensUsed: data.metadata?.tokensUsed || 0
-    })
-
-    // Convert response to Map
-    const results = new Map<number, string>()
-    if (data.extractedPages) {
-      Object.entries(data.extractedPages).forEach(([pageNum, text]) => {
-        results.set(parseInt(pageNum), text as string)
-      })
-    }
-
-    return results
-
+    // TODO: Implement vision extraction when service is ready
+    // Vision extraction requires PDF rendering service setup
+    // which is not yet configured for serverless environment
+    return new Map()
   } catch (error) {
     logger.error('Vision extraction failed', context, error as Error)
     // Return empty map - graceful degradation

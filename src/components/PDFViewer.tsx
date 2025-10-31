@@ -1155,7 +1155,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       // Start polling for status updates
       pollingIntervalRef.current = setInterval(async () => {
         try {
-          const response = await fetch(`/api/documents/ocr-status?documentId=${document.id}`);
+          const response = await fetch(`/api/documents?action=ocr-status&documentId=${document.id}`);
           
           if (response.ok) {
             const data = await response.json();
