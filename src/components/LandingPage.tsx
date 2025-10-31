@@ -257,9 +257,6 @@ const LandingPage: React.FC = () => {
             <p className="text-lg text-slate-600 max-w-xl">
               Upload a paper. Instantly see how it connects to everything you've ever added.
             </p>
-            <p className="text-2xl font-semibold text-slate-900 italic max-w-lg">
-              "Stop just reading documents. Start connecting them."
-            </p>
           </div>
           
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
