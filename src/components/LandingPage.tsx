@@ -305,10 +305,6 @@ const LandingPage: React.FC = () => {
       <section id="features" className="bg-gradient-to-b from-white to-slate-50">
         <div className="mx-auto max-w-7xl px-6 py-24 sm:py-32">
           <div className="flex flex-col gap-4 text-center mb-16">
-            <div className="inline-flex items-center gap-2 rounded-full bg-green-50 px-4 py-1.5 text-sm font-medium text-green-700 mb-4">
-              <span>✨</span>
-              <span>Powerful Features</span>
-            </div>
             <h2 className="text-4xl md:text-5xl font-bold text-slate-900 max-w-3xl mx-auto" style={{ fontFamily: "'Inter', sans-serif" }}>
               Connect Your Ideas, Not Just Your Documents
             </h2>
