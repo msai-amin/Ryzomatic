@@ -1518,6 +1518,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       removeHeadersFooters: boolean
       simplifyFormatting: boolean
       reorganizationStyle: 'logical' | 'chronological' | 'topic-based'
+      optimizeForTTS: boolean
     },
     applyToAllPages: boolean
   ) => {

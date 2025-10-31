@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Sparkles, CheckCircle, AlertCircle } from 'lucide-react'
+import { X, Sparkles, CheckCircle, AlertCircle, Volume2 } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 
 interface CleanupPreferences {
@@ -11,6 +11,7 @@ interface CleanupPreferences {
   removeHeadersFooters: boolean
   simplifyFormatting: boolean
   reorganizationStyle: 'logical' | 'chronological' | 'topic-based'
+  optimizeForTTS: boolean
 }
 
 interface TextCleanupModalProps {
@@ -39,7 +40,8 @@ export const TextCleanupModal: React.FC<TextCleanupModalProps> = ({
     removeSideNotes: false,
     removeHeadersFooters: false,
     simplifyFormatting: false,
-    reorganizationStyle: 'logical'
+    reorganizationStyle: 'logical',
+    optimizeForTTS: false
   })
   
   const [applyToAllPages, setApplyToAllPages] = useState(false)
@@ -68,7 +70,8 @@ export const TextCleanupModal: React.FC<TextCleanupModalProps> = ({
       preferences.removeFootnotes ||
       preferences.removeSideNotes ||
       preferences.removeHeadersFooters ||
-      preferences.simplifyFormatting
+      preferences.simplifyFormatting ||
+      preferences.optimizeForTTS
 
     if (!hasSelection) {
       alert('Please select at least one cleanup option.')
@@ -134,6 +137,39 @@ export const TextCleanupModal: React.FC<TextCleanupModalProps> = ({
               Cleanup Options
             </label>
             <div className="space-y-3">
+              {/* Optimize for TTS - Prominent option */}
+              <label className="flex items-start space-x-3 cursor-pointer group p-3 rounded-lg border-2 transition-colors" 
+                style={{ 
+                  borderColor: preferences.optimizeForTTS ? 'var(--color-primary, #3b82f6)' : 'var(--color-border)',
+                  backgroundColor: preferences.optimizeForTTS ? 'rgba(59, 130, 246, 0.05)' : 'transparent'
+                }}>
+                <input
+                  type="checkbox"
+                  checked={preferences.optimizeForTTS}
+                  onChange={() => handleTogglePreference('optimizeForTTS')}
+                  disabled={isProcessing}
+                  className="mt-1 w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Volume2 className="w-4 h-4" style={{ color: 'var(--color-primary, #3b82f6)' }} />
+                    <span className="text-sm font-semibold group-hover:underline" style={{ color: 'var(--color-text-primary, #1f2937)' }}>
+                      Optimize for TTS
+                    </span>
+                    {preferences.optimizeForTTS && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary, #3b82f6)' }}>
+                        Recommended
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs mt-1 block" style={{ color: 'var(--color-text-tertiary, #9ca3af)' }}>
+                    Prepare text for optimal Text-to-Speech playback: expand abbreviations, format numbers for speech, 
+                    fix punctuation, break long sentences, remove non-speech elements (formulas, citations, URLs), 
+                    and improve natural flow while preserving paragraph breaks for pauses.
+                  </span>
+                </div>
+              </label>
+
               {/* Reorganize Paragraphs */}
               <label className="flex items-start space-x-3 cursor-pointer group">
                 <input
