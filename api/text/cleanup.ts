@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { geminiService } from '../../lib/gemini';
+import { geminiService } from '../../lib/gemini.js';
 
 interface CleanupPreferences {
   reorganizeParagraphs: boolean;
