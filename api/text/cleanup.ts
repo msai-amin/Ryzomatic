@@ -19,6 +19,16 @@ interface CleanupPreferences {
  * This endpoint doesn't require authentication as it's used internally in reading mode
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Enable CORS
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -133,11 +143,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 Text to optimize:
 ${text}`;
 
+      // Check if Gemini API key is configured
+      if (!process.env.GEMINI_API_KEY) {
+        console.error('GEMINI_API_KEY not configured');
+        return res.status(200).json({ 
+          cleanedText: text,
+          success: true,
+          fallback: true,
+          error: 'GEMINI_API_KEY not configured'
+        });
+      }
+
       // Use Gemini service with free tier (gemini-2.5-flash-lite)
-      const response = await geminiService.chat({
-        message: ttsPrompt,
-        tier: 'free', // Uses gemini-2.5-flash-lite
-      });
+      let response: string;
+      try {
+        response = await geminiService.chat({
+          message: ttsPrompt,
+          tier: 'free', // Uses gemini-2.5-flash-lite
+        });
+      } catch (geminiError: any) {
+        console.error('Gemini API error in TTS optimization:', geminiError);
+        console.error('Error details:', {
+          message: geminiError?.message,
+          stack: geminiError?.stack,
+          hasApiKey: !!process.env.GEMINI_API_KEY
+        });
+        // Return original text as fallback
+        return res.status(200).json({ 
+          cleanedText: text,
+          success: true,
+          fallback: true,
+          error: geminiError?.message || 'Gemini API call failed'
+        });
+      }
 
       if (!response) {
         console.error('Text cleanup (TTS optimization): Empty response from Gemini');
@@ -216,11 +254,39 @@ ${text}`;
     
     prompt += `\n\nText to clean:\n${text}`;
 
+    // Check if Gemini API key is configured
+    if (!process.env.GEMINI_API_KEY) {
+      console.error('GEMINI_API_KEY not configured');
+      return res.status(200).json({ 
+        cleanedText: text,
+        success: true,
+        fallback: true,
+        error: 'GEMINI_API_KEY not configured'
+      });
+    }
+
     // Use Gemini service with free tier (gemini-2.5-flash-lite)
-    const response = await geminiService.chat({
-      message: prompt,
-      tier: 'free', // Uses gemini-2.5-flash-lite
-    });
+    let response: string;
+    try {
+      response = await geminiService.chat({
+        message: prompt,
+        tier: 'free', // Uses gemini-2.5-flash-lite
+      });
+    } catch (geminiError: any) {
+      console.error('Gemini API error:', geminiError);
+      console.error('Error details:', {
+        message: geminiError?.message,
+        stack: geminiError?.stack,
+        hasApiKey: !!process.env.GEMINI_API_KEY
+      });
+      // Return original text as fallback
+      return res.status(200).json({ 
+        cleanedText: text,
+        success: true,
+        fallback: true,
+        error: geminiError?.message || 'Gemini API call failed'
+      });
+    }
 
     if (!response) {
       console.error('Text cleanup: Empty response from Gemini');
@@ -259,14 +325,22 @@ ${text}`;
 
   } catch (error: any) {
     console.error('Text cleanup error:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      stack: error?.stack,
+      name: error?.name,
+      body: req.body ? { hasText: !!req.body.text, hasPreferences: !!req.body.preferences } : 'no body'
+    });
     
     // Return original text as fallback instead of failing completely
     const { text } = req.body;
+    const fallbackText = text || '';
+    
     return res.status(200).json({ 
-      cleanedText: text || '',
+      cleanedText: fallbackText,
       success: true,
       fallback: true,
-      error: error.message
+      error: error?.message || 'Unknown error occurred'
     });
   }
 }

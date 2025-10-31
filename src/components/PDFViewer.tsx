@@ -1573,8 +1573,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
           if (data.success && data.cleanedText) {
             newCleanedTexts[pageNum] = data.cleanedText
+            console.log(`✅ Successfully cleaned page ${pageNum}`)
           } else {
-            console.warn(`Cleanup failed for page ${pageNum}, using original text`)
+            console.warn(`Cleanup failed for page ${pageNum}:`, data.error || 'Unknown error')
+            if (data.fallback) {
+              // Keep original text in cleanedPageTexts so user knows something happened
+              // But we won't overwrite if it's just a fallback
+            }
           }
         } catch (error) {
           console.error(`Error cleaning page ${pageNum}:`, error)
