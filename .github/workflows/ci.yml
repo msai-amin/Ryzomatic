@@ -17,13 +17,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
       
-      - name: Clear npm cache
-        run: npm cache clean --force
-      
-      - name: Install dependencies
-        run: npm install
+      - name: Clean install
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
       
       - name: Run ESLint
         run: npm run lint
@@ -43,13 +41,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
       
-      - name: Clear npm cache
-        run: npm cache clean --force
-      
-      - name: Install dependencies
-        run: npm install
+      - name: Clean install
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
       
       - name: Run tests with coverage
         run: npm run test:ci
@@ -78,13 +74,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
       
-      - name: Clear npm cache
-        run: npm cache clean --force
-      
-      - name: Install dependencies
-        run: npm install
+      - name: Clean install
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
       
       - name: Run npm audit
         run: npm audit --audit-level=high
@@ -113,13 +107,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
       
-      - name: Clear npm cache
-        run: npm cache clean --force
-      
-      - name: Install dependencies
-        run: npm install
+      - name: Clean install
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
       
       - name: Build application
         run: npm run build
@@ -142,13 +134,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
       
-      - name: Clear npm cache
-        run: npm cache clean --force
-      
-      - name: Install dependencies
-        run: npm install
+      - name: Clean install
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
       
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
