@@ -89,6 +89,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
    - Remove citations in parentheses: (Smith, 2024) → remove or convert to "as noted by Smith"
    - Replace URLs with "[link]" or readable domain name
    - Replace email addresses with "[email]" or spell out
+   - **Remove publication metadata and copyright notices**:
+     * Copyright symbols and notices (©, Copyright, All rights reserved, "The Authors", "published by X", etc.)
+     * Publication information (journal names, publisher names, "published by Wiley Periodicals LLC", etc.)
+     * Editorial metadata ("This article is part of...", "Topic Editors", "Topic Editor", special issue information)
+     * References to other articles ("For a full listing, see [URL]", "see [journal] early view", etc.)
+     * ISSN numbers, DOI references, and similar publication identifiers
+     * Author attributions that are publication metadata (at the end of articles, not citations within content)
+     * "This article is part of" statements and related editorial information
+     * Any lines or paragraphs that primarily contain publication/editorial metadata rather than article content
 
 6. **Format special content for speech**:
    - Acronyms: Decide whether to spell out (NASA → "N-A-S-A") or keep as word (NATO) based on common usage
