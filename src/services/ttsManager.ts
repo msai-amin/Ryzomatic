@@ -15,7 +15,7 @@ export interface TTSProvider {
   getVoices: () => Promise<any[]>
   speak: (text: string, onEnd?: () => void, onWord?: (word: string, charIndex: number) => void) => Promise<void>
   pause: () => void
-  resume: () => void
+  resume: () => void | Promise<void>
   stop: () => void
   isSpeaking: () => boolean
   isPausedState: () => boolean
@@ -240,9 +240,14 @@ class TTSManager {
     }
   }
 
-  resume(): void {
+  async resume(): Promise<void> {
     if (this.currentProvider) {
-      this.currentProvider.resume()
+      // Resume can be async for Google Cloud TTS (to handle AudioContext resume)
+      if (this.currentProvider.type === 'google-cloud') {
+        await (this.currentProvider.resume() as Promise<void>)
+      } else {
+        this.currentProvider.resume()
+      }
     }
   }
 

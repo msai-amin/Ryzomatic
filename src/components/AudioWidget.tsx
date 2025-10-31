@@ -45,20 +45,9 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       
       let text = ''
       
-      // Get text from content or pageTexts
-      if (currentDocument.content && typeof currentDocument.content === 'string') {
-        console.log('🔍 AudioWidget: Raw content analysis', {
-          contentType: typeof currentDocument.content,
-          contentConstructor: (currentDocument.content as any)?.constructor?.name,
-          contentValue: currentDocument.content.substring(0, 200) + (currentDocument.content.length > 200 ? '...' : ''),
-          isString: typeof currentDocument.content === 'string',
-          isArrayBuffer: (currentDocument.content as any) instanceof ArrayBuffer
-        });
-        
-        // Use string content directly
-        text = currentDocument.content
-        console.log('🔍 AudioWidget: Using content', { textType: typeof text, textLength: text.length });
-      } else if (currentDocument.pageTexts && currentDocument.pageTexts.length > 0) {
+      // Priority: pageTexts (for PDFs) > string content (for text files)
+      // For PDFs, content is ArrayBuffer (binary data), so we must use pageTexts
+      if (currentDocument.pageTexts && currentDocument.pageTexts.length > 0) {
         console.log('🔍 AudioWidget: Processing pageTexts', {
           pageTextsTypes: currentDocument.pageTexts.map((text, i) => ({
             index: i,
@@ -74,12 +63,19 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         )
         text = safePageTexts.join('\n\n')
         console.log('🔍 AudioWidget: Joined text', { textType: typeof text, textLength: text.length });
-      } else if (currentDocument.content && typeof currentDocument.content !== 'string') {
-        console.log('🔍 AudioWidget: Content is not a string, skipping content processing', {
-          contentType: typeof currentDocument.content,
-          contentConstructor: (currentDocument.content as any)?.constructor?.name,
-          isArrayBuffer: (currentDocument.content as any) instanceof ArrayBuffer
-        });
+      } else if (currentDocument.content && typeof currentDocument.content === 'string') {
+        // Fallback to string content only if pageTexts is not available
+        // Check that it's actually a valid string (not "[object ArrayBuffer]")
+        const contentStr = String(currentDocument.content);
+        if (contentStr && !contentStr.startsWith('[object ') && contentStr.length > 10) {
+          console.log('🔍 AudioWidget: Using string content (no pageTexts available)', {
+            contentType: typeof currentDocument.content,
+            textLength: contentStr.length
+          });
+          text = contentStr;
+        } else {
+          console.warn('🔍 AudioWidget: Content appears to be invalid (likely ArrayBuffer converted to string), skipping');
+        }
       }
       
       if (text) {
@@ -336,8 +332,13 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       updateTTS({ isPlaying: false, isPaused: true }) // SET PAUSED FLAG
     } else if (tts.isPaused) { // CHECK STORE PAUSED STATE
       // Resume
-      ttsManager.resume()
-      updateTTS({ isPlaying: true, isPaused: false }) // CLEAR PAUSED FLAG
+      try {
+        await ttsManager.resume()
+        updateTTS({ isPlaying: true, isPaused: false }) // CLEAR PAUSED FLAG
+      } catch (error) {
+        console.error('AudioWidget: Failed to resume playback:', error)
+        updateTTS({ isPlaying: false, isPaused: false })
+      }
     } else {
       // Start new playback with caching
       setIsProcessing(true)

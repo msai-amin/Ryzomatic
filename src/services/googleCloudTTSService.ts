@@ -482,6 +482,31 @@ class GoogleCloudTTSService {
     }
 
     try {
+      // CRITICAL FIX: Resume AudioContext if suspended
+      // Modern browsers require user interaction to resume suspended AudioContext
+      if (this.audioContext.state === 'suspended') {
+        console.log('AudioContext is suspended, attempting to resume...');
+        try {
+          await this.audioContext.resume();
+          console.log('AudioContext resumed successfully');
+        } catch (resumeError) {
+          console.error('Failed to resume AudioContext:', resumeError);
+          throw new Error('Cannot play audio: AudioContext is suspended and cannot be resumed. Please interact with the page first.');
+        }
+      }
+
+      // Ensure AudioContext is running before playing
+      if (this.audioContext.state !== 'running') {
+        console.warn('AudioContext state is not running:', this.audioContext.state);
+        // Try to resume again
+        try {
+          await this.audioContext.resume();
+        } catch (resumeError) {
+          console.error('Failed to resume AudioContext before playback:', resumeError);
+          throw new Error('Cannot play audio: AudioContext is not running');
+        }
+      }
+
       // Decode audio data
       const decodedAudio = await this.audioContext.decodeAudioData(audioBuffer);
       
@@ -504,7 +529,7 @@ class GoogleCloudTTSService {
       this.onWordCallback = onWord || null;
       
       // CRITICAL: Create a Promise that resolves when audio ends
-      const audioEndPromise = new Promise<void>((resolve) => {
+      const audioEndPromise = new Promise<void>((resolve, reject) => {
         source.onended = () => {
           this.isPaused = false;
           this.pauseTime = 0;
@@ -518,18 +543,45 @@ class GoogleCloudTTSService {
           this.onWordCallback = null;
           resolve(); // Resolve promise when audio ends
         };
+        
+        // Handle errors during playback
+        source.onerror = (error) => {
+          console.error('Audio source error:', error);
+          this.isPaused = false;
+          this.pauseTime = 0;
+          this.startTime = 0;
+          this.audioStartTime = 0;
+          this.audioPauseTime = 0;
+          this.currentAudioBuffer = null;
+          this.currentAudio = null;
+          this.onEndCallback = null;
+          this.onWordCallback = null;
+          reject(new Error('Audio playback error'));
+        };
       });
 
       // Start playing and track start time
       this.audioStartTime = this.audioContext.currentTime;
       this.startTime = this.audioContext.currentTime;
-      source.start();
+      
+      try {
+        source.start();
+        console.log('Audio playback started successfully, AudioContext state:', this.audioContext.state);
+      } catch (startError) {
+        console.error('Failed to start audio playback:', startError);
+        throw new Error('Failed to start audio playback: ' + (startError instanceof Error ? startError.message : String(startError)));
+      }
       
       // WAIT for audio to complete before returning
       await audioEndPromise;
       
     } catch (error) {
       console.error('Error playing audio:', error);
+      // Clean up on error
+      this.currentAudio = null;
+      this.currentAudioBuffer = null;
+      this.onEndCallback = null;
+      this.onWordCallback = null;
       throw error;
     }
   }
@@ -550,9 +602,21 @@ class GoogleCloudTTSService {
     }
   }
 
-  resume() {
+  async resume() {
     if (this.isPaused && this.audioContext && this.currentAudioBuffer) {
       console.log('GoogleCloudTTSService: Resuming from time:', this.pauseTime);
+      
+      // Resume AudioContext if suspended
+      if (this.audioContext.state === 'suspended') {
+        console.log('AudioContext is suspended during resume, attempting to resume...');
+        try {
+          await this.audioContext.resume();
+          console.log('AudioContext resumed successfully during resume');
+        } catch (resumeError) {
+          console.error('Failed to resume AudioContext during resume:', resumeError);
+          throw new Error('Cannot resume audio: AudioContext is suspended');
+        }
+      }
       
       // Create a new audio source
       const source = this.audioContext.createBufferSource();
