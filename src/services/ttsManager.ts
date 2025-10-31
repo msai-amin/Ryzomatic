@@ -224,6 +224,10 @@ class TTSManager {
     console.log('TTSManager.speak: Stopping any currently playing audio...')
     this.stop()
     
+    // Small delay to ensure stop() completes before starting new playback
+    // This prevents race conditions with stopRequested flags
+    await new Promise(resolve => setTimeout(resolve, 50))
+    
     console.log('TTSManager.speak: Calling provider.speak...')
     try {
       await this.currentProvider.speak(text, onEnd, onWord)

@@ -344,7 +344,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       setIsProcessing(true)
       
       try {
-        ttsManager.stop()
+        // Don't call stop() here - TTSManager.speak() already calls stop() internally
+        // Calling it here causes stopRequested flag to be set incorrectly
         updateTTS({ isPlaying: false, isPaused: false }) // Ensure paused is false
         
         const text = getTextForPlaybackMode(playbackMode)

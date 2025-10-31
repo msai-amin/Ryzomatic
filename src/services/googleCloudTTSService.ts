@@ -399,11 +399,20 @@ class GoogleCloudTTSService {
 
   async speak(text: string, onEnd?: () => void, onWord?: (word: string, charIndex: number) => void): Promise<void> {
     try {
-      // Reset stop flag for new playback
+      // CRITICAL: Reset stop flag FIRST before any async operations
+      // This ensures new playback can proceed even if stop() was called previously
+      console.log('GoogleCloudTTSService.speak: Resetting stopRequested from', this.stopRequested, 'to false');
       this.stopRequested = false;
       
-      // Stop any current speech
-      this.stop();
+      // Stop any current speech (but don't let it block new playback)
+      // Only stop if there's actually audio playing
+      if (this.currentAudio || this.isPaused) {
+        this.stop();
+        // Reset flag again after stop() (since stop() sets it to true)
+        this.stopRequested = false;
+      }
+      
+      console.log('GoogleCloudTTSService.speak: stopRequested =', this.stopRequested, 'after stop(), ready to start playback');
 
       // Auto-select a voice if none is selected
       if (!this.settings.voice) {
@@ -450,12 +459,13 @@ class GoogleCloudTTSService {
     }
 
     console.log(`Split text into ${chunks.length} chunks`);
+    console.log(`GoogleCloudTTSService.speakInChunks: stopRequested = ${this.stopRequested} at start`);
 
     // Play each chunk sequentially
     for (let i = 0; i < chunks.length; i++) {
       // CHECK FOR STOP REQUEST BEFORE EACH CHUNK
       if (this.stopRequested) {
-        console.log(`Chunk playback cancelled at ${i + 1}/${chunks.length}`);
+        console.log(`Chunk playback cancelled at ${i + 1}/${chunks.length}, stopRequested = ${this.stopRequested}`);
         return; // Exit loop immediately
       }
       
@@ -651,8 +661,9 @@ class GoogleCloudTTSService {
   }
 
   stop() {
-    console.log('GoogleCloudTTSService.stop() called')
+    console.log('GoogleCloudTTSService.stop() called, stopRequested was:', this.stopRequested)
     this.stopRequested = true; // SET FLAG IMMEDIATELY
+    console.log('GoogleCloudTTSService.stop() set stopRequested to:', this.stopRequested)
     
     if (this.currentAudio) {
       console.log('GoogleCloudTTSService: Stopping current audio')
@@ -672,7 +683,7 @@ class GoogleCloudTTSService {
     this.currentAudioBuffer = null;
     this.onEndCallback = null;
     this.onWordCallback = null;
-    console.log('GoogleCloudTTSService: Stop completed')
+    console.log('GoogleCloudTTSService: Stop completed, stopRequested =', this.stopRequested)
   }
 
   isSpeaking(): boolean {
