@@ -49,20 +49,35 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     if (savedTheme) {
       try {
         const parsedTheme = JSON.parse(savedTheme as string);
-        setCurrentTheme(parsedTheme);
+        // Validate that the theme has all required properties
+        if (parsedTheme && parsedTheme.colors && parsedTheme.colors.background && parsedTheme.colors.textPrimary) {
+          setCurrentTheme(parsedTheme);
+        } else {
+          console.warn('Saved theme is missing required properties, using default');
+          // Clear invalid theme from localStorage
+          localStorage.removeItem('academic-reader-theme');
+        }
       } catch (error) {
         console.warn('Failed to parse saved theme, using default');
+        // Clear corrupted theme from localStorage
+        localStorage.removeItem('academic-reader-theme');
       }
     }
     
     if (savedDarkMode) {
-      setIsDarkMode(JSON.parse(savedDarkMode as string));
+      try {
+        setIsDarkMode(JSON.parse(savedDarkMode as string));
+      } catch (error) {
+        console.warn('Failed to parse saved dark mode, using default');
+      }
     }
 
     if (savedColors) {
       try {
         const parsedColors = JSON.parse(savedColors as string);
-        setAnnotationColors(parsedColors);
+        if (Array.isArray(parsedColors)) {
+          setAnnotationColors(parsedColors);
+        }
       } catch (error) {
         console.warn('Failed to parse saved colors, using defaults');
       }
@@ -88,42 +103,84 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   useEffect(() => {
     const root = document.documentElement;
     
-    // Apply CSS custom properties
-    Object.entries(currentTheme.colors).forEach(([key, value]) => {
-      if (typeof value === 'object' && value !== null) {
+    // Ensure theme is valid - if currentTheme is missing properties, use defaultTheme
+    const themeToApply = currentTheme || defaultTheme;
+    
+    // Validate that background/surface colors aren't white (which would cause visibility issues on dark theme)
+    const validateBackgroundColor = (color: string, fallback: string, key: string): string => {
+      // Only validate background and surface colors to prevent white backgrounds
+      const isBackgroundColor = key === 'background' || key === 'backgroundSecondary' || 
+                                key === 'backgroundTertiary' || key === 'surface' || 
+                                key === 'surfaceHover' || key === 'surfaceBorder';
+      
+      if (isBackgroundColor && color && 
+          (color.toLowerCase() === '#ffffff' || color.toLowerCase() === '#fff' || color.toLowerCase() === 'white')) {
+        console.warn(`Invalid white background color detected for ${key}, using fallback`);
+        return fallback;
+      }
+      return color;
+    };
+    
+    // Apply CSS custom properties with validation
+    Object.entries(themeToApply.colors).forEach(([key, value]) => {
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
         Object.entries(value).forEach(([subKey, subValue]) => {
-          root.style.setProperty(`--color-${key}-${subKey}`, subValue as string);
+          if (subValue && typeof subValue === 'string') {
+            // Get fallback from defaultTheme if available
+            const fallback = (defaultTheme.colors as any)[key]?.[subKey] || subValue;
+            const validatedColor = validateBackgroundColor(subValue, fallback, key);
+            root.style.setProperty(`--color-${key}-${subKey}`, validatedColor);
+          }
         });
-      } else {
-        root.style.setProperty(`--color-${key}`, value as string);
+      } else if (value && typeof value === 'string') {
+        // Get fallback from defaultTheme if available
+        const fallback = (defaultTheme.colors as any)[key] || value;
+        const validatedColor = validateBackgroundColor(value, fallback, key);
+        root.style.setProperty(`--color-${key}`, validatedColor);
       }
     });
 
     // Apply spacing
-    Object.entries(currentTheme.spacing).forEach(([key, value]) => {
-      root.style.setProperty(`--spacing-${key}`, value);
-    });
+    if (themeToApply.spacing) {
+      Object.entries(themeToApply.spacing).forEach(([key, value]) => {
+        if (value) {
+          root.style.setProperty(`--spacing-${key}`, value as string);
+        }
+      });
+    }
 
     // Apply typography
-    Object.entries(currentTheme.typography).forEach(([key, value]) => {
-      if (typeof value === 'object' && value !== null) {
-        Object.entries(value).forEach(([subKey, subValue]) => {
-          root.style.setProperty(`--font-${key}-${subKey}`, subValue as string);
-        });
-      } else {
-        root.style.setProperty(`--font-${key}`, value as string);
-      }
-    });
+    if (themeToApply.typography) {
+      Object.entries(themeToApply.typography).forEach(([key, value]) => {
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          Object.entries(value).forEach(([subKey, subValue]) => {
+            if (subValue !== null && subValue !== undefined) {
+              root.style.setProperty(`--font-${key}-${subKey}`, String(subValue));
+            }
+          });
+        } else if (value !== null && value !== undefined) {
+          root.style.setProperty(`--font-${key}`, String(value));
+        }
+      });
+    }
 
     // Apply border radius
-    Object.entries(currentTheme.borderRadius).forEach(([key, value]) => {
-      root.style.setProperty(`--border-radius-${key}`, value);
-    });
+    if (themeToApply.borderRadius) {
+      Object.entries(themeToApply.borderRadius).forEach(([key, value]) => {
+        if (value) {
+          root.style.setProperty(`--border-radius-${key}`, value as string);
+        }
+      });
+    }
 
     // Apply shadows
-    Object.entries(currentTheme.shadows).forEach(([key, value]) => {
-      root.style.setProperty(`--shadow-${key}`, value);
-    });
+    if (themeToApply.shadows) {
+      Object.entries(themeToApply.shadows).forEach(([key, value]) => {
+        if (value) {
+          root.style.setProperty(`--shadow-${key}`, value as string);
+        }
+      });
+    }
 
     // Apply dark mode class
     if (isDarkMode) {
@@ -131,7 +188,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     } else {
       document.body.classList.remove('dark');
     }
-  }, [currentTheme, isDarkMode]);
+  }, [currentTheme, isDarkMode, defaultTheme]);
 
   const setTheme = (theme: ThemeConfig) => {
     setCurrentTheme(theme);
