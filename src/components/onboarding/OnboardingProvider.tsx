@@ -188,7 +188,9 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   useEffect(() => {
     if (user && !isActive && steps.length > 0) {
       const hasCompletedOnboarding = localStorage.getItem('onboarding-completed')
-      if (!hasCompletedOnboarding) {
+      const hasDismissedOnboarding = localStorage.getItem('onboarding-dismissed')
+      // Only start onboarding if user hasn't completed it AND hasn't dismissed it
+      if (!hasCompletedOnboarding && !hasDismissedOnboarding) {
         // Small delay to ensure UI is rendered
         const timer = setTimeout(() => {
           startOnboarding()
@@ -237,6 +239,8 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   }
 
   const closeOnboarding = () => {
+    // Save dismissal flag so it doesn't pop up again
+    localStorage.setItem('onboarding-dismissed', 'true')
     setIsActive(false)
     setCurrentStep(0)
   }
