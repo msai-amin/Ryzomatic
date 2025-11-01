@@ -449,7 +449,7 @@ const LandingPage: React.FC = () => {
                 
                 <div className="pt-8">
                   <button
-                    onClick={tier.name === 'Academic' ? () => window.location.href = 'mailto:support@vstyle.co' : handleGetStarted}
+                    onClick={tier.name === 'Academic' ? () => window.location.href = 'mailto:info@thevstyle.ca' : handleGetStarted}
                     className={`w-full rounded-full px-4 py-3 text-sm font-semibold transition ${
                       tier.popular
                         ? 'bg-slate-800 text-white shadow-lg shadow-slate-800/20 hover:bg-slate-700'
@@ -479,7 +479,7 @@ const LandingPage: React.FC = () => {
             <a href="#features" className="transition hover:text-slate-900">Features</a>
             <a href="#use-cases" className="transition hover:text-slate-900">Use Cases</a>
             <a href="#pricing" className="transition hover:text-slate-900">Pricing</a>
-            <a href="mailto:support@vstyle.co" className="transition hover:text-slate-900">support@vstyle.co</a>
+            <a href="mailto:info@thevstyle.ca" className="transition hover:text-slate-900">info@thevstyle.ca</a>
           </div>
           
           <p className="text-xs text-slate-500">
