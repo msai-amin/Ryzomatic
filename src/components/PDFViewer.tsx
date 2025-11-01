@@ -1970,14 +1970,19 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
     // Determine which page the selection is on
     let currentPage = pageNumber
-    if (pdfViewer.scrollMode === 'continuous') {
+    // In reading mode or continuous scroll mode, detect page from DOM
+    if (pdfViewer.readingMode || pdfViewer.scrollMode === 'continuous') {
       // Find the page containing the selection
       const targetElement = range.commonAncestorContainer
       const pageElement = (targetElement as Element).closest?.('[data-page-number]') ||
-                         (targetElement.parentElement as Element)?.closest?.('[data-page-number]')
+                         (targetElement.nodeType === Node.TEXT_NODE 
+                           ? (targetElement.parentElement as Element)?.closest?.('[data-page-number]')
+                           : null)
       if (pageElement) {
         const pageAttr = pageElement.getAttribute('data-page-number')
-        if (pageAttr) currentPage = parseInt(pageAttr)
+        if (pageAttr) {
+          currentPage = parseInt(pageAttr, 10)
+        }
       }
     }
 
@@ -2005,7 +2010,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       x: rect.right + 10,
       y: rect.top - 10
     })
-  }, [pdfViewer.scrollMode, pageNumber, isHighlightMode])
+  }, [pdfViewer.scrollMode, pdfViewer.readingMode, pageNumber, isHighlightMode])
   
   // Handle right-click context menu for AI features
   const handleContextMenuClick = useCallback((event: React.MouseEvent) => {
@@ -2454,7 +2459,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               fontSize: `${typography.fontSize}px`,
               lineHeight: typography.lineHeight,
               textAlign: typography.textAlign,
-              hyphens: typography.textAlign === 'justify' ? 'auto' : 'none'
+              hyphens: typography.textAlign === 'justify' ? 'auto' : 'none',
+              userSelect: 'text',
+              WebkitUserSelect: 'text',
+              MozUserSelect: 'text',
+              msUserSelect: 'text'
             }}
             data-page-number={pageNum}
             onContextMenu={handleContextMenuClick}
