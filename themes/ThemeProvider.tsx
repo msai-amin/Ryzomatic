@@ -46,29 +46,53 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     const savedDarkMode = localStorage.getItem('academic-reader-dark-mode');
     const savedColors = localStorage.getItem('annotation-colors-custom');
     
+    // Load dark mode first so we can use it for validation
+    let loadedDarkMode = false;
+    if (savedDarkMode) {
+      try {
+        loadedDarkMode = JSON.parse(savedDarkMode as string);
+        setIsDarkMode(loadedDarkMode);
+      } catch (error) {
+        console.warn('Failed to parse saved dark mode, using default');
+      }
+    }
+    
     if (savedTheme) {
       try {
         const parsedTheme = JSON.parse(savedTheme as string);
-        // Validate that the theme has all required properties
-        if (parsedTheme && parsedTheme.colors && parsedTheme.colors.background && parsedTheme.colors.textPrimary) {
-          setCurrentTheme(parsedTheme);
+        // Comprehensive validation: check for all required properties
+        const hasRequiredColors = parsedTheme && 
+          parsedTheme.colors && 
+          parsedTheme.colors.background && 
+          parsedTheme.colors.textPrimary &&
+          parsedTheme.colors.surface &&
+          parsedTheme.colors.border;
+        
+        // Validate color values are not invalid (white backgrounds, white text in light mode, etc)
+        if (hasRequiredColors) {
+          // Quick validation: check if critical colors are white/transparent
+          const bg = String(parsedTheme.colors.background || '').toLowerCase();
+          const text = String(parsedTheme.colors.textPrimary || '').toLowerCase();
+          const isWhiteBg = bg === '#ffffff' || bg === '#fff' || bg === 'white' || bg === 'transparent';
+          const isWhiteText = text === '#ffffff' || text === '#fff' || text === 'white';
+          
+          // Block white backgrounds always, and white text in light mode
+          if (isWhiteBg || (isWhiteText && !loadedDarkMode)) {
+            console.warn('Saved theme has invalid color values (white background/text), using default');
+            localStorage.removeItem('academic-reader-theme');
+            setCurrentTheme(defaultTheme);
+          } else {
+            setCurrentTheme(parsedTheme);
+          }
         } else {
           console.warn('Saved theme is missing required properties, using default');
           // Clear invalid theme from localStorage
           localStorage.removeItem('academic-reader-theme');
         }
       } catch (error) {
-        console.warn('Failed to parse saved theme, using default');
+        console.warn('Failed to parse saved theme, using default:', error);
         // Clear corrupted theme from localStorage
         localStorage.removeItem('academic-reader-theme');
-      }
-    }
-    
-    if (savedDarkMode) {
-      try {
-        setIsDarkMode(JSON.parse(savedDarkMode as string));
-      } catch (error) {
-        console.warn('Failed to parse saved dark mode, using default');
       }
     }
 
@@ -106,36 +130,54 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     // Ensure theme is valid - if currentTheme is missing properties, use defaultTheme
     const themeToApply = currentTheme || defaultTheme;
     
-    // Validate that background/surface colors aren't white (which would cause visibility issues on dark theme)
-    const validateBackgroundColor = (color: string, fallback: string, key: string): string => {
-      // Only validate background and surface colors to prevent white backgrounds
+    // Comprehensive color validation to prevent visibility issues
+    const validateColor = (color: string, fallback: string, key: string, subKey?: string): string => {
+      if (!color || typeof color !== 'string') {
+        return fallback;
+      }
+      
+      const colorLower = color.toLowerCase().trim();
+      const isWhite = colorLower === '#ffffff' || colorLower === '#fff' || colorLower === 'white';
+      const isTransparent = colorLower === 'transparent' || colorLower === 'rgba(0,0,0,0)';
+      
+      // Determine color type
       const isBackgroundColor = key === 'background' || key === 'backgroundSecondary' || 
                                 key === 'backgroundTertiary' || key === 'surface' || 
                                 key === 'surfaceHover' || key === 'surfaceBorder';
+      const isTextColor = key === 'textPrimary' || key === 'textSecondary' || 
+                          key === 'textTertiary' || key === 'textInverse' ||
+                          (key === 'text' && (subKey === 'Primary' || subKey === 'Secondary' || subKey === 'Tertiary'));
       
-      if (isBackgroundColor && color && 
-          (color.toLowerCase() === '#ffffff' || color.toLowerCase() === '#fff' || color.toLowerCase() === 'white')) {
-        console.warn(`Invalid white background color detected for ${key}, using fallback`);
+      // Block white/transparent backgrounds - always invalid
+      if (isBackgroundColor && (isWhite || isTransparent)) {
+        console.warn(`Invalid white/transparent background color detected for ${key}${subKey ? '.' + subKey : ''}, using fallback`);
         return fallback;
       }
+      
+      // Block white text colors in light mode (would be invisible on light backgrounds)
+      if (isTextColor && isWhite && !isDarkMode) {
+        console.warn(`Invalid white text color detected for ${key}${subKey ? '.' + subKey : ''} in light mode, using fallback`);
+        return fallback;
+      }
+      
       return color;
     };
     
-    // Apply CSS custom properties with validation
+    // Apply CSS custom properties with comprehensive validation
     Object.entries(themeToApply.colors).forEach(([key, value]) => {
       if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
         Object.entries(value).forEach(([subKey, subValue]) => {
           if (subValue && typeof subValue === 'string') {
             // Get fallback from defaultTheme if available
             const fallback = (defaultTheme.colors as any)[key]?.[subKey] || subValue;
-            const validatedColor = validateBackgroundColor(subValue, fallback, key);
+            const validatedColor = validateColor(subValue, fallback, key, subKey);
             root.style.setProperty(`--color-${key}-${subKey}`, validatedColor);
           }
         });
       } else if (value && typeof value === 'string') {
         // Get fallback from defaultTheme if available
         const fallback = (defaultTheme.colors as any)[key] || value;
-        const validatedColor = validateBackgroundColor(value, fallback, key);
+        const validatedColor = validateColor(value, fallback, key);
         root.style.setProperty(`--color-${key}`, validatedColor);
       }
     });
