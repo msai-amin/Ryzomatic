@@ -398,9 +398,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   
   setAuthenticated: (authenticated) => set({ isAuthenticated: authenticated }),
   
-  checkAuth: async () => {
+  checkAuth: async (sessionFromContext?: any) => {
     try {
-      const user = await authService.getCurrentUser();
+      let user;
+      
+      // If session is provided from AuthContext, use it directly to avoid race condition
+      if (sessionFromContext?.user) {
+        user = sessionFromContext.user;
+        console.log('Using session from AuthContext:', user.email);
+      } else {
+        // Otherwise, get user from auth service (fallback for backward compatibility)
+        user = await authService.getCurrentUser();
+      }
       
       if (user) {
         console.log('User authenticated:', user.email);

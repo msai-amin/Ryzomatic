@@ -15,8 +15,12 @@ import { supabaseStorageService } from './services/supabaseStorageService'
 import { libraryOrganizationService } from './services/libraryOrganizationService'
 import { librarySearchService } from './services/librarySearchService'
 import { ThemeProvider } from '../themes/ThemeProvider'
+import { useAuth } from './contexts/AuthContext'
 
 function App() {
+  // Use AuthContext as the single source of truth for auth state
+  const { session, loading: authLoading } = useAuth()
+  
   const { 
     isChatOpen, 
     toggleChat, 
@@ -29,6 +33,21 @@ function App() {
   const [isInitialized, setIsInitialized] = useState(false)
   const [showNeoReader, setShowNeoReader] = useState(false)
   const [showLandingPage, setShowLandingPage] = useState(false)
+
+  // Sync AuthContext session changes with Zustand store
+  useEffect(() => {
+    if (!authLoading && session) {
+      // Session is available from AuthContext, sync with Zustand store
+      checkAuth(session).catch((error) => {
+        logger.error('Failed to sync session with store', { component: 'App' }, error);
+      });
+    } else if (!authLoading && !session) {
+      // No session available, clear auth state in store
+      const { setAuthenticated, setUser } = useAppStore.getState();
+      setAuthenticated(false);
+      setUser(null);
+    }
+  }, [session, authLoading, checkAuth]);
 
   useEffect(() => {
     // Initialize monitoring and error handling
@@ -100,7 +119,14 @@ function App() {
       logger.info('Not showing landing page - has OAuth params', context);
     }
 
+    // Wait for AuthContext to finish loading before initializing
+    // This prevents the race condition where checkAuth runs before session is restored
+    if (authLoading) {
+      return; // Don't proceed until AuthContext has loaded the session
+    }
+
     // Check authentication status on app load
+    // Now that AuthContext has loaded, we can safely check auth state
     const initializeAuth = async () => {
       // If we have OAuth callback parameters, let Supabase handle them
       if (urlParams.has('code') || hashParams.has('access_token')) {
@@ -132,27 +158,19 @@ function App() {
         });
       }
       
-      try {
-        if (supabase) {
-          await checkAuth()
-          
-          // Initialize Supabase storage service if user is already authenticated
-          if (isAuthenticated && user) {
-            supabaseStorageService.setCurrentUser(user.id)
-            libraryOrganizationService.setCurrentUser(user.id)
-            librarySearchService.setCurrentUser(user.id)
-            logger.info('Supabase storage service initialized on startup', { userId: user.id })
-          }
-        } else {
-          logger.warn('Supabase not available - skipping auth check', context);
-        }
-        setIsInitialized(true)
-        logger.info('Authentication initialization completed', context);
-      } catch (error) {
-        logger.error('Authentication initialization failed', context, error as Error);
-        await errorHandler.handleError(error as Error, context);
-        setIsInitialized(true); // Still initialize to show error state
+      // Initialize services if user is authenticated
+      // Note: Session sync is handled by the separate useEffect above
+      // We just need to initialize services here
+      if (supabase && session && session.user) {
+        const userId = session.user.id;
+        supabaseStorageService.setCurrentUser(userId)
+        libraryOrganizationService.setCurrentUser(userId)
+        librarySearchService.setCurrentUser(userId)
+        logger.info('Supabase storage service initialized on startup', { userId })
       }
+      
+      setIsInitialized(true)
+      logger.info('Authentication initialization completed', context);
     }
     
     initializeAuth()
@@ -168,9 +186,12 @@ function App() {
         });
         
         // Only process SIGNED_IN and SIGNED_OUT events
+        // Note: AuthContext already handles session updates, we just need to:
+        // 1. Initialize services when user signs in
+        // 2. Close auth modal on successful sign-in
         if (event === 'SIGNED_IN' && user) {
           // User just signed in (via OAuth or email)
-          await checkAuth()
+          // Session sync will happen automatically via the useEffect that watches session
           
           // Initialize Supabase storage service with user ID
           supabaseStorageService.setCurrentUser(user.id)
@@ -181,10 +202,10 @@ function App() {
           setIsAuthModalOpen(false)
         } else if (event === 'SIGNED_OUT') {
           // Only clear state on explicit sign-out, not on token refresh
+          // Session sync will happen automatically via the useEffect that watches session
           logger.info('User signed out')
-          await checkAuth()
         }
-        // Ignore TOKEN_REFRESHED and other events to prevent loops
+        // Ignore TOKEN_REFRESHED and other events - AuthContext handles these
       })
       subscription = authStateChange.data.subscription
     }
@@ -195,7 +216,7 @@ function App() {
         subscription.unsubscribe()
       }
     }
-  }, [checkAuth])
+  }, [checkAuth, authLoading, session])
 
   const handleAuthSuccess = async () => {
     if (supabase) {
@@ -208,8 +229,8 @@ function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const wantsAuth = urlParams.get('auth') === 'true';
 
-  // Show loading while checking auth
-  if (!isInitialized) {
+  // Show loading while AuthContext is loading or app is initializing
+  if (authLoading || !isInitialized) {
     return (
       <div 
         className="min-h-screen flex items-center justify-center"
