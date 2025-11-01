@@ -1848,10 +1848,38 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   // Handle text selection for highlighting (Method 1)
   // AI Context Menu Handlers
   const handleAIClarification = useCallback(() => {
-    // Get current page text for context
-    const rawPageText = document.pageTexts?.[pageNumber - 1]
-    const pageText = typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
-    const context = getPDFTextSelectionContext(pageNumber, pageText)
+    // Detect page number from selection or use current page
+    let detectedPageNumber = pageNumber
+    const selection = window.getSelection()
+    
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0)
+      const targetElement = range.commonAncestorContainer
+      const pageElement = (targetElement as Element).closest?.('[data-page-number]') ||
+                         (targetElement.nodeType === Node.TEXT_NODE 
+                           ? (targetElement.parentElement as Element)?.closest?.('[data-page-number]')
+                           : null)
+      
+      if (pageElement) {
+        const pageAttr = pageElement.getAttribute('data-page-number')
+        if (pageAttr) {
+          detectedPageNumber = parseInt(pageAttr, 10)
+        }
+      }
+    }
+    
+    // Get page text - prioritize cleaned text if available, otherwise use original
+    const cleanedText = cleanedPageTexts[detectedPageNumber]
+    let pageText: string
+    
+    if (cleanedText) {
+      pageText = cleanedText
+    } else {
+      const rawPageText = document.pageTexts?.[detectedPageNumber - 1]
+      pageText = typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
+    }
+    
+    const context = getPDFTextSelectionContext(detectedPageNumber, pageText)
     
     if (context) {
       setSelectedTextContext(context)
@@ -1861,12 +1889,41 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       }
     }
     setContextMenu(null)
-  }, [pageNumber, document.pageTexts, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
+  }, [pageNumber, document.pageTexts, cleanedPageTexts, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
 
   const handleAIFurtherReading = useCallback(() => {
-    const rawPageText = document.pageTexts?.[pageNumber - 1]
-    const pageText = typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
-    const context = getPDFTextSelectionContext(pageNumber, pageText)
+    // Detect page number from selection or use current page
+    let detectedPageNumber = pageNumber
+    const selection = window.getSelection()
+    
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0)
+      const targetElement = range.commonAncestorContainer
+      const pageElement = (targetElement as Element).closest?.('[data-page-number]') ||
+                         (targetElement.nodeType === Node.TEXT_NODE 
+                           ? (targetElement.parentElement as Element)?.closest?.('[data-page-number]')
+                           : null)
+      
+      if (pageElement) {
+        const pageAttr = pageElement.getAttribute('data-page-number')
+        if (pageAttr) {
+          detectedPageNumber = parseInt(pageAttr, 10)
+        }
+      }
+    }
+    
+    // Get page text - prioritize cleaned text if available, otherwise use original
+    const cleanedText = cleanedPageTexts[detectedPageNumber]
+    let pageText: string
+    
+    if (cleanedText) {
+      pageText = cleanedText
+    } else {
+      const rawPageText = document.pageTexts?.[detectedPageNumber - 1]
+      pageText = typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
+    }
+    
+    const context = getPDFTextSelectionContext(detectedPageNumber, pageText)
     
     if (context) {
       setSelectedTextContext(context)
@@ -1876,7 +1933,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       }
     }
     setContextMenu(null)
-  }, [pageNumber, document.pageTexts, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
+  }, [pageNumber, document.pageTexts, cleanedPageTexts, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
 
   const handleSaveNoteFromContext = useCallback(() => {
     if (contextMenu) {
@@ -2399,6 +2456,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               textAlign: typography.textAlign,
               hyphens: typography.textAlign === 'justify' ? 'auto' : 'none'
             }}
+            data-page-number={pageNum}
+            onContextMenu={handleContextMenuClick}
           >
             {segments.map((segment, index) => {
               if (segment.type === 'break') {
@@ -2684,7 +2743,43 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                     <Type className="w-5 h-5" />
                   </button>
                   <button
-                    onClick={() => setShowCleanupModal(true)}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setIsHighlightMode(!isHighlightMode)
+                      // Clear any existing selection and popover when toggling mode
+                      if (isHighlightMode) {
+                        setHighlightPickerPosition(null)
+                        setSelectedTextInfo(null)
+                        setShowHighlightColorPopover(false)
+                      }
+                    }}
+                    className={`p-2 rounded-lg transition-colors relative ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText}`}
+                    style={{
+                      backgroundColor: isHighlightMode ? 'var(--color-primary-light, rgba(59, 130, 246, 0.1))' : undefined,
+                      color: isHighlightMode ? 'var(--color-primary, #3b82f6)' : undefined
+                    }}
+                    title={isHighlightMode ? "Exit Highlight Mode" : "Enter Highlight Mode"}
+                  >
+                    <Highlighter className="w-5 h-5" />
+                    {/* Highlight Mode Marker */}
+                    {isHighlightMode && (
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-pulse" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Check if cleanedPageTexts already exists (indicates TTS-ready text has been generated)
+                      if (Object.keys(cleanedPageTexts).length > 0) {
+                        const confirmed = window.confirm(
+                          'This document has already been processed with AI cleanup (TTS-ready text has been generated). Do you want to process it again?'
+                        )
+                        if (!confirmed) {
+                          return
+                        }
+                      }
+                      setShowCleanupModal(true)
+                    }}
                     className={`p-2 ${themeStyles.buttonBg} ${themeStyles.buttonHover} ${themeStyles.buttonText} rounded-lg transition-colors`}
                     title="Clean Up Text"
                   >
@@ -2770,7 +2865,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 }
                 
                 return (
-                  <div key={pageNum} className="mb-16 last:mb-0">
+                  <div key={pageNum} className="mb-16 last:mb-0" data-page-number={pageNum}>
                     {/* Page number indicator with edit icon */}
                     <div className="flex items-center justify-center gap-3 mb-4">
                       <div className={`text-sm ${themeStyles.text} opacity-50`}>
