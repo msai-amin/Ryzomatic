@@ -1200,108 +1200,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     }
   }, [ocrStatus, document.id])
 
-  // Process formulas for LaTeX conversion when entering reading mode
-  useEffect(() => {
-    // Debounce formula processing to prevent too frequent conversions
-    const timeoutId = setTimeout(async () => {
-      const processFormulas = async () => {
-        if (!pdfViewer.readingMode || !typography.renderFormulas || !document.pageTexts) {
-          return
-        }
-
-        // Prevent multiple simultaneous conversions
-        if (isConvertingFormulas) {
-          return
-        }
-
-        // Extract formulas from all pages
-        const allFormulas: Array<{ formula: string; isBlock: boolean; marker: string; pageNum: number }> = []
-        
-        document.pageTexts?.forEach((pageText, index) => {
-          // Ensure pageText is a string
-          const safePageText = typeof pageText === 'string' ? pageText : String(pageText || '')
-          const markedFormulas = extractMarkedFormulas(safePageText)
-          
-          // Debug: Log formula extraction
-          if (markedFormulas.length > 0) {
-            console.log(`🔍 Formula extraction - Page ${index + 1}:`, {
-              pageText: safePageText.substring(0, 200) + '...',
-              markedFormulas: markedFormulas.map(f => ({
-                formula: f.formula.substring(0, 50) + '...',
-                isBlock: f.isBlock,
-                marker: f.marker.substring(0, 30) + '...'
-              }))
-            })
-          }
-          
-          markedFormulas.forEach(f => {
-            allFormulas.push({ ...f, pageNum: index + 1 })
-          })
-        })
-
-        if (allFormulas.length === 0) {
-          console.log('🔍 No formulas found in document pages')
-          return
-        }
-        
-        console.log(`🔍 Found ${allFormulas.length} formulas total`, allFormulas.map(f => ({
-          formula: f.formula.substring(0, 30) + '...',
-          isBlock: f.isBlock,
-          pageNum: f.pageNum
-        })))
-
-        // Filter out formulas that are already converted
-        const formulasToConvert = allFormulas
-          .filter(f => !formulaLatex.has(f.formula))
-          .map(f => ({
-            text: f.formula,
-            startIndex: 0,
-            endIndex: f.formula.length,
-            isBlock: f.isBlock,
-            confidence: 1.0,
-          }))
-
-        if (formulasToConvert.length === 0) {
-          console.log('🔍 All formulas already converted, skipping conversion')
-          return
-        }
-        
-        console.log(`🔍 Converting ${formulasToConvert.length} formulas`, formulasToConvert.map(f => ({
-          text: f.text.substring(0, 30) + '...',
-          isBlock: f.isBlock
-        })))
-
-        // Convert formulas that aren't already cached
-        setIsConvertingFormulas(true)
-        setFormulaConversionProgress({ current: 0, total: formulasToConvert.length })
-
-        try {
-          const latexMap = await convertMultipleFormulas(
-            formulasToConvert,
-            (current, total) => {
-              setFormulaConversionProgress({ current, total })
-            }
-          )
-
-          // Store the LaTeX conversions
-          const newLatexMap = new Map(formulaLatex) // Start with existing conversions
-          latexMap.forEach((result, formulaText) => {
-            newLatexMap.set(formulaText, result.latex)
-          })
-          
-          setFormulaLatex(newLatexMap)
-        } catch (error) {
-          console.error('Failed to convert formulas:', error)
-        } finally {
-          setIsConvertingFormulas(false)
-        }
-      }
-
-      processFormulas()
-    }, 500) // 500ms debounce
-
-    return () => clearTimeout(timeoutId)
-  }, [pdfViewer.readingMode, typography.renderFormulas, document.pageTexts, document.id, isConvertingFormulas, formulaLatex])
+  // Formula conversion removed from Reading Mode per user request
+  // Formulas will no longer be automatically converted when entering reading mode
+  // This keeps Reading Mode simpler and faster without formula processing overhead
 
   // Handle OCR retry
   // Handle saving edited text
@@ -2517,44 +2418,22 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   </div>
                 )
               } else if (segment.type === 'formula') {
-                // Render formula with LaTeX if enabled and available
+                // Formula conversion removed from Reading Mode - just render as plain text
                 const formulaText = segment.content
-                const latex = formulaLatex.get(formulaText)
-                
-                if (typography.renderFormulas && latex && !isConvertingFormulas) {
-                  return (
-                    <FormulaRenderer
-                      key={`formula-${index}`}
-                      latex={latex}
-                      isBlock={false}
-                      fallback={formulaText}
-                      showCopyButton={true}
-                    />
-                  )
-                } else if (typography.renderFormulas && isConvertingFormulas) {
-                  return (
-                    <FormulaPlaceholder
-                      key={`formula-${index}`}
-                      text={formulaText}
-                      isBlock={false}
-                    />
-                  )
-                } else {
-                  // Fallback to monospace rendering
-                  return (
-                    <span
-                      key={`formula-${index}`}
-                      className={`inline-block px-2 py-1 mx-1 rounded ${themeStyles.text} bg-opacity-10`}
-                      style={{
-                        fontFamily: 'monospace',
-                        fontSize: `${typography.fontSize * 0.95}px`,
-                        backgroundColor: themeStyles.text.includes('gray-100') ? '#1f2937' : '#f3f4f6'
-                      }}
-                    >
-                      {formulaText}
-                    </span>
-                  )
-                }
+                // Render formula as plain monospace text without LaTeX conversion
+                return (
+                  <span
+                    key={`formula-${index}`}
+                    className={`inline-block px-2 py-1 mx-1 rounded ${themeStyles.text} bg-opacity-10`}
+                    style={{
+                      fontFamily: 'monospace',
+                      fontSize: `${typography.fontSize * 0.95}px`,
+                      backgroundColor: themeStyles.text.includes('gray-100') ? '#1f2937' : '#f3f4f6'
+                    }}
+                  >
+                    {formulaText}
+                  </span>
+                )
               } else if (segment.type === 'word') {
                 // Determine if this word is in the current paragraph
                 const isCurrentParagraph = segment.paragraphIndex === currentParagraphIndex
@@ -2652,14 +2531,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                     : `${numPages} pages total`}
                 </span>
               </div>
-              
-              {/* Formula conversion indicator */}
-              {isConvertingFormulas && (
-                <div className="flex items-center gap-2 text-xs opacity-70 px-3 py-1 rounded-lg" style={{ backgroundColor: 'var(--color-background-secondary)', color: 'var(--color-text-secondary)' }}>
-                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent" />
-                  <span>Converting formulas... {formulaConversionProgress.current}/{formulaConversionProgress.total}</span>
-                </div>
-              )}
               
               {/* Text cleanup progress indicator */}
               {isCleaning && cleaningProgress.total > 0 && (
