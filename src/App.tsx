@@ -34,18 +34,33 @@ function App() {
   const [showNeoReader, setShowNeoReader] = useState(false)
   const [showLandingPage, setShowLandingPage] = useState(false)
 
-  // Sync AuthContext session changes with Zustand store
+  // Sync AuthContext session changes with Zustand store and initialize services
   useEffect(() => {
     if (!authLoading && session) {
       // Session is available from AuthContext, sync with Zustand store
       checkAuth(session).catch((error) => {
         logger.error('Failed to sync session with store', { component: 'App' }, error);
       });
+      
+      // Initialize services immediately when session is available
+      // This prevents components from trying to use services before they're initialized
+      if (session.user) {
+        const userId = session.user.id;
+        supabaseStorageService.setCurrentUser(userId);
+        libraryOrganizationService.setCurrentUser(userId);
+        librarySearchService.setCurrentUser(userId);
+        logger.info('Services initialized with session from AuthContext', { userId });
+      }
     } else if (!authLoading && !session) {
       // No session available, clear auth state in store
       const { setAuthenticated, setUser } = useAppStore.getState();
       setAuthenticated(false);
       setUser(null);
+      
+      // Clear services when there's no session
+      supabaseStorageService.setCurrentUser(null as any);
+      libraryOrganizationService.setCurrentUser(null as any);
+      librarySearchService.setCurrentUser(null as any);
     }
   }, [session, authLoading, checkAuth]);
 
@@ -158,16 +173,8 @@ function App() {
         });
       }
       
-      // Initialize services if user is authenticated
-      // Note: Session sync is handled by the separate useEffect above
-      // We just need to initialize services here
-      if (supabase && session && session.user) {
-        const userId = session.user.id;
-        supabaseStorageService.setCurrentUser(userId)
-        libraryOrganizationService.setCurrentUser(userId)
-        librarySearchService.setCurrentUser(userId)
-        logger.info('Supabase storage service initialized on startup', { userId })
-      }
+      // Services are already initialized in the sync effect above when session is available
+      // No need to initialize them here again
       
       setIsInitialized(true)
       logger.info('Authentication initialization completed', context);

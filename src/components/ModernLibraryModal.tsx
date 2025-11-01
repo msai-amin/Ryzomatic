@@ -39,22 +39,31 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
     setActiveCollection,
     setSelectedTags,
     toggleBookSelection,
-    clearSelection
+    clearSelection,
+    isAuthenticated
   } = useAppStore();
 
   // Load initial data
   useEffect(() => {
-    if (isOpen) {
-      loadData();
+    if (isOpen && isAuthenticated) {
+      // Small delay to ensure services are initialized with user ID
+      const timer = setTimeout(() => {
+        loadData();
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [isOpen, refreshTrigger]);
+  }, [isOpen, refreshTrigger, isAuthenticated]);
 
   // Search books when filters change
   useEffect(() => {
-    if (isOpen) {
-      searchBooks();
+    if (isOpen && isAuthenticated) {
+      // Small delay to ensure services are initialized with user ID
+      const timer = setTimeout(() => {
+        searchBooks();
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [libraryView.searchQuery, libraryView.filters, libraryView.sortBy, libraryView.sortOrder, isOpen]);
+  }, [libraryView.searchQuery, libraryView.filters, libraryView.sortBy, libraryView.sortOrder, isOpen, isAuthenticated]);
 
   const loadData = async () => {
     setIsLoading(true);

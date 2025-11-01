@@ -46,7 +46,8 @@ export const LibrarySearchBar: React.FC<LibrarySearchBarProps> = ({
     libraryView, 
     setSearchQuery, 
     setLibrarySort, 
-    setLibraryView 
+    setLibraryView,
+    isAuthenticated
   } = useAppStore();
 
   // Debounced search
@@ -61,8 +62,12 @@ export const LibrarySearchBar: React.FC<LibrarySearchBarProps> = ({
     return () => clearTimeout(timer);
   }, [query, libraryView.filters, onSearch, setSearchQuery, libraryView.searchQuery]);
 
-  // Load suggestions when component mounts
+  // Load suggestions when component mounts and user is authenticated
   useEffect(() => {
+    if (!isAuthenticated) {
+      return; // Don't load suggestions if user is not authenticated
+    }
+
     const loadSuggestions = async () => {
       try {
         const data = await librarySearchService.getSearchSuggestions();
@@ -73,7 +78,7 @@ export const LibrarySearchBar: React.FC<LibrarySearchBarProps> = ({
     };
 
     loadSuggestions();
-  }, []);
+  }, [isAuthenticated]);
 
   // Handle click outside to close suggestions
   useEffect(() => {
