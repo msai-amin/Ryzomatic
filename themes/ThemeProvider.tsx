@@ -132,6 +132,58 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     // Ensure theme is valid - if currentTheme is missing properties, use defaultTheme
     const themeToApply = currentTheme || defaultTheme;
     
+    // Safety check: If the theme background is white/transparent, force default theme
+    const bg = String(themeToApply.colors?.background || '').toLowerCase().trim();
+    const isInvalidBg = bg === '#ffffff' || bg === '#fff' || bg === 'white' || bg === 'transparent' || bg === 'rgba(0,0,0,0)' || bg === '';
+    if (isInvalidBg) {
+      console.warn('Theme has invalid white/transparent/missing background, forcing default theme');
+      // Clear corrupted theme and reset
+      localStorage.removeItem('academic-reader-theme');
+      setCurrentTheme(defaultTheme);
+      // Don't return early - apply defaultTheme immediately
+      const finalTheme = defaultTheme;
+      
+      // Apply default theme colors immediately
+      Object.entries(finalTheme.colors).forEach(([key, value]) => {
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          Object.entries(value).forEach(([subKey, subValue]) => {
+            if (subValue && typeof subValue === 'string') {
+              root.style.setProperty(`--color-${key}-${subKey}`, subValue);
+            }
+          });
+        } else if (value && typeof value === 'string') {
+          root.style.setProperty(`--color-${key}`, value);
+        }
+      });
+      
+      // Apply other theme properties
+      Object.entries(finalTheme.spacing || {}).forEach(([key, value]) => {
+        if (value) root.style.setProperty(`--spacing-${key}`, value as string);
+      });
+      
+      Object.entries(finalTheme.typography || {}).forEach(([key, value]) => {
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          Object.entries(value).forEach(([subKey, subValue]) => {
+            if (subValue !== null && subValue !== undefined) {
+              root.style.setProperty(`--font-${key}-${subKey}`, String(subValue));
+            }
+          });
+        } else if (value !== null && value !== undefined) {
+          root.style.setProperty(`--font-${key}`, String(value));
+        }
+      });
+      
+      Object.entries(finalTheme.borderRadius || {}).forEach(([key, value]) => {
+        if (value) root.style.setProperty(`--border-radius-${key}`, value as string);
+      });
+      
+      Object.entries(finalTheme.shadows || {}).forEach(([key, value]) => {
+        if (value) root.style.setProperty(`--shadow-${key}`, value as string);
+      });
+      
+      return; // Exit early after applying default
+    }
+    
     // Comprehensive color validation to prevent visibility issues
     const validateColor = (color: string, fallback: string, key: string, subKey?: string): string => {
       if (!color || typeof color !== 'string') {
