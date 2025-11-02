@@ -355,7 +355,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   
   // Library view settings
   libraryView: {
-    viewMode: 'grid',
+    viewMode: 'list',
     sortBy: 'last_read_at',
     sortOrder: 'desc',
     selectedCollectionId: null,

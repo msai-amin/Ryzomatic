@@ -10,3 +10,4 @@
 # Keep LaTeX source and PDF
 !docs/SMART_READER_DATABASE_GUIDE.pdf
 !docs/SMART_READER_DATABASE_GUIDE.tex
+node_modules

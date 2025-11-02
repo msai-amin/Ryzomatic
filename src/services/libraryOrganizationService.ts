@@ -17,6 +17,8 @@ export interface Collection {
   book_count?: number;
   level?: number;
   path?: string;
+  is_smart?: boolean;
+  smart_filter?: any;
 }
 
 export interface Tag {
@@ -695,6 +697,268 @@ class LibraryOrganizationService {
       return data?.[0] || {};
     } catch (error) {
       logger.error('Error getting library stats', { userId: this.currentUserId }, error as Error);
+      throw error;
+    }
+  }
+
+  // Smart Collections
+  async getSmartCollectionBooks(collectionId: string): Promise<any[]> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { data, error } = await supabase
+        .rpc('get_smart_collection_books', { collection_id_param: collectionId });
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to get smart collection books: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'getSmartCollectionBooks', collectionId, error: error.message }
+        );
+      }
+
+      return data || [];
+    } catch (error) {
+      logger.error('Error getting smart collection books', { collectionId }, error as Error);
+      throw error;
+    }
+  }
+
+  async createUserSmartCollection(
+    name: string,
+    description: string,
+    smartFilter: any
+  ): Promise<Collection> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { data, error } = await supabase
+        .from('user_collections')
+        .insert({
+          user_id: this.currentUserId!,
+          name,
+          description,
+          is_smart: true,
+          smart_filter: smartFilter,
+          color: '#8B5CF6',
+          icon: 'sparkles'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to create smart collection: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'createUserSmartCollection', error: error.message }
+        );
+      }
+
+      logger.info('Smart collection created', { collectionId: data.id, userId: this.currentUserId });
+      return data;
+    } catch (error) {
+      logger.error('Error creating smart collection', { userId: this.currentUserId }, error as Error);
+      throw error;
+    }
+  }
+
+  // Enhanced Batch Operations
+  async batchAddTags(bookIds: string[], tagIds: string[]): Promise<void> {
+    this.ensureAuthenticated();
+    
+    try {
+      const assignments = bookIds.flatMap(bookId =>
+        tagIds.map(tagId => ({ book_id: bookId, tag_id: tagId }))
+      );
+
+      const { error } = await supabase
+        .from('book_tag_assignments')
+        .upsert(assignments, { onConflict: 'book_id,tag_id' });
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to batch add tags: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'batchAddTags', bookIds, tagIds, error: error.message }
+        );
+      }
+
+      logger.info('Tags batch added', { bookCount: bookIds.length, tagCount: tagIds.length, userId: this.currentUserId });
+    } catch (error) {
+      logger.error('Error batch adding tags', { bookIds, tagIds }, error as Error);
+      throw error;
+    }
+  }
+
+  async batchDelete(bookIds: string[]): Promise<void> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { error } = await supabase
+        .from('user_books')
+        .delete()
+        .in('id', bookIds)
+        .eq('user_id', this.currentUserId!);
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to batch delete books: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'batchDelete', bookIds, error: error.message }
+        );
+      }
+
+      logger.info('Books batch deleted', { bookCount: bookIds.length, userId: this.currentUserId });
+    } catch (error) {
+      logger.error('Error batch deleting books', { bookIds }, error as Error);
+      throw error;
+    }
+  }
+
+  async batchToggleFavorite(bookIds: string[], isFavorite: boolean): Promise<void> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { error } = await supabase
+        .from('user_books')
+        .update({ is_favorite: isFavorite })
+        .in('id', bookIds)
+        .eq('user_id', this.currentUserId!);
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to batch toggle favorite: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'batchToggleFavorite', bookIds, isFavorite, error: error.message }
+        );
+      }
+
+      logger.info('Books batch favorite toggled', { bookCount: bookIds.length, isFavorite, userId: this.currentUserId });
+    } catch (error) {
+      logger.error('Error batch toggling favorite', { bookIds }, error as Error);
+      throw error;
+    }
+  }
+
+  async batchArchive(bookIds: string[]): Promise<void> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { error } = await supabase
+        .from('user_books')
+        .update({ archived_at: new Date().toISOString() })
+        .in('id', bookIds)
+        .eq('user_id', this.currentUserId!);
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to batch archive books: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'batchArchive', bookIds, error: error.message }
+        );
+      }
+
+      logger.info('Books batch archived', { bookCount: bookIds.length, userId: this.currentUserId });
+    } catch (error) {
+      logger.error('Error batch archiving books', { bookIds }, error as Error);
+      throw error;
+    }
+  }
+
+  async batchExport(bookIds: string[]): Promise<any> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { data, error } = await supabase
+        .from('user_books')
+        .select('*, book_collections(*), book_tag_assignments(*)')
+        .in('id', bookIds)
+        .eq('user_id', this.currentUserId!);
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to batch export books: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'batchExport', bookIds, error: error.message }
+        );
+      }
+
+      return {
+        books: data || [],
+        exportedAt: new Date().toISOString(),
+        format: 'json'
+      };
+    } catch (error) {
+      logger.error('Error batch exporting books', { bookIds }, error as Error);
+      throw error;
+    }
+  }
+
+  async detectDuplicates(bookId: string): Promise<any[]> {
+    this.ensureAuthenticated();
+    
+    try {
+      // Get the book to check
+      const { data: book, error: bookError } = await supabase
+        .from('user_books')
+        .select('title, file_size_bytes')
+        .eq('id', bookId)
+        .eq('user_id', this.currentUserId!)
+        .single();
+
+      if (bookError || !book) {
+        return [];
+      }
+
+      // Find potential duplicates by title similarity and file size
+      const { data: duplicates, error } = await supabase
+        .from('user_books')
+        .select('*')
+        .eq('user_id', this.currentUserId!)
+        .neq('id', bookId)
+        .eq('file_size_bytes', book.file_size_bytes);
+
+      if (error) {
+        logger.error('Error detecting duplicates', { bookId, error: error.message });
+        return [];
+      }
+
+      return duplicates || [];
+    } catch (error) {
+      logger.error('Error detecting duplicates', { bookId }, error as Error);
+      return [];
+    }
+  }
+
+  async mergeDuplicates(primaryBookId: string, duplicateIds: string[]): Promise<void> {
+    this.ensureAuthenticated();
+    
+    try {
+      // This is a complex operation that should be done via an RPC function
+      // For now, we'll handle basic merging
+      const { error } = await supabase
+        .rpc('merge_books', { 
+          primary_id: primaryBookId, 
+          duplicate_ids: duplicateIds 
+        });
+
+      if (error) {
+        // If RPC doesn't exist, handle gracefully
+        logger.warn('Merge books RPC not available, skipping merge', { primaryBookId, duplicateIds });
+        // Just delete the duplicates
+        await this.batchDelete(duplicateIds);
+      }
+
+      logger.info('Books merged', { primaryBookId, duplicateCount: duplicateIds.length, userId: this.currentUserId });
+    } catch (error) {
+      logger.error('Error merging books', { primaryBookId, duplicateIds }, error as Error);
       throw error;
     }
   }

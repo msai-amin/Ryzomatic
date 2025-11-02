@@ -139,6 +139,23 @@ export interface UserAudio {
   created_at: string;
 }
 
+export interface ReadingGoal {
+  id: string;
+  user_id: string;
+  goal_type: 'books_read' | 'pages_read' | 'minutes_studied' | 'notes_created' | 'sessions_completed';
+  target_value: number;
+  current_value: number;
+  period: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  streak_days: number;
+  last_activity_date: string | null;
+  start_date: string;
+  end_date: string | null;
+  completed: boolean;
+  metadata: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
 // Auth helpers
 export const auth = {
   async signUp(email: string, password: string, fullName?: string) {

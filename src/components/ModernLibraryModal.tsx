@@ -9,6 +9,9 @@ import { BookCard } from './library/BookCard';
 import { CollectionTree } from './library/CollectionTree';
 import { TagChip, TagList, TagFilter } from './library/TagChip';
 import { LibrarySearchBar } from './library/LibrarySearchBar';
+import { SmartCollectionItem } from './library/SmartCollectionItem';
+import { RecentBookCard } from './library/RecentBookCard';
+import { BulkActionsToolbar } from './library/BulkActionsToolbar';
 
 interface ModernLibraryModalProps {
   isOpen: boolean;
@@ -24,6 +27,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
   const [books, setBooks] = useState<SearchResult[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [recentBooks, setRecentBooks] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedBook, setSelectedBook] = useState<SearchResult | null>(null);
@@ -70,7 +74,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
     setError(null);
     
     try {
-      // Load collections and tags in parallel
+      // Load collections, tags, and recent books in parallel
       const [collectionsData, tagsData] = await Promise.all([
         libraryOrganizationService.getCollections(),
         libraryOrganizationService.getTags()
@@ -78,6 +82,18 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
       
       setCollections(collectionsData);
       setTags(tagsData);
+      
+      // Load recent books
+      try {
+        const { results } = await librarySearchService.searchBooks(
+          {},
+          { field: 'last_read_at', order: 'desc' },
+          5
+        );
+        setRecentBooks(results.filter(b => b.last_read_at));
+      } catch (error) {
+        console.error('Failed to load recent books:', error);
+      }
     } catch (err) {
       setError('Failed to load library data');
       console.error('Error loading data:', err);
@@ -283,6 +299,90 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
     }
   }, [tags]);
 
+  const handleSmartCollectionSelect = useCallback((collectionId: string) => {
+    handleCollectionSelect(collectionId);
+  }, [handleCollectionSelect]);
+
+  const handleBulkAddToCollection = useCallback(() => {
+    // TODO: Show collection picker modal
+    console.log('Bulk add to collection');
+  }, []);
+
+  const handleBulkAddTags = useCallback(() => {
+    // TODO: Show tag picker modal
+    console.log('Bulk add tags');
+  }, []);
+
+  const handleBulkToggleFavorite = useCallback(async (isFavorite: boolean) => {
+    try {
+      await libraryOrganizationService.batchToggleFavorite(libraryView.selectedBooks, isFavorite);
+      searchBooks();
+      clearSelection();
+    } catch (error) {
+      console.error('Failed to bulk toggle favorite:', error);
+      alert('Failed to update favorites');
+    }
+  }, [libraryView.selectedBooks, searchBooks, clearSelection]);
+
+  const handleBulkArchive = useCallback(async () => {
+    try {
+      await libraryOrganizationService.batchArchive(libraryView.selectedBooks);
+      searchBooks();
+      clearSelection();
+    } catch (error) {
+      console.error('Failed to bulk archive:', error);
+      alert('Failed to archive books');
+    }
+  }, [libraryView.selectedBooks, searchBooks, clearSelection]);
+
+  const handleBulkDelete = useCallback(async () => {
+    if (confirm(`Are you sure you want to delete ${libraryView.selectedBooks.length} books?`)) {
+      try {
+        await libraryOrganizationService.batchDelete(libraryView.selectedBooks);
+        searchBooks();
+        clearSelection();
+      } catch (error) {
+        console.error('Failed to bulk delete:', error);
+        alert('Failed to delete books');
+      }
+    }
+  }, [libraryView.selectedBooks, searchBooks, clearSelection]);
+
+  const handleBulkExport = useCallback(async () => {
+    try {
+      const data = await libraryOrganizationService.batchExport(libraryView.selectedBooks);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `books_export_${new Date().toISOString()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to bulk export:', error);
+      alert('Failed to export books');
+    }
+  }, [libraryView.selectedBooks]);
+
+  const handleBulkDetectDuplicates = useCallback(async () => {
+    if (libraryView.selectedBooks.length !== 1) {
+      alert('Please select exactly one book to detect duplicates');
+      return;
+    }
+    try {
+      const duplicates = await libraryOrganizationService.detectDuplicates(libraryView.selectedBooks[0]);
+      if (duplicates.length > 0) {
+        alert(`Found ${duplicates.length} potential duplicates`);
+        console.log('Duplicates:', duplicates);
+      } else {
+        alert('No duplicates found');
+      }
+    } catch (error) {
+      console.error('Failed to detect duplicates:', error);
+      alert('Failed to detect duplicates');
+    }
+  }, [libraryView.selectedBooks]);
+
   if (!isOpen) return null;
 
   return createPortal(
@@ -442,6 +542,33 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
               borderColor: 'var(--color-border)',
             }}
           >
+            {/* Smart Collections */}
+            {collections.filter(c => c.is_smart).length > 0 && (
+              <div 
+                className="p-4 border-b"
+                style={{ borderColor: 'var(--color-border)' }}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h3 
+                    className="font-medium"
+                    style={{ color: 'var(--color-text-primary)' }}
+                  >
+                    ✨ Smart Collections
+                  </h3>
+                </div>
+                <div className="space-y-1">
+                  {collections.filter(c => c.is_smart).map(collection => (
+                    <SmartCollectionItem
+                      key={collection.id}
+                      collection={collection}
+                      isActive={libraryView.selectedCollectionId === collection.id}
+                      onClick={() => handleSmartCollectionSelect(collection.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Collections */}
             <div 
               className="p-4 border-b"
@@ -465,7 +592,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
                 </button>
               </div>
               <CollectionTree
-                collections={collections}
+                collections={collections.filter(c => !c.is_smart)}
                 selectedCollectionId={libraryView.selectedCollectionId}
                 onSelectCollection={handleCollectionSelect}
                 onCreateCollection={handleCreateCollection}
@@ -511,6 +638,27 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
           >
             {/* Books grid/list */}
             <div className="flex-1 p-6 overflow-y-auto">
+              {/* Recently Read Section */}
+              {!libraryView.searchQuery && !libraryView.selectedCollectionId && recentBooks.length > 0 && (
+                <div className="mb-6">
+                  <h2 
+                    className="text-lg font-semibold mb-3 flex items-center gap-2"
+                    style={{ color: 'var(--color-text-primary)' }}
+                  >
+                    📖 Recently Read
+                  </h2>
+                  <div className="flex gap-3 overflow-x-auto pb-2">
+                    {recentBooks.map(book => (
+                      <RecentBookCard
+                        key={book.id}
+                        book={book}
+                        onOpen={handleBookOpen}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {isLoading ? (
                 <div className="flex items-center justify-center h-64">
                   <RefreshCw className="w-8 h-8 animate-spin" style={{ color: 'var(--color-text-tertiary)' }} />
@@ -669,6 +817,21 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Bulk Actions Toolbar */}
+      {libraryView.selectedBooks.length > 0 && (
+        <BulkActionsToolbar
+          selectedCount={libraryView.selectedBooks.length}
+          onAddToCollection={handleBulkAddToCollection}
+          onAddTags={handleBulkAddTags}
+          onToggleFavorite={handleBulkToggleFavorite}
+          onArchive={handleBulkArchive}
+          onDelete={handleBulkDelete}
+          onExport={handleBulkExport}
+          onDetectDuplicates={handleBulkDetectDuplicates}
+          onClearSelection={clearSelection}
+        />
+      )}
     </div>,
     document.body
   );
