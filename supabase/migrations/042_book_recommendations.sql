@@ -27,10 +27,10 @@ RETURNS TABLE (
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
-SET search_path = ''
+SET search_path = public, pg_temp
 AS $$
 DECLARE
-  source_embedding public.vector(768);
+  source_embedding vector(768);
   user_uuid UUID;
 BEGIN
   -- Get current user
