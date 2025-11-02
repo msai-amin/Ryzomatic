@@ -143,7 +143,7 @@ COMMENT ON TABLE book_series IS
 COMMENT ON COLUMN book_series.name IS 
   'Series name (e.g., "Harry Potter", "The Lord of the Rings")';
 
-COMMENT ON COLUMN book_series.series_order IS 
+COMMENT ON COLUMN book_series.display_order IS 
   'Display order for series in the library';
 
 COMMENT ON COLUMN user_books.series_id IS 
