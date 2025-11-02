@@ -30,7 +30,7 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  source_embedding vector(768);
+  source_embedding public.vector(768);
   user_uuid UUID;
 BEGIN
   -- Get current user
