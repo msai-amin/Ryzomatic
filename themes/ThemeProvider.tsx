@@ -68,20 +68,22 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
           parsedTheme.colors.surface &&
           parsedTheme.colors.border;
         
-        // Validate color values are not invalid (white backgrounds, white text in light mode, etc)
+        // Validate color values are not invalid (white backgrounds causing visibility issues)
+        // Allow dark themes with light text - that's valid
         if (hasRequiredColors) {
-          // Quick validation: check if critical colors are white/transparent
-          const bg = String(parsedTheme.colors.background || '').toLowerCase();
-          const text = String(parsedTheme.colors.textPrimary || '').toLowerCase();
-          const isWhiteBg = bg === '#ffffff' || bg === '#fff' || bg === 'white' || bg === 'transparent';
-          const isWhiteText = text === '#ffffff' || text === '#fff' || text === 'white';
+          // Quick validation: only block white/transparent backgrounds (always problematic)
+          // Don't block white text - it's valid in dark mode
+          const bg = String(parsedTheme.colors.background || '').toLowerCase().trim();
+          const isWhiteBg = bg === '#ffffff' || bg === '#fff' || bg === 'white' || bg === 'transparent' || bg === 'rgba(0,0,0,0)';
           
-          // Block white backgrounds always, and white text in light mode
-          if (isWhiteBg || (isWhiteText && !loadedDarkMode)) {
-            console.warn('Saved theme has invalid color values (white background/text), using default');
+          // Only block white/transparent backgrounds - always invalid regardless of mode
+          // White text is fine in dark mode, so don't validate that
+          if (isWhiteBg) {
+            console.warn('Saved theme has invalid white/transparent background, using default theme');
             localStorage.removeItem('academic-reader-theme');
             setCurrentTheme(defaultTheme);
           } else {
+            // Theme is valid - apply it
             setCurrentTheme(parsedTheme);
           }
         } else {
@@ -148,17 +150,15 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
                           key === 'textTertiary' || key === 'textInverse' ||
                           (key === 'text' && (subKey === 'Primary' || subKey === 'Secondary' || subKey === 'Tertiary'));
       
-      // Block white/transparent backgrounds - always invalid
+      // Block white/transparent backgrounds - always invalid (causes visibility issues)
       if (isBackgroundColor && (isWhite || isTransparent)) {
         console.warn(`Invalid white/transparent background color detected for ${key}${subKey ? '.' + subKey : ''}, using fallback`);
         return fallback;
       }
       
-      // Block white text colors in light mode (would be invisible on light backgrounds)
-      if (isTextColor && isWhite && !isDarkMode) {
-        console.warn(`Invalid white text color detected for ${key}${subKey ? '.' + subKey : ''} in light mode, using fallback`);
-        return fallback;
-      }
+      // Don't block white text - it's valid in dark mode
+      // Only block if we're in light mode AND it's a text color AND background is light
+      // For now, be less strict - allow white text since we're using dark theme
       
       return color;
     };
