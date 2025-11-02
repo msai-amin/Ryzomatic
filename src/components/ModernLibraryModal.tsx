@@ -336,15 +336,13 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
   }, [libraryView.selectedBooks, searchBooks, clearSelection]);
 
   const handleBulkDelete = useCallback(async () => {
-    if (confirm(`Are you sure you want to delete ${libraryView.selectedBooks.length} books?`)) {
-      try {
-        await libraryOrganizationService.batchDelete(libraryView.selectedBooks);
-        searchBooks();
-        clearSelection();
-      } catch (error) {
-        console.error('Failed to bulk delete:', error);
-        alert('Failed to delete books');
-      }
+    try {
+      await libraryOrganizationService.batchDelete(libraryView.selectedBooks);
+      searchBooks();
+      clearSelection();
+    } catch (error) {
+      console.error('Failed to bulk delete:', error);
+      alert('Failed to delete books');
     }
   }, [libraryView.selectedBooks, searchBooks, clearSelection]);
 
