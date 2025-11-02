@@ -8,6 +8,7 @@
 -- ============================================================================
 
 -- Function to get similar books based on document descriptions
+-- Uses a subquery to avoid DECLARE vector variable (vector type doesn't work in DECLARE with SET search_path = '')
 CREATE OR REPLACE FUNCTION get_similar_books(
   book_id_param UUID,
   similarity_threshold DECIMAL DEFAULT 0.7,
@@ -28,40 +29,36 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  source_embedding vector(768);
   user_uuid UUID;
 BEGIN
   -- Get current user
   user_uuid := auth.uid();
   
-  -- Get source book embedding
-  SELECT description_embedding INTO source_embedding
-  FROM public.document_descriptions
-  WHERE book_id = book_id_param
-    AND user_id = user_uuid;
-  
-  IF source_embedding IS NULL THEN
-    -- Return empty if no embedding
-    RETURN;
-  END IF;
-  
-  -- Find similar books
+  -- Find similar books using subquery for the source embedding
   RETURN QUERY
+  WITH source_book AS (
+    SELECT description_embedding
+    FROM public.document_descriptions
+    WHERE book_id = book_id_param
+      AND user_id = user_uuid
+      AND description_embedding IS NOT NULL
+  )
   SELECT 
     ub.id,
     ub.title,
     ub.file_name,
     ub.file_type,
-    1 - (dd.description_embedding <=> source_embedding) as similarity_score,
+    1 - (dd.description_embedding <=> sb.description_embedding) as similarity_score,
     ub.reading_progress,
     ub.last_read_at
   FROM public.document_descriptions dd
   JOIN public.user_books ub ON ub.id = dd.book_id
+  CROSS JOIN source_book sb
   WHERE dd.user_id = user_uuid
     AND dd.book_id != book_id_param
     AND dd.description_embedding IS NOT NULL
-    AND 1 - (dd.description_embedding <=> source_embedding) > similarity_threshold
-  ORDER BY dd.description_embedding <=> source_embedding
+    AND 1 - (dd.description_embedding <=> sb.description_embedding) > similarity_threshold
+  ORDER BY dd.description_embedding <=> sb.description_embedding
   LIMIT limit_count;
 END;
 $$;
