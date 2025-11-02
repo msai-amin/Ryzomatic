@@ -96,8 +96,9 @@ async function handleUpload(req: VercelRequest, res: VercelResponse) {
     }
 
     // Check document count limit
+    // Using user_books instead of documents (consolidated in migration 026)
     const { count: documentCount } = await supabase
-      .from('documents')
+      .from('user_books')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id);
 
@@ -187,24 +188,24 @@ async function handleUpload(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Create document record
+    // Create document record (using user_books table after consolidation)
     const title = (fields.title?.[0] as string) || 
                   (metadata as any).title || 
                   file.originalFilename || 
                   'Untitled Document';
 
     const { data: document, error: docError } = await supabase
-      .from('documents')
+      .from('user_books')
       .insert({
         user_id: user.id,
         title,
         file_name: file.originalFilename || 'unknown',
-        file_size: file.size,
+        file_size_bytes: file.size,
         file_type: file.mimetype || 'application/octet-stream',
         s3_key: s3Key,
         content,
         embedding_status: 'pending',
-        metadata: {
+        custom_metadata: {
           ...metadata,
           uploadedAt: new Date().toISOString(),
           originalName: file.originalFilename,
@@ -327,9 +328,9 @@ async function handleOCRProcess(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Verify document ownership
+    // Verify document ownership (using user_books after consolidation)
     const { data: document, error: docError } = await supabase
-      .from('documents')
+      .from('user_books')
       .select('id, s3_key, file_name')
       .eq('id', documentId)
       .eq('user_id', user.id)
@@ -339,9 +340,9 @@ async function handleOCRProcess(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: 'Document not found or access denied' });
     }
 
-    // Update document status
+    // Update document status (using user_books after consolidation)
     await supabase
-      .from('documents')
+      .from('user_books')
       .update({ 
         ocr_status: 'processing',
         ocr_metadata: { 
@@ -374,7 +375,7 @@ async function handleOCRProcess(req: VercelRequest, res: VercelResponse) {
 
     if (!ocrResult.success) {
       await supabase
-        .from('documents')
+        .from('user_books')
         .update({ 
           ocr_status: 'failed',
           ocr_metadata: { 
@@ -392,9 +393,9 @@ async function handleOCRProcess(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Update document with OCR results
+    // Update document with OCR results (using user_books after consolidation)
     await supabase
-      .from('documents')
+      .from('user_books')
       .update({ 
         content: ocrResult.extractedText,
         ocr_status: 'completed',
@@ -460,7 +461,7 @@ async function handleOCRProcess(req: VercelRequest, res: VercelResponse) {
     if (req.body?.documentId) {
       try {
         await supabase
-          .from('documents')
+          .from('user_books')
           .update({ 
             ocr_status: 'failed',
             ocr_metadata: { 
@@ -514,9 +515,9 @@ async function handleOCRStatus(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: 'Invalid token' });
     }
 
-    // Get document
+    // Get document (using user_books after consolidation)
     const { data: document, error: docError } = await supabase
-      .from('documents')
+      .from('user_books')
       .select('id, ocr_status, ocr_metadata, content')
       .eq('id', documentId)
       .eq('user_id', user.id)

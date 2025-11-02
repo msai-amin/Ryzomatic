@@ -17,6 +17,8 @@ export interface Profile {
   updated_at: string;
 }
 
+// DEPRECATED: Use UserBook interface instead
+// This interface is kept for backward compatibility but should not be used in new code
 export interface Document {
   id: string;
   user_id: string;
@@ -62,23 +64,53 @@ export interface UsageRecord {
   created_at: string;
 }
 
-// User Books interfaces
+// User Books interface (consolidated from Document + UserBook)
 export interface UserBook {
   id: string;
   user_id: string;
   title: string;
   file_name: string;
   file_type: 'pdf' | 'text';
-  file_size: number;
+  file_size: number;  // DEPRECATED: Use file_size_bytes instead
+  file_size_bytes?: number;  // Canonical size field
   total_pages?: number;
-  s3_key?: string;  // NEW: S3 storage path instead of base64 data
-  text_content?: string;  // Only for text files
+  s3_key?: string;
+  text_content?: string;
+  page_texts?: string[];
+  page_texts_cleaned?: string[];
+  
+  // AI/RAG fields (consolidated from documents table)
+  content?: string;
+  embedding_status?: 'pending' | 'processing' | 'completed' | 'failed';
+  
+  // OCR fields (from documents table)
+  needs_ocr?: boolean;
+  ocr_status?: 'not_needed' | 'pending' | 'processing' | 'completed' | 'failed' | 'user_declined';
+  ocr_metadata?: Record<string, any>;
+  
+  // TTS fields
   tts_metadata: Record<string, any>;
+  tts_last_position?: Record<string, any>;
+  
+  // Reading progress
   last_read_page: number;
   reading_progress: number;
+  last_read_at?: string;
+  
+  // Library organization
+  is_favorite?: boolean;
+  custom_metadata?: Record<string, any>;
+  notes_count?: number;
+  
+  // Pomodoro tracking
+  pomodoro_sessions_count?: number;
+  total_pomodoro_time_seconds?: number;
+  total_pomodoro_sessions?: number;
+  last_pomodoro_at?: string;
+  
+  // Timestamps
   created_at: string;
   updated_at: string;
-  last_read_at?: string;
 }
 
 export interface UserNote {
@@ -189,11 +221,13 @@ export const profiles = {
   },
 };
 
-// Document helpers
+// DEPRECATED: Document helpers - Use userBooks instead
+// These helpers are kept for backward compatibility but will be removed in a future version
 export const documents = {
   async list(userId: string, limit = 50) {
+    console.warn('documents.list is deprecated. Use userBooks.list instead.');
     const { data, error } = await supabase
-      .from('documents')
+      .from('user_books')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
@@ -202,8 +236,9 @@ export const documents = {
   },
 
   async get(documentId: string) {
+    console.warn('documents.get is deprecated. Use userBooks.get instead.');
     const { data, error } = await supabase
-      .from('documents')
+      .from('user_books')
       .select('*')
       .eq('id', documentId)
       .single();
@@ -211,8 +246,9 @@ export const documents = {
   },
 
   async create(document: Omit<Document, 'id' | 'created_at' | 'updated_at'>) {
+    console.warn('documents.create is deprecated. Use userBooks.create instead.');
     const { data, error } = await supabase
-      .from('documents')
+      .from('user_books')
       .insert(document)
       .select()
       .single();
@@ -220,8 +256,9 @@ export const documents = {
   },
 
   async update(documentId: string, updates: Partial<Document>) {
+    console.warn('documents.update is deprecated. Use userBooks.update instead.');
     const { data, error } = await supabase
-      .from('documents')
+      .from('user_books')
       .update(updates)
       .eq('id', documentId)
       .select()
@@ -230,20 +267,21 @@ export const documents = {
   },
 
   async delete(documentId: string) {
+    console.warn('documents.delete is deprecated. Use userBooks.delete instead.');
     const { error } = await supabase
-      .from('documents')
+      .from('user_books')
       .delete()
       .eq('id', documentId);
     return { error };
   },
 };
 
-// Conversation helpers
+// Conversation helpers (using chat schema after migration 031)
 export const conversations = {
   async list(userId: string, documentId?: string) {
     let query = supabase
-      .from('conversations')
-      .select('*, messages(count)')
+      .from('chat.conversations')
+      .select('*, chat.messages(count)')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false });
 
@@ -257,8 +295,8 @@ export const conversations = {
 
   async get(conversationId: string) {
     const { data, error } = await supabase
-      .from('conversations')
-      .select('*, messages(*)')
+      .from('chat.conversations')
+      .select('*, chat.messages(*)')
       .eq('id', conversationId)
       .single();
     return { data, error };
@@ -270,7 +308,7 @@ export const conversations = {
     title?: string
   ) {
     const { data, error } = await supabase
-      .from('conversations')
+      .from('chat.conversations')
       .insert({
         user_id: userId,
         document_id: documentId,
@@ -283,18 +321,18 @@ export const conversations = {
 
   async delete(conversationId: string) {
     const { error } = await supabase
-      .from('conversations')
+      .from('chat.conversations')
       .delete()
       .eq('id', conversationId);
     return { error };
   },
 };
 
-// Message helpers
+// Message helpers (using chat schema after migration 031)
 export const messages = {
   async list(conversationId: string) {
     const { data, error } = await supabase
-      .from('messages')
+      .from('chat.messages')
       .select('*')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true });
@@ -303,7 +341,7 @@ export const messages = {
 
   async create(message: Omit<Message, 'id' | 'created_at'>) {
     const { data, error } = await supabase
-      .from('messages')
+      .from('chat.messages')
       .insert(message)
       .select()
       .single();

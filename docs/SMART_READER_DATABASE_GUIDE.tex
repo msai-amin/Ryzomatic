@@ -1,0 +1,1030 @@
+\documentclass[11pt,a4paper,twoside]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{textcomp}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+
+% Code listings configuration
+\lstset{
+    language=SQL,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{gray}\itshape,
+    stringstyle=\color{red},
+    numberstyle=\tiny\color{gray},
+    numbers=left,
+    numberblanklines=false,
+    stepnumber=1,
+    numbersep=8pt,
+    frame=single,
+    frameround=tttt,
+    breaklines=true,
+    breakatwhitespace=true,
+    showspaces=false,
+    showstringspaces=false,
+    tabsize=2,
+    captionpos=b,
+    aboveskip=10pt,
+    belowskip=5pt
+}
+
+% Custom colors
+\definecolor{primaryblue}{RGB}{59,130,246}
+\definecolor{secondarygreen}{RGB}{34,197,94}
+\definecolor{warningorange}{RGB}{249,115,22}
+\definecolor{sectiongray}{RGB}{107,114,128}
+
+% Header and footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE]{\leftmark}
+\fancyhead[RO]{\rightmark}
+\fancyfoot[CE,CO]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Title formatting
+\titleformat{\section}
+  {\color{primaryblue}\Large\bfseries}
+  {}
+  {0em}
+  {}
+  [\color{sectiongray}\titlerule[0.8pt]]
+
+\titleformat{\subsection}
+  {\color{secondarygreen}\large\bfseries}
+  {}
+  {0em}
+  {}
+
+% Title
+\title{\Huge\textbf{Smart Reader Database Guide}\\
+\large A Comprehensive Schema Reference and Justification}
+\author{Smart Reader Project\\Database Architecture Team}
+\date{\today}
+
+% Custom boxes
+\newtcolorbox{infobox}{
+    colback=primaryblue!5,
+    colframe=primaryblue,
+    title=\textbf{Information},
+    fonttitle=\bfseries
+}
+
+\newtcolorbox{warningbox}{
+    colback=warningorange!5,
+    colframe=warningorange,
+    title=\textbf{Warning},
+    fonttitle=\bfseries
+}
+
+\newtcolorbox{designbox}{
+    colback=secondarygreen!5,
+    colframe=secondarygreen,
+    title=\textbf{Design Decision},
+    fonttitle=\bfseries
+}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+This guide provides a comprehensive overview of the Smart Reader database architecture, designed for PostgreSQL with Supabase. The document explains the rationale behind schema design decisions, indexes, security policies, and performance optimizations. It serves as both a reference manual and a pedagogical resource for understanding multi-tenant SaaS database architecture patterns, covering topics from basic normalization to advanced partitioning and vector search strategies.
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+\subsection{Purpose of This Guide}
+
+This guide is designed to be \textbf{self-teaching} and \textbf{illustrative}. It doesn't just document \textit{what} the database schema contains, but \textit{why} each design decision was made. Whether you're a new developer joining the project, a database administrator reviewing the architecture, or a student learning about production database design, this guide will help you understand the thought process behind each component.
+
+\subsection{Database Overview}
+
+The Smart Reader platform is a \textbf{document reading and AI chat application} that allows users to:
+\begin{itemize}
+    \item Upload and manage PDF and text documents
+    \item Chat with AI about document contents (RAG - Retrieval-Augmented Generation)
+    \item Take notes and highlight text
+    \item Track reading progress and study time using Pomodoro technique
+    \item Organize documents into collections and tags
+\end{itemize}
+
+\textbf{Technical Stack:}
+\begin{itemize}
+    \item \textbf{Database:} PostgreSQL 15+ via Supabase
+    \item \textbf{Storage:} AWS S3 for large files
+    \item \textbf{Vectors:} pgvector extension for semantic search
+    \item \textbf{Security:} Row-Level Security (RLS) on all tables
+    \item \textbf{Deployment:} Serverless with edge functions
+\end{itemize}
+
+\subsection{Design Principles}
+
+Throughout this database design, we followed several key principles:
+
+\begin{enumerate}
+    \item \textbf{Multi-tenancy by design:} Every table is user-scoped with RLS policies
+    \item \textbf{Scalability first:} Ready for 10,000+ users without architectural changes
+    \item \textbf{Security by default:} RLS enabled on all tables, \texttt{SET search\_path = ''} on functions
+    \item \textbf{Performance optimization:} Strategic indexes, materialized views, and denormalization where appropriate
+    \item \textbf{Data integrity:} Foreign keys, CHECK constraints, and ACID compliance
+    \item \textbf{Maintainability:} Clear naming, documentation, and audit trails
+\end{enumerate}
+
+\section{Core Architecture}
+
+\subsection{Schema Organization}
+
+One of the most important architectural decisions was \textbf{schema separation}. Instead of putting everything in the \texttt{public} schema, we split the database into two logical domains:
+
+\begin{description}
+    \item[\texttt{public} schema:] \textbf{Library Management} - Books, notes, highlights, productivity tracking
+    \item[\texttt{chat} schema:] \textbf{AI/RAG Infrastructure} - Conversations, memories, vector embeddings
+\end{description}
+
+\begin{designbox}
+\textbf{Why schema separation?}
+\begin{itemize}
+    \item \textbf{Logical isolation:} Library features and AI chat evolve independently
+    \item \textbf{Performance:} Different scaling strategies (library can be cached, chat needs low latency)
+    \item \textbf{Security:} Separate RLS policies for different use cases
+    \item \textbf{Maintainability:} Clearer for developers to find related tables
+    \item \textbf{Database sharding:} Future-proof for splitting to separate databases
+\end{itemize}
+\end{designbox}
+
+\subsection{Security Model}
+
+\subsubsection{Row-Level Security (RLS)}
+
+\textbf{Every table} in the database has RLS enabled. This means that even if an attacker gains SQL access, they can only see their own data. PostgreSQL automatically filters rows based on policy conditions.
+
+\begin{lstlisting}[caption=Example RLS Policy Pattern]
+-- Users can only read their own books
+CREATE POLICY "Users can read own books" ON user_books
+  FOR SELECT USING (auth.uid() = user_id);
+
+-- Users can create books for themselves
+CREATE POLICY "Users can create own books" ON user_books
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+\end{lstlisting}
+
+\begin{infobox}
+\textbf{auth.uid()} is a Supabase function that returns the authenticated user's UUID. All RLS policies use this to enforce data isolation.
+\end{infobox}
+
+\subsubsection{Security Definer Functions}
+
+Some database functions need elevated privileges (e.g., creating partitions, refreshing views). We use \texttt{SECURITY DEFINER} with \texttt{SET search\_path = ''} to prevent search path attacks:
+
+\begin{lstlisting}[caption=Secure Function Pattern]
+CREATE OR REPLACE FUNCTION get_user_stats(user_uuid UUID)
+RETURNS TABLE (...) 
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''  -- Prevents search path attacks
+AS $$
+BEGIN
+  -- Schema-qualified tables prevent hijacking
+  RETURN QUERY
+  SELECT * FROM public.user_books
+  WHERE user_id = user_uuid;
+END;
+$$;
+\end{lstlisting}
+
+\begin{warningbox}
+Without \texttt{SET search\_path = ''}, a malicious user could create a table named \texttt{user\_books} and the function would query their table instead of the real one! Always use schema-qualified names in SECURITY DEFINER functions.
+\end{warningbox}
+
+\section{Core Tables}
+
+\subsection{profiles}
+
+The \texttt{profiles} table extends Supabase's built-in \texttt{auth.users} table. It's the root of our user data model.
+
+\begin{lstlisting}[caption=profiles Table Schema]
+CREATE TABLE profiles (
+  id UUID REFERENCES auth.users(id) PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  full_name TEXT,
+  tier TEXT DEFAULT 'free' CHECK (tier IN ('free', 'pro', 'premium', 'enterprise')),
+  credits INTEGER DEFAULT 100,
+  stripe_customer_id TEXT,
+  stripe_subscription_id TEXT,
+  subscription_status TEXT,
+  ocr_count_monthly INTEGER DEFAULT 0,
+  ocr_last_reset TIMESTAMP DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+\end{lstlisting}
+
+\begin{designbox}
+\textbf{Design decisions:}
+\begin{itemize}
+    \item \textbf{Foreign key to auth.users:} Leverages Supabase auth, no password management needed
+    \item \textbf{CHECK constraint on tier:} Database-level validation prevents invalid values
+    \item \textbf{Denormalized credits:} Fast access without JOINs; updated via triggers/functions
+    \item \textbf{Monthly OCR counter:} Tracks usage for billing; resets via scheduled function
+    \item \textbf{Stripe integration:} Stores customer and subscription IDs for payment operations
+\end{itemize}
+\end{designbox}
+
+\subsection{user\_books}
+
+The \textbf{central table} of the application. This evolved from having both a \texttt{documents} table and \texttt{user\_books} table (Migration 026 merged them). It now handles everything related to uploaded documents.
+
+\begin{lstlisting}[caption=user\_books Core Schema (Abridged)]
+CREATE TABLE user_books (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  
+  -- File metadata
+  title TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  file_type TEXT CHECK (file_type IN ('pdf', 'text')),
+  file_size_bytes BIGINT NOT NULL,
+  s3_key TEXT,  -- Files stored in S3, not database
+  
+  -- Reading support
+  total_pages INTEGER,
+  page_texts TEXT[],  -- Array of text per page (for TTS)
+  text_content TEXT,
+  
+  -- AI/RAG support
+  content TEXT,  -- Full text for AI chat
+  embedding_status TEXT CHECK (embedding_status IN 
+    ('pending', 'processing', 'completed', 'failed')),
+  
+  -- OCR support
+  needs_ocr BOOLEAN DEFAULT FALSE,
+  ocr_status TEXT CHECK (ocr_status IN 
+    ('not_needed', 'pending', 'processing', 'completed', 'failed')),
+  ocr_metadata JSONB DEFAULT '{}',
+  
+  -- Reading progress
+  last_read_page INTEGER DEFAULT 1,
+  reading_progress DECIMAL(5,2) DEFAULT 0.00,
+  last_read_at TIMESTAMPTZ,
+  
+  -- Organization
+  is_favorite BOOLEAN DEFAULT FALSE,
+  custom_metadata JSONB DEFAULT '{}',
+  
+  -- Denormalized counters
+  notes_count INTEGER DEFAULT 0,
+  pomodoro_sessions_count INTEGER DEFAULT 0,
+  total_pomodoro_time_seconds INTEGER DEFAULT 0,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+\end{lstlisting}
+
+\begin{designbox}
+\textbf{Key design decisions:}
+\begin{enumerate}
+    \item \textbf{S3 storage:} Large PDF files aren't stored in the database (Migration 004). This dramatically improves performance and reduces costs.
+    
+    \item \textbf{Array columns (page\_texts):} PostgreSQL arrays are perfect for this use case - we extract text from each page and store in an array. Access via subscript notation: \texttt{page\_texts[0]} for page 1.
+    
+    \item \textbf{Denormalization:} \texttt{notes\_count} and \texttt{pomodoro\_sessions\_count} are denormalized. We could compute them with \texttt{COUNT()}, but that would be slow for dashboard queries. Instead, they're maintained via triggers.
+    
+    \item \textbf{JSONB flexibility:} \texttt{custom\_metadata} allows extensibility without schema changes. Users could store publication date, ISBN, etc.
+    
+    \item \textbf{CHECK constraints:} Enforce valid values at the database level, preventing invalid data from entering the system.
+\end{enumerate}
+\end{designbox}
+
+\subsubsection{Critical Indexes}
+
+\begin{lstlisting}[caption=Essential user\_books Indexes]
+-- Most common query: list user's books with pagination
+CREATE INDEX idx_user_books_library_view ON user_books
+  (user_id, is_favorite, last_read_at DESC, id);
+
+-- Find by file type (common filter)
+CREATE INDEX idx_user_books_type_date ON user_books
+  (user_id, file_type, created_at DESC);
+
+-- Full-text search (GIN index for fast search)
+CREATE INDEX idx_books_search ON user_books
+  USING gin(to_tsvector('english', title || ' ' || file_name));
+
+-- Active reading (only books with progress > 0)
+CREATE INDEX idx_user_books_active_reading ON user_books
+  (user_id, book_id) WHERE reading_progress > 0;
+\end{lstlisting}
+
+\begin{designbox}
+\textbf{Index strategy explanation:}
+\begin{itemize}
+    \item \textbf{Composite index order:} Columns ordered by selectivity (user\_id most selective, then is\_favorite, etc.)
+    \item \textbf{Covering index:} Includes \texttt{id} to avoid heap access for pagination
+    \item \textbf{Partial index:} \texttt{WHERE reading\_progress > 0} creates smaller, faster index for active books
+    \item \textbf{GIN index:} Special index type for full-text search, much faster than regular indexes
+\end{itemize}
+\end{designbox}
+
+\subsection{user\_notes}
+
+Annotations on book pages. Supports multiple note types (Cornell, outline, mindmap, etc.) via flexible JSONB.
+
+\begin{lstlisting}[caption=user\_notes Schema]
+CREATE TABLE user_notes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  book_id UUID REFERENCES user_books(id) ON DELETE CASCADE NOT NULL,
+  page_number INTEGER NOT NULL,
+  content TEXT NOT NULL,
+  position_x DECIMAL(10,2),
+  position_y DECIMAL(10,2),
+  note_type TEXT CHECK (note_type IN 
+    ('cornell', 'outline', 'mindmap', 'chart', 'boxing', 'freeform')),
+  note_metadata JSONB DEFAULT '{}',
+  is_ai_generated BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+\end{lstlisting}
+
+\begin{designbox}
+\textbf{Why position columns?}
+Notes can be positioned on a PDF canvas (like sticky notes). X,Y coordinates enable:
+\begin{itemize}
+    \item Visual rendering of notes on PDF viewer
+    \item Dragging notes to reposition
+    \item Grouping nearby notes
+    \item Exporting with spatial information
+\end{itemize}
+\end{designbox}
+
+\subsection{user\_highlights}
+
+Text highlights with context for robust text matching.
+
+\begin{lstlisting}[caption=user_highlights Schema]
+CREATE TABLE user_highlights (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  book_id UUID REFERENCES user_books(id) ON DELETE CASCADE NOT NULL,
+  page_number INTEGER NOT NULL,
+  highlighted_text TEXT NOT NULL,
+  color_id TEXT,
+  color_hex TEXT,
+  
+  -- Context for matching
+  text_start_offset INTEGER,
+  text_end_offset INTEGER,
+  text_context_before TEXT,  -- 50 chars before
+  text_context_after TEXT,   -- 50 chars after
+  
+  -- Orphan handling
+  is_orphaned BOOLEAN DEFAULT FALSE,
+  orphaned_reason TEXT,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+\end{lstlisting}
+
+\begin{designbox}
+\textbf{Why context columns?}
+If a user edits the original PDF and re-uploads, text positions might change. By storing 50 characters before and after, we can:
+\begin{enumerate}
+    \item Find the highlight's new position using fuzzy matching
+    \item Detect if the text was deleted (mark as orphaned)
+    \item Warn users when highlights are affected by edits
+\end{enumerate}
+This is a production-grade solution to a common problem!
+\end{designbox}
+
+\subsection{Collection and Tag System}
+
+\subsubsection{user\_collections}
+
+Folders for organizing books. Supports hierarchical nesting with \texttt{parent\_id}.
+
+\begin{lstlisting}[caption=user\_collections Schema]
+CREATE TABLE user_collections (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  parent_id UUID REFERENCES user_collections(id) ON DELETE CASCADE,
+  color TEXT DEFAULT '#3B82F6',
+  icon TEXT DEFAULT 'folder',
+  is_favorite BOOLEAN DEFAULT FALSE,
+  display_order INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+\end{lstlisting}
+
+\subsubsection{book\_tags and book\_tag\_assignments}
+
+Flexible tagging system with many-to-many relationships.
+
+\begin{lstlisting}[caption=Tag System Schema]
+-- Tags themselves
+CREATE TABLE book_tags (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  color TEXT DEFAULT '#6B7280',
+  category TEXT DEFAULT 'general',
+  usage_count INTEGER DEFAULT 0,  -- Denormalized
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, name)  -- No duplicate tags per user
+);
+
+  -- Many-to-many: books <-> tags
+CREATE TABLE book_tag_assignments (
+  book_id UUID REFERENCES user_books(id) ON DELETE CASCADE NOT NULL,
+  tag_id UUID REFERENCES book_tags(id) ON DELETE CASCADE NOT NULL,
+  assigned_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (book_id, tag_id)
+);
+\end{lstlisting}
+
+\begin{designbox}
+\textbf{Many-to-many design:}
+\begin{itemize}
+    \item \textbf{Separate junction table:} Allows books to have multiple tags, tags to apply to multiple books
+    \item \textbf{Composite PRIMARY KEY:} Prevents duplicate assignments at database level
+    \item \textbf{Denormalized usage\_count:} Tracks how many books use each tag for "popular tags" features
+    \item \textbf{UNIQUE on (user\_id, name):} Prevents duplicate tag names per user (e.g., can't have two "work" tags)
+\end{itemize}
+\end{designbox}
+
+\section{AI and RAG Infrastructure (Chat Schema)}
+
+\subsection{chat.conversations and chat.messages}
+
+The foundation of the AI chat system. Conversations contain messages.
+
+\begin{lstlisting}[caption=Conversation Tables in Chat Schema]
+-- In chat schema
+CREATE TABLE conversations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  document_id UUID REFERENCES user_books(id) ON DELETE SET NULL,
+  title TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE NOT NULL,
+  role TEXT CHECK (role IN ('user', 'assistant', 'system')),
+  content TEXT NOT NULL,
+  tokens_used INTEGER,
+  model TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+\end{lstlisting}
+
+\begin{designbox}
+\textbf{Why chat schema?}
+\begin{itemize}
+    \item Separates AI infrastructure from library management
+    \item Different scaling needs (chat needs low latency, library can be cached)
+    \item Enables future sharding (can move chat to separate database)
+    \item Clearer for developers
+\end{itemize}
+\end{designbox}
+
+\subsection{chat.conversation\_memories}
+
+Extracted semantic entities from conversations for building knowledge graphs.
+
+\begin{lstlisting}[caption=Memory System]
+CREATE TABLE conversation_memories (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+  entity_type TEXT NOT NULL, 
+    -- 'concept', 'question', 'insight', 'reference', 'action', 'document'
+  entity_text TEXT NOT NULL,
+  entity_metadata JSONB DEFAULT '{}',
+  source_message_id UUID REFERENCES messages(id),
+  document_id UUID REFERENCES user_books(id) ON DELETE SET NULL,
+  embedding vector(768),  -- pgvector!
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Vector similarity search index
+CREATE INDEX idx_memories_user_embedding ON conversation_memories 
+  USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+\end{lstlisting}
+
+\begin{designbox}
+\textbf{Vector embeddings explained:}
+\begin{itemize}
+    \item Each memory gets a 768-dimensional vector embedding (using Gemini's text-embedding-004)
+    \item \texttt{ivfflat} is an Inverted File Index - the fastest approximate nearest neighbor algorithm in pgvector
+    \item \texttt{vector\_cosine\_ops} uses cosine similarity (1 - angle between vectors)
+    \item \texttt{lists = 100} means 100 clusters for approximate search (trade-off: speed vs. accuracy)
+\end{itemize}
+
+\textbf{Use case:} "What memories are similar to 'quantum entanglement'?" Find related concepts across conversations.
+\end{designbox}
+
+\subsection{chat.memory\_relationships}
+
+Connect memories to build a knowledge graph.
+
+\begin{lstlisting}[caption=Memory Graph]
+CREATE TABLE memory_relationships (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  memory_from UUID REFERENCES conversation_memories(id) ON DELETE CASCADE,
+  memory_to UUID REFERENCES conversation_memories(id) ON DELETE CASCADE,
+  relationship_type TEXT NOT NULL, 
+    -- 'relates_to', 'contradicts', 'supports', 'cites', 'explains'
+  strength DECIMAL(3,2) DEFAULT 0.5,  -- 0.0 to 1.0
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+\end{lstlisting}
+
+\begin{infobox}
+This enables \textbf{knowledge graph} functionality. Memories become nodes, relationships become edges. Users can see how concepts connect across different conversations.
+\end{infobox}
+
+\section{Productivity Features}
+
+\subsection{Pomodoro Tracking}
+
+The Pomodoro Technique is a time management method. We track individual sessions and aggregate statistics.
+
+\begin{lstlisting}[caption=Pomodoro System]
+CREATE TABLE pomodoro_sessions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  book_id UUID REFERENCES user_books(id) ON DELETE CASCADE NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ended_at TIMESTAMPTZ,
+  duration_seconds INTEGER,  -- Calculated
+  mode TEXT CHECK (mode IN ('work', 'shortBreak', 'longBreak')),
+  completed BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Stats aggregated in user_books
+total_pomodoro_time_seconds INTEGER DEFAULT 0,
+total_pomodoro_sessions INTEGER DEFAULT 0,
+last_pomodoro_at TIMESTAMPTZ
+\end{lstlisting}
+
+\begin{designbox}
+\textbf{Why track both sessions and aggregates?}
+\begin{itemize}
+    \item \textbf{Sessions:} Detailed history for analytics ("I studied more on weekdays")
+    \item \textbf{Aggregates:} Fast dashboard queries without expensive GROUP BY
+    \item Trigger maintains consistency when sessions change
+\end{itemize}
+\end{designbox}
+
+\subsection{Gamification}
+
+Achievements and streaks motivate users to maintain studying habits.
+
+\begin{lstlisting}[caption=Gamification Tables]
+CREATE TABLE pomodoro_achievements (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  achievement_key TEXT NOT NULL,  -- 'first_pomodoro', '10_hours', etc.
+  title TEXT NOT NULL,
+  description TEXT,
+  progress_current INTEGER DEFAULT 0,
+  progress_target INTEGER,
+  unlocked_at TIMESTAMPTZ,
+  metadata JSONB DEFAULT '{}',
+  UNIQUE(user_id, achievement_key)
+);
+
+CREATE TABLE pomodoro_streaks (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  streak_type TEXT NOT NULL,  -- 'daily', 'weekly'
+  current_streak INTEGER DEFAULT 0,
+  longest_streak INTEGER DEFAULT 0,
+  last_activity_date DATE NOT NULL,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+\end{lstlisting}
+
+\section{Advanced Features}
+
+\subsection{Materialized Views}
+
+Materialized views pre-compute expensive aggregations for dashboard queries.
+
+\begin{lstlisting}[caption=Analytics View Example]
+CREATE MATERIALIZED VIEW user_books_daily_stats AS
+SELECT 
+  user_id,
+  DATE(created_at) as upload_date,
+  COUNT(*) as total_books,
+  COUNT(*) FILTER (WHERE file_type = 'pdf') as pdf_books,
+  SUM(file_size_bytes) as total_size_bytes,
+  AVG(reading_progress) as avg_reading_progress
+FROM user_books
+GROUP BY user_id, DATE(created_at);
+
+-- Unique index for fast lookups
+CREATE UNIQUE INDEX ON user_books_daily_stats(user_id, upload_date);
+\end{lstlisting}
+
+\begin{designbox}
+\textbf{Why materialized views?}
+\begin{itemize}
+    \item \textbf{Performance:} Pre-aggregated data queries in milliseconds vs. seconds
+    \item \textbf{Reduced load:} Dashboard doesn't scan millions of rows
+    \item \textbf{Trade-off:} Data is stale until refresh (acceptable for analytics)
+    \item \textbf{Refresh strategy:} Nightly via \texttt{pg\_cron} or on-demand
+\end{itemize}
+
+\textbf{Note:} Cannot use \texttt{REFRESH CONCURRENTLY} with views containing \texttt{NOW()} - we discovered this during migration fixes!
+\end{designbox}
+
+\subsection{Table Partitioning}
+
+Partitioning enables scaling to thousands of users with per-user data isolation.
+
+\begin{lstlisting}[caption=Partitioning Infrastructure]
+-- Partitioned table (future migration target)
+CREATE TABLE user_books_partitioned (
+  LIKE user_books INCLUDING DEFAULTS
+) PARTITION BY LIST (user_id);
+
+-- Each user gets their own partition
+CREATE TABLE user_books_u_{user_id} PARTITION OF user_books_partitioned
+  FOR VALUES IN ('{user_id}');
+
+-- Cleanup is now O(1) - drop partition!
+DROP TABLE user_books_u_{user_id};
+\end{lstlisting}
+
+\begin{designbox}
+\textbf{Partitioning benefits:}
+\begin{enumerate}
+    \item \textbf{G prune:} PostgreSQL skips irrelevant partitions automatically
+    \item \textbf{Fast cleanup:} GDPR deletion is instant (drop partition)
+    \item \textbf{Index efficiency:} Smaller per-partition indexes
+    \item \textbf{Maintenance:} VACUUM individual partitions
+    \item \textbf{Future sharding:} Can move partitions to different servers
+\end{enumerate}
+
+\textbf{Challenges:}
+\begin{itemize}
+    \item PRIMARY KEY must include partition key
+    \item Foreign keys require special handling
+    \item Queries crossing partitions are slower
+\end{itemize}
+\end{designbox}
+
+\subsection{External Vector Store Preparation}
+
+\begin{lstlisting}[caption=Vector Metadata Table]
+CREATE TABLE embedding_metadata (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  book_id UUID REFERENCES user_books(id) ON DELETE CASCADE NOT NULL,
+  provider TEXT CHECK (provider IN 
+    ('supabase', 'pinecone', 'weaviate', 'qdrant', 'local')),
+  namespace TEXT,
+  vector_id TEXT NOT NULL,
+  collection TEXT,
+  embedding_model TEXT DEFAULT 'text-embedding-004',
+  vector_dimensions INTEGER DEFAULT 768,
+  chunk_index INTEGER,
+  chunk_count INTEGER DEFAULT 1,
+  generated_at TIMESTAMPTZ DEFAULT NOW(),
+  generation_cost_usd DECIMAL(10,6)
+);
+\end{lstlisting}
+
+\begin{designbox}
+\textbf{Why offload vectors?}
+\begin{itemize}
+    \item pgvector vectors are 768 dimensions × 4 bytes = 3KB per embedding
+    \item 1000 books × 100 chunks = 300MB just for vectors
+    \item External stores (Pinecone) are purpose-built and optimized
+    \item Reduces PostgreSQL load
+    \item This table tracks metadata while actual vectors live elsewhere
+\end{itemize}
+\end{designbox}
+
+\section{Migration History}
+
+The database has 33 migrations that tell the story of its evolution:
+
+\subsection{Early Migrations (001-008)}
+
+\textbf{001\_initial\_schema:} Core tables for auth, documents, conversations, messages
+
+\textbf{002\_add\_profile\_insert\_policy:} RLS for profile creation
+
+\textbf{003\_add\_user\_books\_table:} Separate table for books with TTS support (pdf\_data\_base64, page\_texts array)
+
+\textbf{004\_move\_books\_to\_s3:} \textbf{CRITICAL MIGRATION} - Removes large base64 columns. Files now in S3, only metadata in database.
+
+\textbf{005\_add\_pomodoro\_tracking:} Productivity feature
+
+\textbf{006\_add\_ocr\_support:} Scanned PDF OCR capability
+
+\textbf{007\_library\_organization:} Collections, tags, favorites
+
+\textbf{008\_pomodoro\_gamification:} Achievements and streaks
+
+\subsection{Security Hardening (009-015)}
+
+\textbf{010-014:} Search path security fixes. Discovered \texttt{SET search\_path = ''} issue, spent multiple migrations fixing all functions.
+
+\textbf{012\_feature\_flags\_and\_monitoring:} Feature toggles and query performance logging
+
+\subsection{Feature Expansion (016-025)}
+
+\textbf{016\_document\_relationships:} Link related documents
+
+\textbf{017-021:} Various fixes and enhancements
+
+\textbf{022\_structured\_rag\_memory:} Memory system with vector embeddings
+
+\textbf{023\_document\_descriptions:} AI-generated document summaries
+
+\textbf{024\_add\_cleaned\_texts:} TTS text cleanup
+
+\textbf{025\_fix\_remaining\_search\_path:} Final security pass
+
+\subsection{Major Restructuring (026-033)}
+
+These migrations completed in January 2025:
+
+\textbf{026\_consolidate\_document\_storage:} 
+\begin{itemize}
+    \item Merged \texttt{documents} into \texttt{user\_books}
+    \item Eliminated duplicate models
+    \item Dropped \texttt{response\_cache}, \texttt{document\_embeddings}
+    \item \textbf{Challenge:} Foreign key constraint ordering
+\end{itemize}
+
+\textbf{027\_standardize\_fields:}
+\begin{itemize}
+    \item Standardized JSONB defaults to \texttt{'{}'}
+    \item Unified file size column (\texttt{file\_size\_bytes})
+    \item Fixed timestamp types
+    \item \textbf{Challenge:} Conditional checks for moved tables
+\end{itemize}
+
+\textbf{028\_rationalize\_indexes:}
+\begin{itemize}
+    \item Removed 20+ redundant indexes
+    \item Added covering indexes
+    \item Created partial indexes
+    \item \textbf{Challenge:} Partial index with \texttt{NOW()} not allowed
+\end{itemize}
+
+\textbf{029\_user\_partitioning:}
+\begin{itemize}
+    \item Created partitioned table infrastructure
+    \item Auto-partition management functions
+    \item GDPR cleanup function
+    \item \textbf{Challenge:} PRIMARY KEY must include partition key
+\end{itemize}
+
+\textbf{030\_analytics\_views:}
+\begin{itemize}
+    \item 4 materialized views for analytics
+    \item Refresh functions
+    \item \textbf{Challenge:} Can't use \texttt{REFRESH CONCURRENTLY} with \texttt{NOW()}
+\end{itemize}
+
+\textbf{031\_separate\_chat\_schema:}
+\begin{itemize}
+    \item Created \texttt{chat} schema
+    \item Moved 6 tables to chat schema
+    \item Updated all RLS policies
+    \item \textbf{Challenge:} Cross-schema foreign key references
+\end{itemize}
+
+\textbf{032\_vector\_metadata:}
+\begin{itemize}
+    \item Prepared for external vector stores
+    \item \textbf{Challenge:} CTE aggregation for complex stats query
+\end{itemize}
+
+\textbf{033\_cleanup\_unused\_functions:}
+\begin{itemize}
+    \item Audited and cleaned functions
+    \item Added proper GRANTs
+    \item Verified security settings
+\end{itemize}
+
+\section{Performance Optimizations}
+
+\subsection{Index Strategy}
+
+We carefully crafted indexes based on query patterns:
+
+\begin{itemize}
+    \item \textbf{Covering indexes:} Include frequently-selected columns to avoid heap access
+    \item \textbf{Composite indexes:} Order by selectivity for multi-column queries
+    \item \textbf{Partial indexes:} Smaller indexes for common filters
+    \item \textbf{GIN indexes:} Full-text search performance
+    \item \textbf{Vector indexes:} IVFFlat for similarity search
+\end{itemize}
+
+\subsection{Denormalization}
+
+Strategic denormalization improves read performance:
+
+\begin{itemize}
+    \item \texttt{user\_books.notes\_count} - Avoids COUNT() on every library load
+    \item \texttt{user\_books.pomodoro\_sessions\_count} - Fast dashboard stats
+    \item \texttt{book\_tags.usage\_count} - Popular tags feature
+\end{itemize}
+
+\textbf{Maintenance:} Triggers update denormalized values when source data changes.
+
+\subsection{Query Optimization Patterns}
+
+\begin{lstlisting}[caption=Pagination Pattern]
+-- Keyset pagination (faster than OFFSET for large datasets)
+SELECT * FROM user_books
+WHERE user_id = $1
+  AND (last_read_at, id) < ($2_last_read, $2_id)
+ORDER BY last_read_at DESC, id DESC
+LIMIT 20;
+\end{lstlisting}
+
+\begin{infobox}
+\textbf{Why keyset over OFFSET?}
+\begin{itemize}
+    \item OFFSET 10000 scans 10000 rows before returning results
+    \item Keyset pagination uses index seek - constant time regardless of position
+    \item Essential for apps with millions of rows
+\end{itemize}
+\end{infobox}
+
+\section{Lessons Learned}
+
+\subsection{Common Pitfalls We Encountered}
+
+\begin{enumerate}
+    \item \textbf{Search path security:} Always use \texttt{SET search\_path = ''} in \texttt{SECURITY DEFINER} functions
+    \item \textbf{Partial indexes:} Can't use volatile functions like \texttt{NOW()} in WHERE clauses
+    \item \textbf{Materialized views:} \texttt{REFRESH CONCURRENTLY} incompatible with \texttt{NOW()}
+    \item \textbf{Partitioned tables:} PRIMARY KEY must include partition key
+    \item \textbf{Foreign keys:} Drop before dropping tables, recreate after
+    \item \textbf{RLS policies:} Must reference correct schema after moves
+\end{enumerate}
+
+\subsection{Best Practices Established}
+
+\begin{itemize}
+    \item \textbf{Migration numbering:} Sequential, never duplicate
+    \item \textbf{Schema qualification:} Always use schema.table in functions
+    \item \textbf{RLS by default:} Every table gets RLS policies
+    \item \textbf{Check constraints:} Validate at database level, not just application
+    \item \textbf{Documentation:} Comment every table and column
+    \item \textbf{Testing:} Audit scripts catch issues before production
+\end{itemize}
+
+\section{Conclusion}
+
+This database architecture demonstrates several advanced PostgreSQL patterns:
+\begin{itemize}
+    \item Multi-tenant security with RLS
+    \item Schema separation for logical organization
+    \item Strategic denormalization for performance
+    \item Materialized views for analytics
+    \item Table partitioning for scalability
+    \item Vector search with pgvector
+    \item Comprehensive migration strategy
+\end{itemize}
+
+The Smart Reader database is designed to scale from proof-of-concept to thousands of users while maintaining excellent query performance, data integrity, and security posture.
+
+\textbf{Next steps:}
+\begin{enumerate}
+    \item Monitor query performance with \texttt{pg\_stat\_statements}
+    \item Schedule materialized view refreshes via \texttt{pg\_cron}
+    \item Migrate to external vector store when vectors exceed 1GB
+    \item Consider TimescaleDB for time-series Pomodoro analytics
+    \item Implement read replicas for analytics workloads
+\end{enumerate}
+
+\newpage
+
+\appendix
+
+\section{Migration Reference}
+
+\begin{longtable}{l l p{8cm}}
+\toprule
+\textbf{Migration} & \textbf{Name} & \textbf{Description} \\
+\midrule
+001 & initial\_schema & Core tables: profiles, documents, conversations, messages \\
+002 & add\_profile\_insert\_policy & RLS for profile creation \\
+003 & add\_user\_books\_table & User books with TTS support \\
+004 & move\_books\_to\_s3 & Remove large base64 columns, use S3 \\
+005 & add\_pomodoro\_tracking & Pomodoro sessions table \\
+006 & add\_ocr\_support & OCR fields and counters \\
+007 & library\_organization & Collections, tags, favorites \\
+008 & add\_pomodoro\_gamification & Achievements and streaks \\
+009 & search\_rpcs & Search function implementations \\
+010-014 & fix\_search\_path\_security & Security hardening \\
+012 & feature\_flags\_and\_monitoring & Feature toggles, query logging \\
+015 & add\_highlights\_table & Text highlights with context \\
+016 & add\_document\_relationships & Link related documents \\
+017-025 & fixes\_and\_enhancements & Various improvements \\
+022 & structured\_rag\_memory & Memory system with vectors \\
+023 & document\_descriptions & AI document summaries \\
+026 & consolidate\_document\_storage & Merge documents into user\_books \\
+027 & standardize\_fields & Standardize JSONB, timestamps \\
+028 & rationalize\_indexes & Remove redundants, add covering \\
+029 & user\_partitioning & Partitioning infrastructure \\
+030 & analytics\_views & Materialized views for analytics \\
+031 & separate\_chat\_schema & Move chat tables to new schema \\
+032 & vector\_metadata & External vector store prep \\
+033 & cleanup\_unused\_functions & Function audit and cleanup \\
+\bottomrule
+\end{longtable}
+
+\section{Table Quick Reference}
+
+\subsection{Public Schema}
+
+\begin{itemize}
+    \item \texttt{profiles} - User accounts and subscriptions
+    \item \texttt{user\_books} - Documents (PDF/text) uploaded by users
+    \item \texttt{user\_notes} - Annotations and research notes
+    \item \texttt{user\_highlights} - Text highlights
+    \item \texttt{user\_collections} - Folders for organization
+    \item \texttt{book\_tags} - Flexible tags
+    \item \texttt{book\_collections} - Books <-> collections (junction)
+    \item \texttt{book\_tag\_assignments} - Books <-> tags (junction)
+    \item \texttt{pomodoro\_sessions} - Timer sessions
+    \item \texttt{pomodoro\_achievements} - Unlocked achievements
+    \item \texttt{pomodoro\_streaks} - Daily/weekly streaks
+    \item \texttt{tts\_audio\_cache} - Cached TTS audio
+    \item \texttt{document\_descriptions} - AI/user summaries
+    \item \texttt{document\_relationships} - Links between documents
+    \item \texttt{note\_relationships} - Links between notes
+    \item \texttt{embedding\_metadata} - Vector tracking
+    \item \texttt{usage\_records} - Usage tracking
+\end{itemize}
+
+\subsection{Chat Schema}
+
+\begin{itemize}
+    \item \texttt{conversations} - User chat conversations
+    \item \texttt{messages} - Conversation messages
+    \item \texttt{conversation\_memories} - Extracted memories
+    \item \texttt{memory\_relationships} - Memory graph edges
+    \item \texttt{action\_cache} - Cached action mappings
+    \item \texttt{memory\_extraction\_jobs} - Background jobs
+\end{itemize}
+
+\section{Important Functions}
+
+\begin{itemize}
+    \item \texttt{update\_updated\_at\_column()} - Trigger for updated\_at
+    \item \texttt{handle\_new\_user()} - Create profile on signup
+    \item \texttt{create\_user\_partition(UUID)} - Create partition for user
+    \item \texttt{cleanup\_user\_data(UUID)} - GDPR deletion
+    \item \texttt{refresh\_all\_analytics\_views()} - Refresh materialized views
+    \item \texttt{get\_similar\_memories(..., vector, ...)} - Vector similarity
+    \item \texttt{get\_related\_memories(UUID, ...)} - Memory graph
+    \item \texttt{get\_book\_embeddings(UUID)} - Embedding metadata
+\end{itemize}
+
+\end{document}

@@ -67,9 +67,10 @@ async function handleExtract(req: VercelRequest, res: VercelResponse, userId: st
   }
 
   // Get conversation details
+  // Using chat schema after migration 031 and user_books instead of documents (consolidated in migration 026)
   const { data: conversation, error: convError } = await supabase
-    .from('conversations')
-    .select('*, documents(*)')
+    .from('chat.conversations')
+    .select('*, user_books(*)')
     .eq('id', conversationId)
     .eq('user_id', userId)
     .single();
@@ -78,9 +79,9 @@ async function handleExtract(req: VercelRequest, res: VercelResponse, userId: st
     return res.status(404).json({ error: 'Conversation not found' });
   }
 
-  // Get messages
+  // Get messages (using chat schema after migration 031)
   const { data: messages, error: msgsError } = await supabase
-    .from('messages')
+    .from('chat.messages')
     .select('*')
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true });
@@ -90,7 +91,7 @@ async function handleExtract(req: VercelRequest, res: VercelResponse, userId: st
   }
 
   // Get document title if available
-  const documentTitle = conversation.documents?.title || conversation.title;
+  const documentTitle = conversation.user_books?.title || conversation.title;
 
   // Extract memory
   const result = await memoryService.extractAndStoreMemory({

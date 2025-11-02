@@ -1,27 +1,12 @@
-node_modules
-.env
-.env.local
-.env.vercel
-dist
+# LaTeX artifacts
+*.aux
+*.out
+*.toc
 *.log
-logs/
-.DS_Store
-.vercel
+*.synctex.gz
+*.fdb_latexmk
+*.fls
 
-# Archive directory (keep in git for reference)
-# archive/
-.env.production.local
-.env.supabase
-
-# Build artifacts
-dist/
-.vercel/
-
-# Test artifacts
-coverage/
-.nyc_output/
-playwright-report/
-test-results/
-playwright/.cache/
-.vitest/
-*.lcov
+# Keep LaTeX source and PDF
+!docs/SMART_READER_DATABASE_GUIDE.pdf
+!docs/SMART_READER_DATABASE_GUIDE.tex

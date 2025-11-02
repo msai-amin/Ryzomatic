@@ -62,10 +62,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Get document content if documentId provided
+    // Using user_books instead of documents (consolidated in migration 026)
     let documentContent: string | undefined;
     if (documentId) {
       const { data: document, error: docError } = await supabase
-        .from('documents')
+        .from('user_books')
         .select('content')
         .eq('id', documentId)
         .eq('user_id', user.id)
@@ -78,17 +79,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       documentContent = document.content;
     }
 
-    // Get conversation history if conversationId provided
-    let conversationHistory: Array<{ role: string; content: string }> = [];
-    let enhancedContext = '';
-    
-    if (conversationId) {
-      const { data: messages, error: messagesError } = await supabase
-        .from('messages')
-        .select('role, content')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true })
-        .limit(10); // Last 10 messages for context
+  // Get conversation history if conversationId provided
+  // Using chat schema after migration 031
+  let conversationHistory: Array<{ role: string; content: string }> = [];
+  let enhancedContext = '';
+  
+  if (conversationId) {
+    const { data: messages, error: messagesError } = await supabase
+      .from('chat.messages')
+      .select('role, content')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true })
+      .limit(10); // Last 10 messages for context
 
       if (!messagesError && messages) {
         conversationHistory = messages;
@@ -170,9 +172,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let finalConversationId = conversationId;
 
     if (!conversationId) {
-      // Create new conversation
+      // Create new conversation (using chat schema after migration 031)
       const { data: newConversation, error: convError } = await supabase
-        .from('conversations')
+        .from('chat.conversations')
         .insert({
           user_id: user.id,
           document_id: documentId,
@@ -187,8 +189,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (finalConversationId) {
-      // Save messages
-      await supabase.from('messages').insert([
+      // Save messages (using chat schema after migration 031)
+      await supabase.from('chat.messages').insert([
         {
           conversation_id: finalConversationId,
           role: 'user',
@@ -205,7 +207,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Update conversation's updated_at
       await supabase
-        .from('conversations')
+        .from('chat.conversations')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', finalConversationId);
     }
