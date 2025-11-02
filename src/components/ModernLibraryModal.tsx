@@ -341,13 +341,33 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
               <div className="flex items-center gap-2 mr-4">
                 <button
                   onClick={() => handleBulkAction('favorite')}
-                  className="px-3 py-1 text-sm bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200"
+                  className="px-3 py-1 text-sm rounded transition-colors"
+                  style={{
+                    backgroundColor: 'rgba(250, 204, 21, 0.1)',
+                    color: 'rgba(161, 98, 7, 1)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(250, 204, 21, 0.2)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(250, 204, 21, 0.1)';
+                  }}
                 >
                   Favorite
                 </button>
                 <button
                   onClick={() => handleBulkAction('delete')}
-                  className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
+                  className="px-3 py-1 text-sm rounded transition-colors"
+                  style={{
+                    backgroundColor: 'var(--color-error-light, rgba(239, 68, 68, 0.1))',
+                    color: 'var(--color-error)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--color-error-light, rgba(239, 68, 68, 0.2))';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--color-error-light, rgba(239, 68, 68, 0.1))';
+                  }}
                 >
                   Delete
                 </button>
@@ -356,11 +376,21 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
             
             <button
               onClick={() => setBulkMode(!bulkMode)}
-              className={`px-3 py-1 text-sm rounded ${
-                bulkMode 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              className="px-3 py-1 text-sm rounded transition-colors"
+              style={{
+                backgroundColor: bulkMode ? 'var(--color-primary-light, rgba(37, 99, 235, 0.1))' : 'var(--color-surface)',
+                color: bulkMode ? 'var(--color-primary)' : 'var(--color-text-primary)'
+              }}
+              onMouseEnter={(e) => {
+                if (!bulkMode) {
+                  e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!bulkMode) {
+                  e.currentTarget.style.backgroundColor = 'var(--color-surface)';
+                }
+              }}
             >
               {bulkMode ? 'Exit Bulk' : 'Bulk Select'}
             </button>
@@ -426,7 +456,10 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
                 </h3>
                 <button
                   onClick={() => setShowCreateCollection(true)}
-                  className="p-1 text-gray-400 hover:text-gray-600"
+                  className="p-1 transition-colors"
+                  style={{ color: 'var(--color-text-tertiary)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -453,7 +486,10 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
                 </h3>
                 <button
                   onClick={() => setShowCreateTag(true)}
-                  className="p-1 text-gray-400 hover:text-gray-600"
+                  className="p-1 transition-colors"
+                  style={{ color: 'var(--color-text-tertiary)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -477,7 +513,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
             <div className="flex-1 p-6 overflow-y-auto">
               {isLoading ? (
                 <div className="flex items-center justify-center h-64">
-                  <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
+                  <RefreshCw className="w-8 h-8 animate-spin" style={{ color: 'var(--color-text-tertiary)' }} />
                 </div>
               ) : error ? (
                 <div className="flex items-center justify-center h-64">
@@ -559,10 +595,13 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
               }}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-medium text-gray-900">Book Details</h3>
+                <h3 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>Book Details</h3>
                 <button
                   onClick={() => setSelectedBook(null)}
-                  className="p-1 text-gray-400 hover:text-gray-600"
+                  className="p-1 transition-colors"
+                  style={{ color: 'var(--color-text-tertiary)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -570,25 +609,28 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
               
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-medium text-gray-900">{selectedBook.title}</h4>
-                  <p className="text-sm text-gray-500">{selectedBook.file_type.toUpperCase()}</p>
+                  <h4 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>{selectedBook.title}</h4>
+                  <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>{selectedBook.file_type.toUpperCase()}</p>
                 </div>
                 
                 <div>
-                  <h5 className="text-sm font-medium text-gray-700 mb-2">Progress</h5>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <h5 className="text-sm font-medium mb-2" style={{ color: 'var(--color-text-primary)' }}>Progress</h5>
+                  <div className="w-full rounded-full h-2" style={{ backgroundColor: 'var(--color-border)' }}>
                     <div
-                      className="h-2 rounded-full bg-blue-500"
-                      style={{ width: `${selectedBook.reading_progress}%` }}
+                      className="h-2 rounded-full"
+                      style={{ 
+                        width: `${selectedBook.reading_progress}%`,
+                        backgroundColor: 'var(--color-primary)'
+                      }}
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
                     {Math.round(selectedBook.reading_progress)}% complete
                   </p>
                 </div>
                 
                 <div>
-                  <h5 className="text-sm font-medium text-gray-700 mb-2">Tags</h5>
+                  <h5 className="text-sm font-medium mb-2" style={{ color: 'var(--color-text-primary)' }}>Tags</h5>
                   <TagList
                     tags={selectedBook.tags.map(t => ({
                       id: t.tag_id,
@@ -607,7 +649,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
                 </div>
                 
                 <div>
-                  <h5 className="text-sm font-medium text-gray-700 mb-2">Collections</h5>
+                  <h5 className="text-sm font-medium mb-2" style={{ color: 'var(--color-text-primary)' }}>Collections</h5>
                   <div className="space-y-1">
                     {selectedBook.collections.map((collection, index) => (
                       <div key={index} className="flex items-center gap-2">
@@ -615,7 +657,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
                           className="w-3 h-3 rounded-full"
                           style={{ backgroundColor: collection.user_collections.color }}
                         />
-                        <span className="text-sm text-gray-700">
+                        <span className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
                           {collection.user_collections.name}
                         </span>
                       </div>

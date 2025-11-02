@@ -370,22 +370,37 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 pb-8 px-4 overflow-y-auto" style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}>
       <div className="w-full max-w-4xl my-auto overflow-hidden text-left align-middle transition-all transform rounded-lg shadow-xl animate-scale-in" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">📚 My Library</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+          <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+            <h2 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>📚 My Library</h2>
+            <button 
+              onClick={onClose} 
+              style={{ color: 'var(--color-text-tertiary)' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
+            >
               <X className="w-6 h-6" />
             </button>
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b border-gray-200 px-6">
+          <div className="flex border-b px-6" style={{ borderColor: 'var(--color-border)' }}>
             <button
               onClick={() => setActiveTab('books')}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'books'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+              className="px-4 py-3 text-sm font-medium border-b-2 transition-colors"
+              style={{
+                borderColor: activeTab === 'books' ? 'var(--color-primary)' : 'transparent',
+                color: activeTab === 'books' ? 'var(--color-primary)' : 'var(--color-text-secondary)'
+              }}
+              onMouseEnter={(e) => {
+                if (activeTab !== 'books') {
+                  e.currentTarget.style.color = 'var(--color-text-primary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeTab !== 'books') {
+                  e.currentTarget.style.color = 'var(--color-text-secondary)';
+                }
+              }}
             >
               <div className="flex items-center gap-2">
                 <Book className="w-4 h-4" />
@@ -394,11 +409,21 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
             </button>
             <button
               onClick={() => setActiveTab('notes')}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'notes'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+              className="px-4 py-3 text-sm font-medium border-b-2 transition-colors"
+              style={{
+                borderColor: activeTab === 'notes' ? 'var(--color-primary)' : 'transparent',
+                color: activeTab === 'notes' ? 'var(--color-primary)' : 'var(--color-text-secondary)'
+              }}
+              onMouseEnter={(e) => {
+                if (activeTab !== 'notes') {
+                  e.currentTarget.style.color = 'var(--color-text-primary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeTab !== 'notes') {
+                  e.currentTarget.style.color = 'var(--color-text-secondary)';
+                }
+              }}
             >
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4" />
@@ -407,11 +432,21 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
             </button>
             <button
               onClick={() => setActiveTab('audio')}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'audio'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+              className="px-4 py-3 text-sm font-medium border-b-2 transition-colors"
+              style={{
+                borderColor: activeTab === 'audio' ? 'var(--color-primary)' : 'transparent',
+                color: activeTab === 'audio' ? 'var(--color-primary)' : 'var(--color-text-secondary)'
+              }}
+              onMouseEnter={(e) => {
+                if (activeTab !== 'audio') {
+                  e.currentTarget.style.color = 'var(--color-text-primary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeTab !== 'audio') {
+                  e.currentTarget.style.color = 'var(--color-text-secondary)';
+                }
+              }}
             >
               <div className="flex items-center gap-2">
                 <Music className="w-4 h-4" />
@@ -425,20 +460,30 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
             {activeTab === 'books' && (
               <div className="space-y-3">
                 {books.length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">No saved books yet</p>
+                  <p className="text-center py-8" style={{ color: 'var(--color-text-secondary)' }}>No saved books yet</p>
                 ) : (
                   books.map(book => (
                     <div
                       key={book.id}
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                      className="flex items-center justify-between p-4 border rounded-lg transition-colors"
+                      style={{
+                        borderColor: 'var(--color-border)',
+                        backgroundColor: 'var(--color-surface)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--color-surface)';
+                      }}
                     >
                       <div className="flex-1 cursor-pointer" onClick={() => handleOpenBook(book)}>
-                        <h3 className="font-medium text-gray-900">{book.title}</h3>
-                        <p className="text-sm text-gray-500">
+                        <h3 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>{book.title}</h3>
+                        <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
                           {book.type.toUpperCase()} • {book.totalPages ? `${book.totalPages} pages` : 'Text file'}
                           {book.lastReadPage && ` • Last read: Page ${book.lastReadPage}`}
                         </p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
                           Saved {new Date(book.savedAt).toLocaleDateString()}
                         </p>
                       </div>
@@ -447,7 +492,14 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                           e.stopPropagation();
                           handleDeleteBook(book.id);
                         }}
-                        className="ml-4 p-2 text-red-600 hover:bg-red-50 rounded"
+                        className="ml-4 p-2 rounded transition-colors"
+                        style={{ color: 'var(--color-error)' }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = 'var(--color-error-light, rgba(239, 68, 68, 0.1))';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -460,29 +512,46 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
             {activeTab === 'notes' && (
               <div className="space-y-3">
                 {notes.length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">No notes yet</p>
+                  <p className="text-center py-8" style={{ color: 'var(--color-text-secondary)' }}>No notes yet</p>
                 ) : (
                   notes.map(note => (
                     <div
                       key={note.id}
-                      className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                      className="p-4 border rounded-lg transition-colors"
+                      style={{
+                        borderColor: 'var(--color-border)',
+                        backgroundColor: 'var(--color-surface)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--color-surface)';
+                      }}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           {note.selectedText && (
-                            <p className="text-sm text-gray-500 italic mb-2">
+                            <p className="text-sm italic mb-2" style={{ color: 'var(--color-text-secondary)' }}>
                               "{note.selectedText}"
                             </p>
                           )}
-                          <p className="text-gray-900">{note.content}</p>
-                          <p className="text-xs text-gray-400 mt-2">
+                          <p style={{ color: 'var(--color-text-primary)' }}>{note.content}</p>
+                          <p className="text-xs mt-2" style={{ color: 'var(--color-text-tertiary)' }}>
                             {note.pageNumber && `Page ${note.pageNumber} • `}
                             {new Date(note.createdAt).toLocaleDateString()}
                           </p>
                         </div>
                         <button
                           onClick={() => handleDeleteNote(note.id)}
-                          className="ml-4 p-2 text-red-600 hover:bg-red-50 rounded"
+                          className="ml-4 p-2 rounded transition-colors"
+                          style={{ color: 'var(--color-error)' }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--color-error-light, rgba(239, 68, 68, 0.1))';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -496,39 +565,70 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
             {activeTab === 'audio' && (
               <div className="space-y-3">
                 {audio.length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">No audio files yet</p>
+                  <p className="text-center py-8" style={{ color: 'var(--color-text-secondary)' }}>No audio files yet</p>
                 ) : (
                   audio.map(item => (
                     <div
                       key={item.id}
-                      className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                      className="p-4 border rounded-lg transition-colors"
+                      style={{
+                        borderColor: 'var(--color-border)',
+                        backgroundColor: 'var(--color-surface)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--color-surface)';
+                      }}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <h3 className="font-medium text-gray-900">{item.title}</h3>
-                          <p className="text-sm text-gray-500">
+                          <h3 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>{item.title}</h3>
+                          <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
                             Pages {item.pageRange.start}-{item.pageRange.end} • {item.voiceName}
                           </p>
-                          <p className="text-xs text-gray-400">
+                          <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
                             {new Date(item.createdAt).toLocaleDateString()}
                           </p>
                         </div>
                         <div className="flex items-center gap-2 ml-4">
                           <button
                             onClick={() => handlePlayAudio(item)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                            className="p-2 rounded transition-colors"
+                            style={{ color: 'var(--color-primary)' }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = 'var(--color-primary-light, rgba(37, 99, 235, 0.1))';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
                           >
                             <Music className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDownloadAudio(item)}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded"
+                            className="p-2 rounded transition-colors"
+                            style={{ color: 'var(--color-success)' }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = 'var(--color-success-light, rgba(5, 150, 105, 0.1))';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
                           >
                             <Download className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteAudio(item.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded"
+                            className="p-2 rounded transition-colors"
+                            style={{ color: 'var(--color-error)' }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = 'var(--color-error-light, rgba(239, 68, 68, 0.1))';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -542,21 +642,24 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <div className="px-6 py-4 border-t" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-background-secondary)' }}>
             {/* Storage Info */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2 text-sm">
-                <HardDrive className="w-4 h-4 text-gray-500" />
-                <span className="text-gray-600">
+                <HardDrive className="w-4 h-4" style={{ color: 'var(--color-text-secondary)' }} />
+                <span style={{ color: 'var(--color-text-secondary)' }}>
                   Storage: {(storageInfo.used / 1024 / 1024).toFixed(2)} MB / {(storageInfo.max / 1024 / 1024).toFixed(0)} MB
                 </span>
               </div>
-              <div className="text-sm text-gray-600">{storageInfo.percentage}% used</div>
+              <div className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>{storageInfo.percentage}% used</div>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+            <div className="w-full rounded-full h-2 mb-4" style={{ backgroundColor: 'var(--color-border)' }}>
               <div
-                className="bg-blue-500 h-2 rounded-full"
-                style={{ width: `${Math.min(storageInfo.percentage, 100)}%` }}
+                className="h-2 rounded-full"
+                style={{ 
+                  width: `${Math.min(storageInfo.percentage, 100)}%`,
+                  backgroundColor: 'var(--color-primary)'
+                }}
               ></div>
             </div>
 
@@ -596,12 +699,12 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
             )}
 
             {!isGoogleDriveEnabled && (
-              <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+              <div className="mb-4 p-3 border rounded-lg" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+                <div className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--color-text-secondary)' }}>
                   <CloudOff className="w-4 h-4" />
                   <span>Google Drive sync not enabled</span>
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
                   Sign in to Google to sync your books, notes, and audio files across devices
                 </p>
               </div>
@@ -611,12 +714,36 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
             <div className="flex gap-2">
               <button
                 onClick={handleExportData}
-                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                className="flex items-center gap-2 px-4 py-2 text-sm rounded transition-colors border"
+                style={{
+                  color: 'var(--color-text-primary)',
+                  backgroundColor: 'var(--color-surface)',
+                  borderColor: 'var(--color-border)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-surface)';
+                }}
               >
                 <Download className="w-4 h-4" />
                 Export Data
               </button>
-              <label className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 cursor-pointer">
+              <label 
+                className="flex items-center gap-2 px-4 py-2 text-sm rounded transition-colors border cursor-pointer"
+                style={{
+                  color: 'var(--color-text-primary)',
+                  backgroundColor: 'var(--color-surface)',
+                  borderColor: 'var(--color-border)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-surface)';
+                }}
+              >
                 <Upload className="w-4 h-4" />
                 Import Data
                 <input

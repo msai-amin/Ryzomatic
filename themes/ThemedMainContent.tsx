@@ -551,8 +551,17 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
               {(['markdown', 'html', 'json', 'text'] as const).map((format) => (
                 <label
                   key={format}
-                  className="flex items-center space-x-2 p-3 rounded-md cursor-pointer hover:bg-gray-100 transition-colors"
-                  style={{ color: 'var(--color-text-primary)' }}
+                  className="flex items-center space-x-2 p-3 rounded-md cursor-pointer transition-colors"
+                  style={{ 
+                    backgroundColor: 'var(--color-surface)',
+                    color: 'var(--color-text-primary)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--color-surface)';
+                  }}
                 >
                   <input
                     type="radio"
