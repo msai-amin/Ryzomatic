@@ -220,15 +220,13 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
   }, []);
 
   const handleBookDelete = useCallback(async (bookId: string) => {
-    if (confirm('Are you sure you want to delete this book?')) {
-      try {
-        await supabaseStorageService.deleteBook(bookId);
-        setBooks(books.filter(b => b.id !== bookId));
-        clearSelection();
-      } catch (error) {
-        console.error('Failed to delete book:', error);
-        alert('Failed to delete book');
-      }
+    try {
+      await supabaseStorageService.deleteBook(bookId);
+      setBooks(books.filter(b => b.id !== bookId));
+      clearSelection();
+    } catch (error) {
+      console.error('Failed to delete book:', error);
+      alert('Failed to delete book');
     }
   }, [books, clearSelection]);
 
