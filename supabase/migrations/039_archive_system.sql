@@ -153,9 +153,7 @@ BEGIN
     PERFORM cron.schedule(
       'cleanup-old-archived-books',
       '0 2 1 * *', -- cron: minute hour day-of-month month day-of-week
-      $$
-        SELECT cleanup_old_archived(90);
-      $$
+      'SELECT cleanup_old_archived(90);'
     );
     RAISE NOTICE 'Scheduled monthly cleanup of archived books older than 90 days';
   ELSE
