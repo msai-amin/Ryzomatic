@@ -102,6 +102,10 @@ export interface UserBook {
   custom_metadata?: Record<string, any>;
   notes_count?: number;
   
+  // Series grouping
+  series_id?: string;
+  series_order?: number;
+  
   // Pomodoro tracking
   pomodoro_sessions_count?: number;
   total_pomodoro_time_seconds?: number;
@@ -152,6 +156,20 @@ export interface ReadingGoal {
   end_date: string | null;
   completed: boolean;
   metadata: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BookSeries {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  author?: string;
+  cover_image_url?: string;
+  display_order: number;
+  is_favorite: boolean;
+  custom_metadata: Record<string, any>;
   created_at: string;
   updated_at: string;
 }

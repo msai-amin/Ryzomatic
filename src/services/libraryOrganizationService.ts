@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import { logger } from './logger';
 import { errorHandler, ErrorType, ErrorSeverity } from './errorHandler';
+import { BookSeries } from '../../lib/supabase';
 
 export interface Collection {
   id: string;
@@ -959,6 +960,221 @@ class LibraryOrganizationService {
       logger.info('Books merged', { primaryBookId, duplicateCount: duplicateIds.length, userId: this.currentUserId });
     } catch (error) {
       logger.error('Error merging books', { primaryBookId, duplicateIds }, error as Error);
+      throw error;
+    }
+  }
+
+  // Series Management
+  async createSeries(series: Omit<BookSeries, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<BookSeries> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { data, error } = await supabase
+        .from('book_series')
+        .insert({
+          user_id: this.currentUserId!,
+          ...series
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to create series: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'createSeries', error: error.message }
+        );
+      }
+
+      logger.info('Series created', { seriesId: data.id, userId: this.currentUserId });
+      return data;
+    } catch (error) {
+      logger.error('Error creating series', { userId: this.currentUserId }, error as Error);
+      throw error;
+    }
+  }
+
+  async getSeries(): Promise<BookSeries[]> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { data, error } = await supabase
+        .from('book_series')
+        .select('*')
+        .eq('user_id', this.currentUserId!)
+        .order('display_order', { ascending: true });
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to get series: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'getSeries', error: error.message }
+        );
+      }
+
+      return data || [];
+    } catch (error) {
+      logger.error('Error getting series', { userId: this.currentUserId }, error as Error);
+      throw error;
+    }
+  }
+
+  async updateSeries(id: string, updates: Partial<BookSeries>): Promise<BookSeries> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { data, error } = await supabase
+        .from('book_series')
+        .update(updates)
+        .eq('id', id)
+        .eq('user_id', this.currentUserId!)
+        .select()
+        .single();
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to update series: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'updateSeries', seriesId: id, error: error.message }
+        );
+      }
+
+      logger.info('Series updated', { seriesId: id, userId: this.currentUserId });
+      return data;
+    } catch (error) {
+      logger.error('Error updating series', { seriesId: id }, error as Error);
+      throw error;
+    }
+  }
+
+  async deleteSeries(id: string): Promise<void> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { error } = await supabase
+        .from('book_series')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', this.currentUserId!);
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to delete series: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'deleteSeries', seriesId: id, error: error.message }
+        );
+      }
+
+      logger.info('Series deleted', { seriesId: id, userId: this.currentUserId });
+    } catch (error) {
+      logger.error('Error deleting series', { seriesId: id }, error as Error);
+      throw error;
+    }
+  }
+
+  async addBookToSeries(bookId: string, seriesId: string, order?: number): Promise<void> {
+    this.ensureAuthenticated();
+    
+    try {
+      const updates: any = { series_id: seriesId };
+      if (order !== undefined) {
+        updates.series_order = order;
+      }
+
+      const { error } = await supabase
+        .from('user_books')
+        .update(updates)
+        .eq('id', bookId)
+        .eq('user_id', this.currentUserId!);
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to add book to series: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'addBookToSeries', bookId, seriesId, error: error.message }
+        );
+      }
+
+      logger.info('Book added to series', { bookId, seriesId, userId: this.currentUserId });
+    } catch (error) {
+      logger.error('Error adding book to series', { bookId, seriesId }, error as Error);
+      throw error;
+    }
+  }
+
+  async removeBookFromSeries(bookId: string): Promise<void> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { error } = await supabase
+        .from('user_books')
+        .update({ series_id: null, series_order: 0 })
+        .eq('id', bookId)
+        .eq('user_id', this.currentUserId!);
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to remove book from series: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'removeBookFromSeries', bookId, error: error.message }
+        );
+      }
+
+      logger.info('Book removed from series', { bookId, userId: this.currentUserId });
+    } catch (error) {
+      logger.error('Error removing book from series', { bookId }, error as Error);
+      throw error;
+    }
+  }
+
+  async getSeriesBooks(seriesId: string): Promise<any[]> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { data, error } = await supabase
+        .rpc('get_series_books', { series_id_param: seriesId });
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to get series books: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'getSeriesBooks', seriesId, error: error.message }
+        );
+      }
+
+      return data || [];
+    } catch (error) {
+      logger.error('Error getting series books', { seriesId }, error as Error);
+      throw error;
+    }
+  }
+
+  async getSeriesProgress(seriesId: string): Promise<any> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { data, error } = await supabase
+        .rpc('get_series_progress', { series_id_param: seriesId });
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to get series progress: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'getSeriesProgress', seriesId, error: error.message }
+        );
+      }
+
+      return data?.[0] || null;
+    } catch (error) {
+      logger.error('Error getting series progress', { seriesId }, error as Error);
       throw error;
     }
   }
