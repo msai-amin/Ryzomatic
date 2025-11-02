@@ -976,6 +976,16 @@ The Smart Reader database is designed to scale from proof-of-concept to thousand
 031 & separate\_chat\_schema & Move chat tables to new schema \\
 032 & vector\_metadata & External vector store prep \\
 033 & cleanup\_unused\_functions & Function audit and cleanup \\
+034 & smart\_collections & System smart collections with filters \\
+035 & reading\_goals & Reading goals and streaks tracking \\
+036 & fix\_partitioned\_rls & RLS policies for partitioned tables \\
+037 & hide\_analytics\_views & Hide materialized views from API \\
+038 & series\_grouping & Book series management \\
+039 & archive\_system & Archive/trash functionality \\
+040 & filter\_presets & Saved filter configurations \\
+041 & collection\_templates & Pre-configured collection structures \\
+042 & book\_recommendations & AI-powered book recommendations \\
+043 & remove\_unused\_partitioning & Remove unused partition infrastructure \\
 \bottomrule
 \end{longtable}
 
@@ -992,6 +1002,10 @@ The Smart Reader database is designed to scale from proof-of-concept to thousand
     \item \texttt{book\_tags} - Flexible tags
     \item \texttt{book\_collections} - Books <-> collections (junction)
     \item \texttt{book\_tag\_assignments} - Books <-> tags (junction)
+    \item \texttt{book\_series} - Multi-volume book series
+    \item \texttt{reading\_goals} - Reading objectives and tracking
+    \item \texttt{collection\_templates} - Pre-configured collection structures
+    \item \texttt{filter\_presets} - Saved filter combinations
     \item \texttt{pomodoro\_sessions} - Timer sessions
     \item \texttt{pomodoro\_achievements} - Unlocked achievements
     \item \texttt{pomodoro\_streaks} - Daily/weekly streaks
@@ -1019,12 +1033,18 @@ The Smart Reader database is designed to scale from proof-of-concept to thousand
 \begin{itemize}
     \item \texttt{update\_updated\_at\_column()} - Trigger for updated\_at
     \item \texttt{handle\_new\_user()} - Create profile on signup
-    \item \texttt{create\_user\_partition(UUID)} - Create partition for user
-    \item \texttt{cleanup\_user\_data(UUID)} - GDPR deletion
     \item \texttt{refresh\_all\_analytics\_views()} - Refresh materialized views
     \item \texttt{get\_similar\_memories(..., vector, ...)} - Vector similarity
     \item \texttt{get\_related\_memories(UUID, ...)} - Memory graph
     \item \texttt{get\_book\_embeddings(UUID)} - Embedding metadata
+    \item \texttt{get\_smart\_collection\_books(UUID)} - Get books in smart collection
+    \item \texttt{update\_reading\_goals()} - Update goals on activity
+    \item \texttt{create\_collections\_from\_template(UUID, UUID)} - Apply template
+    \item \texttt{get\_unified\_recommendations(UUID, INT)} - AI recommendations
+    \item \texttt{get\_series\_books(UUID)} - Books in a series
+    \item \texttt{archive\_book(UUID)} - Archive a book
+    \item \texttt{get\_archived\_books(UUID)} - List archived books
+    \item \texttt{get\_popular\_templates(INT)} - Most used templates
 \end{itemize}
 
 \end{document}
