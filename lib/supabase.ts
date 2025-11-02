@@ -174,6 +174,37 @@ export interface BookSeries {
   updated_at: string;
 }
 
+export interface FilterPreset {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  filter_config: Record<string, any>;
+  icon: string;
+  color: string;
+  is_favorite: boolean;
+  display_order: number;
+  usage_count: number;
+  last_used_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CollectionTemplate {
+  id: string;
+  user_id: string | null;
+  name: string;
+  description?: string;
+  icon: string;
+  color: string;
+  structure: any[];
+  is_public: boolean;
+  is_system: boolean;
+  usage_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 // Auth helpers
 export const auth = {
   async signUp(email: string, password: string, fullName?: string) {
