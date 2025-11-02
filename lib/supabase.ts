@@ -456,7 +456,7 @@ export const userBooks = {
   async list(userId: string, limit = 20) {  // Reduced from 50 to 20
     const { data, error } = await supabase
       .from('user_books')
-      .select('id, user_id, title, file_name, file_type, file_size, total_pages, last_read_page, reading_progress, created_at, updated_at, last_read_at, tts_metadata')  // Exclude large columns
+      .select('id, user_id, title, file_name, file_type, file_size_bytes, total_pages, last_read_page, reading_progress, created_at, updated_at, last_read_at, tts_metadata')  // Exclude large columns
       .eq('user_id', userId)
       .order('last_read_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
