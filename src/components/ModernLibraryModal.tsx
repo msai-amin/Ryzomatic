@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Settings, RefreshCw, Check, Trash2, Move, Share2 } from 'lucide-react';
+import { X, Plus, Settings, RefreshCw, Check, Trash2, Move, Share2, Upload } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { librarySearchService, SearchResult } from '../services/librarySearchService';
 import { libraryOrganizationService, Collection, Tag } from '../services/libraryOrganizationService';
@@ -12,6 +12,7 @@ import { LibrarySearchBar } from './library/LibrarySearchBar';
 import { SmartCollectionItem } from './library/SmartCollectionItem';
 import { RecentBookCard } from './library/RecentBookCard';
 import { BulkActionsToolbar } from './library/BulkActionsToolbar';
+import { DocumentUpload } from './DocumentUpload';
 
 interface ModernLibraryModalProps {
   isOpen: boolean;
@@ -34,6 +35,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
   const [showCreateCollection, setShowCreateCollection] = useState(false);
   const [showCreateTag, setShowCreateTag] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   
   const {
     libraryView,
@@ -222,13 +224,14 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
   const handleBookDelete = useCallback(async (bookId: string) => {
     try {
       await supabaseStorageService.deleteBook(bookId);
-      setBooks(books.filter(b => b.id !== bookId));
+      // Refresh the books list after deletion
+      await searchBooks();
       clearSelection();
     } catch (error) {
       console.error('Failed to delete book:', error);
       alert('Failed to delete book');
     }
-  }, [books, clearSelection]);
+  }, [searchBooks, clearSelection]);
 
   const handleBulkAction = useCallback(async (action: string) => {
     if (libraryView.selectedBooks.length === 0) return;
@@ -238,7 +241,8 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
         if (confirm(`Delete ${libraryView.selectedBooks.length} books?`)) {
           try {
             await Promise.all(libraryView.selectedBooks.map(id => supabaseStorageService.deleteBook(id)));
-            setBooks(books.filter(b => !libraryView.selectedBooks.includes(b.id)));
+            // Refresh the books list after deletion
+            await searchBooks();
             clearSelection();
           } catch (error) {
             console.error('Failed to delete books:', error);
@@ -336,7 +340,8 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
   const handleBulkDelete = useCallback(async () => {
     try {
       await libraryOrganizationService.batchDelete(libraryView.selectedBooks);
-      searchBooks();
+      // Refresh the books list after deletion
+      await searchBooks();
       clearSelection();
     } catch (error) {
       console.error('Failed to bulk delete:', error);
@@ -489,6 +494,24 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
               }}
             >
               {bulkMode ? 'Exit Bulk' : 'Bulk Select'}
+            </button>
+
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="px-4 py-2 text-sm rounded-lg transition-colors flex items-center gap-2"
+              style={{
+                backgroundColor: 'var(--color-primary)',
+                color: 'white'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = '0.9';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = '1';
+              }}
+            >
+              <Upload className="w-4 h-4" />
+              Upload
             </button>
             
             <button
@@ -828,6 +851,18 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
           />
         )}
       </div>
+
+      {/* Document Upload Modal */}
+      {showUploadModal && (
+        <DocumentUpload
+          onClose={() => setShowUploadModal(false)}
+          onUploadComplete={() => {
+            setShowUploadModal(false);
+            loadData();
+          }}
+          setAsCurrentDocument={false}
+        />
+      )}
     </div>,
     document.body
   );

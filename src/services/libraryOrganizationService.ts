@@ -798,6 +798,14 @@ class LibraryOrganizationService {
     this.ensureAuthenticated();
     
     try {
+      // Get books to find S3 keys before deleting
+      const { data: books } = await supabase
+        .from('user_books')
+        .select('id, s3_key')
+        .in('id', bookIds)
+        .eq('user_id', this.currentUserId!);
+
+      // Delete from database
       const { error } = await supabase
         .from('user_books')
         .delete()
@@ -811,6 +819,16 @@ class LibraryOrganizationService {
           ErrorSeverity.HIGH,
           { context: 'batchDelete', bookIds, error: error.message }
         );
+      }
+
+      // Clean up S3 files (non-blocking)
+      if (books && books.length > 0) {
+        const { bookStorageService } = await import('./bookStorageService');
+        Promise.all(
+          books
+            .filter(b => b.s3_key)
+            .map(b => bookStorageService.deleteBook(b.s3_key!, this.currentUserId!))
+        ).catch(err => logger.warn('S3 cleanup failed in batch delete', { bookIds }, err));
       }
 
       logger.info('Books batch deleted', { bookCount: bookIds.length, userId: this.currentUserId });

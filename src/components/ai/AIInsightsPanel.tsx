@@ -24,6 +24,7 @@ import {
   generateHistoricalContext,
   HistoricalContext 
 } from '../../services/ai/historicalContextService';
+import { AIProcessingLoader, LoaderContext } from '../loaders/AIProcessingLoader';
 
 interface AIInsightsPanelProps {
   documentText: string;
@@ -197,7 +198,7 @@ export const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({
             )}
             
             {frameworkStatus === 'loading' && (
-              <LoadingState message="Analyzing theoretical frameworks..." />
+              <LoadingState message="Analyzing theoretical frameworks..." context="ai-insights" />
             )}
             
             {frameworkStatus === 'success' && frameworkData && (
@@ -224,7 +225,7 @@ export const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({
             )}
             
             {contextStatus === 'loading' && (
-              <LoadingState message="Generating historical context..." />
+              <LoadingState message="Generating historical context..." context="ai-insights" />
             )}
             
             {contextStatus === 'success' && contextData && (
@@ -377,10 +378,12 @@ const EmptyState: React.FC<{
   </div>
 );
 
-const LoadingState: React.FC<{ message: string }> = ({ message }) => (
-  <div className="text-center py-12">
-    <Loader2 className="w-16 h-16 mx-auto mb-4 text-blue-600 animate-spin" />
-    <p className="text-gray-600">{message}</p>
+const LoadingState: React.FC<{ message: string; context: LoaderContext }> = ({ message, context }) => (
+  <div className="py-8">
+    <AIProcessingLoader 
+      context={context}
+      message={message}
+    />
   </div>
 );
 

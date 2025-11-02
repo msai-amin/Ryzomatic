@@ -1,5 +1,6 @@
 import React from 'react';
 import { Loader, CheckCircle, XCircle, AlertTriangle, Sparkles, Ban } from 'lucide-react';
+import { AIProcessingLoader } from './loaders/AIProcessingLoader';
 
 interface OCRStatusBadgeProps {
   status: 'not_needed' | 'pending' | 'processing' | 'completed' | 'failed' | 'user_declined';
@@ -132,15 +133,11 @@ export const OCRBanner: React.FC<OCRBannerProps> = ({
           borderColor: 'var(--color-primary)',
         }}
       >
-        <Loader className="w-5 h-5 animate-spin flex-shrink-0 mt-0.5" style={{ color: 'var(--color-primary)' }} />
-        <div className="flex-1">
-          <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-            AI OCR Processing
-          </p>
-          <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
-            Extracting text from your document. This may take a moment...
-          </p>
-        </div>
+        <AIProcessingLoader 
+          context="ocr-processing"
+          message="Extracting text from document..."
+          className="w-full"
+        />
       </div>
     );
   }
