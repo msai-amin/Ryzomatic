@@ -1178,6 +1178,76 @@ class LibraryOrganizationService {
       throw error;
     }
   }
+
+  // Archive Management
+  async archiveBook(bookId: string): Promise<void> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { error } = await supabase
+        .rpc('archive_book', { book_id_param: bookId });
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to archive book: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'archiveBook', bookId, error: error.message }
+        );
+      }
+
+      logger.info('Book archived', { bookId, userId: this.currentUserId });
+    } catch (error) {
+      logger.error('Error archiving book', { bookId }, error as Error);
+      throw error;
+    }
+  }
+
+  async restoreBook(bookId: string): Promise<void> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { error } = await supabase
+        .rpc('restore_book', { book_id_param: bookId });
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to restore book: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'restoreBook', bookId, error: error.message }
+        );
+      }
+
+      logger.info('Book restored', { bookId, userId: this.currentUserId });
+    } catch (error) {
+      logger.error('Error restoring book', { bookId }, error as Error);
+      throw error;
+    }
+  }
+
+  async getArchivedBooks(): Promise<any[]> {
+    this.ensureAuthenticated();
+    
+    try {
+      const { data, error } = await supabase
+        .rpc('get_archived_books', { user_id_param: this.currentUserId! });
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to get archived books: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'getArchivedBooks', error: error.message }
+        );
+      }
+
+      return data || [];
+    } catch (error) {
+      logger.error('Error getting archived books', { userId: this.currentUserId }, error as Error);
+      throw error;
+    }
+  }
 }
 
 export const libraryOrganizationService = new LibraryOrganizationService();
