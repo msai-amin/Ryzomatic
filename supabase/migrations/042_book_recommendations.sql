@@ -2,6 +2,9 @@
 -- AI-powered recommendations based on reading history, embeddings, and metadata
 -- Date: 2025-01-27
 
+-- Ensure pgvector extension is available
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- ============================================================================
 -- HELPER FUNCTIONS FOR RECOMMENDATIONS
 -- ============================================================================
