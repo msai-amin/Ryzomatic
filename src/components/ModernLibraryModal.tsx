@@ -812,22 +812,22 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
             </div>
           )}
         </div>
-      </div>
 
-      {/* Bulk Actions Toolbar */}
-      {libraryView.selectedBooks.length > 0 && (
-        <BulkActionsToolbar
-          selectedCount={libraryView.selectedBooks.length}
-          onAddToCollection={handleBulkAddToCollection}
-          onAddTags={handleBulkAddTags}
-          onToggleFavorite={handleBulkToggleFavorite}
-          onArchive={handleBulkArchive}
-          onDelete={handleBulkDelete}
-          onExport={handleBulkExport}
-          onDetectDuplicates={handleBulkDetectDuplicates}
-          onClearSelection={clearSelection}
-        />
-      )}
+        {/* Bulk Actions Toolbar */}
+        {libraryView.selectedBooks.length > 0 && (
+          <BulkActionsToolbar
+            selectedCount={libraryView.selectedBooks.length}
+            onAddToCollection={handleBulkAddToCollection}
+            onAddTags={handleBulkAddTags}
+            onToggleFavorite={handleBulkToggleFavorite}
+            onArchive={handleBulkArchive}
+            onDelete={handleBulkDelete}
+            onExport={handleBulkExport}
+            onDetectDuplicates={handleBulkDetectDuplicates}
+            onClearSelection={clearSelection}
+          />
+        )}
+      </div>
     </div>,
     document.body
   );
