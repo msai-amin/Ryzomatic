@@ -1933,6 +1933,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   // Create highlight after color selection
   const handleCreateHighlight = useCallback(async (colorId: string, colorHex: string) => {
     if (!selectedTextInfo || !selectedTextInfo.range) {
+      console.error('Cannot create highlight: missing selectedTextInfo or range')
+      alert('Cannot create highlight: No text selected. Please select text first.')
       setHighlightPickerPosition(null)
       return
     }
@@ -1954,13 +1956,28 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     try {
       const range = selectedTextInfo.range
       
+      // Check if range is still valid (DOM might have changed)
+      try {
+        const testRect = range.getBoundingClientRect()
+        if (!testRect) {
+          throw new Error('Range is invalid or detached from DOM')
+        }
+      } catch (rangeError) {
+        console.error('Range is invalid:', rangeError)
+        alert('The selected text is no longer valid. Please select the text again.')
+        setHighlightPickerPosition(null)
+        setSelectedTextInfo(null)
+        return
+      }
+      
       // Use getBoundingClientRect() instead of getClientRects() for a single unified rect
       // This gives us the bounding box that encompasses the entire selection
       const selectionRect = range.getBoundingClientRect()
       
       // ROBUST VALIDATION: Check for valid selection rectangle
       if (!selectionRect || selectionRect.width === 0 || selectionRect.height === 0) {
-        console.warn('Invalid bounding rectangle for selection:', selectionRect)
+        console.error('Invalid bounding rectangle for selection:', selectionRect)
+        alert('Cannot create highlight: Invalid text selection. Please try selecting the text again.')
         setHighlightPickerPosition(null)
         setSelectedTextInfo(null)
         return
@@ -1968,7 +1985,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
       // Additional validation for reasonable dimensions
       if (selectionRect.width < 1 || selectionRect.height < 1) {
-        console.warn('Selection too small to create highlight:', selectionRect)
+        console.error('Selection too small to create highlight:', selectionRect)
+        alert('Cannot create highlight: Selection is too small. Please select more text.')
         setHighlightPickerPosition(null)
         setSelectedTextInfo(null)
         return
@@ -1981,7 +1999,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       let currentElement = range.startContainer.parentElement
       while (currentElement && !pageContainer) {
         if (currentElement.hasAttribute('data-page-number') || 
-            currentElement.classList.contains('relative') && currentElement.querySelector('canvas')) {
+            (currentElement.classList.contains('relative') && currentElement.querySelector('canvas'))) {
           pageContainer = currentElement
           break
         }
@@ -1997,7 +2015,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       }
 
       if (!pageContainer) {
-        console.warn('Could not find page container')
+        console.error('Could not find page container for highlight')
+        alert('Cannot create highlight: Unable to locate page container. Please try again.')
         setHighlightPickerPosition(null)
         setSelectedTextInfo(null)
         return
@@ -2037,7 +2056,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
       // ROBUST VALIDATION: Check for reasonable position values
       if (position.x < 0 || position.y < 0 || position.width <= 0 || position.height <= 0) {
-        console.warn('Invalid calculated position:', { rawPosition, position, scale })
+        console.error('Invalid calculated position:', { rawPosition, position, scale })
+        alert('Cannot create highlight: Invalid position calculation. Please try selecting the text again.')
         setHighlightPickerPosition(null)
         setSelectedTextInfo(null)
         return
@@ -2110,13 +2130,34 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       setSelectedTextInfo(null)
     } catch (error: any) {
       console.error('Error creating highlight:', error)
+      console.error('Error details:', {
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name,
+        selectedTextInfo: selectedTextInfo ? {
+          text: selectedTextInfo.text.substring(0, 50),
+          pageNumber: selectedTextInfo.pageNumber,
+          hasRange: !!selectedTextInfo.range
+        } : null
+      })
       
-      // Show user-friendly message
+      // Show user-friendly message based on error type
       if (error.message?.includes('only available in production')) {
         alert('💡 Highlighting is only available in the deployed version.\n\nThis feature requires backend API endpoints that are only active in production.\n\nTo test highlights, please use the deployed app at your Vercel URL.')
+      } else if (error.message?.includes('Failed to create highlight')) {
+        // Backend error - show the specific error message
+        alert(`Failed to create highlight: ${error.message}\n\nPlease check your connection and try again.`)
+      } else if (error.message) {
+        // Other specific errors
+        alert(`Failed to create highlight: ${error.message}`)
       } else {
-        alert('Failed to create highlight. Please try again.')
+        // Generic error
+        alert(`Failed to create highlight. Please try again.\n\nError: ${error?.message || 'Unknown error'}`)
       }
+      
+      // Clear UI state on error
+      setHighlightPickerPosition(null)
+      setSelectedTextInfo(null)
     }
   }, [selectedTextInfo, document.id, document.pageTexts])
 
