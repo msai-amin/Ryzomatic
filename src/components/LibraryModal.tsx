@@ -242,8 +242,14 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
   };
 
   const handleDeleteBook = async (id: string) => {
-    if (confirm('Are you sure you want to delete this book and all its notes?')) {
+    console.log('handleDeleteBook called with id:', id);
+    const confirmed = window.confirm('Are you sure you want to delete this book and all its notes?');
+    console.log('Confirmation result:', confirmed);
+    
+    if (confirmed) {
       try {
+        console.log('Starting deletion process for book:', id);
+        
         // Delete from Supabase (primary storage)
         await supabaseStorageService.deleteBook(id);
         console.log('Book deleted from Supabase:', id);
@@ -251,17 +257,25 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         // Also delete from localStorage as backup
         try {
           storageService.deleteBook(id);
+          console.log('Book deleted from localStorage:', id);
         } catch (localError) {
           console.warn('Failed to delete from localStorage (non-critical):', localError);
         }
         
         // Reload the library
+        console.log('Reloading library data...');
         await loadData();
+        console.log('Library data reloaded successfully');
         
         alert('Book deleted successfully!');
       } catch (error) {
         console.error('Error deleting book:', error);
-        alert(`Failed to delete book: ${error.message}`);
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+        alert(`Failed to delete book: ${error.message || 'Unknown error'}`);
       }
     }
   };
@@ -489,7 +503,10 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                       </div>
                       <button
                         onClick={(e) => {
+                          console.log('Delete button clicked for book:', book.id);
+                          console.log('handleDeleteBook function type:', typeof handleDeleteBook);
                           e.stopPropagation();
+                          e.preventDefault();
                           handleDeleteBook(book.id);
                         }}
                         className="ml-4 p-2 rounded transition-colors"
