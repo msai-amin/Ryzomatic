@@ -544,6 +544,17 @@ class SupabaseStorageService {
         );
       }
       
+      // Verify session is active (required for RLS)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw errorHandler.createError(
+          'No active session. Please sign in again.',
+          ErrorType.AUTHENTICATION,
+          ErrorSeverity.HIGH,
+          { context }
+        );
+      }
+      
       // Get or create Trash collection for this user
       const trashCollection = await this.getOrCreateTrashCollection();
       
@@ -580,24 +591,40 @@ class SupabaseStorageService {
         }
         
         // Add to Trash collection using the service (handles auth properly)
-        try {
-          await libraryOrganizationService.addBookToCollection(bookId, trashCollection.id);
-          logger.info('Book moved to Trash collection successfully', context, undefined, {
-            trashCollectionId: trashCollection.id
+        // Use direct supabase call with verified session
+        const { error: addError } = await supabase
+          .from('book_collections')
+          .insert({
+            book_id: bookId,
+            collection_id: trashCollection.id
           });
-        } catch (addError: any) {
+        
+        if (addError) {
           // If book is already in trash, that's fine
-          if (addError?.code === '23505' || addError?.message?.includes('duplicate')) {
+          if (addError.code === '23505' || addError.message?.includes('duplicate')) {
             logger.info('Book already in Trash collection', context);
           } else {
             logger.error('Failed to add book to Trash collection', context, addError as Error);
+            logger.error('RLS error details', context, undefined, {
+              errorCode: addError.code,
+              errorMessage: addError.message,
+              errorDetails: addError.details,
+              bookId,
+              collectionId: trashCollection.id,
+              userId: this.currentUserId,
+              sessionUserId: session.user.id
+            });
             throw errorHandler.createError(
-              `Failed to move book to Trash: ${addError?.message || 'Unknown error'}`,
+              `Failed to move book to Trash: ${addError.message}`,
               ErrorType.DATABASE,
               ErrorSeverity.HIGH,
-              { context, error: addError?.message }
+              { context, error: addError.message }
             );
           }
+        } else {
+          logger.info('Book moved to Trash collection successfully', context, undefined, {
+            trashCollectionId: trashCollection.id
+          });
         }
       } catch (error) {
         logger.error('Error moving book to Trash', context, error as Error);
