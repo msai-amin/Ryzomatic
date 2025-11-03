@@ -38,31 +38,30 @@ export const BulkActionsToolbar: React.FC<BulkActionsProps> = ({
   const handleDelete = () => {
     console.log('BulkActionsToolbar: Delete button clicked, showConfirmDelete:', showConfirmDelete);
     console.log('BulkActionsToolbar: onDelete function:', typeof onDelete);
+    console.log('BulkActionsToolbar: selectedCount:', selectedCount);
     
-    if (!showConfirmDelete) {
-      console.log('BulkActionsToolbar: First click - showing confirmation');
-      alert('⚠️ Click DELETE again to confirm deletion!'); // Make it obvious
-      setShowConfirmDelete(true);
-      setTimeout(() => {
-        console.log('BulkActionsToolbar: Confirmation timeout expired, resetting');
-        setShowConfirmDelete(false);
-      }, 5000); // Increased to 5 seconds
-      return;
-    }
+    // Simplified: Just show confirm dialog directly, no two-click pattern
+    const confirmed = window.confirm(`Are you sure you want to delete ${selectedCount} book(s)? This action cannot be undone.`);
     
-    console.log('BulkActionsToolbar: Second click - calling onDelete()');
-    if (typeof onDelete === 'function') {
-      const confirmed = window.confirm(`Are you sure you want to delete ${selectedCount} book(s)?`);
-      if (confirmed) {
-        console.log('BulkActionsToolbar: User confirmed deletion, calling onDelete()');
-        onDelete();
+    if (confirmed) {
+      console.log('BulkActionsToolbar: User confirmed deletion, calling onDelete()');
+      if (typeof onDelete === 'function') {
+        try {
+          onDelete();
+          console.log('BulkActionsToolbar: onDelete() called successfully');
+        } catch (error) {
+          console.error('BulkActionsToolbar: Error calling onDelete():', error);
+          alert(`Failed to delete: ${error.message || 'Unknown error'}`);
+        }
       } else {
-        console.log('BulkActionsToolbar: User cancelled deletion');
+        console.error('BulkActionsToolbar: onDelete is not a function!', onDelete);
+        alert('ERROR: Delete handler is not a function!');
       }
     } else {
-      console.error('BulkActionsToolbar: onDelete is not a function!', onDelete);
-      alert('ERROR: Delete handler is not a function!');
+      console.log('BulkActionsToolbar: User cancelled deletion');
     }
+    
+    // Reset confirmation state if it was set
     setShowConfirmDelete(false);
   };
 
