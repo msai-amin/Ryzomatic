@@ -576,6 +576,80 @@ class SupabaseStorageService {
     }
   }
 
+  // Permanently delete book (only works if book is in Trash collection)
+  async permanentlyDeleteBook(bookId: string): Promise<void> {
+    this.ensureAuthenticated();
+    
+    try {
+      const context = { bookId, userId: this.currentUserId };
+      
+      // Safety check: Verify book is in Trash collection
+      const trashCollection = await this.getOrCreateTrashCollection();
+      const { data: trashCheck, error: checkError } = await supabase
+        .from('book_collections')
+        .select('collection_id')
+        .eq('book_id', bookId)
+        .eq('collection_id', trashCollection.id)
+        .single();
+      
+      if (checkError || !trashCheck) {
+        throw errorHandler.createError(
+          'Book must be in Trash collection before permanent deletion',
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context, error: 'Book not in Trash collection' }
+        );
+      }
+      
+      logger.info('Permanently deleting book from Trash', context);
+      
+      // Get book to find S3 key before deletion
+      let s3Key: string | undefined;
+      try {
+        const { data: book, error: getError } = await userBooks.get(bookId);
+        if (!getError && book) {
+          s3Key = book.s3_key;
+        }
+      } catch (getError) {
+        logger.warn('Could not fetch book before permanent deletion', context, getError as Error);
+      }
+      
+      // Delete from database (this will cascade delete from book_collections)
+      const { data: deleteData, error: deleteError } = await userBooks.delete(bookId);
+      
+      if (deleteError) {
+        logger.error('Failed to permanently delete book from database', context, deleteError as Error);
+        throw errorHandler.createError(
+          `Failed to permanently delete book: ${deleteError.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context, error: deleteError.message }
+        );
+      }
+      
+      logger.info('Book permanently deleted from database', context, undefined, {
+        deletedRows: deleteData
+      });
+      
+      // Delete from S3 if s3_key exists
+      if (s3Key) {
+        try {
+          await bookStorageService.deleteBook(s3Key, this.currentUserId!);
+          logger.info('Book file permanently deleted from S3', context, { s3Key });
+        } catch (s3Error) {
+          // Log but don't fail - database record is already deleted
+          logger.error('Failed to delete file from S3 (non-critical)', context, s3Error as Error);
+        }
+      } else {
+        logger.info('No S3 key found, skipping S3 deletion', context);
+      }
+      
+    } catch (error) {
+      logger.error('Error permanently deleting book', { bookId }, error as Error);
+      throw error;
+    }
+  }
+
   // Helper to get or create Trash collection
   private async getOrCreateTrashCollection(): Promise<{ id: string }> {
     this.ensureAuthenticated();

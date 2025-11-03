@@ -5,6 +5,7 @@ import { useAppStore } from '../store/appStore';
 import { librarySearchService, SearchResult } from '../services/librarySearchService';
 import { libraryOrganizationService, Collection, Tag } from '../services/libraryOrganizationService';
 import { supabaseStorageService } from '../services/supabaseStorageService';
+import { supabase } from '../../lib/supabase';
 import { BookCard } from './library/BookCard';
 import { CollectionTree } from './library/CollectionTree';
 import { TagChip, TagList, TagFilter } from './library/TagChip';
@@ -340,15 +341,53 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
   const handleBulkDelete = useCallback(async () => {
     console.log('ModernLibraryModal: handleBulkDelete called with books:', libraryView.selectedBooks);
     try {
-      // Delete directly using supabaseStorageService instead of libraryOrganizationService
+      // Get current user ID
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
+        throw new Error('User not authenticated');
+      }
+      
+      // Get Trash collection ID to check if books are in Trash
+      const { data: trashCollection } = await supabase
+        .from('user_collections')
+        .select('id')
+        .eq('user_id', currentUser.id)
+        .eq('name', 'Trash')
+        .single();
+      
+      const trashCollectionId = trashCollection?.id;
+      console.log('ModernLibraryModal: Trash collection ID:', trashCollectionId);
+      
+      // Check which books are in Trash
+      const { data: bookCollections } = await supabase
+        .from('book_collections')
+        .select('book_id, collection_id')
+        .in('book_id', libraryView.selectedBooks);
+      
+      const booksInTrash = new Set(
+        (bookCollections || [])
+          .filter(bc => bc.collection_id === trashCollectionId)
+          .map(bc => bc.book_id)
+      );
+      
+      console.log('ModernLibraryModal: Books in Trash:', Array.from(booksInTrash));
       console.log('ModernLibraryModal: Starting deletion of', libraryView.selectedBooks.length, 'books');
       
       await Promise.all(
         libraryView.selectedBooks.map(async (bookId) => {
-          console.log('ModernLibraryModal: Deleting book:', bookId);
+          console.log('ModernLibraryModal: Processing book:', bookId, 'inTrash:', booksInTrash.has(bookId));
           try {
-            await supabaseStorageService.deleteBook(bookId);
-            console.log('ModernLibraryModal: Successfully deleted book:', bookId);
+            if (booksInTrash.has(bookId)) {
+              // Permanently delete if in Trash
+              console.log('ModernLibraryModal: Permanently deleting book from Trash:', bookId);
+              await supabaseStorageService.permanentlyDeleteBook(bookId);
+              console.log('ModernLibraryModal: Successfully permanently deleted book:', bookId);
+            } else {
+              // Move to Trash if not in Trash
+              console.log('ModernLibraryModal: Moving book to Trash:', bookId);
+              await supabaseStorageService.deleteBook(bookId);
+              console.log('ModernLibraryModal: Successfully moved book to Trash:', bookId);
+            }
           } catch (error) {
             console.error('ModernLibraryModal: Failed to delete book:', bookId, error);
             throw error;
@@ -356,7 +395,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
         })
       );
       
-      console.log('ModernLibraryModal: All books deleted successfully');
+      console.log('ModernLibraryModal: All books processed successfully');
       // Refresh the books list after deletion
       await searchBooks();
       clearSelection();

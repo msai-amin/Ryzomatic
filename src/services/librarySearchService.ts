@@ -221,9 +221,28 @@ class LibrarySearchService {
         tags: tagsMap[item.id] || []
       }));
 
+      // Get Trash collection ID to filter out trash books
+      const { data: trashCollection } = await supabase
+        .from('user_collections')
+        .select('id, name')
+        .eq('user_id', this.currentUserId!)
+        .eq('name', 'Trash')
+        .single();
+      
+      const trashCollectionId = trashCollection?.id;
+      const isSearchingTrash = trashCollectionId && filters.collections?.includes(trashCollectionId);
+      
+      // Filter out Trash books unless explicitly searching for Trash collection
+      const filteredResults = results.filter(book => {
+        if (!trashCollectionId) return true; // No Trash collection exists yet
+        const isInTrash = book.collections.some(coll => coll.collection_id === trashCollectionId);
+        // Only show Trash books if explicitly searching for Trash collection
+        return !isInTrash || isSearchingTrash;
+      });
+
       // Cache the results
       this.searchCache.set(cacheKey, {
-        data: results,
+        data: filteredResults,
         timestamp: Date.now()
       });
 
@@ -238,21 +257,22 @@ class LibrarySearchService {
       
       logger.info('Search completed', {
         ...context,
-        resultCount: results.length,
+        resultCount: filteredResults.length,
         durationMs,
-        cacheKey
+        cacheKey,
+        filteredOutTrash: results.length - filteredResults.length
       });
 
       return {
-        results,
+        results: filteredResults,
         metadata: {
-          total: results.length,
+          total: filteredResults.length,
           page: 1,
           limit,
-          hasMore: results.length === limit,
+          hasMore: filteredResults.length === limit,
           filters,
           sort,
-          cursor: results.length > 0 ? this.buildNextCursor(results, sort) : null
+          cursor: filteredResults.length > 0 ? this.buildNextCursor(filteredResults, sort) : null
         }
       };
 

@@ -672,7 +672,29 @@ class LibraryOrganizationService {
         );
       }
 
-      return data || [];
+      // Get Trash collection ID to filter out trash books
+      const { data: trashCollection } = await supabase
+        .from('user_collections')
+        .select('id')
+        .eq('user_id', this.currentUserId!)
+        .eq('name', 'Trash')
+        .single();
+      
+      const trashCollectionId = trashCollection?.id;
+      const isSearchingTrash = trashCollectionId && filters.collections?.includes(trashCollectionId);
+      
+      // Filter out Trash books unless explicitly searching for Trash collection
+      const filteredData = (data || []).filter((book: any) => {
+        if (!trashCollectionId) return true; // No Trash collection exists yet
+        if (isSearchingTrash) return true; // Show all if searching Trash
+        
+        // Check if book is in Trash collection
+        const bookCollections = book.book_collections || [];
+        const isInTrash = bookCollections.some((bc: any) => bc.collection_id === trashCollectionId);
+        return !isInTrash;
+      });
+
+      return filteredData;
     } catch (error) {
       logger.error('Error searching books', { filters }, error as Error);
       throw error;
