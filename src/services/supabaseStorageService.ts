@@ -529,41 +529,52 @@ class SupabaseStorageService {
       
       // Add book to Trash collection (and remove from all other collections)
       try {
-        // Remove from all existing collections first
-        const { error: removeError } = await supabase
-          .from('book_collections')
-          .delete()
-          .eq('book_id', bookId);
+        // Use libraryOrganizationService to handle authentication properly
+        const { libraryOrganizationService } = await import('./libraryOrganizationService');
         
-        if (removeError) {
+        // Remove from all existing collections first
+        try {
+          // Get all collections this book is in
+          const { data: existingCollections } = await supabase
+            .from('book_collections')
+            .select('collection_id')
+            .eq('book_id', bookId);
+          
+          if (existingCollections && existingCollections.length > 0) {
+            // Remove from each collection
+            for (const coll of existingCollections) {
+              if (coll.collection_id !== trashCollection.id) {
+                try {
+                  await libraryOrganizationService.removeBookFromCollection(bookId, coll.collection_id);
+                } catch (removeError) {
+                  logger.warn('Failed to remove book from collection', context, removeError as Error);
+                }
+              }
+            }
+          }
+        } catch (removeError) {
           logger.warn('Failed to remove book from existing collections', context, removeError as Error);
         }
         
-        // Add to Trash collection
-        const { error: addError } = await supabase
-          .from('book_collections')
-          .insert({
-            book_id: bookId,
-            collection_id: trashCollection.id
-          });
-        
-        if (addError) {
-          // If book is already in trash, that's fine
-          if (addError.code !== '23505') { // Not a duplicate key error
-            logger.error('Failed to add book to Trash collection', context, addError as Error);
-            throw errorHandler.createError(
-              `Failed to move book to Trash: ${addError.message}`,
-              ErrorType.DATABASE,
-              ErrorSeverity.HIGH,
-              { context, error: addError.message }
-            );
-          } else {
-            logger.info('Book already in Trash collection', context);
-          }
-        } else {
+        // Add to Trash collection using the service (handles auth properly)
+        try {
+          await libraryOrganizationService.addBookToCollection(bookId, trashCollection.id);
           logger.info('Book moved to Trash collection successfully', context, undefined, {
             trashCollectionId: trashCollection.id
           });
+        } catch (addError: any) {
+          // If book is already in trash, that's fine
+          if (addError?.code === '23505' || addError?.message?.includes('duplicate')) {
+            logger.info('Book already in Trash collection', context);
+          } else {
+            logger.error('Failed to add book to Trash collection', context, addError as Error);
+            throw errorHandler.createError(
+              `Failed to move book to Trash: ${addError?.message || 'Unknown error'}`,
+              ErrorType.DATABASE,
+              ErrorSeverity.HIGH,
+              { context, error: addError?.message }
+            );
+          }
         }
       } catch (error) {
         logger.error('Error moving book to Trash', context, error as Error);
