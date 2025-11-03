@@ -484,7 +484,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                         className="flex items-center justify-between p-4 border rounded-lg transition-colors"
                         style={{
                           borderColor: 'var(--color-border)',
-                          backgroundColor: 'var(--color-surface)'
+                          backgroundColor: 'var(--color-surface)',
+                          position: 'relative'
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)';
@@ -505,14 +506,27 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                       </div>
                       <button
                         onClick={(e) => {
+                          alert('DELETE BUTTON CLICKED - TEST'); // Immediate test
                           console.log('Delete button clicked for book:', book.id);
                           console.log('handleDeleteBook function type:', typeof handleDeleteBook);
                           e.stopPropagation();
                           e.preventDefault();
-                          handleDeleteBook(book.id);
+                          if (typeof handleDeleteBook === 'function') {
+                            handleDeleteBook(book.id);
+                          } else {
+                            alert('ERROR: handleDeleteBook is not a function!');
+                          }
+                        }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation(); // Also stop on mousedown
                         }}
                         className="ml-4 p-2 rounded transition-colors"
-                        style={{ color: 'var(--color-error)' }}
+                        style={{ 
+                          color: 'var(--color-error)',
+                          position: 'relative',
+                          zIndex: 10,
+                          pointerEvents: 'auto'
+                        }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.backgroundColor = 'var(--color-error-light, rgba(239, 68, 68, 0.1))';
                         }}
