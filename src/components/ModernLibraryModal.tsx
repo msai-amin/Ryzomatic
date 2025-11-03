@@ -411,6 +411,29 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
     }
   }, [libraryView.selectedBooks, searchBooks, clearSelection]);
 
+  const handleEmptyTrash = useCallback(async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to permanently delete all books in Trash? This action cannot be undone.'
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      console.log('ModernLibraryModal: Emptying Trash');
+      const result = await supabaseStorageService.emptyTrash();
+      console.log('ModernLibraryModal: Trash emptied, deleted count:', result.deletedCount);
+      
+      // Refresh the books list
+      await searchBooks();
+      clearSelection();
+      
+      alert(`Successfully deleted ${result.deletedCount} book(s) from Trash.`);
+    } catch (error) {
+      console.error('ModernLibraryModal: Failed to empty Trash:', error);
+      alert(`Failed to empty Trash: ${error?.message || 'Unknown error'}`);
+    }
+  }, [searchBooks, clearSelection]);
+
   const handleBulkExport = useCallback(async () => {
     try {
       const data = await libraryOrganizationService.batchExport(libraryView.selectedBooks);
@@ -605,12 +628,38 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
             borderColor: 'var(--color-border)',
           }}
         >
-          <LibrarySearchBar
-            onSearch={handleSearch}
-            onFiltersChange={handleFiltersChange}
-            onSortChange={handleSortChange}
-            onViewModeChange={handleViewModeChange}
-          />
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <LibrarySearchBar
+                onSearch={handleSearch}
+                onFiltersChange={handleFiltersChange}
+                onSortChange={handleSortChange}
+                onViewModeChange={handleViewModeChange}
+              />
+            </div>
+            {/* Empty Trash button - shown when Trash collection is selected */}
+            {collections.find(c => c.id === libraryView.selectedCollectionId && c.name === 'Trash') && (
+              <button
+                onClick={handleEmptyTrash}
+                className="px-4 py-2 text-sm rounded transition-colors flex items-center gap-2 whitespace-nowrap"
+                style={{
+                  backgroundColor: 'var(--color-error-light, rgba(239, 68, 68, 0.1))',
+                  color: 'var(--color-error)',
+                  border: '1px solid var(--color-error-light, rgba(239, 68, 68, 0.3))'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-error-light, rgba(239, 68, 68, 0.2))';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-error-light, rgba(239, 68, 68, 0.1))';
+                }}
+                title="Permanently delete all books in Trash"
+              >
+                <Trash2 className="w-4 h-4" />
+                Empty Trash
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Main content */}

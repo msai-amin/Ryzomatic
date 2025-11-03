@@ -648,6 +648,74 @@ class SupabaseStorageService {
     }
   }
 
+  // Empty Trash - permanently delete all books in Trash collection
+  async emptyTrash(): Promise<{ deletedCount: number }> {
+    this.ensureAuthenticated();
+    
+    try {
+      const context = { userId: this.currentUserId };
+      logger.info('Emptying Trash collection', context);
+      
+      // Get Trash collection
+      const trashCollection = await this.getOrCreateTrashCollection();
+      
+      // Get all books in Trash collection
+      const { data: trashBooks, error: fetchError } = await supabase
+        .from('book_collections')
+        .select('book_id')
+        .eq('collection_id', trashCollection.id);
+      
+      if (fetchError) {
+        throw errorHandler.createError(
+          `Failed to fetch books from Trash: ${fetchError.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context, error: fetchError.message }
+        );
+      }
+      
+      if (!trashBooks || trashBooks.length === 0) {
+        logger.info('Trash is already empty', context);
+        return { deletedCount: 0 };
+      }
+      
+      const bookIds = trashBooks.map(b => b.book_id);
+      logger.info(`Found ${bookIds.length} books in Trash to permanently delete`, context);
+      
+      // Permanently delete all books in Trash
+      let deletedCount = 0;
+      const errors: Error[] = [];
+      
+      for (const bookId of bookIds) {
+        try {
+          await this.permanentlyDeleteBook(bookId);
+          deletedCount++;
+          logger.info(`Permanently deleted book from Trash: ${bookId}`, context);
+        } catch (error) {
+          logger.error(`Failed to permanently delete book: ${bookId}`, context, error as Error);
+          errors.push(error as Error);
+        }
+      }
+      
+      if (errors.length > 0) {
+        logger.warn(`Some books failed to delete: ${errors.length}/${bookIds.length}`, context);
+        throw errorHandler.createError(
+          `Failed to delete ${errors.length} out of ${bookIds.length} books from Trash`,
+          ErrorType.DATABASE,
+          ErrorSeverity.MEDIUM,
+          { context, deletedCount, failedCount: errors.length }
+        );
+      }
+      
+      logger.info(`Successfully emptied Trash: ${deletedCount} books deleted`, context);
+      return { deletedCount };
+      
+    } catch (error) {
+      logger.error('Error emptying Trash', { userId: this.currentUserId }, error as Error);
+      throw error;
+    }
+  }
+
   // Helper to get or create Trash collection
   private async getOrCreateTrashCollection(): Promise<{ id: string }> {
     this.ensureAuthenticated();
