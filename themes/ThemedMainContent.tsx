@@ -297,14 +297,25 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                 <Tooltip content="Create New Note" position="left">
                   <button 
                     onClick={async () => {
-                      if (!user || !currentDocument) return;
+                      if (!user) {
+                        alert('Please sign in to create notes.');
+                        return;
+                      }
+                      
+                      if (!currentDocument) {
+                        alert('Please open a document first.');
+                        return;
+                      }
                       
                       try {
+                        // Use current page number from PDF viewer, or default to 1
+                        const currentPage = pdfViewer?.currentPage || 1;
+                        
                         // Create a new blank note
                         const { data, error } = await notesService.createNote(
                           user.id,
                           currentDocument.id,
-                          1, // Default to page 1
+                          currentPage,
                           '', // Empty content initially
                           'freeform', // Simple text note
                           {}, // No metadata
@@ -313,6 +324,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                         
                         if (error) {
                           console.error('Error creating note:', error);
+                          alert(`Failed to create note: ${error.message || 'Unknown error'}`);
                         } else {
                           console.log('New note created successfully');
                           // Trigger refresh of notes list
@@ -324,8 +336,9 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                             setEditingNote(data);
                           }
                         }
-                      } catch (error) {
+                      } catch (error: any) {
                         console.error('Exception creating note:', error);
+                        alert(`Failed to create note: ${error?.message || 'Unknown error'}`);
                       }
                     }}
                     className="p-2 rounded-lg transition-colors hover:opacity-80"
@@ -333,6 +346,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
                       backgroundColor: 'var(--color-primary)',
                       color: 'var(--color-text-inverse)',
                     }}
+                    disabled={!user || !currentDocument}
                   >
                     <Plus className="w-4 h-4" />
                   </button>
