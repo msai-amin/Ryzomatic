@@ -14,6 +14,7 @@ import { extractStructuredText } from '../utils/pdfTextExtractor'
 import { extractWithFallback } from '../services/pdfExtractionOrchestrator'
 import { canPerformVisionExtraction } from '../services/visionUsageService'
 import { configurePDFWorker } from '../utils/pdfjsConfig'
+import { supabase } from '../../lib/supabase'
 // PDF.js will be imported dynamically to avoid ES module issues
 
 interface DocumentUploadProps {
@@ -120,16 +121,16 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
         let authToken: string | undefined
         
         try {
-          const { data: { user } } = await supabaseStorageService['supabase'].auth.getUser()
+          const { data: { user } } = await supabase.auth.getUser()
           if (user) {
             userId = user.id
-            const { data: profile } = await supabaseStorageService['supabase']
+            const { data: profile } = await supabase
               .from('profiles')
               .select('tier')
               .eq('id', user.id)
               .single()
             userTier = profile?.tier || 'free'
-            const session = await supabaseStorageService['supabase'].auth.getSession()
+            const session = await supabase.auth.getSession()
             authToken = session.data.session?.access_token
           }
         } catch (authError) {

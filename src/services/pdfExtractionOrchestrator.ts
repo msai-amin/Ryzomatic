@@ -262,14 +262,27 @@ export async function extractWithFallback(
     return result
 
   } catch (error) {
-    logger.error('PDF extraction failed', context, error as Error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
+    
+    logger.error('PDF extraction failed', context, error as Error, {
+      errorMessage,
+      errorStack,
+      fileName: context.fileName,
+      fileSize: context.fileSize
+    })
     
     const appError = errorHandler.createError(
-      `Failed to extract PDF text: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      `Failed to extract PDF text: ${errorMessage}`,
       ErrorType.PDF_PROCESSING,
       ErrorSeverity.HIGH,
       context,
-      { fileName: context.fileName, fileSize: context.fileSize }
+      { 
+        fileName: context.fileName, 
+        fileSize: context.fileSize,
+        errorDetails: errorMessage,
+        errorStack 
+      }
     )
     
     throw appError
