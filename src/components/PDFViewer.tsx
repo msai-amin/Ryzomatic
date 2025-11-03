@@ -1843,13 +1843,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   }, [contextMenu])
 
   const handleTextSelection = useCallback((event: MouseEvent) => {
-    // Only show highlight picker when highlight mode is active
-    if (!isHighlightMode) {
-      setHighlightPickerPosition(null)
-      setSelectedTextInfo(null)
-      return
-    }
-
     const selection = window.getSelection()
     if (!selection || selection.isCollapsed || !selection.rangeCount) {
       setHighlightPickerPosition(null)
@@ -1899,17 +1892,23 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       }
     })
 
+    // ALWAYS store selection info (used by notes, AI, context menu, etc.)
     setSelectedTextInfo({
       text: selectedText,
       pageNumber: currentPage,
       range
     })
 
-    // Position the color picker near the selection
-    setHighlightPickerPosition({
-      x: rect.right + 10,
-      y: rect.top - 10
-    })
+    // ONLY show highlight picker UI when highlight mode is active
+    if (isHighlightMode) {
+      setHighlightPickerPosition({
+        x: rect.right + 10,
+        y: rect.top - 10
+      })
+    } else {
+      // Clear picker UI when not in highlight mode, but keep selection info
+      setHighlightPickerPosition(null)
+    }
   }, [pdfViewer.scrollMode, pdfViewer.readingMode, pageNumber, isHighlightMode])
   
   // Handle right-click context menu for AI features
