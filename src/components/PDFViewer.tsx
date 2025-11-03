@@ -2108,6 +2108,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       )
 
       // Create highlight via service
+      console.log('📝 Creating highlight with bookId:', {
+        bookId: document.id,
+        documentId: document.id,
+        documentName: document.name,
+        pageNumber: selectedTextInfo.pageNumber,
+        hasDocument: !!document,
+        documentType: document?.type
+      })
+      
       const highlight = await highlightService.createHighlight({
         bookId: document.id,
         pageNumber: selectedTextInfo.pageNumber,

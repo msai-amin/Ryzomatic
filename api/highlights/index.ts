@@ -106,6 +106,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         textContextAfter
       } = req.body
 
+      console.log('🔍 Highlight API received request:', {
+        bookId,
+        userId: user.id,
+        userEmail: user.email,
+        pageNumber,
+        hasBookId: !!bookId,
+        bookIdType: typeof bookId,
+        bookIdLength: bookId?.length
+      })
+
       // Validate required fields
       if (!bookId || !pageNumber || !highlightedText || !colorId || !colorHex || !positionData) {
         return res.status(400).json({ 
@@ -115,11 +125,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // Verify book ownership - check if book exists first, then check ownership
+      console.log('🔍 Looking up book in database:', { bookId, userId: user.id })
       const { data: bookExists, error: existsError } = await supabase
         .from('user_books')
         .select('id, user_id')
         .eq('id', bookId)
         .single()
+      
+      console.log('🔍 Book lookup result:', {
+        bookId,
+        found: !!bookExists,
+        error: existsError,
+        errorCode: existsError?.code,
+        errorMessage: existsError?.message,
+        bookUserId: bookExists?.user_id,
+        requestUserId: user.id
+      })
 
       if (existsError || !bookExists) {
         console.error('Book lookup failed when creating highlight:', {
