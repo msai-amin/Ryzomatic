@@ -143,9 +143,17 @@ class Logger {
     const formattedMessage = this.formatMessage(entry);
     
     if (entry.error) {
-      consoleMethod(formattedMessage, entry.error);
-    } else {
+      // Log error with full details
       consoleMethod(formattedMessage);
+      consoleMethod('Error details:', {
+        name: entry.error.name,
+        message: entry.error.message,
+        stack: entry.error.stack
+      });
+    }
+    
+    if (entry.metadata && Object.keys(entry.metadata).length > 0) {
+      consoleMethod('Metadata:', entry.metadata);
     }
   }
 
