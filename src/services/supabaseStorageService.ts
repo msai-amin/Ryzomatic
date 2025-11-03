@@ -524,6 +524,26 @@ class SupabaseStorageService {
       // Instead of deleting, move book to Trash collection
       logger.info('Moving book to Trash collection', context);
       
+      // Verify book belongs to current user (required for RLS)
+      const { data: book, error: bookError } = await userBooks.get(bookId);
+      if (bookError || !book) {
+        throw errorHandler.createError(
+          'Book not found or access denied',
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context, error: bookError?.message || 'Book not found' }
+        );
+      }
+      
+      if (book.user_id !== this.currentUserId) {
+        throw errorHandler.createError(
+          'Book does not belong to current user',
+          ErrorType.AUTHENTICATION,
+          ErrorSeverity.HIGH,
+          { context }
+        );
+      }
+      
       // Get or create Trash collection for this user
       const trashCollection = await this.getOrCreateTrashCollection();
       
@@ -533,9 +553,7 @@ class SupabaseStorageService {
         const { libraryOrganizationService } = await import('./libraryOrganizationService');
         
         // Ensure libraryOrganizationService is initialized with current user
-        if (!libraryOrganizationService['currentUserId']) {
-          libraryOrganizationService.setCurrentUser(this.currentUserId!);
-        }
+        libraryOrganizationService.setCurrentUser(this.currentUserId!);
         
         // Remove from all existing collections first
         try {
