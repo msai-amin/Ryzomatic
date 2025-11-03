@@ -476,22 +476,24 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                 {books.length === 0 ? (
                   <p className="text-center py-8" style={{ color: 'var(--color-text-secondary)' }}>No saved books yet</p>
                 ) : (
-                  books.map(book => (
-                    <div
-                      key={book.id}
-                      className="flex items-center justify-between p-4 border rounded-lg transition-colors"
-                      style={{
-                        borderColor: 'var(--color-border)',
-                        backgroundColor: 'var(--color-surface)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--color-surface)';
-                      }}
-                    >
-                      <div className="flex-1 cursor-pointer" onClick={() => handleOpenBook(book)}>
+                  books.map(book => {
+                    console.log('Rendering book card with delete button for:', book.id);
+                    return (
+                      <div
+                        key={book.id}
+                        className="flex items-center justify-between p-4 border rounded-lg transition-colors"
+                        style={{
+                          borderColor: 'var(--color-border)',
+                          backgroundColor: 'var(--color-surface)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'var(--color-surface)';
+                        }}
+                      >
+                        <div className="flex-1 cursor-pointer" onClick={() => handleOpenBook(book)}>
                         <h3 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>{book.title}</h3>
                         <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
                           {book.type.toUpperCase()} • {book.totalPages ? `${book.totalPages} pages` : 'Text file'}
@@ -521,7 +523,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                  ))
+                  );
+                  })
                 )}
               </div>
             )}
