@@ -521,61 +521,106 @@ class SupabaseStorageService {
     try {
       const context = { bookId, userId: this.currentUserId };
       
-      // First, get book to find S3 key (optional - continue even if this fails)
-      let book: any = null;
-      let s3Key: string | undefined;
+      // Instead of deleting, move book to Trash collection
+      logger.info('Moving book to Trash collection', context);
       
+      // Get or create Trash collection for this user
+      const trashCollection = await this.getOrCreateTrashCollection();
+      
+      // Add book to Trash collection (and remove from all other collections)
       try {
-        const { data, error } = await userBooks.get(bookId);
-        if (error) {
-          logger.warn('Could not fetch book before deletion (will continue anyway)', context, error as Error);
+        // Remove from all existing collections first
+        const { error: removeError } = await supabase
+          .from('book_collections')
+          .delete()
+          .eq('book_id', bookId);
+        
+        if (removeError) {
+          logger.warn('Failed to remove book from existing collections', context, removeError as Error);
+        }
+        
+        // Add to Trash collection
+        const { error: addError } = await supabase
+          .from('book_collections')
+          .insert({
+            book_id: bookId,
+            collection_id: trashCollection.id
+          });
+        
+        if (addError) {
+          // If book is already in trash, that's fine
+          if (addError.code !== '23505') { // Not a duplicate key error
+            logger.error('Failed to add book to Trash collection', context, addError as Error);
+            throw errorHandler.createError(
+              `Failed to move book to Trash: ${addError.message}`,
+              ErrorType.DATABASE,
+              ErrorSeverity.HIGH,
+              { context, error: addError.message }
+            );
+          } else {
+            logger.info('Book already in Trash collection', context);
+          }
         } else {
-          book = data;
-          s3Key = book?.s3_key;
+          logger.info('Book moved to Trash collection successfully', context, undefined, {
+            trashCollectionId: trashCollection.id
+          });
         }
-      } catch (getError) {
-        logger.warn('Error fetching book before deletion (will continue anyway)', context, getError as Error);
-      }
-      
-      // Delete from database first
-      logger.info('Attempting to delete book from database', context);
-      const { data: deleteData, error: deleteError } = await userBooks.delete(bookId);
-      
-      logger.info('Delete operation completed', context, undefined, {
-        hasError: !!deleteError,
-        errorMessage: deleteError?.message,
-        deleteData: deleteData
-      });
-      
-      if (deleteError) {
-        logger.error('Failed to delete book from database', context, deleteError as Error);
-        throw errorHandler.createError(
-          `Failed to delete book: ${deleteError.message}`,
-          ErrorType.DATABASE,
-          ErrorSeverity.HIGH,
-          { context, error: deleteError.message }
-        );
-      }
-
-      logger.info('Book deleted from database successfully', context, undefined, {
-        deletedRows: deleteData
-      });
-
-      // Then delete from S3 if s3_key exists
-      if (s3Key) {
-        try {
-          await bookStorageService.deleteBook(s3Key, this.currentUserId!);
-          logger.info('Book file deleted from S3', context, { s3Key });
-        } catch (s3Error) {
-          // Log but don't fail - database record is already deleted
-          logger.error('Failed to delete file from S3 (non-critical)', context, s3Error as Error);
-        }
-      } else {
-        logger.info('No S3 key found, skipping S3 deletion', context);
+      } catch (error) {
+        logger.error('Error moving book to Trash', context, error as Error);
+        throw error;
       }
 
     } catch (error) {
       logger.error('Error deleting book', { bookId }, error as Error);
+      throw error;
+    }
+  }
+
+  // Helper to get or create Trash collection
+  private async getOrCreateTrashCollection(): Promise<{ id: string }> {
+    this.ensureAuthenticated();
+    
+    try {
+      // First, try to find existing Trash collection
+      const { data: existing, error: findError } = await supabase
+        .from('user_collections')
+        .select('id')
+        .eq('user_id', this.currentUserId!)
+        .eq('name', 'Trash')
+        .single();
+      
+      if (!findError && existing) {
+        return existing;
+      }
+      
+      // Create Trash collection if it doesn't exist
+      const { data: created, error: createError } = await supabase
+        .from('user_collections')
+        .insert({
+          user_id: this.currentUserId!,
+          name: 'Trash',
+          description: 'Deleted books',
+          color: '#6B7280',
+          icon: 'trash-2',
+          is_favorite: false,
+          display_order: 9999 // Put it at the end
+        })
+        .select('id')
+        .single();
+      
+      if (createError || !created) {
+        throw errorHandler.createError(
+          `Failed to create Trash collection: ${createError?.message || 'Unknown error'}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'getOrCreateTrashCollection', error: createError?.message }
+        );
+      }
+      
+      logger.info('Trash collection created', { collectionId: created.id, userId: this.currentUserId });
+      return created;
+    } catch (error) {
+      logger.error('Error getting/creating Trash collection', { userId: this.currentUserId }, error as Error);
       throw error;
     }
   }
