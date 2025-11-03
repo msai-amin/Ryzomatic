@@ -10,7 +10,7 @@
 export function getPDFWorkerSrc(): string {
   // Use CDN for production to ensure correct version
   if (import.meta.env.PROD) {
-    return 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.296/build/pdf.worker.min.mjs';
+    return 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.394/build/pdf.worker.min.mjs';
   }
   
   // Use local worker for development
