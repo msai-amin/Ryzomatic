@@ -544,88 +544,25 @@ class SupabaseStorageService {
         );
       }
       
-      // Verify session is active (required for RLS)
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw errorHandler.createError(
-          'No active session. Please sign in again.',
-          ErrorType.AUTHENTICATION,
-          ErrorSeverity.HIGH,
-          { context }
-        );
-      }
-      
-      // Get or create Trash collection for this user
-      const trashCollection = await this.getOrCreateTrashCollection();
-      
-      // Add book to Trash collection (and remove from all other collections)
+      // Use RPC function to move book to Trash (bypasses RLS issues)
       try {
-        // Use libraryOrganizationService to handle authentication properly
-        const { libraryOrganizationService } = await import('./libraryOrganizationService');
+        const { data: trashCollectionId, error: rpcError } = await supabase.rpc('move_book_to_trash', {
+          book_id_param: bookId
+        });
         
-        // Ensure libraryOrganizationService is initialized with current user
-        libraryOrganizationService.setCurrentUser(this.currentUserId!);
-        
-        // Remove from all existing collections first
-        try {
-          // Get all collections this book is in
-          const { data: existingCollections } = await supabase
-            .from('book_collections')
-            .select('collection_id')
-            .eq('book_id', bookId);
-          
-          if (existingCollections && existingCollections.length > 0) {
-            // Remove from each collection
-            for (const coll of existingCollections) {
-              if (coll.collection_id !== trashCollection.id) {
-                try {
-                  await libraryOrganizationService.removeBookFromCollection(bookId, coll.collection_id);
-                } catch (removeError) {
-                  logger.warn('Failed to remove book from collection', context, removeError as Error);
-                }
-              }
-            }
-          }
-        } catch (removeError) {
-          logger.warn('Failed to remove book from existing collections', context, removeError as Error);
+        if (rpcError) {
+          logger.error('Failed to move book to Trash via RPC', context, rpcError as Error);
+          throw errorHandler.createError(
+            `Failed to move book to Trash: ${rpcError.message}`,
+            ErrorType.DATABASE,
+            ErrorSeverity.HIGH,
+            { context, error: rpcError.message }
+          );
         }
         
-        // Add to Trash collection using the service (handles auth properly)
-        // Use direct supabase call with verified session
-        const { error: addError } = await supabase
-          .from('book_collections')
-          .insert({
-            book_id: bookId,
-            collection_id: trashCollection.id
-          });
-        
-        if (addError) {
-          // If book is already in trash, that's fine
-          if (addError.code === '23505' || addError.message?.includes('duplicate')) {
-            logger.info('Book already in Trash collection', context);
-          } else {
-            logger.error('Failed to add book to Trash collection', context, addError as Error);
-            logger.error('RLS error details', context, undefined, {
-              errorCode: addError.code,
-              errorMessage: addError.message,
-              errorDetails: addError.details,
-              bookId,
-              collectionId: trashCollection.id,
-              userId: this.currentUserId,
-              sessionUserId: session.user.id
-            });
-            throw errorHandler.createError(
-              `Failed to move book to Trash: ${addError.message}`,
-              ErrorType.DATABASE,
-              ErrorSeverity.HIGH,
-              { context, error: addError.message }
-            );
-          }
-        } else {
-          logger.info('Book moved to Trash collection successfully', context, undefined, {
-            trashCollectionId: trashCollection.id
-          });
-        }
+        logger.info('Book moved to Trash collection successfully', context, undefined, {
+          trashCollectionId: trashCollectionId
+        });
       } catch (error) {
         logger.error('Error moving book to Trash', context, error as Error);
         throw error;
