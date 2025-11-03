@@ -1714,9 +1714,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         const updatedDoc = { ...document, highlights: bookHighlights, highlightsLoaded: true }
         setCurrentDocument(updatedDoc)
       } catch (error: any) {
-        // If book not found and recently uploaded, it might still be saving - just use empty array
-        if (error?.message?.includes('Book not found') && isRecentlyUploaded) {
-          console.log('Book not yet in database, will load highlights on refresh')
+        // If book not found, just use empty array (book might not be saved yet or was deleted)
+        if (error?.message?.includes('Book not found') || error?.message?.includes('Failed to fetch highlights')) {
+          console.log('Book not found or highlights fetch failed, using empty highlights array:', error?.message)
           setHighlights([])
           const updatedDoc = { ...document, highlights: [], highlightsLoaded: true }
           setCurrentDocument(updatedDoc)

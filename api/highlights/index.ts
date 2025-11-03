@@ -50,6 +50,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .single()
 
       if (existsError || !bookExists) {
+        // If book doesn't exist, return empty highlights array instead of error
+        // This can happen if the book was just uploaded and hasn't been saved yet,
+        // or if the book was deleted but the document is still open
+        if (existsError?.code === 'PGRST116') {
+          console.warn('Book not found when fetching highlights (book may not be saved yet):', {
+            bookId,
+            userId: user.id,
+            error: existsError?.message
+          })
+          return res.status(200).json({ 
+            success: true, 
+            highlights: [],
+            message: 'Book not found - returning empty highlights'
+          })
+        }
+        
         console.error('Book lookup failed when fetching highlights:', {
           bookId,
           userId: user.id,

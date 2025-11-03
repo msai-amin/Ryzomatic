@@ -159,6 +159,12 @@ class HighlightService {
       });
 
       if (!response.ok) {
+        // If 404, return empty array instead of throwing error
+        // This can happen if the book doesn't exist yet (e.g., just uploaded)
+        if (response.status === 404) {
+          console.warn('Book not found when fetching highlights, returning empty array:', bookId);
+          return [];
+        }
         const error = await response.json();
         throw new Error(error.error || 'Failed to fetch highlights');
       }
