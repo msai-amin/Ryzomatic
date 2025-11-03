@@ -521,32 +521,48 @@ class SupabaseStorageService {
     try {
       const context = { bookId, userId: this.currentUserId };
       
-      // First, get book to find S3 key
-      const { data: book } = await userBooks.get(bookId);
+      // First, get book to find S3 key (optional - continue even if this fails)
+      let book: any = null;
+      let s3Key: string | undefined;
+      
+      try {
+        const { data, error } = await userBooks.get(bookId);
+        if (error) {
+          logger.warn('Could not fetch book before deletion (will continue anyway)', context, error as Error);
+        } else {
+          book = data;
+          s3Key = book?.s3_key;
+        }
+      } catch (getError) {
+        logger.warn('Error fetching book before deletion (will continue anyway)', context, getError as Error);
+      }
       
       // Delete from database first
-      const { error } = await userBooks.delete(bookId);
+      const { error: deleteError } = await userBooks.delete(bookId);
       
-      if (error) {
+      if (deleteError) {
+        logger.error('Failed to delete book from database', context, deleteError as Error);
         throw errorHandler.createError(
-          `Failed to delete book: ${error.message}`,
+          `Failed to delete book: ${deleteError.message}`,
           ErrorType.DATABASE,
           ErrorSeverity.HIGH,
-          { context, error: error.message }
+          { context, error: deleteError.message }
         );
       }
 
       logger.info('Book deleted from database', context);
 
       // Then delete from S3 if s3_key exists
-      if (book?.s3_key) {
+      if (s3Key) {
         try {
-          await bookStorageService.deleteBook(book.s3_key, this.currentUserId!);
-          logger.info('Book file deleted from S3', context, { s3Key: book.s3_key });
+          await bookStorageService.deleteBook(s3Key, this.currentUserId!);
+          logger.info('Book file deleted from S3', context, { s3Key });
         } catch (s3Error) {
           // Log but don't fail - database record is already deleted
           logger.error('Failed to delete file from S3 (non-critical)', context, s3Error as Error);
         }
+      } else {
+        logger.info('No S3 key found, skipping S3 deletion', context);
       }
 
     } catch (error) {
