@@ -538,7 +538,14 @@ class SupabaseStorageService {
       }
       
       // Delete from database first
-      const { error: deleteError } = await userBooks.delete(bookId);
+      logger.info('Attempting to delete book from database', context);
+      const { data: deleteData, error: deleteError } = await userBooks.delete(bookId);
+      
+      logger.info('Delete operation completed', context, undefined, {
+        hasError: !!deleteError,
+        errorMessage: deleteError?.message,
+        deleteData: deleteData
+      });
       
       if (deleteError) {
         logger.error('Failed to delete book from database', context, deleteError as Error);
@@ -550,7 +557,9 @@ class SupabaseStorageService {
         );
       }
 
-      logger.info('Book deleted from database', context);
+      logger.info('Book deleted from database successfully', context, undefined, {
+        deletedRows: deleteData
+      });
 
       // Then delete from S3 if s3_key exists
       if (s3Key) {

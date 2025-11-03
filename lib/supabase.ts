@@ -493,11 +493,12 @@ export const userBooks = {
   },
 
   async delete(bookId: string) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('user_books')
       .delete()
-      .eq('id', bookId);
-    return { error };
+      .eq('id', bookId)
+      .select();
+    return { data, error };
   },
 
   async updateReadingProgress(bookId: string, pageNumber: number, totalPages: number) {
