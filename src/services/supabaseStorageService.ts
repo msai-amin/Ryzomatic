@@ -716,23 +716,36 @@ class SupabaseStorageService {
     this.ensureAuthenticated();
     
     try {
+      // Verify session first
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw errorHandler.createError(
+          'No active session for Trash collection creation',
+          ErrorType.AUTHENTICATION,
+          ErrorSeverity.HIGH,
+          { context: 'getOrCreateTrashCollection' }
+        );
+      }
+      
       // First, try to find existing Trash collection
       const { data: existing, error: findError } = await supabase
         .from('user_collections')
         .select('id')
-        .eq('user_id', this.currentUserId!)
+        .eq('user_id', session.user.id) // Use session user ID to match auth.uid()
         .eq('name', 'Trash')
         .single();
       
       if (!findError && existing) {
+        logger.info('Found existing Trash collection', { collectionId: existing.id });
         return existing;
       }
       
       // Create Trash collection if it doesn't exist
+      // Use session.user.id to ensure it matches auth.uid() in RLS
       const { data: created, error: createError } = await supabase
         .from('user_collections')
         .insert({
-          user_id: this.currentUserId!,
+          user_id: session.user.id, // Use session user ID to match auth.uid()
           name: 'Trash',
           description: 'Deleted books',
           color: '#6B7280',
@@ -744,6 +757,7 @@ class SupabaseStorageService {
         .single();
       
       if (createError || !created) {
+        logger.error('Failed to create Trash collection', { userId: this.currentUserId }, createError as Error);
         throw errorHandler.createError(
           `Failed to create Trash collection: ${createError?.message || 'Unknown error'}`,
           ErrorType.DATABASE,
@@ -752,7 +766,7 @@ class SupabaseStorageService {
         );
       }
       
-      logger.info('Trash collection created', { collectionId: created.id, userId: this.currentUserId });
+      logger.info('Trash collection created', { collectionId: created.id, userId: session.user.id });
       return created;
     } catch (error) {
       logger.error('Error getting/creating Trash collection', { userId: this.currentUserId }, error as Error);
