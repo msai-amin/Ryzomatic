@@ -338,14 +338,37 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
   }, [libraryView.selectedBooks, searchBooks, clearSelection]);
 
   const handleBulkDelete = useCallback(async () => {
+    console.log('ModernLibraryModal: handleBulkDelete called with books:', libraryView.selectedBooks);
     try {
-      await libraryOrganizationService.batchDelete(libraryView.selectedBooks);
+      // Delete directly using supabaseStorageService instead of libraryOrganizationService
+      console.log('ModernLibraryModal: Starting deletion of', libraryView.selectedBooks.length, 'books');
+      
+      await Promise.all(
+        libraryView.selectedBooks.map(async (bookId) => {
+          console.log('ModernLibraryModal: Deleting book:', bookId);
+          try {
+            await supabaseStorageService.deleteBook(bookId);
+            console.log('ModernLibraryModal: Successfully deleted book:', bookId);
+          } catch (error) {
+            console.error('ModernLibraryModal: Failed to delete book:', bookId, error);
+            throw error;
+          }
+        })
+      );
+      
+      console.log('ModernLibraryModal: All books deleted successfully');
       // Refresh the books list after deletion
       await searchBooks();
       clearSelection();
+      console.log('ModernLibraryModal: Library refreshed after deletion');
     } catch (error) {
-      console.error('Failed to bulk delete:', error);
-      alert('Failed to delete books');
+      console.error('ModernLibraryModal: Failed to bulk delete:', error);
+      console.error('ModernLibraryModal: Error details:', {
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name
+      });
+      alert(`Failed to delete books: ${error?.message || 'Unknown error'}`);
     }
   }, [libraryView.selectedBooks, searchBooks, clearSelection]);
 
