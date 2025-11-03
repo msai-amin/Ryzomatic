@@ -178,13 +178,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.error('Book ownership mismatch when creating highlight:', {
           bookId,
           bookUserId: bookExists.user_id,
-          requestUserId: user.id
+          requestUserId: user.id,
+          userEmail: user.email
         })
         return res.status(403).json({ 
           error: 'Access denied',
-          details: 'Book belongs to a different user'
+          details: `Book belongs to a different user. Book user_id: ${bookExists.user_id}, Request user_id: ${user.id}`
         })
       }
+      
+      console.log('✅ Book found and ownership verified:', {
+        bookId,
+        userId: user.id,
+        bookUserId: bookExists.user_id
+      })
 
       const { data: highlight, error } = await supabase
         .from('user_highlights')
