@@ -41,17 +41,24 @@ export const BulkActionsToolbar: React.FC<BulkActionsProps> = ({
     
     if (!showConfirmDelete) {
       console.log('BulkActionsToolbar: First click - showing confirmation');
+      alert('⚠️ Click DELETE again to confirm deletion!'); // Make it obvious
       setShowConfirmDelete(true);
       setTimeout(() => {
-        console.log('BulkActionsToolbar: Confirmation timeout expired');
+        console.log('BulkActionsToolbar: Confirmation timeout expired, resetting');
         setShowConfirmDelete(false);
-      }, 3000);
+      }, 5000); // Increased to 5 seconds
       return;
     }
     
     console.log('BulkActionsToolbar: Second click - calling onDelete()');
     if (typeof onDelete === 'function') {
-      onDelete();
+      const confirmed = window.confirm(`Are you sure you want to delete ${selectedCount} book(s)?`);
+      if (confirmed) {
+        console.log('BulkActionsToolbar: User confirmed deletion, calling onDelete()');
+        onDelete();
+      } else {
+        console.log('BulkActionsToolbar: User cancelled deletion');
+      }
     } else {
       console.error('BulkActionsToolbar: onDelete is not a function!', onDelete);
       alert('ERROR: Delete handler is not a function!');
