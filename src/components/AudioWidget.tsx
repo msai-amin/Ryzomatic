@@ -332,31 +332,54 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     
     isSavingRef.current = true
     
-    const position: TTSPosition = {
-      page: pdfViewer.currentPage,
-      paragraphIndex: tts.currentParagraphIndex ?? 0,
-      timestamp: Date.now(),
-      mode: playbackMode,
-      progressSeconds: ttsManager.getCurrentTime()
-    }
-    
-    // Save to Zustand store (immediate)
-    saveTTSPosition(documentId, position)
-    
-    // Save to database (async, for persistence across sessions)
-    if (user?.id) {
-      try {
-        await supabase
-          .from('user_books')
-          .update({ tts_last_position: position })
-          .eq('id', documentId)
-          .eq('user_id', user.id)
-      } catch (error) {
-        console.error('Failed to save TTS position to database:', error)
+    try {
+      const position: TTSPosition = {
+        page: pdfViewer.currentPage,
+        paragraphIndex: tts.currentParagraphIndex ?? 0,
+        timestamp: Date.now(),
+        mode: playbackMode,
+        progressSeconds: ttsManager.getCurrentTime()
       }
+      
+      // Validate position data
+      if (position.page < 1 || !position.mode) {
+        console.warn('AudioWidget: Invalid position data, skipping save', position)
+        return
+      }
+      
+      // Save to Zustand store (immediate)
+      saveTTSPosition(documentId, position)
+      
+      // Save to database (async, for persistence across sessions)
+      if (user?.id) {
+        // Retry logic for database saves
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const { error } = await supabase
+              .from('user_books')
+              .update({ tts_last_position: position })
+              .eq('id', documentId)
+              .eq('user_id', user.id)
+            
+            if (!error) break
+            
+            if (attempt === 2) {
+              console.error('AudioWidget: Failed to save TTS position after retries:', error)
+              throw error
+            }
+            
+            // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, 1000))
+          } catch (err) {
+            if (attempt === 2) {
+              console.error('AudioWidget: Database save error:', err)
+            }
+          }
+        }
+      }
+    } finally {
+      isSavingRef.current = false
     }
-    
-    isSavingRef.current = false
   }, [playbackMode, pdfViewer.currentPage, tts.currentParagraphIndex, user, saveTTSPosition])
 
   // Load saved position from store or database
@@ -718,19 +741,21 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             title={
               isProcessing 
                 ? "Processing..." 
-                : (tts.isPlaying || (ttsManager.isSpeaking() && !ttsManager.isPausedState()))
-                  ? "Pause" 
-                  : (tts.isPaused || ttsManager.isPausedState())
-                    ? "Resume"
+                : (tts.isPaused || ttsManager.isPausedState())
+                  ? "Resume"
+                  : tts.isPlaying
+                    ? "Pause"
                     : "Play"
             }
           >
             {isProcessing ? (
               <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-text-inverse)' }} />
-            ) : tts.isPlaying || (ttsManager.isSpeaking() && !ttsManager.isPausedState()) ? ( // Show pause icon when actively playing
-              <Pause className="w-5 h-5" />
-            ) : ( // Show play icon when paused or stopped (so user can resume or start)
-              <Play className="w-5 h-5" />
+            ) : (tts.isPaused || ttsManager.isPausedState()) ? (
+              <Play className="w-5 h-5" />  // Show play when paused
+            ) : tts.isPlaying ? (
+              <Pause className="w-5 h-5" />  // Show pause when playing
+            ) : (
+              <Play className="w-5 h-5" />  // Show play when stopped
             )}
           </button>
 
