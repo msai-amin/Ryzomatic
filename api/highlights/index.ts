@@ -42,16 +42,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Book ID is required' })
       }
 
-      // Verify book ownership
-      const { data: book, error: bookError } = await supabase
+      // Verify book ownership - check if book exists first, then check ownership
+      const { data: bookExists, error: existsError } = await supabase
         .from('user_books')
-        .select('id')
+        .select('id, user_id')
         .eq('id', bookId)
-        .eq('user_id', user.id)
         .single()
 
-      if (bookError || !book) {
-        return res.status(403).json({ error: 'Book not found or access denied' })
+      if (existsError || !bookExists) {
+        console.error('Book lookup failed when fetching highlights:', {
+          bookId,
+          userId: user.id,
+          error: existsError,
+          errorCode: existsError?.code,
+          errorMessage: existsError?.message
+        })
+        return res.status(404).json({ 
+          error: 'Book not found',
+          details: existsError?.message || 'Book does not exist in database'
+        })
+      }
+
+      // Check if book belongs to user
+      if (bookExists.user_id !== user.id) {
+        console.error('Book ownership mismatch when fetching highlights:', {
+          bookId,
+          bookUserId: bookExists.user_id,
+          requestUserId: user.id
+        })
+        return res.status(403).json({ 
+          error: 'Access denied',
+          details: 'Book belongs to a different user'
+        })
       }
 
       const { data: highlights, error } = await supabase
@@ -92,16 +114,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         })
       }
 
-      // Verify book ownership
-      const { data: book, error: bookError } = await supabase
+      // Verify book ownership - check if book exists first, then check ownership
+      const { data: bookExists, error: existsError } = await supabase
         .from('user_books')
-        .select('id')
+        .select('id, user_id')
         .eq('id', bookId)
-        .eq('user_id', user.id)
         .single()
 
-      if (bookError || !book) {
-        return res.status(403).json({ error: 'Book not found or access denied' })
+      if (existsError || !bookExists) {
+        console.error('Book lookup failed when creating highlight:', {
+          bookId,
+          userId: user.id,
+          error: existsError,
+          errorCode: existsError?.code,
+          errorMessage: existsError?.message,
+          bookExists: !!bookExists
+        })
+        return res.status(404).json({ 
+          error: 'Book not found',
+          details: existsError?.message || 'Book does not exist in database'
+        })
+      }
+
+      // Check if book belongs to user
+      if (bookExists.user_id !== user.id) {
+        console.error('Book ownership mismatch when creating highlight:', {
+          bookId,
+          bookUserId: bookExists.user_id,
+          requestUserId: user.id
+        })
+        return res.status(403).json({ 
+          error: 'Access denied',
+          details: 'Book belongs to a different user'
+        })
       }
 
       const { data: highlight, error } = await supabase
