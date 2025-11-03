@@ -52,6 +52,7 @@ import { notesService } from '../services/notesService'
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { supabase } from '../../lib/supabase'
+import { configurePDFWorker } from '../utils/pdfjsConfig'
 
 // PDF.js will be imported dynamically
 
@@ -393,10 +394,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         // Dynamic import of PDF.js to avoid ES module issues with Vite
         const pdfjsLib = await import('pdfjs-dist')
         
-        // Set up PDF.js worker - with safety check
-        if (pdfjsLib && 'GlobalWorkerOptions' in pdfjsLib) {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
-        }
+        // Set up PDF.js worker
+        configurePDFWorker(pdfjsLib)
 
         let pdfData: ArrayBuffer | Uint8Array
 

@@ -13,6 +13,7 @@ import { calculateOCRCredits } from '../utils/ocrUtils'
 import { extractStructuredText } from '../utils/pdfTextExtractor'
 import { extractWithFallback } from '../services/pdfExtractionOrchestrator'
 import { canPerformVisionExtraction } from '../services/visionUsageService'
+import { configurePDFWorker } from '../utils/pdfjsConfig'
 // PDF.js will be imported dynamically to avoid ES module issues
 
 interface DocumentUploadProps {
@@ -471,10 +472,8 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
       // Access the actual library - it might be under .default or directly available
       const pdfjsLib = pdfjsModule.default || pdfjsModule
       
-      // Set up PDF.js worker - with safety check
-      if (pdfjsLib && 'GlobalWorkerOptions' in pdfjsLib) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
-      }
+      // Set up PDF.js worker
+      configurePDFWorker(pdfjsLib)
       
       logger.info('PDF.js worker configured', context);
       

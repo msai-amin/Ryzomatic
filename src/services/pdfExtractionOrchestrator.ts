@@ -16,6 +16,7 @@ import {
   generateQualitySummary,
   type DocumentQualityReport 
 } from '../utils/pdfQualityValidator';
+import { configurePDFWorker } from '../utils/pdfjsConfig';
 import { logger } from './logger';
 import { errorHandler, ErrorType, ErrorSeverity } from './errorHandler';
 
@@ -87,9 +88,7 @@ export async function extractWithFallback(
     const pdfjsLib = pdfjsModule.default || pdfjsModule
     
     // Set up PDF.js worker
-    if (pdfjsLib && 'GlobalWorkerOptions' in pdfjsLib) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
-    }
+    configurePDFWorker(pdfjsLib)
     
     const fileBlob = pdfFile instanceof File 
       ? new Blob([await pdfFile.arrayBuffer()], { type: 'application/pdf' })

@@ -2,6 +2,7 @@ import { userBooks, userNotes, userAudio, UserBook, UserNote, UserAudio, supabas
 import { logger } from './logger';
 import { errorHandler, ErrorType, ErrorSeverity } from './errorHandler';
 import { bookStorageService } from './bookStorageService';
+import { configurePDFWorker } from '../utils/pdfjsConfig';
 
 export interface SavedBook {
   id: string;
@@ -380,7 +381,7 @@ class SupabaseStorageService {
             
             // Import PDF.js dynamically
             const pdfjsLib = await import('pdfjs-dist');
-            pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+            configurePDFWorker(pdfjsLib);
             
             // CRITICAL: Create a copy of the ArrayBuffer to prevent detachment
             // The original ArrayBuffer will be used by PDFViewer, so we need a copy for text extraction
