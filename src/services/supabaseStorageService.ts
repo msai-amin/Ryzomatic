@@ -532,6 +532,11 @@ class SupabaseStorageService {
         // Use libraryOrganizationService to handle authentication properly
         const { libraryOrganizationService } = await import('./libraryOrganizationService');
         
+        // Ensure libraryOrganizationService is initialized with current user
+        if (!libraryOrganizationService['currentUserId']) {
+          libraryOrganizationService.setCurrentUser(this.currentUserId!);
+        }
+        
         // Remove from all existing collections first
         try {
           // Get all collections this book is in
