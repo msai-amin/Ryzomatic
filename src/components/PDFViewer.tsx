@@ -311,15 +311,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   useEffect(() => {
     setScale(pdfViewer.zoom)
   }, [pdfViewer.zoom])
-  
-  // CRITICAL: Re-render text layer when zoom/scale changes to maintain alignment
-  useEffect(() => {
-    if (pdfDocRef.current && pageNumber && !pdfViewer.readingMode && !isLoading) {
-      // Force re-render of current page when zoom changes
-      // This ensures text layer stays aligned with canvas at new zoom level
-      setPageRendered(false)
-    }
-  }, [scale, pdfViewer.zoom, pageNumber, pdfViewer.readingMode, isLoading])
   const [searchQuery, setSearchQuery] = useState('')
   const [highlightPickerPosition, setHighlightPickerPosition] = useState<{ x: number; y: number } | null>(null)
   const [selectedTextInfo, setSelectedTextInfo] = useState<{
@@ -403,6 +394,16 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       alert('Failed to delete highlight. Please try again.')
     }
   }, [selectedHighlightId, lastCreatedHighlightId])
+
+  // CRITICAL: Re-render text layer when zoom/scale changes to maintain alignment
+  // Must be after refs are defined to avoid initialization errors
+  useEffect(() => {
+    if (pdfDocRef.current && pageNumber && !pdfViewer.readingMode && !isLoading) {
+      // Force re-render of current page when zoom changes
+      // This ensures text layer stays aligned with canvas at new zoom level
+      setPageRendered(false)
+    }
+  }, [pdfViewer.zoom, pageNumber, pdfViewer.readingMode, isLoading])
 
   // Load PDF document
   useEffect(() => {
