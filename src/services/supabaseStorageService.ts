@@ -125,24 +125,9 @@ class SupabaseStorageService {
     try {
       const context = { bookId: book.id, userId: this.currentUserId };
       
-      // Size limit to prevent disk I/O issues: 5MB
-      const MAX_PDF_SIZE = 5 * 1024 * 1024; // 5MB
-      const fileSize = book.fileData instanceof ArrayBuffer ? book.fileData.byteLength : 
-                       book.fileData instanceof Blob ? book.fileData.size : 
-                       typeof book.fileData === 'string' ? book.fileData.length : 0;
-      
-      if (book.type === 'pdf' && fileSize > MAX_PDF_SIZE) {
-        logger.warn('PDF exceeds size limit', context, undefined, {
-          fileSize: fileSize / 1024 / 1024 + 'MB',
-          limit: MAX_PDF_SIZE / 1024 / 1024 + 'MB'
-        });
-        throw errorHandler.createError(
-          `PDF file is too large (${(fileSize / 1024 / 1024).toFixed(2)}MB). Maximum size is ${MAX_PDF_SIZE / 1024 / 1024}MB. Please use a smaller file.`,
-          ErrorType.VALIDATION,
-          ErrorSeverity.MEDIUM,
-          { context, fileSize, limit: MAX_PDF_SIZE }
-        );
-      }
+      // NOTE: File size validation is handled in DocumentUpload.tsx before saveBook() is called
+      // Files are stored in S3, not in the database, so large files are supported
+      // S3 supports files up to 5GB via presigned URLs
       
       // NEW: Upload file to S3 instead of storing in database
       let s3Key: string | undefined;
