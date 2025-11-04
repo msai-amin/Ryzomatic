@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 // PDF.js will be imported dynamically to avoid ES module issues
 import { 
   ChevronLeft, 
@@ -50,7 +50,7 @@ import { HighlightColorPicker } from './HighlightColorPicker'
 import { HighlightManagementPanel } from './HighlightManagementPanel'
 import { HighlightColorPopover } from './HighlightColorPopover'
 import { notesService } from '../services/notesService'
-import { ContextMenu, createAIContextMenuOptions, ContextMenuOption } from './ContextMenu'
+import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { supabase } from '../../lib/supabase'
 import { configurePDFWorker } from '../utils/pdfjsConfig'
@@ -330,11 +330,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     y: number
     text: string
   } | null>(null)
-  const [highlightContextMenu, setHighlightContextMenu] = useState<{
-    x: number
-    y: number
-    highlightId: string
-  } | null>(null)
   const [showNotesPanel, setShowNotesPanel] = useState<boolean>(false)
   const [isToolbarStuck, setIsToolbarStuck] = useState<boolean>(false)
   const [showLibrary, setShowLibrary] = useState<boolean>(false)
@@ -377,6 +372,28 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   const renderTaskRef = useRef<any>(null)
   const pageCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map())
   const pageTextLayerRefs = useRef<Map<number, HTMLDivElement>>(new Map())
+
+  // Define removeHighlight early to avoid circular dependency issues
+  const removeHighlight = useCallback(async (id: string) => {
+    try {
+      await highlightService.deleteHighlight(id)
+      setHighlights(prev => prev.filter(h => h.id !== id))
+      
+      // Clear selection if this was the selected highlight
+      if (selectedHighlightId === id) {
+        setSelectedHighlightId(null)
+      }
+      
+      // Clear undo toast if this was the last created highlight
+      if (lastCreatedHighlightId === id) {
+        setLastCreatedHighlightId(null)
+        setShowUndoToast(false)
+      }
+    } catch (error) {
+      console.error('Error deleting highlight:', error)
+      alert('Failed to delete highlight. Please try again.')
+    }
+  }, [selectedHighlightId, lastCreatedHighlightId])
 
   // Load PDF document
   useEffect(() => {
@@ -1208,7 +1225,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
     const handleClick = (e: MouseEvent) => {
       setContextMenu(null)
-      setHighlightContextMenu(null)
       // Clear highlight selection when clicking outside highlights
       // Highlights stop propagation in their onClick handlers, so clicks on highlights won't reach here
       // Only clear if not selecting text (user might be selecting text to highlight)
@@ -2340,40 +2356,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       setSelectedTextInfo(null)
     }
   }, [selectedTextInfo, document.id, document.pageTexts])
-
-  const removeHighlight = useCallback(async (id: string) => {
-    try {
-      await highlightService.deleteHighlight(id)
-      setHighlights(prev => prev.filter(h => h.id !== id))
-      
-      // Clear selection if this was the selected highlight
-      if (selectedHighlightId === id) {
-        setSelectedHighlightId(null)
-      }
-      
-      // Clear undo toast if this was the last created highlight
-      if (lastCreatedHighlightId === id) {
-        setLastCreatedHighlightId(null)
-        setShowUndoToast(false)
-      }
-    } catch (error) {
-      console.error('Error deleting highlight:', error)
-      alert('Failed to delete highlight. Please try again.')
-    }
-  }, [selectedHighlightId, lastCreatedHighlightId])
-
-  // Memoize highlight context menu options
-  const highlightMenuOptions = useMemo<ContextMenuOption[]>(() => {
-    if (!highlightContextMenu) return [];
-    return [
-      {
-        label: 'Delete Highlight',
-        icon: <Trash2 className="w-4 h-4" style={{ color: '#ef4444' }} />,
-        onClick: () => removeHighlight(highlightContextMenu.highlightId),
-        className: 'text-red-500'
-      }
-    ];
-  }, [highlightContextMenu, removeHighlight]);
 
   // Mark highlights as orphaned when page text is edited
   const markPageHighlightsOrphaned = useCallback(async (pageNum: number) => {
@@ -3671,16 +3653,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                         e.stopPropagation()
                         setSelectedHighlightId(highlight.id)
                       }}
-                      onContextMenu={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        setSelectedHighlightId(highlight.id)
-                        setHighlightContextMenu({
-                          x: e.clientX,
-                          y: e.clientY,
-                          highlightId: highlight.id
-                        })
-                      }}
                         >
                           {highlight.is_orphaned && (
                             <div className="absolute -top-3 -left-1 bg-yellow-500 text-white text-xs px-1 rounded z-10">
@@ -3783,11 +3755,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                         cursor: 'pointer',
                       }}
                       title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
-                      onContextMenu={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        // Right-click will be handled by context menu
-                      }}
                     >
                       {highlight.is_orphaned && (
                         <div className="absolute -top-3 -left-1 bg-yellow-500 text-white text-xs px-1 rounded z-10">
@@ -3825,16 +3792,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             handleSaveNoteFromContext
           )}
           onClose={() => setContextMenu(null)}
-        />
-      )}
-
-      {/* Highlight Context Menu */}
-      {highlightContextMenu && (
-        <ContextMenu
-          x={highlightContextMenu.x}
-          y={highlightContextMenu.y}
-          options={highlightMenuOptions}
-          onClose={() => setHighlightContextMenu(null)}
         />
       )}
 
