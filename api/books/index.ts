@@ -2,6 +2,13 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getDownloadUrl, deleteFile, fileExists, uploadFile } from '../../lib/s3.js';
+import { createClient } from '@supabase/supabase-js';
+import { checkRateLimit, getRateLimitHeaders } from '../../lib/rateLimiter';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // Initialize S3 client
 const s3Client = new S3Client({
@@ -73,6 +80,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (keyParts.length !== 3 || keyParts[0] !== 'books' || keyParts[1] !== userId) {
       console.error('[Books API] Invalid s3Key ownership:', { s3Key, userId, keyParts });
       return res.status(403).json({ error: 'Access denied: Invalid s3Key ownership' });
+    }
+
+    // Authenticate user for upload operations (rate limiting requires auth)
+    let authenticatedUserId: string | null = null;
+    if (operation === 'GET_UPLOAD_URL' || operation === 'DIRECT_UPLOAD') {
+      const token = req.headers.authorization?.replace('Bearer ', '');
+      if (!token) {
+        return res.status(401).json({ error: 'Unauthorized - authentication required for upload operations' });
+      }
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !user) {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
+
+      // Verify userId matches authenticated user
+      if (user.id !== userId) {
+        return res.status(403).json({ error: 'Access denied - userId mismatch' });
+      }
+
+      authenticatedUserId = user.id;
+
+      // Check rate limit for upload operations
+      const rateLimitResult = await checkRateLimit(user.id, 'upload');
+      const rateLimitHeaders = getRateLimitHeaders(rateLimitResult);
+      
+      // Set rate limit headers in response
+      Object.entries(rateLimitHeaders).forEach(([key, value]) => {
+        res.setHeader(key, value);
+      });
+
+      if (!rateLimitResult.allowed) {
+        return res.status(429).json({
+          error: 'Rate limit exceeded',
+          limit: rateLimitResult.limit,
+          remaining: 0,
+          reset_at: rateLimitResult.resetAt?.toISOString(),
+        });
+      }
     }
 
     // Route to appropriate operation

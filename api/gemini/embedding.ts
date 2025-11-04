@@ -1,5 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { createClient } from '@supabase/supabase-js';
+import { checkRateLimit, getRateLimitHeaders } from '../../lib/rateLimiter';
 
 const geminiKey = process.env.GEMINI_API_KEY;
 
@@ -7,13 +9,48 @@ if (!geminiKey) throw new Error('GEMINI_API_KEY is not set');
 
 const genAI = new GoogleGenerativeAI(geminiKey);
 
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
-  const { text, texts } = req.body;
+
   try {
+    // Authenticate user
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Check rate limit
+    const rateLimitResult = await checkRateLimit(user.id, 'embedding');
+    const rateLimitHeaders = getRateLimitHeaders(rateLimitResult);
+    
+    // Set rate limit headers in response
+    Object.entries(rateLimitHeaders).forEach(([key, value]) => {
+      res.setHeader(key, value);
+    });
+
+    if (!rateLimitResult.allowed) {
+      return res.status(429).json({
+        error: 'Rate limit exceeded',
+        limit: rateLimitResult.limit,
+        remaining: 0,
+        reset_at: rateLimitResult.resetAt?.toISOString(),
+      });
+    }
+
+    const { text, texts } = req.body;
     const model = genAI.getGenerativeModel({ model: 'models/text-embedding-004' });
     if (typeof text === 'string') {
       const result = await model.embedContent(text);

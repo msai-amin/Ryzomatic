@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { memoryService } from '../../lib/memoryService';
 import { unifiedGraphService } from '../../lib/unifiedGraphService';
+import { checkRateLimit, getRateLimitHeaders } from '../../lib/rateLimiter';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -35,6 +36,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Check rate limit
+    const rateLimitResult = await checkRateLimit(user.id, 'memory');
+    const rateLimitHeaders = getRateLimitHeaders(rateLimitResult);
+    
+    // Set rate limit headers in response
+    Object.entries(rateLimitHeaders).forEach(([key, value]) => {
+      res.setHeader(key, value);
+    });
+
+    if (!rateLimitResult.allowed) {
+      return res.status(429).json({
+        error: 'Rate limit exceeded',
+        limit: rateLimitResult.limit,
+        remaining: 0,
+        reset_at: rateLimitResult.resetAt?.toISOString(),
+      });
     }
 
     // Route to appropriate action

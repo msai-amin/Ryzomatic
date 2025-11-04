@@ -11,6 +11,7 @@ import { uploadFile, generateDocumentKey } from '../../lib/s3';
 import { GPT5NanoService, OCR_LIMITS } from '../../lib/gpt5nano';
 import { geminiService } from '../../lib/gemini';
 import { documentDescriptionService } from '../../lib/documentDescriptionService';
+import { checkRateLimit, getRateLimitHeaders } from '../../lib/rateLimiter';
 import formidable from 'formidable';
 import fs from 'fs/promises';
 
@@ -82,6 +83,24 @@ async function handleUpload(req: VercelRequest, res: VercelResponse) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Check rate limit
+    const rateLimitResult = await checkRateLimit(user.id, 'upload');
+    const rateLimitHeaders = getRateLimitHeaders(rateLimitResult);
+    
+    // Set rate limit headers in response
+    Object.entries(rateLimitHeaders).forEach(([key, value]) => {
+      res.setHeader(key, value);
+    });
+
+    if (!rateLimitResult.allowed) {
+      return res.status(429).json({
+        error: 'Rate limit exceeded',
+        limit: rateLimitResult.limit,
+        remaining: 0,
+        reset_at: rateLimitResult.resetAt?.toISOString(),
+      });
     }
 
     // Get user profile
