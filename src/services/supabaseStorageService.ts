@@ -129,6 +129,19 @@ class SupabaseStorageService {
       // Files are stored in S3, not in the database, so large files are supported
       // S3 supports files up to 5GB via presigned URLs
       
+      // Calculate file size from fileData
+      let fileSize: number = 0;
+      if (book.fileData) {
+        if (book.fileData instanceof Blob) {
+          fileSize = book.fileData.size;
+        } else if (book.fileData instanceof ArrayBuffer) {
+          fileSize = book.fileData.byteLength;
+        } else if (typeof book.fileData === 'string') {
+          // For text files, approximate size (UTF-8 encoding)
+          fileSize = new TextEncoder().encode(book.fileData).length;
+        }
+      }
+      
       // NEW: Upload file to S3 instead of storing in database
       let s3Key: string | undefined;
       
