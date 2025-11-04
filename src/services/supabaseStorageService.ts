@@ -215,7 +215,22 @@ class SupabaseStorageService {
           : 0
       };
 
-      const { data, error } = await userBooks.create(userBook as any);
+      // CRITICAL: Log what we're sending to see if ID is included
+      logger.info('About to save book with ID', context, {
+        providedId: book.id,
+        userBookId: userBook.id,
+        userBookKeys: Object.keys(userBook),
+        hasIdInUserBook: 'id' in userBook
+      });
+
+      // CRITICAL: Use direct supabase.insert() instead of userBooks.create()
+      // to ensure the id field is included in the INSERT statement
+      // userBooks.create() has type Omit<UserBook, 'id'> which might strip it out
+      const { data, error } = await supabase
+        .from('user_books')
+        .insert(userBook as any)
+        .select()
+        .single();
       
       if (error) {
         // If database save fails, try to clean up S3 upload
@@ -245,7 +260,12 @@ class SupabaseStorageService {
       logger.info('Book saved successfully with database ID', context, {
         providedId: book.id,
         databaseId: data.id,
-        idsMatch: book.id === data.id
+        idsMatch: book.id === data.id,
+        databaseRecord: {
+          id: data.id,
+          title: data.title,
+          user_id: data.user_id
+        }
       });
 
       // Save notes if any
