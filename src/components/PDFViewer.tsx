@@ -311,6 +311,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   useEffect(() => {
     setScale(pdfViewer.zoom)
   }, [pdfViewer.zoom])
+  
+  // CRITICAL: Re-render text layer when zoom/scale changes to maintain alignment
+  useEffect(() => {
+    if (pdfDocRef.current && pageNumber && !pdfViewer.readingMode && !isLoading) {
+      // Force re-render of current page when zoom changes
+      // This ensures text layer stays aligned with canvas at new zoom level
+      setPageRendered(false)
+    }
+  }, [scale, pdfViewer.zoom, pageNumber, pdfViewer.readingMode, isLoading])
   const [searchQuery, setSearchQuery] = useState('')
   const [highlightPickerPosition, setHighlightPickerPosition] = useState<{ x: number; y: number } | null>(null)
   const [selectedTextInfo, setSelectedTextInfo] = useState<{
@@ -606,13 +615,40 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           // Any changes to positioning, sizing, or transforms will break selection accuracy
           if (textLayerRef.current) {
             textLayerRef.current.innerHTML = ''
-            // CRITICAL: Set text layer container size to match canvas exactly
-            // This ensures proper alignment at all zoom levels
-            textLayerRef.current.style.width = viewport.width + 'px'
-            textLayerRef.current.style.height = viewport.height + 'px'
-            textLayerRef.current.style.position = 'absolute'
-            textLayerRef.current.style.top = '0'
-            textLayerRef.current.style.left = '0'
+            
+            // CRITICAL: Match canvas container's positioning and transform exactly
+            // Get the canvas container to ensure same coordinate system
+            const canvasContainer = canvasRef.current?.parentElement
+            if (canvasContainer) {
+              const containerStyles = window.getComputedStyle(canvasContainer)
+              
+              // Match container's transform if present
+              const transform = containerStyles.transform
+              const transformOrigin = containerStyles.transformOrigin || '0 0'
+              
+              // Set text layer container size to match canvas exactly
+              textLayerRef.current.style.width = viewport.width + 'px'
+              textLayerRef.current.style.height = viewport.height + 'px'
+              textLayerRef.current.style.position = 'absolute'
+              textLayerRef.current.style.top = '0'
+              textLayerRef.current.style.left = '0'
+              textLayerRef.current.style.transformOrigin = transformOrigin
+              
+              // Apply same transform as canvas container if any
+              if (transform && transform !== 'none') {
+                textLayerRef.current.style.transform = transform
+              } else {
+                textLayerRef.current.style.transform = 'none'
+              }
+            } else {
+              // Fallback: basic positioning if container not found
+              textLayerRef.current.style.width = viewport.width + 'px'
+              textLayerRef.current.style.height = viewport.height + 'px'
+              textLayerRef.current.style.position = 'absolute'
+              textLayerRef.current.style.top = '0'
+              textLayerRef.current.style.left = '0'
+              textLayerRef.current.style.transformOrigin = '0 0'
+            }
             const textContent = await page.getTextContent()
             
             // Manual text layer rendering with proper viewport synchronization
@@ -901,13 +937,40 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           // Any changes to positioning, sizing, or transforms will break selection accuracy
           if (textLayerDiv) {
             textLayerDiv.innerHTML = ''
-            // CRITICAL: Set text layer container size to match canvas exactly
-            // This ensures proper alignment at all zoom levels
-            textLayerDiv.style.width = viewport.width + 'px'
-            textLayerDiv.style.height = viewport.height + 'px'
-            textLayerDiv.style.position = 'absolute'
-            textLayerDiv.style.top = '0'
-            textLayerDiv.style.left = '0'
+            
+            // CRITICAL: Match canvas container's positioning and transform exactly
+            // Get the page container (parent of canvas and textLayer)
+            const pageContainer = canvas.parentElement
+            if (pageContainer) {
+              const containerStyles = window.getComputedStyle(pageContainer)
+              
+              // Match container's transform if present
+              const transform = containerStyles.transform
+              const transformOrigin = containerStyles.transformOrigin || '0 0'
+              
+              // Set text layer container size to match canvas exactly
+              textLayerDiv.style.width = viewport.width + 'px'
+              textLayerDiv.style.height = viewport.height + 'px'
+              textLayerDiv.style.position = 'absolute'
+              textLayerDiv.style.top = '0'
+              textLayerDiv.style.left = '0'
+              textLayerDiv.style.transformOrigin = transformOrigin
+              
+              // Apply same transform as container if any
+              if (transform && transform !== 'none') {
+                textLayerDiv.style.transform = transform
+              } else {
+                textLayerDiv.style.transform = 'none'
+              }
+            } else {
+              // Fallback: basic positioning if container not found
+              textLayerDiv.style.width = viewport.width + 'px'
+              textLayerDiv.style.height = viewport.height + 'px'
+              textLayerDiv.style.position = 'absolute'
+              textLayerDiv.style.top = '0'
+              textLayerDiv.style.left = '0'
+              textLayerDiv.style.transformOrigin = '0 0'
+            }
             const textContent = await page.getTextContent()
             
             // Manual text layer rendering with proper viewport synchronization
@@ -2144,24 +2207,39 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       }
 
       // Find the page container - look for the element with data-page-number or the canvas parent
+      // CRITICAL: We need the exact container that holds both canvas and textLayer
       let pageContainer: HTMLElement | null = null
       
       // Try to find the page container by traversing up the DOM
       let currentElement = range.startContainer.parentElement
       while (currentElement && !pageContainer) {
-        if (currentElement.hasAttribute('data-page-number') || 
-            (currentElement.classList.contains('relative') && currentElement.querySelector('canvas'))) {
-          pageContainer = currentElement
+        // Look for container that has both canvas and textLayer as children
+        const hasCanvas = currentElement.querySelector('canvas')
+        const hasTextLayer = currentElement.querySelector('.textLayer')
+        const position = window.getComputedStyle(currentElement).position
+        
+        // Preferred: container with both canvas and textLayer, positioned relative
+        if (hasCanvas && hasTextLayer && position === 'relative') {
+          pageContainer = currentElement as HTMLElement
+          break
+        }
+        // Fallback: container with data-page-number attribute
+        if (currentElement.hasAttribute('data-page-number')) {
+          pageContainer = currentElement as HTMLElement
           break
         }
         currentElement = currentElement.parentElement
       }
 
-      // Fallback: look for single page mode container
+      // Fallback: look for single page mode container (direct parent of canvas)
       if (!pageContainer) {
         const singlePageCanvas = canvasRef.current?.parentElement
         if (singlePageCanvas) {
-          pageContainer = singlePageCanvas as HTMLElement
+          // Verify it's the right container (should have position: relative)
+          const position = window.getComputedStyle(singlePageCanvas).position
+          if (position === 'relative') {
+            pageContainer = singlePageCanvas as HTMLElement
+          }
         }
       }
 
@@ -2173,12 +2251,16 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         return
       }
 
-      // Get the container's bounding rectangle
+      // Get the container's bounding rectangle in viewport coordinates
       const containerRect = pageContainer.getBoundingClientRect()
       
       // CRITICAL: Calculate position relative to the page container
       // The text spans use position: absolute within the page container
       // We need to match their coordinate system exactly
+      
+      // Account for any CSS transforms on the container
+      const containerStyles = window.getComputedStyle(pageContainer)
+      const transform = containerStyles.transform
       
       // For multi-line selections, use getClientRects() to get all line fragments
       // This provides better accuracy for selections spanning multiple lines
@@ -2208,11 +2290,38 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       
       // selectionRect gives us viewport coordinates, containerRect gives us the container's viewport position
       // Subtracting gives us the position within the container - same coordinate system as text spans
-      const rawPosition = {
+      let rawPosition = {
         x: finalRect.left - containerRect.left,
         y: finalRect.top - containerRect.top,
         width: finalRect.width,
         height: finalRect.height
+      }
+      
+      // CRITICAL: Account for container transforms that might affect coordinate system
+      // If container has a transform (e.g., scale), we need to adjust coordinates
+      if (transform && transform !== 'none') {
+        // Parse transform matrix if present
+        const matrixMatch = transform.match(/matrix\(([^)]+)\)/)
+        if (matrixMatch) {
+          const values = matrixMatch[1].split(',').map(v => parseFloat(v.trim()))
+          if (values.length >= 4) {
+            // Transform scaling is typically in values[0] (scaleX) and values[3] (scaleY)
+            // Translation is in values[4] (translateX) and values[5] (translateY)
+            const scaleX = values[0] || 1
+            const scaleY = values[3] || 1
+            
+            // If transform is applied, coordinates need to be adjusted
+            // getBoundingClientRect already accounts for transforms, but we need
+            // to ensure we're using the right coordinate space
+            // For most cases, getBoundingClientRect handles this correctly
+            // But if there's scaling, we may need to adjust
+            if (scaleX !== 1 || scaleY !== 1) {
+              // The coordinates from getBoundingClientRect are already transformed
+              // But we need to work in the container's local coordinate space
+              // This is already handled by subtracting containerRect, so we're good
+            }
+          }
+        }
       }
 
       // TEXT ALIGNMENT: Use browser's getBoundingClientRect() without adjustments
@@ -3646,6 +3755,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                         pointerEvents: 'auto',
                         border: selectedHighlightId === highlight.id ? '2px solid #3B82F6' : (highlight.is_orphaned ? '2px dashed #999' : 'none'),
                         zIndex: 3,
+                        transformOrigin: '0 0', // Match text layer transform origin
                         cursor: 'pointer',
                       }}
                       title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
@@ -3748,6 +3858,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                         zIndex: 3,
                         // Enable sub-pixel rendering for better alignment
                         transform: 'translateZ(0)',
+                        transformOrigin: '0 0', // Match text layer transform origin
                         willChange: 'transform',
                         backfaceVisibility: 'hidden',
                         // Ensure pixel-perfect positioning
