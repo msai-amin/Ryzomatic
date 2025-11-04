@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 // PDF.js will be imported dynamically to avoid ES module issues
 import { 
   ChevronLeft, 
@@ -2362,6 +2362,19 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     }
   }, [selectedHighlightId, lastCreatedHighlightId])
 
+  // Memoize highlight context menu options
+  const highlightMenuOptions = useMemo<ContextMenuOption[]>(() => {
+    if (!highlightContextMenu) return [];
+    return [
+      {
+        label: 'Delete Highlight',
+        icon: <Trash2 className="w-4 h-4" style={{ color: '#ef4444' }} />,
+        onClick: () => removeHighlight(highlightContextMenu.highlightId),
+        className: 'text-red-500'
+      }
+    ];
+  }, [highlightContextMenu, removeHighlight]);
+
   // Mark highlights as orphaned when page text is edited
   const markPageHighlightsOrphaned = useCallback(async (pageNum: number) => {
     try {
@@ -3816,26 +3829,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       )}
 
       {/* Highlight Context Menu */}
-      {highlightContextMenu && (() => {
-        // Create options lazily when menu is actually rendered
-        const options: ContextMenuOption[] = [
-          {
-            label: 'Delete Highlight',
-            icon: <Trash2 className="w-4 h-4" style={{ color: '#ef4444' }} />,
-            onClick: () => removeHighlight(highlightContextMenu.highlightId),
-            className: 'text-red-500'
-          }
-        ];
-        
-        return (
-          <ContextMenu
-            x={highlightContextMenu.x}
-            y={highlightContextMenu.y}
-            options={options}
-            onClose={() => setHighlightContextMenu(null)}
-          />
-        );
-      })()}
+      {highlightContextMenu && (
+        <ContextMenu
+          x={highlightContextMenu.x}
+          y={highlightContextMenu.y}
+          options={highlightMenuOptions}
+          onClose={() => setHighlightContextMenu(null)}
+        />
+      )}
 
       {/* Notes Panel */}
       <NotesPanel
