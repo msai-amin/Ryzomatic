@@ -229,10 +229,28 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
               
               // CRITICAL: Update document with database ID if different
               if (databaseId !== document.id) {
-                console.log('🔄 Updating document ID from', document.id, 'to database ID:', databaseId);
+                const oldId = document.id;
+                console.log('🔄 Updating document ID from', oldId, 'to database ID:', databaseId);
+                
+                // Update the document object with the new ID
+                const updatedDocument = { ...document, id: databaseId };
+                
+                // Update in store using setCurrentDocument (directly replaces currentDocument)
+                const { setCurrentDocument, documents } = useAppStore.getState();
+                
+                // Update currentDocument if it's the one we just added
+                const currentDoc = useAppStore.getState().currentDocument;
+                if (currentDoc?.id === oldId) {
+                  setCurrentDocument(updatedDocument);
+                }
+                
+                // Also update in documents array
+                useAppStore.setState({
+                  documents: documents.map(doc => doc.id === oldId ? updatedDocument : doc)
+                });
+                
+                // Update local variable
                 document.id = databaseId;
-                const { updateDocument } = useAppStore.getState();
-                updateDocument(document);
                 setUploadedDocumentId(databaseId);
               }
               
@@ -328,10 +346,28 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
               
               // CRITICAL: Update document with database ID if different
               if (databaseId !== document.id) {
-                console.log('🔄 Updating document ID from', document.id, 'to database ID:', databaseId);
+                const oldId = document.id;
+                console.log('🔄 Updating document ID from', oldId, 'to database ID:', databaseId);
+                
+                // Update the document object with the new ID
+                const updatedDocument = { ...document, id: databaseId };
+                
+                // Update in store using setCurrentDocument (directly replaces currentDocument)
+                const { setCurrentDocument, documents } = useAppStore.getState();
+                
+                // Update currentDocument if it's the one we just added
+                const currentDoc = useAppStore.getState().currentDocument;
+                if (currentDoc?.id === oldId) {
+                  setCurrentDocument(updatedDocument);
+                }
+                
+                // Also update in documents array
+                useAppStore.setState({
+                  documents: documents.map(doc => doc.id === oldId ? updatedDocument : doc)
+                });
+                
+                // Update local variable
                 document.id = databaseId;
-                const { updateDocument } = useAppStore.getState();
-                updateDocument(document);
                 setUploadedDocumentId(databaseId);
               }
               
@@ -417,10 +453,28 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
         
         // CRITICAL: Update document with database ID if different
         if (databaseId !== document.id) {
-          console.log('🔄 OCR Approve: Updating document ID from', document.id, 'to database ID:', databaseId);
+          const oldId = document.id;
+          console.log('🔄 OCR Approve: Updating document ID from', oldId, 'to database ID:', databaseId);
+          
+          // Update the document object with the new ID
+          const updatedDocument = { ...document, id: databaseId };
+          
+          // Update in store using setCurrentDocument (directly replaces currentDocument)
+          const { setCurrentDocument, documents } = useAppStore.getState();
+          
+          // Update currentDocument if it's the one we just added
+          const currentDoc = useAppStore.getState().currentDocument;
+          if (currentDoc?.id === oldId) {
+            setCurrentDocument(updatedDocument);
+          }
+          
+          // Also update in documents array
+          useAppStore.setState({
+            documents: documents.map(doc => doc.id === oldId ? updatedDocument : doc)
+          });
+          
+          // Update local variable
           document.id = databaseId;
-          const { updateDocument } = useAppStore.getState();
-          updateDocument(document);
           setUploadedDocumentId(databaseId);
         }
         
@@ -471,10 +525,28 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
         
         // CRITICAL: Update document with database ID if different
         if (databaseId !== document.id) {
-          console.log('🔄 OCR Decline: Updating document ID from', document.id, 'to database ID:', databaseId);
+          const oldId = document.id;
+          console.log('🔄 OCR Decline: Updating document ID from', oldId, 'to database ID:', databaseId);
+          
+          // Update the document object with the new ID
+          const updatedDocument = { ...document, id: databaseId };
+          
+          // Update in store using setCurrentDocument (directly replaces currentDocument)
+          const { setCurrentDocument, documents } = useAppStore.getState();
+          
+          // Update currentDocument if it's the one we just added
+          const currentDoc = useAppStore.getState().currentDocument;
+          if (currentDoc?.id === oldId) {
+            setCurrentDocument(updatedDocument);
+          }
+          
+          // Also update in documents array
+          useAppStore.setState({
+            documents: documents.map(doc => doc.id === oldId ? updatedDocument : doc)
+          });
+          
+          // Update local variable
           document.id = databaseId;
-          const { updateDocument } = useAppStore.getState();
-          updateDocument(document);
           setUploadedDocumentId(databaseId);
         }
         
