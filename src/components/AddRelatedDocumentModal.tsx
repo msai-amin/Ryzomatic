@@ -97,11 +97,26 @@ export const AddRelatedDocumentModal: React.FC<AddRelatedDocumentModalProps> = (
         }),
       });
 
-      const result = await response.json();
-
+      // Check if response is ok before parsing JSON
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to create relationship');
+        let errorMessage = 'Failed to create relationship';
+        try {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorData.message || errorData.details || errorMessage;
+          } else {
+            // If response is not JSON (e.g., HTML error page), use status text
+            const text = await response.text();
+            errorMessage = `Server error: ${response.status} ${response.statusText}. ${text.substring(0, 100)}`;
+          }
+        } catch (parseError) {
+          errorMessage = `Server error: ${response.status} ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
+
+      const result = await response.json();
 
       setSuccess('Relationship created successfully! AI is calculating relevance...');
       

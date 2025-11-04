@@ -1,6 +1,31 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import { documentDescriptionService } from '../../lib/documentDescriptionService';
+
+// Optional service - loaded dynamically to avoid module loading errors
+let documentDescriptionService: any = null;
+
+async function getDocumentDescriptionService() {
+  if (documentDescriptionService !== null) {
+    return documentDescriptionService;
+  }
+  
+  // Mark as attempted to avoid infinite loops
+  if (documentDescriptionService === false) {
+    return null;
+  }
+  
+  try {
+    // Try dynamic import - this will only execute when needed
+    const module = await import('../../lib/documentDescriptionService');
+    documentDescriptionService = module.documentDescriptionService;
+    return documentDescriptionService;
+  } catch (error) {
+    // Mark as failed (false) so we don't retry
+    documentDescriptionService = false;
+    console.warn('DocumentDescriptionService not available:', error instanceof Error ? error.message : 'Unknown error');
+    return null;
+  }
+}
 
 // Create Supabase client for serverless functions
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -27,17 +52,30 @@ const supabase = supabaseUrl && supabaseKey
   : null;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method === 'GET') {
-    return handleGet(req, res);
-  } else if (req.method === 'POST') {
-    return handlePost(req, res);
-  } else if (req.method === 'PATCH') {
-    return handlePatch(req, res);
-  } else if (req.method === 'DELETE') {
-    return handleDelete(req, res);
-  } else {
-    res.setHeader('Allow', ['GET', 'POST', 'PATCH', 'DELETE']);
-    return res.status(405).json({ error: 'Method not allowed' });
+  // Set JSON content type header
+  res.setHeader('Content-Type', 'application/json');
+  
+  try {
+    if (req.method === 'GET') {
+      return await handleGet(req, res);
+    } else if (req.method === 'POST') {
+      return await handlePost(req, res);
+    } else if (req.method === 'PATCH') {
+      return await handlePatch(req, res);
+    } else if (req.method === 'DELETE') {
+      return await handleDelete(req, res);
+    } else {
+      res.setHeader('Allow', ['GET', 'POST', 'PATCH', 'DELETE']);
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+  } catch (error) {
+    // Catch any unhandled errors and return JSON
+    console.error('Unhandled error in relationships handler:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: errorMessage
+    });
   }
 }
 
@@ -47,7 +85,11 @@ async function handleGet(req: VercelRequest, res: VercelResponse) {
 
     // Handle document description requests
     if (action === 'getDescription' && bookId && userId) {
-      const description = await documentDescriptionService.getDescription(
+      const service = await getDocumentDescriptionService();
+      if (!service) {
+        return res.status(500).json({ error: 'Document description service not available' });
+      }
+      const description = await service.getDescription(
         bookId as string,
         userId as string
       );
@@ -56,7 +98,11 @@ async function handleGet(req: VercelRequest, res: VercelResponse) {
 
     // Handle document description by combined description
     if (action === 'getCombinedDescription' && bookId && userId) {
-      const description = await documentDescriptionService.getCombinedDescription(
+      const service = await getDocumentDescriptionService();
+      if (!service) {
+        return res.status(500).json({ error: 'Document description service not available' });
+      }
+      const description = await service.getCombinedDescription(
         bookId as string,
         userId as string
       );
@@ -102,7 +148,11 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
 
     // Handle document description generation
     if (action === 'generateDescription' && bookId && userId) {
-      const description = await documentDescriptionService.generateDescription(
+      const service = await getDocumentDescriptionService();
+      if (!service) {
+        return res.status(500).json({ error: 'Document description service not available' });
+      }
+      const description = await service.generateDescription(
         bookId,
         userId,
         content
@@ -199,8 +249,12 @@ async function handlePatch(req: VercelRequest, res: VercelResponse) {
 
     // Handle document description update
     if (action === 'updateDescription' && bookId && userId) {
+      const service = await getDocumentDescriptionService();
+      if (!service) {
+        return res.status(500).json({ error: 'Document description service not available' });
+      }
       const body = req.body as any;
-      const description = await documentDescriptionService.updateDescription(
+      const description = await service.updateDescription(
         bookId as string,
         userId as string,
         body.userDescription
@@ -262,7 +316,11 @@ async function handleDelete(req: VercelRequest, res: VercelResponse) {
 
     // Handle document description deletion
     if (action === 'deleteDescription' && bookId && userId) {
-      const success = await documentDescriptionService.deleteDescription(
+      const service = await getDocumentDescriptionService();
+      if (!service) {
+        return res.status(500).json({ error: 'Document description service not available' });
+      }
+      const success = await service.deleteDescription(
         bookId as string,
         userId as string
       );
