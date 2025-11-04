@@ -2363,17 +2363,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   }, [selectedHighlightId, lastCreatedHighlightId])
 
   // Create highlight context menu options
+  // Use the same pattern as createAIContextMenuOptions - inline JSX in returned array
   const createHighlightContextMenuOptions = useCallback((highlightId: string): ContextMenuOption[] => {
-    // Create icon lazily to avoid initialization issues
-    const deleteIcon = React.createElement(Trash2, { 
-      className: 'w-4 h-4', 
-      style: { color: '#ef4444' } 
-    });
-    
     return [
       {
         label: 'Delete Highlight',
-        icon: deleteIcon,
+        icon: <Trash2 className="w-4 h-4" style={{ color: '#ef4444' }} />,
         onClick: () => removeHighlight(highlightId),
         className: 'text-red-500'
       }
