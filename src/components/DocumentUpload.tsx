@@ -206,12 +206,11 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
         // CRITICAL: Save to database FIRST (if saveToLibrary is checked) to get the database ID
         // This ensures the document has the correct ID before being added to the store
         // Otherwise, highlights/notes will fail with "Book not found" because they use document.id
+        let saveSucceeded = !saveToLibrary; // If saveToLibrary is false, consider it "succeeded" (no save needed)
         if (saveToLibrary) {
           await trackPerformance('saveToLibrary', async () => {
             try {
               // Save to Supabase (primary storage) and get the database-generated ID
-              // In local development, S3 API endpoints may not be available (404)
-              // This is OK - the document is still loaded in memory for the current session
               const databaseId = await supabaseStorageService.saveBook({
                 id: document.id,
                 title: document.name,
@@ -229,6 +228,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
                 document.id = databaseId;
               }
               setUploadedDocumentId(databaseId);
+              saveSucceeded = true; // Mark save as succeeded
               
               logger.info('Document saved to Supabase', context, {
                 documentId: databaseId
@@ -273,17 +273,29 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
                 }
               }
             } catch (err) {
-              // In local development, S3 API may not be available (404)
-              // Log the error but don't fail the whole upload since the PDF is already loaded
-              logger.warn('Could not save to library (likely S3 API unavailable in local dev)', context, err as Error);
-              // Don't throw - continue to add document even if save fails
+              // Save failed - don't add document to store if saveToLibrary was requested
+              logger.error('Failed to save PDF to library', context, err as Error);
+              saveSucceeded = false;
+              // Show error to user
+              const errorMessage = err instanceof Error ? err.message : 'Failed to save document to library';
+              setError(`Failed to save document to library: ${errorMessage}. The document will not be available for notes or highlights.`);
+              // Don't throw - we'll check saveSucceeded below
             }
           }, context);
         }
         
-        // CRITICAL: Add document to store AFTER saving (so it has the correct database ID)
-        // This ensures highlights/notes work immediately because document.id matches database book.id
-        addDocument(document, setAsCurrentDocument)
+        // CRITICAL: Only add document to store if save succeeded (or saveToLibrary was false)
+        // This prevents adding documents with wrong IDs that will cause foreign key errors
+        if (saveSucceeded) {
+          addDocument(document, setAsCurrentDocument)
+        } else {
+          // Save failed and saveToLibrary was true - don't add document
+          logger.warn('Not adding document to store because save failed', context, {
+            documentId: document.id,
+            documentName: document.name
+          });
+          throw new Error('Failed to save document to library. Please try again.');
+        }
       } else {
         const content = await trackPerformance(
           'extractTextFromFile',
@@ -307,6 +319,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
         
         // CRITICAL: Save to database FIRST (if saveToLibrary is checked) to get the database ID
         // This ensures the document has the correct ID before being added to the store
+        let saveSucceeded = !saveToLibrary; // If saveToLibrary is false, consider it "succeeded" (no save needed)
         if (saveToLibrary) {
           await trackPerformance('saveToLibrary', async () => {
             try {
@@ -326,6 +339,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
                 document.id = databaseId;
               }
               setUploadedDocumentId(databaseId);
+              saveSucceeded = true; // Mark save as succeeded
               
               logger.info('Document saved to Supabase', context, {
                 documentId: databaseId
@@ -354,16 +368,29 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
               console.log('DocumentUpload: Calling refreshLibrary() after successful text save')
               refreshLibrary();
             } catch (err) {
-              // In local development, S3 API may not be available (404)
-              // Log the error but don't fail the whole upload since the document is already loaded
-              logger.warn('Could not save text file to library (likely S3 API unavailable in local dev)', context, err as Error);
-              // Don't throw - continue to add document even if save fails
+              // Save failed - don't add document to store if saveToLibrary was requested
+              logger.error('Failed to save text file to library', context, err as Error);
+              saveSucceeded = false;
+              // Show error to user
+              const errorMessage = err instanceof Error ? err.message : 'Failed to save document to library';
+              setError(`Failed to save document to library: ${errorMessage}. The document will not be available for notes or highlights.`);
+              // Don't throw - we'll check saveSucceeded below
             }
           }, context);
         }
         
-        // CRITICAL: Add document to store AFTER saving (so it has the correct database ID)
-        addDocument(document, setAsCurrentDocument)
+        // CRITICAL: Only add document to store if save succeeded (or saveToLibrary was false)
+        // This prevents adding documents with wrong IDs that will cause foreign key errors
+        if (saveSucceeded) {
+          addDocument(document, setAsCurrentDocument)
+        } else {
+          // Save failed and saveToLibrary was true - don't add document
+          logger.warn('Not adding document to store because save failed', context, {
+            documentId: document.id,
+            documentName: document.name
+          });
+          throw new Error('Failed to save document to library. Please try again.');
+        }
       }
       
       // Call the upload complete callback if provided
