@@ -708,19 +708,27 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               // Calculate horizontal scaling
               const fontWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1])) * scaleX
               
-              // More accurate baseline calculation
-              // PDF coordinates have origin at bottom-left, viewport at top-left
-              // Transform Y coordinate: PDF Y=0 is at bottom, viewport Y=0 is at top
-              // Typical font ascent is ~80% of font size
-              const ascentRatio = 0.8
-              const baselineOffset = fontSize * ascentRatio
-              const baselineY = viewport.height - y - baselineOffset
+              // CRITICAL FIX: Accurate baseline calculation
+              // PDF coordinates: origin at bottom-left, tx[5] is baseline Y (from bottom)
+              // Viewport coordinates: origin at top-left
+              // Convert PDF baseline to viewport baseline position (from top)
+              const baselineYViewport = viewport.height - y // Baseline position in viewport (from top)
+              
+              // CSS 'top' positions the top edge of the element
+              // To align the span's baseline with the PDF baseline, we need to offset by
+              // the distance from the span's top edge to its baseline
+              // For most fonts, baseline is ~70-80% of font size from top
+              // Using 0.70 to move text down (if text appears too high, decrease this value)
+              // If text appears too low, increase this value
+              const baselineToTopRatio = 0.70
+              const baselineOffset = fontSize * baselineToTopRatio
+              const topPosition = baselineYViewport - baselineOffset
               
               const span = window.document.createElement('span')
               span.textContent = item.str
               span.style.position = 'absolute'
               span.style.left = `${x}px`
-              span.style.top = `${baselineY}px`
+              span.style.top = `${topPosition}px`
               span.style.fontSize = `${fontSize}px`
               
               // Use actual font family from PDF if available
@@ -1049,18 +1057,27 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               // Calculate horizontal scaling
               const fontWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1])) * scaleX
               
-              // More accurate baseline calculation
-              // PDF coordinates have origin at bottom-left, viewport at top-left
-              // Transform Y coordinate: PDF Y=0 is at bottom, viewport Y=0 is at top
-              const ascentRatio = 0.8
-              const baselineOffset = fontSize * ascentRatio
-              const baselineY = viewport.height - y - baselineOffset
+              // CRITICAL FIX: Accurate baseline calculation
+              // PDF coordinates: origin at bottom-left, tx[5] is baseline Y (from bottom)
+              // Viewport coordinates: origin at top-left
+              // Convert PDF baseline to viewport baseline position (from top)
+              const baselineYViewport = viewport.height - y // Baseline position in viewport (from top)
+              
+              // CSS 'top' positions the top edge of the element
+              // To align the span's baseline with the PDF baseline, we need to offset by
+              // the distance from the span's top edge to its baseline
+              // For most fonts, baseline is ~70-80% of font size from top
+              // Using 0.70 to move text down (if text appears too high, decrease this value)
+              // If text appears too low, increase this value
+              const baselineToTopRatio = 0.70
+              const baselineOffset = fontSize * baselineToTopRatio
+              const topPosition = baselineYViewport - baselineOffset
               
               const span = window.document.createElement('span')
               span.textContent = item.str
               span.style.position = 'absolute'
               span.style.left = `${x}px`
-              span.style.top = `${baselineY}px`
+              span.style.top = `${topPosition}px`
               span.style.fontSize = `${fontSize}px`
               
               // Use actual font family from PDF if available
