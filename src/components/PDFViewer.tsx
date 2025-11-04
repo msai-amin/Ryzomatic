@@ -587,28 +587,64 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             const textLayerFrag = window.document.createDocumentFragment()
             const textDivs: HTMLSpanElement[] = []
             
+            // Font family mapping for better PDF font matching
+            const fontMap: Record<string, string> = {
+              'Times-Roman': 'Times, "Times New Roman", serif',
+              'Times-Bold': 'Times, "Times New Roman", serif',
+              'Times-Italic': 'Times, "Times New Roman", serif',
+              'Times-BoldItalic': 'Times, "Times New Roman", serif',
+              'Helvetica': 'Arial, Helvetica, sans-serif',
+              'Helvetica-Bold': 'Arial, Helvetica, sans-serif',
+              'Helvetica-Oblique': 'Arial, Helvetica, sans-serif',
+              'Helvetica-BoldOblique': 'Arial, Helvetica, sans-serif',
+              'Courier': '"Courier New", Courier, monospace',
+              'Courier-Bold': '"Courier New", Courier, monospace',
+              'Courier-Oblique': '"Courier New", Courier, monospace',
+              'Courier-BoldOblique': '"Courier New", Courier, monospace',
+            };
+
             textContent.items.forEach((item: any, index: number) => {
               const tx = item.transform
               
               // Transform PDF coordinates to viewport coordinates
-              // For better alignment, we need to account for the full transformation matrix
-              const x = tx[4]
-              const y = tx[5]
-              const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
+              // Transform matrix: [a, b, c, d, e, f]
+              // where [a b] is X scaling/rotation, [c d] is Y scaling/rotation
+              // and [e f] is the translation (position)
+              const x = tx[4] // e = horizontal translation
+              const y = tx[5] // f = vertical translation
+              
+              // Calculate font size more accurately from transform matrix
+              // Use the magnitude of the vertical component (most reliable)
+              const fontSize = Math.abs(tx[3]) || Math.abs(tx[1]) || Math.abs(tx[2]) || 12
+              const fontHeight = fontSize
+              
+              // Calculate horizontal scaling
               const fontWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1]))
+              
+              // More accurate baseline calculation
+              // PDF coordinates have origin at bottom-left, viewport at top-left
+              // Typical font ascent is ~80% of font size
+              const ascentRatio = 0.8
+              const baselineOffset = fontSize * ascentRatio
+              const baselineY = viewport.height - y - baselineOffset
               
               const span = window.document.createElement('span')
               span.textContent = item.str
               span.style.position = 'absolute'
               span.style.left = `${x}px`
-              span.style.top = `${viewport.height - y - fontHeight}px`
-              span.style.fontSize = `${fontHeight}px`
-              span.style.fontFamily = 'sans-serif'
-              span.style.lineHeight = '1'
+              span.style.top = `${baselineY}px`
+              span.style.fontSize = `${fontSize}px`
+              
+              // Use actual font family from PDF if available
+              const fontName = item.fontName || ''
+              const baseFontName = fontName.split('+').pop() || fontName
+              const mappedFont = fontMap[baseFontName] || baseFontName
+              span.style.fontFamily = mappedFont
+              
+              // More accurate line height matching
+              span.style.lineHeight = `${fontSize}px`
+              span.style.height = `${fontSize}px`
               span.style.whiteSpace = 'pre'
-              // Make height match the actual text height more precisely
-              span.style.height = `${fontHeight}px`
-              span.style.maxHeight = `${fontHeight}px`
               span.style.overflow = 'hidden'
               
               // Calculate width more precisely using PDF metrics
@@ -616,8 +652,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               
               // If no width provided, calculate based on font metrics
               if (!spanWidth || spanWidth <= 0) {
-                // Use more conservative character width estimation
-                spanWidth = item.str.length * fontHeight * 0.5
+                // Better character width estimation based on font type
+                const avgCharWidth = fontSize * 0.6 // More accurate average character width
+                spanWidth = item.str.length * avgCharWidth
               }
               
               // Apply horizontal scaling to match PDF character spacing
@@ -631,9 +668,23 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 span.style.width = `${spanWidth}px`
               }
               
+              // Handle character spacing if available
+              if (item.charSpacing !== undefined && item.charSpacing !== 0) {
+                span.style.letterSpacing = `${item.charSpacing}px`
+              }
+              
               // Ensure proper text selection behavior
               span.style.userSelect = 'text'
               span.style.cursor = 'text'
+              
+              // Enable sub-pixel rendering (only if no transform exists to avoid conflicts)
+              if (!span.style.transform || span.style.transform === 'none') {
+                span.style.transform = 'translateZ(0)'
+              } else {
+                // Combine transforms properly
+                span.style.transform = `${span.style.transform} translateZ(0)`
+              }
+              span.style.willChange = 'transform'
               
               textDivs.push(span)
               textLayerFrag.appendChild(span)
@@ -823,28 +874,59 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             // These settings have been fine-tuned for perfect alignment
             const textLayerFrag = window.document.createDocumentFragment()
             
+            // Font family mapping for better PDF font matching (same as single page mode)
+            const fontMap: Record<string, string> = {
+              'Times-Roman': 'Times, "Times New Roman", serif',
+              'Times-Bold': 'Times, "Times New Roman", serif',
+              'Times-Italic': 'Times, "Times New Roman", serif',
+              'Times-BoldItalic': 'Times, "Times New Roman", serif',
+              'Helvetica': 'Arial, Helvetica, sans-serif',
+              'Helvetica-Bold': 'Arial, Helvetica, sans-serif',
+              'Helvetica-Oblique': 'Arial, Helvetica, sans-serif',
+              'Helvetica-BoldOblique': 'Arial, Helvetica, sans-serif',
+              'Courier': '"Courier New", Courier, monospace',
+              'Courier-Bold': '"Courier New", Courier, monospace',
+              'Courier-Oblique': '"Courier New", Courier, monospace',
+              'Courier-BoldOblique': '"Courier New", Courier, monospace',
+            };
+            
             textContent.items.forEach((item: any, index: number) => {
               const tx = item.transform
               
               // Transform PDF coordinates to viewport coordinates
-              // For better alignment, we need to account for the full transformation matrix
-              const x = tx[4]
-              const y = tx[5]
-              const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]))
+              // Transform matrix: [a, b, c, d, e, f]
+              const x = tx[4] // e = horizontal translation
+              const y = tx[5] // f = vertical translation
+              
+              // Calculate font size more accurately from transform matrix
+              const fontSize = Math.abs(tx[3]) || Math.abs(tx[1]) || Math.abs(tx[2]) || 12
+              const fontHeight = fontSize
+              
+              // Calculate horizontal scaling
               const fontWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1]))
+              
+              // More accurate baseline calculation
+              const ascentRatio = 0.8
+              const baselineOffset = fontSize * ascentRatio
+              const baselineY = viewport.height - y - baselineOffset
               
               const span = window.document.createElement('span')
               span.textContent = item.str
               span.style.position = 'absolute'
               span.style.left = `${x}px`
-              span.style.top = `${viewport.height - y - fontHeight}px`
-              span.style.fontSize = `${fontHeight}px`
-              span.style.fontFamily = 'sans-serif'
-              span.style.lineHeight = '1'
+              span.style.top = `${baselineY}px`
+              span.style.fontSize = `${fontSize}px`
+              
+              // Use actual font family from PDF if available
+              const fontName = item.fontName || ''
+              const baseFontName = fontName.split('+').pop() || fontName
+              const mappedFont = fontMap[baseFontName] || baseFontName
+              span.style.fontFamily = mappedFont
+              
+              // More accurate line height matching
+              span.style.lineHeight = `${fontSize}px`
+              span.style.height = `${fontSize}px`
               span.style.whiteSpace = 'pre'
-              // Make height match the actual text height more precisely
-              span.style.height = `${fontHeight}px`
-              span.style.maxHeight = `${fontHeight}px`
               span.style.overflow = 'hidden'
               
               // Calculate width more precisely using PDF metrics
@@ -852,8 +934,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               
               // If no width provided, calculate based on font metrics
               if (!spanWidth || spanWidth <= 0) {
-                // Use more conservative character width estimation
-                spanWidth = item.str.length * fontHeight * 0.5
+                // Better character width estimation
+                const avgCharWidth = fontSize * 0.6
+                spanWidth = item.str.length * avgCharWidth
               }
               
               // Apply horizontal scaling to match PDF character spacing
@@ -867,9 +950,22 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 span.style.width = `${spanWidth}px`
               }
               
+              // Handle character spacing if available
+              if (item.charSpacing !== undefined && item.charSpacing !== 0) {
+                span.style.letterSpacing = `${item.charSpacing}px`
+              }
+              
               // Ensure proper text selection behavior
               span.style.userSelect = 'text'
               span.style.cursor = 'text'
+              
+              // Enable sub-pixel rendering (same as single page mode)
+              if (!span.style.transform || span.style.transform === 'none') {
+                span.style.transform = 'translateZ(0)'
+              } else {
+                span.style.transform = `${span.style.transform} translateZ(0)`
+              }
+              span.style.willChange = 'transform'
               
               textLayerFrag.appendChild(span)
             })
@@ -2029,13 +2125,39 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       // The text spans use position: absolute within the page container
       // We need to match their coordinate system exactly
       
+      // For multi-line selections, use getClientRects() to get all line fragments
+      // This provides better accuracy for selections spanning multiple lines
+      const rects = range.getClientRects()
+      let finalRect: DOMRect
+      
+      if (rects.length > 1) {
+        // Multi-line selection: combine all rects into one bounding box
+        const rectArray = Array.from(rects)
+        const combinedRect = {
+          left: Math.min(...rectArray.map(r => r.left)),
+          top: Math.min(...rectArray.map(r => r.top)),
+          right: Math.max(...rectArray.map(r => r.right)),
+          bottom: Math.max(...rectArray.map(r => r.bottom)),
+        }
+        finalRect = {
+          ...selectionRect,
+          left: combinedRect.left,
+          top: combinedRect.top,
+          width: combinedRect.right - combinedRect.left,
+          height: combinedRect.bottom - combinedRect.top,
+        } as DOMRect
+      } else {
+        // Single-line selection: use the bounding rect directly
+        finalRect = selectionRect
+      }
+      
       // selectionRect gives us viewport coordinates, containerRect gives us the container's viewport position
       // Subtracting gives us the position within the container - same coordinate system as text spans
       const rawPosition = {
-        x: selectionRect.left - containerRect.left,
-        y: selectionRect.top - containerRect.top,
-        width: selectionRect.width,
-        height: selectionRect.height
+        x: finalRect.left - containerRect.left,
+        y: finalRect.top - containerRect.top,
+        width: finalRect.width,
+        height: finalRect.height
       }
 
       // TEXT ALIGNMENT: Use browser's getBoundingClientRect() without adjustments
@@ -3558,7 +3680,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                         opacity: highlight.is_orphaned ? 0.2 : 0.4,
                         pointerEvents: 'none',
                         border: highlight.is_orphaned ? '2px dashed #999' : 'none',
-                        zIndex: 3
+                        zIndex: 3,
+                        // Enable sub-pixel rendering for better alignment
+                        transform: 'translateZ(0)',
+                        willChange: 'transform',
+                        backfaceVisibility: 'hidden',
+                        // Ensure pixel-perfect positioning
+                        boxSizing: 'border-box',
                       }}
                       title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
                     >
