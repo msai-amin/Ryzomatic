@@ -353,7 +353,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
         .select('id')
         .eq('user_id', currentUser.id)
         .eq('name', 'Trash')
-        .single();
+        .maybeSingle();
       
       const trashCollectionId = trashCollection?.id;
       console.log('ModernLibraryModal: Trash collection ID:', trashCollectionId);
