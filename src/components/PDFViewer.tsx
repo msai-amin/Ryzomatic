@@ -2331,14 +2331,60 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       // Get text element for debugging
       const textElement = range.startContainer.parentElement
 
+      // CRITICAL FIX: Convert screen coordinates to PDF viewport coordinates
+      // The text layer uses PDF.js viewport coordinates, so we must match that coordinate system
+      // Get the actual viewport used for rendering this page
+      let viewportPosition = rawPosition
+      
+      try {
+        const page = await pdfDocRef.current.getPage(selectedTextInfo.pageNumber)
+        const currentViewport = page.getViewport({ scale, rotation })
+        
+        // Find the canvas for this page
+        const pageCanvas = pdfViewer.scrollMode === 'continuous' 
+          ? pageCanvasRefs.current.get(selectedTextInfo.pageNumber)
+          : canvasRef.current
+        
+        if (pageCanvas) {
+          // Get the actual rendered size of the canvas (from browser)
+          const canvasRect = pageCanvas.getBoundingClientRect()
+          
+          // Calculate conversion factor: viewport dimensions vs actual rendered size
+          // This accounts for any CSS transforms or scaling that might affect the canvas
+          const viewportToScreenX = canvasRect.width / currentViewport.width
+          const viewportToScreenY = canvasRect.height / currentViewport.height
+          
+          // Convert screen coordinates (from getBoundingClientRect) to viewport coordinates
+          // The text layer spans use viewport coordinates directly
+          viewportPosition = {
+            x: rawPosition.x / viewportToScreenX,
+            y: rawPosition.y / viewportToScreenY,
+            width: rawPosition.width / viewportToScreenX,
+            height: rawPosition.height / viewportToScreenY
+          }
+          
+          console.log('Viewport coordinate conversion:', {
+            viewport: { width: currentViewport.width, height: currentViewport.height },
+            canvasRect: { width: canvasRect.width, height: canvasRect.height },
+            conversionFactors: { x: viewportToScreenX, y: viewportToScreenY },
+            rawPosition,
+            viewportPosition
+          })
+        }
+      } catch (error) {
+        console.warn('Could not get viewport for coordinate conversion, using raw position:', error)
+        // Fall back to using raw position (existing behavior)
+      }
+
       // ROBUST SCALING: Normalize by current scale so positions are stored at scale 1.0
+      // This ensures highlights scale correctly when zoom changes
       // Add safeguards to prevent division by zero or invalid scale values
       const safeScale = Math.max(scale, 0.1) // Prevent division by zero
       const position = {
-        x: rawPosition.x / safeScale,
-        y: rawPosition.y / safeScale,
-        width: rawPosition.width / safeScale,
-        height: rawPosition.height / safeScale
+        x: viewportPosition.x / safeScale,
+        y: viewportPosition.y / safeScale,
+        width: viewportPosition.width / safeScale,
+        height: viewportPosition.height / safeScale
       }
 
       // ROBUST VALIDATION: Check for reasonable position values
