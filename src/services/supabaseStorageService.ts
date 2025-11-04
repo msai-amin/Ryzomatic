@@ -198,7 +198,7 @@ class SupabaseStorageService {
         title: sanitizedTitle,
         file_name: sanitizedFileName,
         file_type: book.type,
-        file_size: fileSize,
+        file_size_bytes: fileSize,  // ✅ Fixed: Changed from file_size to file_size_bytes to match database schema
         total_pages: book.totalPages,
         s3_key: s3Key,  // NEW: Store S3 path instead of file data
         text_content: book.type === 'text' && typeof book.fileData === 'string' 
