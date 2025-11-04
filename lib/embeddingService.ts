@@ -1,8 +1,3 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
-// Initialize Gemini AI for embeddings
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-
 export interface EmbeddingResult {
   embedding: number[];
   tokenCount?: number;
@@ -13,19 +8,35 @@ export class EmbeddingService {
   private batchSize = 100; // Gemini's limit
 
   /**
-   * Generate embeddings using Gemini text-embedding-004
+   * Generate embeddings using Gemini text-embedding-004 via API endpoint
+   * Uses server-side API to avoid exposing API keys in client
    * @param text - Text to embed
    * @returns Embedding vector (768 dimensions)
    */
   async embed(text: string): Promise<number[]> {
     try {
-      const model = genAI.getGenerativeModel({ 
-        model: this.embeddingModel 
+      // Use server-side API endpoint instead of calling Gemini directly
+      // This keeps API keys secure and avoids 403 errors
+      const response = await fetch('/api/gemini/embedding', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text }),
       });
 
-      const result = await model.embedContent(text);
+      if (!response.ok) {
+        // If API endpoint fails (e.g., no API key configured), return empty array
+        // This gracefully disables the feature without breaking the app
+        if (response.status === 500 || response.status === 403) {
+          console.warn('Embedding API unavailable, note relationship detection disabled');
+          throw new Error('Embedding service unavailable');
+        }
+        throw new Error(`Embedding API error: ${response.statusText}`);
+      }
 
-      const embedding = result.embedding.values;
+      const data = await response.json();
+      const embedding = data.embedding;
       
       if (!embedding || embedding.length === 0) {
         throw new Error('Empty embedding returned');
@@ -33,6 +44,11 @@ export class EmbeddingService {
 
       return embedding;
     } catch (error) {
+      // Gracefully handle errors - don't spam console for expected failures
+      if (error instanceof Error && error.message.includes('unavailable')) {
+        // Silently fail if service is unavailable (no API key configured)
+        throw error;
+      }
       console.error('Error generating embedding:', error);
       throw error;
     }

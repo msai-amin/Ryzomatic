@@ -40,7 +40,18 @@ export class AutoRelationshipService {
       }
 
       // Get embedding for note content
-      const noteEmbedding = await embeddingService.embed(note.content);
+      // Gracefully handle if embedding service is unavailable (e.g., no API key)
+      let noteEmbedding: number[];
+      try {
+        noteEmbedding = await embeddingService.embed(note.content);
+      } catch (error) {
+        // If embedding fails (e.g., API unavailable), silently skip relationship detection
+        // This is a background feature that shouldn't break the app
+        if (error instanceof Error && error.message.includes('unavailable')) {
+          return 0; // Return 0 relationships created
+        }
+        throw error; // Re-throw unexpected errors
+      }
       const noteEmbeddingString = embeddingService.formatForPgVector(noteEmbedding);
 
       let relationshipsCreated = 0;
@@ -224,7 +235,18 @@ export class AutoRelationshipService {
       for (const note of notes) {
         try {
           // Get embedding for this note (we'll compute on-the-fly or cache)
-          const noteEmbeddingOther = await embeddingService.embed(note.content);
+          // Gracefully skip if embedding service is unavailable
+          let noteEmbeddingOther: number[];
+          try {
+            noteEmbeddingOther = await embeddingService.embed(note.content);
+          } catch (embedError) {
+            // If embedding fails (e.g., API unavailable), skip this note silently
+            if (embedError instanceof Error && embedError.message.includes('unavailable')) {
+              continue; // Skip this note without logging
+            }
+            throw embedError; // Re-throw unexpected errors
+          }
+          
           const similarity = embeddingService.cosineSimilarity(noteEmbedding, noteEmbeddingOther);
 
           if (similarity >= this.SIMILARITY_THRESHOLD) {
@@ -243,7 +265,10 @@ export class AutoRelationshipService {
             });
           }
         } catch (error) {
-          console.error('Error processing note similarity:', error);
+          // Only log unexpected errors, not embedding unavailability
+          if (!(error instanceof Error && error.message.includes('unavailable'))) {
+            console.error('Error processing note similarity:', error);
+          }
           continue;
         }
       }
