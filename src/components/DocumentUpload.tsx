@@ -188,12 +188,6 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
           return; // Wait for user consent
         }
         
-        // Either OCR not needed or auto-approved
-        addDocument(document, setAsCurrentDocument)
-        
-        // Store document ID for callback
-        setUploadedDocumentId(document.id)
-        
         logger.info('PDF document processed successfully', context, {
           documentId: document.id,
           totalPages,
@@ -209,7 +203,9 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
           })
         });
         
-        // Save to library if checkbox is checked
+        // CRITICAL: Save to database FIRST (if saveToLibrary is checked) to get the database ID
+        // This ensures the document has the correct ID before being added to the store
+        // Otherwise, highlights/notes will fail with "Book not found" because they use document.id
         if (saveToLibrary) {
           await trackPerformance('saveToLibrary', async () => {
             try {
@@ -229,30 +225,10 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
               
               // CRITICAL: Update document with database ID if different
               if (databaseId !== document.id) {
-                const oldId = document.id;
-                console.log('🔄 Updating document ID from', oldId, 'to database ID:', databaseId);
-                
-                // Update the document object with the new ID
-                const updatedDocument = { ...document, id: databaseId };
-                
-                // Update in store using setCurrentDocument (directly replaces currentDocument)
-                const { setCurrentDocument, documents } = useAppStore.getState();
-                
-                // Update currentDocument if it's the one we just added
-                const currentDoc = useAppStore.getState().currentDocument;
-                if (currentDoc?.id === oldId) {
-                  setCurrentDocument(updatedDocument);
-                }
-                
-                // Also update in documents array
-                useAppStore.setState({
-                  documents: documents.map(doc => doc.id === oldId ? updatedDocument : doc)
-                });
-                
-                // Update local variable
+                console.log('🔄 Updating document ID from', document.id, 'to database ID:', databaseId);
                 document.id = databaseId;
-                setUploadedDocumentId(databaseId);
               }
+              setUploadedDocumentId(databaseId);
               
               logger.info('Document saved to Supabase', context, {
                 documentId: databaseId
@@ -300,10 +276,14 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
               // In local development, S3 API may not be available (404)
               // Log the error but don't fail the whole upload since the PDF is already loaded
               logger.warn('Could not save to library (likely S3 API unavailable in local dev)', context, err as Error);
-              // Don't throw - the document is already added to the reader
+              // Don't throw - continue to add document even if save fails
             }
           }, context);
         }
+        
+        // CRITICAL: Add document to store AFTER saving (so it has the correct database ID)
+        // This ensures highlights/notes work immediately because document.id matches database book.id
+        addDocument(document, setAsCurrentDocument)
       } else {
         const content = await trackPerformance(
           'extractTextFromFile',
@@ -320,17 +300,13 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
           uploadedAt: new Date()
         }
         
-        addDocument(document, setAsCurrentDocument)
-        
-        // Store document ID for callback
-        setUploadedDocumentId(document.id)
-        
         logger.info('Text document processed successfully', context, {
           documentId: document.id,
           contentLength: content.length
         });
         
-        // Save to library if checkbox is checked
+        // CRITICAL: Save to database FIRST (if saveToLibrary is checked) to get the database ID
+        // This ensures the document has the correct ID before being added to the store
         if (saveToLibrary) {
           await trackPerformance('saveToLibrary', async () => {
             try {
@@ -346,30 +322,10 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
               
               // CRITICAL: Update document with database ID if different
               if (databaseId !== document.id) {
-                const oldId = document.id;
-                console.log('🔄 Updating document ID from', oldId, 'to database ID:', databaseId);
-                
-                // Update the document object with the new ID
-                const updatedDocument = { ...document, id: databaseId };
-                
-                // Update in store using setCurrentDocument (directly replaces currentDocument)
-                const { setCurrentDocument, documents } = useAppStore.getState();
-                
-                // Update currentDocument if it's the one we just added
-                const currentDoc = useAppStore.getState().currentDocument;
-                if (currentDoc?.id === oldId) {
-                  setCurrentDocument(updatedDocument);
-                }
-                
-                // Also update in documents array
-                useAppStore.setState({
-                  documents: documents.map(doc => doc.id === oldId ? updatedDocument : doc)
-                });
-                
-                // Update local variable
+                console.log('🔄 Updating document ID from', document.id, 'to database ID:', databaseId);
                 document.id = databaseId;
-                setUploadedDocumentId(databaseId);
               }
+              setUploadedDocumentId(databaseId);
               
               logger.info('Document saved to Supabase', context, {
                 documentId: databaseId
@@ -401,10 +357,13 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
               // In local development, S3 API may not be available (404)
               // Log the error but don't fail the whole upload since the document is already loaded
               logger.warn('Could not save text file to library (likely S3 API unavailable in local dev)', context, err as Error);
-              // Don't throw - the document is already added to the reader
+              // Don't throw - continue to add document even if save fails
             }
           }, context);
         }
+        
+        // CRITICAL: Add document to store AFTER saving (so it has the correct database ID)
+        addDocument(document, setAsCurrentDocument)
       }
       
       // Call the upload complete callback if provided
@@ -435,10 +394,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
       setShowOCRDialog(false);
       setLoading(true);
 
-      // Add document with OCR status set to 'pending'
-      addDocument(document, setAsCurrentDocument);
-
-      // Save to library if needed
+      // CRITICAL: Save to database FIRST (if saveToLibrary is checked) to get the database ID
       if (shouldSave) {
         const databaseId = await supabaseStorageService.saveBook({
           id: document.id,
@@ -453,34 +409,18 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
         
         // CRITICAL: Update document with database ID if different
         if (databaseId !== document.id) {
-          const oldId = document.id;
-          console.log('🔄 OCR Approve: Updating document ID from', oldId, 'to database ID:', databaseId);
-          
-          // Update the document object with the new ID
-          const updatedDocument = { ...document, id: databaseId };
-          
-          // Update in store using setCurrentDocument (directly replaces currentDocument)
-          const { setCurrentDocument, documents } = useAppStore.getState();
-          
-          // Update currentDocument if it's the one we just added
-          const currentDoc = useAppStore.getState().currentDocument;
-          if (currentDoc?.id === oldId) {
-            setCurrentDocument(updatedDocument);
-          }
-          
-          // Also update in documents array
-          useAppStore.setState({
-            documents: documents.map(doc => doc.id === oldId ? updatedDocument : doc)
-          });
-          
-          // Update local variable
+          console.log('🔄 OCR Approve: Updating document ID from', document.id, 'to database ID:', databaseId);
           document.id = databaseId;
-          setUploadedDocumentId(databaseId);
         }
+        setUploadedDocumentId(databaseId);
         
         console.log('DocumentUpload: Calling refreshLibrary() after OCR approval')
         refreshLibrary();
       }
+      
+      // CRITICAL: Add document to store AFTER saving (so it has the correct database ID)
+      // Document has OCR status set to 'pending'
+      addDocument(document, setAsCurrentDocument);
 
       // Call OCR API endpoint
       // This will be polled in PDFViewer component
@@ -506,11 +446,8 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
 
       // Update document status to 'user_declined'
       document.ocrStatus = 'user_declined';
-      
-      // Add document anyway (with limited text)
-      addDocument(document, setAsCurrentDocument);
 
-      // Save to library if needed
+      // CRITICAL: Save to database FIRST (if saveToLibrary is checked) to get the database ID
       if (shouldSave) {
         const databaseId = await supabaseStorageService.saveBook({
           id: document.id,
@@ -525,33 +462,17 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
         
         // CRITICAL: Update document with database ID if different
         if (databaseId !== document.id) {
-          const oldId = document.id;
-          console.log('🔄 OCR Decline: Updating document ID from', oldId, 'to database ID:', databaseId);
-          
-          // Update the document object with the new ID
-          const updatedDocument = { ...document, id: databaseId };
-          
-          // Update in store using setCurrentDocument (directly replaces currentDocument)
-          const { setCurrentDocument, documents } = useAppStore.getState();
-          
-          // Update currentDocument if it's the one we just added
-          const currentDoc = useAppStore.getState().currentDocument;
-          if (currentDoc?.id === oldId) {
-            setCurrentDocument(updatedDocument);
-          }
-          
-          // Also update in documents array
-          useAppStore.setState({
-            documents: documents.map(doc => doc.id === oldId ? updatedDocument : doc)
-          });
-          
-          // Update local variable
+          console.log('🔄 OCR Decline: Updating document ID from', document.id, 'to database ID:', databaseId);
           document.id = databaseId;
-          setUploadedDocumentId(databaseId);
         }
+        setUploadedDocumentId(databaseId);
         
         refreshLibrary();
       }
+      
+      // CRITICAL: Add document to store AFTER saving (so it has the correct database ID)
+      // Document has OCR status set to 'user_declined' (with limited text)
+      addDocument(document, setAsCurrentDocument);
 
       setOcrPendingData(null);
       onClose();
