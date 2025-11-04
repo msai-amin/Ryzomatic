@@ -27,7 +27,8 @@ import {
   Highlighter,
   Plus,
   Sparkles,
-  RotateCcw
+  RotateCcw,
+  X
 } from 'lucide-react'
 import { useAppStore, Document as DocumentType } from '../store/appStore'
 import { ttsManager } from '../services/ttsManager'
@@ -49,7 +50,7 @@ import { HighlightColorPicker } from './HighlightColorPicker'
 import { HighlightManagementPanel } from './HighlightManagementPanel'
 import { HighlightColorPopover } from './HighlightColorPopover'
 import { notesService } from '../services/notesService'
-import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
+import { ContextMenu, createAIContextMenuOptions, ContextMenuOption } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { supabase } from '../../lib/supabase'
 import { configurePDFWorker } from '../utils/pdfjsConfig'
@@ -321,10 +322,18 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   const [showHighlightColorPopover, setShowHighlightColorPopover] = useState(false)
   const [currentHighlightColor, setCurrentHighlightColor] = useState('#FFD700')
   const [isHighlightMode, setIsHighlightMode] = useState(true) // Auto-enable highlight mode when document loads
+  const [selectedHighlightId, setSelectedHighlightId] = useState<string | null>(null)
+  const [lastCreatedHighlightId, setLastCreatedHighlightId] = useState<string | null>(null)
+  const [showUndoToast, setShowUndoToast] = useState(false)
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
     text: string
+  } | null>(null)
+  const [highlightContextMenu, setHighlightContextMenu] = useState<{
+    x: number
+    y: number
+    highlightId: string
   } | null>(null)
   const [showNotesPanel, setShowNotesPanel] = useState<boolean>(false)
   const [isToolbarStuck, setIsToolbarStuck] = useState<boolean>(false)
@@ -580,6 +589,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           // Any changes to positioning, sizing, or transforms will break selection accuracy
           if (textLayerRef.current) {
             textLayerRef.current.innerHTML = ''
+            // CRITICAL: Set text layer container size to match canvas exactly
+            // This ensures proper alignment at all zoom levels
+            textLayerRef.current.style.width = viewport.width + 'px'
+            textLayerRef.current.style.height = viewport.height + 'px'
+            textLayerRef.current.style.position = 'absolute'
+            textLayerRef.current.style.top = '0'
+            textLayerRef.current.style.left = '0'
             const textContent = await page.getTextContent()
             
             // Manual text layer rendering with proper viewport synchronization
@@ -868,6 +884,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           // Any changes to positioning, sizing, or transforms will break selection accuracy
           if (textLayerDiv) {
             textLayerDiv.innerHTML = ''
+            // CRITICAL: Set text layer container size to match canvas exactly
+            // This ensures proper alignment at all zoom levels
+            textLayerDiv.style.width = viewport.width + 'px'
+            textLayerDiv.style.height = viewport.height + 'px'
+            textLayerDiv.style.position = 'absolute'
+            textLayerDiv.style.top = '0'
+            textLayerDiv.style.left = '0'
             const textContent = await page.getTextContent()
             
             // Manual text layer rendering with proper viewport synchronization
@@ -1135,12 +1158,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             handleSaveEditedText()
           }
           break
+        case 'Delete':
+        case 'Backspace':
+          // Delete selected highlight
+          if (selectedHighlightId && !isEditing) {
+            e.preventDefault()
+            removeHighlight(selectedHighlightId)
+            setSelectedHighlightId(null)
+          }
+          break
       }
     }
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [pageNumber, numPages, scale, rotation, showNotesPanel, pdfViewer.readingMode, updatePDFViewer, typography.textAlign, typography.focusMode, typography.readingGuide, updateTypography, isEditing])
+  }, [pageNumber, numPages, scale, rotation, showNotesPanel, pdfViewer.readingMode, updatePDFViewer, typography.textAlign, typography.focusMode, typography.readingGuide, updateTypography, isEditing, selectedHighlightId, removeHighlight])
 
   // Intersection observer for toolbar visual feedback
   useEffect(() => {
@@ -1174,8 +1206,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       }
     }
 
-    const handleClick = () => {
+    const handleClick = (e: MouseEvent) => {
       setContextMenu(null)
+      setHighlightContextMenu(null)
+      // Clear highlight selection when clicking outside highlights
+      // Highlights stop propagation in their onClick handlers, so clicks on highlights won't reach here
+      // Only clear if not selecting text (user might be selecting text to highlight)
+      if (!window.getSelection()?.toString().trim()) {
+        setSelectedHighlightId(null)
+      }
     }
 
     window.document.addEventListener('contextmenu', handleContextMenu)
@@ -2255,6 +2294,16 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       // Add to local state
       setHighlights(prev => [...prev, highlight])
 
+      // Track last created highlight for undo
+      setLastCreatedHighlightId(highlight.id)
+      setShowUndoToast(true)
+      
+      // Auto-hide undo toast after 5 seconds
+      setTimeout(() => {
+        setShowUndoToast(false)
+        setLastCreatedHighlightId(null)
+      }, 5000)
+
       // Clear selection
       window.getSelection()?.removeAllRanges()
       setHighlightPickerPosition(null)
@@ -2296,11 +2345,32 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     try {
       await highlightService.deleteHighlight(id)
       setHighlights(prev => prev.filter(h => h.id !== id))
+      
+      // Clear selection if this was the selected highlight
+      if (selectedHighlightId === id) {
+        setSelectedHighlightId(null)
+      }
+      
+      // Clear undo toast if this was the last created highlight
+      if (lastCreatedHighlightId === id) {
+        setLastCreatedHighlightId(null)
+        setShowUndoToast(false)
+      }
     } catch (error) {
       console.error('Error deleting highlight:', error)
       alert('Failed to delete highlight. Please try again.')
     }
-  }, [])
+  }, [selectedHighlightId, lastCreatedHighlightId])
+
+  // Create highlight context menu options
+  const createHighlightContextMenuOptions = useCallback((highlightId: string): ContextMenuOption[] => [
+    {
+      label: 'Delete Highlight',
+      icon: <Trash2 className="w-4 h-4" style={{ color: '#ef4444' }} />,
+      onClick: () => removeHighlight(highlightId),
+      className: 'text-red-500'
+    }
+  ], [removeHighlight])
 
   // Mark highlights as orphaned when page text is edited
   const markPageHighlightsOrphaned = useCallback(async (pageNum: number) => {
@@ -3581,28 +3651,48 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                         <div
                           key={highlight.id}
                           className="absolute group"
-                          style={{
-                            left: `${scaledPosition.x}px`,
-                            top: `${scaledPosition.y}px`,
-                            width: `${scaledPosition.width}px`,
-                            height: `${scaledPosition.height}px`,
-                            backgroundColor: highlight.color_hex,
-                            opacity: highlight.is_orphaned ? 0.2 : 0.4,
-                            pointerEvents: 'none',
-                            border: highlight.is_orphaned ? '2px dashed #999' : 'none',
-                            zIndex: 3
-                          }}
-                          title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
+                                                style={{
+                        left: `${scaledPosition.x}px`,
+                        top: `${scaledPosition.y}px`,
+                        width: `${scaledPosition.width}px`,
+                        height: `${scaledPosition.height}px`,
+                        backgroundColor: highlight.color_hex,
+                        opacity: highlight.is_orphaned ? 0.2 : 0.4,
+                        pointerEvents: 'auto',
+                        border: selectedHighlightId === highlight.id ? '2px solid #3B82F6' : (highlight.is_orphaned ? '2px dashed #999' : 'none'),
+                        zIndex: 3,
+                        cursor: 'pointer',
+                      }}
+                      title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedHighlightId(highlight.id)
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setSelectedHighlightId(highlight.id)
+                        setHighlightContextMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          highlightId: highlight.id
+                        })
+                      }}
                         >
                           {highlight.is_orphaned && (
-                            <div className="absolute -top-3 -left-1 bg-yellow-500 text-white text-xs px-1 rounded">
+                            <div className="absolute -top-3 -left-1 bg-yellow-500 text-white text-xs px-1 rounded z-10">
                               ⚠
                             </div>
                           )}
                           <button
-                            onClick={() => removeHighlight(highlight.id)}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              removeHighlight(highlight.id)
+                            }}
+                            className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-100 group-hover:opacity-100 transition-all shadow-lg z-10"
                             style={{ pointerEvents: 'auto' }}
+                            title="Delete highlight"
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>
@@ -3678,7 +3768,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                         height: `${scaledPosition.height}px`,
                         backgroundColor: highlight.color_hex,
                         opacity: highlight.is_orphaned ? 0.2 : 0.4,
-                        pointerEvents: 'none',
+                        pointerEvents: 'auto',
                         border: highlight.is_orphaned ? '2px dashed #999' : 'none',
                         zIndex: 3,
                         // Enable sub-pixel rendering for better alignment
@@ -3687,18 +3777,29 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                         backfaceVisibility: 'hidden',
                         // Ensure pixel-perfect positioning
                         boxSizing: 'border-box',
+                        cursor: 'pointer',
                       }}
                       title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
+                      onContextMenu={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        // Right-click will be handled by context menu
+                      }}
                     >
                       {highlight.is_orphaned && (
-                        <div className="absolute -top-3 -left-1 bg-yellow-500 text-white text-xs px-1 rounded">
+                        <div className="absolute -top-3 -left-1 bg-yellow-500 text-white text-xs px-1 rounded z-10">
                           ⚠
                         </div>
                       )}
                       <button
-                        onClick={() => removeHighlight(highlight.id)}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          removeHighlight(highlight.id)
+                        }}
+                        className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-100 group-hover:opacity-100 transition-all shadow-lg z-10"
                         style={{ pointerEvents: 'auto' }}
+                        title="Delete highlight"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
@@ -3724,6 +3825,16 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         />
       )}
 
+      {/* Highlight Context Menu */}
+      {highlightContextMenu && (
+        <ContextMenu
+          x={highlightContextMenu.x}
+          y={highlightContextMenu.y}
+          options={createHighlightContextMenuOptions(highlightContextMenu.highlightId)}
+          onClose={() => setHighlightContextMenu(null)}
+        />
+      )}
+
       {/* Notes Panel */}
       <NotesPanel
         isOpen={showNotesPanel}
@@ -3744,6 +3855,40 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           setSelectedTextInfo(null)
         }}
       />
+
+      {/* Undo Toast for Last Created Highlight */}
+      {showUndoToast && lastCreatedHighlightId && (
+        <div
+          className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3 animate-in slide-in-from-bottom-4"
+          style={{
+            animation: 'slideIn 0.3s ease-out'
+          }}
+        >
+          <span style={{ color: 'var(--color-text-primary)' }}>Highlight created</span>
+          <button
+            onClick={() => {
+              if (lastCreatedHighlightId) {
+                removeHighlight(lastCreatedHighlightId)
+                setLastCreatedHighlightId(null)
+              }
+              setShowUndoToast(false)
+            }}
+            className="px-3 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium transition-colors"
+          >
+            Undo
+          </button>
+          <button
+            onClick={() => {
+              setShowUndoToast(false)
+              setLastCreatedHighlightId(null)
+            }}
+            className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            style={{ color: 'var(--color-text-secondary)' }}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Highlight Management Panel */}
       <HighlightManagementPanel
