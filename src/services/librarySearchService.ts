@@ -227,7 +227,7 @@ class LibrarySearchService {
         .select('id, name')
         .eq('user_id', this.currentUserId!)
         .eq('name', 'Trash')
-        .single();
+        .maybeSingle();
       
       const trashCollectionId = trashCollection?.id;
       const isSearchingTrash = trashCollectionId && filters.collections?.includes(trashCollectionId);
