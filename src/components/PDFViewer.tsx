@@ -676,23 +676,41 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             textContent.items.forEach((item: any, index: number) => {
               const tx = item.transform
               
-              // Transform PDF coordinates to viewport coordinates
+              // CRITICAL FIX: Transform PDF coordinates to viewport coordinates
+              // PDF.js coordinates are in PDF points (72 DPI), viewport uses pixels
+              // The viewport.transform array provides the transformation matrix
               // Transform matrix: [a, b, c, d, e, f]
               // where [a b] is X scaling/rotation, [c d] is Y scaling/rotation
               // and [e f] is the translation (position)
-              const x = tx[4] // e = horizontal translation
-              const y = tx[5] // f = vertical translation
+              
+              // Use PDF.js viewport transform to convert PDF points to viewport pixels
+              // viewport.transform is [scaleX, 0, 0, scaleY, offsetX, offsetY]
+              const viewportTransform = viewport.transform || [scale, 0, 0, scale, 0, 0]
+              const scaleX = viewportTransform[0] || scale
+              const scaleY = viewportTransform[3] || scale
+              
+              // Transform PDF coordinates using viewport transform
+              // Apply the PDF item's transform first, then the viewport transform
+              // tx[4] and tx[5] are in PDF coordinates, we need viewport coordinates
+              const pdfX = tx[4] // e = horizontal translation in PDF space
+              const pdfY = tx[5] // f = vertical translation in PDF space
+              
+              // Convert to viewport coordinates (PDF points to pixels)
+              const x = pdfX * scaleX
+              const y = pdfY * scaleY
               
               // Calculate font size more accurately from transform matrix
-              // Use the magnitude of the vertical component (most reliable)
-              const fontSize = Math.abs(tx[3]) || Math.abs(tx[1]) || Math.abs(tx[2]) || 12
+              // Transform font size from PDF points to viewport pixels
+              const fontSizePDF = Math.abs(tx[3]) || Math.abs(tx[1]) || Math.abs(tx[2]) || 12
+              const fontSize = fontSizePDF * scaleY // Scale font size to viewport
               const fontHeight = fontSize
               
               // Calculate horizontal scaling
-              const fontWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1]))
+              const fontWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1])) * scaleX
               
               // More accurate baseline calculation
               // PDF coordinates have origin at bottom-left, viewport at top-left
+              // Transform Y coordinate: PDF Y=0 is at bottom, viewport Y=0 is at top
               // Typical font ascent is ~80% of font size
               const ascentRatio = 0.8
               const baselineOffset = fontSize * ascentRatio
@@ -718,7 +736,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               span.style.overflow = 'hidden'
               
               // Calculate width more precisely using PDF metrics
-              let spanWidth = item.width
+              // item.width is in PDF points, convert to viewport pixels
+              let spanWidth = item.width ? item.width * scaleX : 0
               
               // If no width provided, calculate based on font metrics
               if (!spanWidth || spanWidth <= 0) {
@@ -728,12 +747,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               }
               
               // Apply horizontal scaling to match PDF character spacing
-              const scaleX = fontWidth / fontHeight
-              if (Math.abs(scaleX - 1) > 0.01) {
-                span.style.transform = `scaleX(${scaleX})`
+              // fontWidth and fontHeight are already in viewport pixels
+              const charScaleX = fontWidth / fontHeight
+              if (Math.abs(charScaleX - 1) > 0.01) {
+                span.style.transform = `scaleX(${charScaleX})`
                 span.style.transformOrigin = '0% 0%'
                 // Adjust width to account for scaling
-                span.style.width = `${spanWidth / scaleX}px`
+                span.style.width = `${spanWidth / charScaleX}px`
               } else {
                 span.style.width = `${spanWidth}px`
               }
@@ -997,19 +1017,41 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             textContent.items.forEach((item: any, index: number) => {
               const tx = item.transform
               
-              // Transform PDF coordinates to viewport coordinates
+              // CRITICAL FIX: Transform PDF coordinates to viewport coordinates
+              // PDF.js coordinates are in PDF points (72 DPI), viewport uses pixels
+              // The viewport.transform array provides the transformation matrix
               // Transform matrix: [a, b, c, d, e, f]
-              const x = tx[4] // e = horizontal translation
-              const y = tx[5] // f = vertical translation
+              // where [a b] is X scaling/rotation, [c d] is Y scaling/rotation
+              // and [e f] is the translation (position)
+              
+              // Use PDF.js viewport transform to convert PDF points to viewport pixels
+              // viewport.transform is [scaleX, 0, 0, scaleY, offsetX, offsetY]
+              const viewportTransform = viewport.transform || [scale, 0, 0, scale, 0, 0]
+              const scaleX = viewportTransform[0] || scale
+              const scaleY = viewportTransform[3] || scale
+              
+              // Transform PDF coordinates using viewport transform
+              // Apply the PDF item's transform first, then the viewport transform
+              // tx[4] and tx[5] are in PDF coordinates, we need viewport coordinates
+              const pdfX = tx[4] // e = horizontal translation in PDF space
+              const pdfY = tx[5] // f = vertical translation in PDF space
+              
+              // Convert to viewport coordinates (PDF points to pixels)
+              const x = pdfX * scaleX
+              const y = pdfY * scaleY
               
               // Calculate font size more accurately from transform matrix
-              const fontSize = Math.abs(tx[3]) || Math.abs(tx[1]) || Math.abs(tx[2]) || 12
+              // Transform font size from PDF points to viewport pixels
+              const fontSizePDF = Math.abs(tx[3]) || Math.abs(tx[1]) || Math.abs(tx[2]) || 12
+              const fontSize = fontSizePDF * scaleY // Scale font size to viewport
               const fontHeight = fontSize
               
               // Calculate horizontal scaling
-              const fontWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1]))
+              const fontWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1])) * scaleX
               
               // More accurate baseline calculation
+              // PDF coordinates have origin at bottom-left, viewport at top-left
+              // Transform Y coordinate: PDF Y=0 is at bottom, viewport Y=0 is at top
               const ascentRatio = 0.8
               const baselineOffset = fontSize * ascentRatio
               const baselineY = viewport.height - y - baselineOffset
@@ -1034,7 +1076,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               span.style.overflow = 'hidden'
               
               // Calculate width more precisely using PDF metrics
-              let spanWidth = item.width
+              // item.width is in PDF points, convert to viewport pixels
+              let spanWidth = item.width ? item.width * scaleX : 0
               
               // If no width provided, calculate based on font metrics
               if (!spanWidth || spanWidth <= 0) {
@@ -1044,19 +1087,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               }
               
               // Apply horizontal scaling to match PDF character spacing
-              const scaleX = fontWidth / fontHeight
-              if (Math.abs(scaleX - 1) > 0.01) {
-                span.style.transform = `scaleX(${scaleX})`
+              // fontWidth and fontHeight are already in viewport pixels
+              const charScaleX = fontWidth / fontHeight
+              if (Math.abs(charScaleX - 1) > 0.01) {
+                span.style.transform = `scaleX(${charScaleX})`
                 span.style.transformOrigin = '0% 0%'
                 // Adjust width to account for scaling
-                span.style.width = `${spanWidth / scaleX}px`
+                span.style.width = `${spanWidth / charScaleX}px`
               } else {
                 span.style.width = `${spanWidth}px`
               }
               
               // Handle character spacing if available
+              // charSpacing is in PDF points, convert to viewport pixels
               if (item.charSpacing !== undefined && item.charSpacing !== 0) {
-                span.style.letterSpacing = `${item.charSpacing}px`
+                span.style.letterSpacing = `${item.charSpacing * scaleX}px`
               }
               
               // Ensure proper text selection behavior
