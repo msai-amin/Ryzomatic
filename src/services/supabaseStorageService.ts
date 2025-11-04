@@ -119,7 +119,7 @@ class SupabaseStorageService {
   }
 
   // Books Management
-  async saveBook(book: SavedBook): Promise<void> {
+  async saveBook(book: SavedBook): Promise<string> {
     this.ensureAuthenticated();
     
     try {
@@ -241,6 +241,13 @@ class SupabaseStorageService {
         );
       }
 
+      // Log the database-generated ID for debugging
+      logger.info('Book saved successfully with database ID', context, {
+        providedId: book.id,
+        databaseId: data.id,
+        idsMatch: book.id === data.id
+      });
+
       // Save notes if any
       if (book.notes && book.notes.length > 0) {
         for (const note of book.notes) {
@@ -265,6 +272,9 @@ class SupabaseStorageService {
         s3Key: data.s3_key,
         storageType: s3Key ? 'S3' : 'Database'
       });
+
+      // Return the database-generated ID
+      return data.id;
 
     } catch (error) {
       logger.error('Error saving book', { bookId: book.id }, error as Error);

@@ -213,10 +213,10 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
         if (saveToLibrary) {
           await trackPerformance('saveToLibrary', async () => {
             try {
-              // Save to Supabase (primary storage)
+              // Save to Supabase (primary storage) and get the database-generated ID
               // In local development, S3 API endpoints may not be available (404)
               // This is OK - the document is still loaded in memory for the current session
-              await supabaseStorageService.saveBook({
+              const databaseId = await supabaseStorageService.saveBook({
                 id: document.id,
                 title: document.name,
                 fileName: file.name,
@@ -227,14 +227,23 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
                 pageTexts, // Include pageTexts for TTS functionality
               })
               
+              // CRITICAL: Update document with database ID if different
+              if (databaseId !== document.id) {
+                console.log('🔄 Updating document ID from', document.id, 'to database ID:', databaseId);
+                document.id = databaseId;
+                const { updateDocument } = useAppStore.getState();
+                updateDocument(document);
+                setUploadedDocumentId(databaseId);
+              }
+              
               logger.info('Document saved to Supabase', context, {
-                documentId: document.id
+                documentId: databaseId
               });
               
               // Try to save to localStorage as backup (optional)
               try {
                 await storageService.saveBook({
-                  id: document.id,
+                  id: databaseId, // Use database ID for consistency
                   title: document.name,
                   fileName: file.name,
                   type: 'pdf',
@@ -245,7 +254,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
                 })
                 
                 logger.info('Document saved to local library (backup)', context, {
-                  documentId: document.id
+                  documentId: databaseId
                 });
               } catch (localStorageError) {
                 // localStorage backup failed, but Supabase succeeded - this is OK
@@ -307,8 +316,8 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
         if (saveToLibrary) {
           await trackPerformance('saveToLibrary', async () => {
             try {
-              // Save to Supabase (primary storage)
-              await supabaseStorageService.saveBook({
+              // Save to Supabase (primary storage) and get the database-generated ID
+              const databaseId = await supabaseStorageService.saveBook({
                 id: document.id,
                 title: document.name,
                 fileName: file.name,
@@ -317,14 +326,23 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
                 fileData: content,
               })
               
+              // CRITICAL: Update document with database ID if different
+              if (databaseId !== document.id) {
+                console.log('🔄 Updating document ID from', document.id, 'to database ID:', databaseId);
+                document.id = databaseId;
+                const { updateDocument } = useAppStore.getState();
+                updateDocument(document);
+                setUploadedDocumentId(databaseId);
+              }
+              
               logger.info('Document saved to Supabase', context, {
-                documentId: document.id
+                documentId: databaseId
               });
               
               // Try to save to localStorage as backup (optional)
               try {
                 await storageService.saveBook({
-                  id: document.id,
+                  id: databaseId, // Use database ID for consistency
                   title: document.name,
                   fileName: file.name,
                   type: 'text',
@@ -333,7 +351,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
                 })
                 
                 logger.info('Document saved to local library (backup)', context, {
-                  documentId: document.id
+                  documentId: databaseId
                 });
               } catch (localStorageError) {
                 // localStorage backup failed, but Supabase succeeded - this is OK
@@ -386,7 +404,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
 
       // Save to library if needed
       if (shouldSave) {
-        await supabaseStorageService.saveBook({
+        const databaseId = await supabaseStorageService.saveBook({
           id: document.id,
           title: document.name,
           fileName: file.name,
@@ -396,6 +414,15 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
           pageTexts: document.pageTexts,
           savedAt: new Date()
         });
+        
+        // CRITICAL: Update document with database ID if different
+        if (databaseId !== document.id) {
+          console.log('🔄 OCR Approve: Updating document ID from', document.id, 'to database ID:', databaseId);
+          document.id = databaseId;
+          const { updateDocument } = useAppStore.getState();
+          updateDocument(document);
+          setUploadedDocumentId(databaseId);
+        }
         
         console.log('DocumentUpload: Calling refreshLibrary() after OCR approval')
         refreshLibrary();
@@ -431,7 +458,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
 
       // Save to library if needed
       if (shouldSave) {
-        await supabaseStorageService.saveBook({
+        const databaseId = await supabaseStorageService.saveBook({
           id: document.id,
           title: document.name,
           fileName: file.name,
@@ -441,6 +468,15 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
           pageTexts: document.pageTexts,
           savedAt: new Date()
         });
+        
+        // CRITICAL: Update document with database ID if different
+        if (databaseId !== document.id) {
+          console.log('🔄 OCR Decline: Updating document ID from', document.id, 'to database ID:', databaseId);
+          document.id = databaseId;
+          const { updateDocument } = useAppStore.getState();
+          updateDocument(document);
+          setUploadedDocumentId(databaseId);
+        }
         
         refreshLibrary();
       }

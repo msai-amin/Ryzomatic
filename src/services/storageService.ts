@@ -214,7 +214,7 @@ class StorageService {
   }
 
   // Books Management
-  async saveBook(book: SavedBook): Promise<void> {
+  async saveBook(book: SavedBook): Promise<string> {
     try {
       // Check if storage is near limit before attempting to save
       if (this.isStorageNearLimit()) {
@@ -313,11 +313,14 @@ class StorageService {
       // Don't throw error for localStorage failures - it's just a backup
       if (error.message.includes('Storage is full') || error.message.includes('quota') || error.name === 'QuotaExceededError') {
         console.warn('localStorage backup failed, but this is not critical if Supabase succeeded');
-        return; // Exit gracefully without throwing
+        return book.id; // Return the provided ID (localStorage doesn't change it)
       } else {
         throw new Error('Failed to save book. Storage may be full.');
       }
     }
+    
+    // Return the book ID (for localStorage, it's the same as provided)
+    return book.id;
   }
 
   getAllBooks(): SavedBook[] {
