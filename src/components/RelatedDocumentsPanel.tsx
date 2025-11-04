@@ -1,9 +1,16 @@
-import React, { useState } from 'react';
-import { FileText, Plus, Eye, Trash2, Loader, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import React, { useState, Suspense, lazy } from 'react';
+import { FileText, Plus, Eye, Trash2, Loader, CheckCircle, AlertCircle, Clock, Network, List } from 'lucide-react';
 import { DocumentRelationshipWithDetails } from '../../lib/supabase';
+import { Document } from '../store/appStore';
 import { Tooltip } from './Tooltip';
 
+// Lazy load the network component for code splitting
+const DocumentRelationshipNetwork = lazy(() => 
+  import('./DocumentRelationshipNetwork').then(module => ({ default: module.DocumentRelationshipNetwork }))
+);
+
 interface RelatedDocumentsPanelProps {
+  currentDocument: Document | null;
   relatedDocuments: DocumentRelationshipWithDetails[];
   isLoading: boolean;
   onAddRelatedDocument: () => void;
@@ -12,6 +19,7 @@ interface RelatedDocumentsPanelProps {
 }
 
 export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
+  currentDocument,
   relatedDocuments,
   isLoading,
   onAddRelatedDocument,
@@ -19,6 +27,7 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
   onDeleteRelationship
 }) => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'graph'>('list');
 
   const getRelevanceColor = (percentage?: number) => {
     if (!percentage) return 'var(--color-text-tertiary)';
@@ -55,6 +64,16 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
     }
   };
 
+  const handleNodeClick = (documentId: string) => {
+    // Find the relationship for this document ID
+    const relationship = relatedDocuments.find(
+      rel => rel.related_document_id === documentId
+    );
+    if (relationship) {
+      onPreviewDocument(relationship);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -83,15 +102,56 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
         <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
           Related Documents
         </h3>
-        <Tooltip content="Add Related Document" position="left">
-          <button
-            onClick={onAddRelatedDocument}
-            className="p-1 rounded transition-colors hover:bg-gray-100"
-            style={{ color: 'var(--color-text-secondary)' }}
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </Tooltip>
+        <div className="flex items-center gap-2">
+          {/* View Toggle */}
+          {relatedDocuments.length > 0 && (
+            <div className="flex items-center gap-1 p-1 rounded border" style={{ borderColor: 'var(--color-border)' }}>
+              <Tooltip content="List View" position="bottom">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-1 rounded transition-colors ${
+                    viewMode === 'list' 
+                      ? 'bg-blue-100' 
+                      : 'hover:bg-gray-100'
+                  }`}
+                  style={{ 
+                    color: viewMode === 'list' 
+                      ? 'var(--color-primary)' 
+                      : 'var(--color-text-secondary)' 
+                  }}
+                >
+                  <List className="w-4 h-4" />
+                </button>
+              </Tooltip>
+              <Tooltip content="Graph View" position="bottom">
+                <button
+                  onClick={() => setViewMode('graph')}
+                  className={`p-1 rounded transition-colors ${
+                    viewMode === 'graph' 
+                      ? 'bg-blue-100' 
+                      : 'hover:bg-gray-100'
+                  }`}
+                  style={{ 
+                    color: viewMode === 'graph' 
+                      ? 'var(--color-primary)' 
+                      : 'var(--color-text-secondary)' 
+                  }}
+                >
+                  <Network className="w-4 h-4" />
+                </button>
+              </Tooltip>
+            </div>
+          )}
+          <Tooltip content="Add Related Document" position="left">
+            <button
+              onClick={onAddRelatedDocument}
+              className="p-1 rounded transition-colors hover:bg-gray-100"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </Tooltip>
+        </div>
       </div>
 
       {/* Document Count */}
@@ -99,7 +159,7 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
         {relatedDocuments.length} related document{relatedDocuments.length !== 1 ? 's' : ''}
       </div>
 
-      {/* Documents List */}
+      {/* Empty State */}
       {relatedDocuments.length === 0 ? (
         <div className="text-center py-6">
           <FileText className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--color-text-tertiary)' }} />
@@ -117,7 +177,8 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
             Add Related Document
           </button>
         </div>
-      ) : (
+      ) : viewMode === 'list' ? (
+        /* List View */
         <div className="space-y-2">
           {relatedDocuments.map((relationship) => (
             <div
@@ -238,6 +299,22 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
             </div>
           ))}
         </div>
+      ) : (
+        /* Graph View */
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-center py-12" style={{ minHeight: 400 }}>
+              <Loader className="w-6 h-6 animate-spin" style={{ color: 'var(--color-primary)' }} />
+            </div>
+          }
+        >
+          <DocumentRelationshipNetwork
+            currentDocument={currentDocument}
+            relatedDocuments={relatedDocuments}
+            onNodeClick={handleNodeClick}
+            height={400}
+          />
+        </Suspense>
       )}
     </div>
   );
