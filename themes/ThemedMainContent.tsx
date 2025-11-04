@@ -86,6 +86,7 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
 
         if (error) {
           console.error('Error creating quick note:', error)
+          alert(`Failed to create note: ${error.message || 'Unknown error'}`)
         } else {
           console.log('Quick note created successfully')
           // Open the sidebar to notes tab
@@ -98,8 +99,9 @@ export const ThemedMainContent: React.FC<ThemedMainContentProps> = ({ children }
             setEditingNote(data)
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Exception creating quick note:', error)
+        alert(`Failed to create note: ${error?.message || 'Unknown error'}`)
       }
     }
 

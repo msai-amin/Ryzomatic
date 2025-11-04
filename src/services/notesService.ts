@@ -1,5 +1,5 @@
 // Notes Service for managing research notes with SQ3R framework
-import { userNotes } from '../../lib/supabase';
+import { userNotes, userBooks, supabase } from '../../lib/supabase';
 import { sendMessageToAI } from './aiService';
 import { Document } from '../store/appStore';
 
@@ -41,6 +41,56 @@ class NotesService {
     position?: { x: number; y: number }
   ): Promise<{ data: NoteWithMetadata | null; error: Error | null }> {
     try {
+      // CRITICAL: Verify book exists in database before creating note
+      // This prevents foreign key constraint violations
+      console.log('🔍 NotesService: Verifying book exists before creating note:', {
+        bookId,
+        userId,
+        pageNumber
+      });
+
+      const { data: bookExists, error: bookError } = await supabase
+        .from('user_books')
+        .select('id, user_id')
+        .eq('id', bookId)
+        .single();
+
+      if (bookError || !bookExists) {
+        console.error('🔍 NotesService: Book lookup failed:', {
+          bookId,
+          userId,
+          error: bookError,
+          errorCode: bookError?.code,
+          errorMessage: bookError?.message,
+          bookExists: !!bookExists
+        });
+
+        const errorMessage = bookError?.message || 'Book does not exist in database';
+        return { 
+          data: null, 
+          error: new Error(`Failed to create note: Book not found. ${errorMessage}. Please ensure the document is saved to your library before creating notes.`) 
+        };
+      }
+
+      // Verify book ownership
+      if (bookExists.user_id !== userId) {
+        console.error('🔍 NotesService: Book ownership mismatch:', {
+          bookId,
+          bookUserId: bookExists.user_id,
+          requestUserId: userId
+        });
+        return { 
+          data: null, 
+          error: new Error('Failed to create note: Access denied. This book belongs to a different user.') 
+        };
+      }
+
+      console.log('✅ NotesService: Book verified, creating note:', {
+        bookId,
+        userId,
+        pageNumber
+      });
+
       const { data, error } = await userNotes.create({
         user_id: userId,
         book_id: bookId,
