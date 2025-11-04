@@ -3829,14 +3829,26 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       )}
 
       {/* Highlight Context Menu */}
-      {highlightContextMenu && (
-        <ContextMenu
-          x={highlightContextMenu.x}
-          y={highlightContextMenu.y}
-          options={createHighlightContextMenuOptions(highlightContextMenu.highlightId)}
-          onClose={() => setHighlightContextMenu(null)}
-        />
-      )}
+      {highlightContextMenu && (() => {
+        // Create options lazily when menu is actually rendered
+        const options: ContextMenuOption[] = [
+          {
+            label: 'Delete Highlight',
+            icon: <Trash2 className="w-4 h-4" style={{ color: '#ef4444' }} />,
+            onClick: () => removeHighlight(highlightContextMenu.highlightId),
+            className: 'text-red-500'
+          }
+        ];
+        
+        return (
+          <ContextMenu
+            x={highlightContextMenu.x}
+            y={highlightContextMenu.y}
+            options={options}
+            onClose={() => setHighlightContextMenu(null)}
+          />
+        );
+      })()}
 
       {/* Notes Panel */}
       <NotesPanel
