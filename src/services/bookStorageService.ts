@@ -90,6 +90,11 @@ export class BookStorageService {
         
         // Fallback to API endpoint if Supabase Storage fails (uses full s3Key with 'books/' prefix)
         try {
+          logger.info('Attempting API fallback for upload', context, {
+            s3Key,
+            userId: metadata.userId
+          });
+
           const urlResponse = await fetch('/api/books', {
             method: 'POST',
             headers: {
@@ -104,10 +109,18 @@ export class BookStorageService {
           });
 
           if (!urlResponse.ok) {
-            throw new Error('API fallback failed');
+            const errorText = await urlResponse.text();
+            logger.error('API fallback failed', context, new Error(`HTTP ${urlResponse.status}: ${errorText}`));
+            throw new Error(`API fallback failed: HTTP ${urlResponse.status} ${urlResponse.statusText}. ${errorText}`);
           }
 
-          const { uploadUrl } = await urlResponse.json();
+          const responseData = await urlResponse.json();
+          if (!responseData.uploadUrl) {
+            logger.error('API response missing uploadUrl', context, undefined, { responseData });
+            throw new Error('API response missing uploadUrl');
+          }
+
+          const { uploadUrl } = responseData;
           const uploadResponse = await fetch(uploadUrl, {
             method: 'PUT',
             headers: {

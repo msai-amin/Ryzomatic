@@ -43,6 +43,16 @@ interface BookRequest {
  * - CHECK_EXISTS: Verifies file existence
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Enable CORS
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -50,14 +60,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { operation, s3Key, userId, expiresIn = 3600, contentType, fileData, metadata } = req.body as BookRequest;
 
+    console.log('[Books API] Request received:', { operation, s3Key, userId, hasFileData: !!fileData });
+
     // Validate required fields
     if (!operation || !s3Key || !userId) {
+      console.error('[Books API] Missing required fields:', { operation, hasS3Key: !!s3Key, hasUserId: !!userId });
       return res.status(400).json({ error: 'Missing required fields: operation, s3Key, userId' });
     }
 
     // Verify ownership from s3Key pattern (books/{userId}/{bookId}.pdf)
     const keyParts = s3Key.split('/');
     if (keyParts.length !== 3 || keyParts[0] !== 'books' || keyParts[1] !== userId) {
+      console.error('[Books API] Invalid s3Key ownership:', { s3Key, userId, keyParts });
       return res.status(403).json({ error: 'Access denied: Invalid s3Key ownership' });
     }
 
@@ -79,11 +93,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return await handleCheckExists(res, s3Key);
 
       default:
+        console.error('[Books API] Unknown operation:', operation);
         return res.status(400).json({ error: `Unknown operation: ${operation}` });
     }
 
   } catch (error: any) {
-    console.error('Books API error:', error);
+    console.error('[Books API] Error:', error);
     return res.status(500).json({ 
       error: 'Book operation failed',
       message: error.message 
