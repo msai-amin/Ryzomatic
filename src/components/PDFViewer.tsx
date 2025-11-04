@@ -771,9 +771,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 span.style.letterSpacing = `${item.charSpacing}px`
               }
               
-              // Ensure proper text selection behavior
+              // CRITICAL: Ensure proper text selection behavior
               span.style.userSelect = 'text'
               span.style.cursor = 'text'
+              span.style.pointerEvents = 'auto' // Explicitly enable pointer events for selection
               
               // Enable sub-pixel rendering (only if no transform exists to avoid conflicts)
               if (!span.style.transform || span.style.transform === 'none') {
@@ -790,9 +791,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             
             textLayerRef.current.appendChild(textLayerFrag)
             
-            // CRITICAL: Make text layer visible immediately after rendering
+            // CRITICAL: Make text layer visible and interactive immediately after rendering
             // Don't wait for pageRendered state to change
             textLayerRef.current.style.opacity = '1'
+            textLayerRef.current.style.pointerEvents = 'auto'
+            textLayerRef.current.style.userSelect = 'text'
             
             console.log('📝 Text layer rendered with improved alignment:', {
               textElements: textDivs.length,
@@ -1121,9 +1124,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 span.style.letterSpacing = `${item.charSpacing * scaleX}px`
               }
               
-              // Ensure proper text selection behavior
+              // CRITICAL: Ensure proper text selection behavior
               span.style.userSelect = 'text'
               span.style.cursor = 'text'
+              span.style.pointerEvents = 'auto' // Explicitly enable pointer events for selection
               
               // Enable sub-pixel rendering (same as single page mode)
               if (!span.style.transform || span.style.transform === 'none') {
@@ -1187,11 +1191,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     }
   }, [pdfViewer.scrollMode, numPages])
 
-  // Ensure text layer is visible when pageRendered changes
+  // Ensure text layer is visible and interactive when pageRendered changes
   useEffect(() => {
     if (pageRendered && textLayerRef.current) {
       textLayerRef.current.style.opacity = '1'
-      console.log('🔍 Ensuring text layer visibility after pageRendered change')
+      textLayerRef.current.style.pointerEvents = 'auto'
+      textLayerRef.current.style.userSelect = 'text'
+      console.log('🔍 Ensuring text layer visibility and interactivity after pageRendered change')
     }
   }, [pageRendered])
 
