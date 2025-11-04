@@ -2362,19 +2362,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     }
   }, [selectedHighlightId, lastCreatedHighlightId])
 
-  // Create highlight context menu options
-  // Use the same pattern as createAIContextMenuOptions - inline JSX in returned array
-  const createHighlightContextMenuOptions = useCallback((highlightId: string): ContextMenuOption[] => {
-    return [
-      {
-        label: 'Delete Highlight',
-        icon: <Trash2 className="w-4 h-4" style={{ color: '#ef4444' }} />,
-        onClick: () => removeHighlight(highlightId),
-        className: 'text-red-500'
-      }
-    ];
-  }, [removeHighlight])
-
   // Mark highlights as orphaned when page text is edited
   const markPageHighlightsOrphaned = useCallback(async (pageNum: number) => {
     try {
