@@ -395,26 +395,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     }
   }, [selectedHighlightId, lastCreatedHighlightId])
 
-  // CRITICAL: Apply CSS transform to container(s) when zoom changes
-  // This avoids re-rendering the text layer and keeps selection aligned
+  // CRITICAL: Re-render text layer when zoom/scale changes to maintain alignment
+  // Must be after refs are defined to avoid initialization errors
   useEffect(() => {
-    if (pdfViewer.readingMode) return
-    
-    // Single page mode: apply transform to pageContainerRef
-    if (pageContainerRef.current && pdfViewer.scrollMode === 'single') {
-      pageContainerRef.current.style.transform = `scale(${pdfViewer.zoom})`
-      pageContainerRef.current.style.transformOrigin = '0 0'
+    if (pdfDocRef.current && pageNumber && !pdfViewer.readingMode && !isLoading) {
+      // Force re-render of current page when zoom changes
+      // This ensures text layer stays aligned with canvas at new zoom level
+      setPageRendered(false)
     }
-    
-    // Continuous mode: apply transform to all page containers
-    if (pdfViewer.scrollMode === 'continuous') {
-      const pageContainers = window.document.querySelectorAll<HTMLElement>('[data-page-number]')
-      pageContainers.forEach((container) => {
-        container.style.transform = `scale(${pdfViewer.zoom})`
-        container.style.transformOrigin = '0 0'
-      })
-    }
-  }, [pdfViewer.zoom, pdfViewer.readingMode, pdfViewer.scrollMode])
+  }, [pdfViewer.zoom, pageNumber, pdfViewer.readingMode, isLoading])
 
   // Load PDF document
   useEffect(() => {
@@ -585,10 +574,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           return
         }
 
-        // CSS TRANSFORM APPROACH: Render at base scale 1.0, use CSS transform for zoom
-        // This ensures text layer and canvas stay perfectly aligned during zoom
-        const baseScale = 1.0
-        const viewport = page.getViewport({ scale: baseScale, rotation })
+        const viewport = page.getViewport({ scale, rotation })
         
         // High-DPI display support for crisp rendering
         const dpr = window.devicePixelRatio || 1
@@ -626,20 +612,44 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         console.log('✅ Canvas rendered successfully')
 
           // Render text layer for selection using the SAME viewport
-          // CSS TRANSFORM APPROACH: Text layer inherits transform from container
-          // No need to apply transform here - the container's CSS transform handles zoom
+          // CRITICAL: This text layer must be perfectly aligned with the canvas
+          // Any changes to positioning, sizing, or transforms will break selection accuracy
           if (textLayerRef.current) {
             textLayerRef.current.innerHTML = ''
             
-            // Set text layer container size to match canvas exactly
-            // Transform is applied by the parent container, so we just set base dimensions
-            textLayerRef.current.style.width = viewport.width + 'px'
-            textLayerRef.current.style.height = viewport.height + 'px'
-            textLayerRef.current.style.position = 'absolute'
-            textLayerRef.current.style.top = '0'
-            textLayerRef.current.style.left = '0'
-            textLayerRef.current.style.transformOrigin = '0 0'
-            textLayerRef.current.style.transform = 'none' // No transform - container handles it
+            // CRITICAL: Match canvas container's positioning and transform exactly
+            // Get the canvas container to ensure same coordinate system
+            const canvasContainer = canvasRef.current?.parentElement
+            if (canvasContainer) {
+              const containerStyles = window.getComputedStyle(canvasContainer)
+              
+              // Match container's transform if present
+              const transform = containerStyles.transform
+              const transformOrigin = containerStyles.transformOrigin || '0 0'
+              
+              // Set text layer container size to match canvas exactly
+              textLayerRef.current.style.width = viewport.width + 'px'
+              textLayerRef.current.style.height = viewport.height + 'px'
+              textLayerRef.current.style.position = 'absolute'
+              textLayerRef.current.style.top = '0'
+              textLayerRef.current.style.left = '0'
+              textLayerRef.current.style.transformOrigin = transformOrigin
+              
+              // Apply same transform as canvas container if any
+              if (transform && transform !== 'none') {
+                textLayerRef.current.style.transform = transform
+              } else {
+                textLayerRef.current.style.transform = 'none'
+              }
+            } else {
+              // Fallback: basic positioning if container not found
+              textLayerRef.current.style.width = viewport.width + 'px'
+              textLayerRef.current.style.height = viewport.height + 'px'
+              textLayerRef.current.style.position = 'absolute'
+              textLayerRef.current.style.top = '0'
+              textLayerRef.current.style.left = '0'
+              textLayerRef.current.style.transformOrigin = '0 0'
+            }
             const textContent = await page.getTextContent()
             
             // Manual text layer rendering with proper viewport synchronization
@@ -929,9 +939,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           
           if (!context) continue
 
-          // CSS TRANSFORM APPROACH: Render at base scale 1.0, use CSS transform for zoom
-          const baseScale = 1.0
-          const viewport = page.getViewport({ scale: baseScale, rotation })
+          const viewport = page.getViewport({ scale, rotation })
           
           // High-DPI display support for crisp rendering
           const dpr = window.devicePixelRatio || 1
@@ -957,20 +965,44 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           await page.render(renderContext).promise
           
           // Render text layer for selection using the SAME viewport
-          // CSS TRANSFORM APPROACH: Text layer inherits transform from container
-          // No need to apply transform here - the container's CSS transform handles zoom
+          // CRITICAL: This text layer must be perfectly aligned with the canvas
+          // Any changes to positioning, sizing, or transforms will break selection accuracy
           if (textLayerDiv) {
             textLayerDiv.innerHTML = ''
             
-            // Set text layer container size to match canvas exactly
-            // Transform is applied by the parent container, so we just set base dimensions
-            textLayerDiv.style.width = viewport.width + 'px'
-            textLayerDiv.style.height = viewport.height + 'px'
-            textLayerDiv.style.position = 'absolute'
-            textLayerDiv.style.top = '0'
-            textLayerDiv.style.left = '0'
-            textLayerDiv.style.transformOrigin = '0 0'
-            textLayerDiv.style.transform = 'none' // No transform - container handles it
+            // CRITICAL: Match canvas container's positioning and transform exactly
+            // Get the page container (parent of canvas and textLayer)
+            const pageContainer = canvas.parentElement
+            if (pageContainer) {
+              const containerStyles = window.getComputedStyle(pageContainer)
+              
+              // Match container's transform if present
+              const transform = containerStyles.transform
+              const transformOrigin = containerStyles.transformOrigin || '0 0'
+              
+              // Set text layer container size to match canvas exactly
+              textLayerDiv.style.width = viewport.width + 'px'
+              textLayerDiv.style.height = viewport.height + 'px'
+              textLayerDiv.style.position = 'absolute'
+              textLayerDiv.style.top = '0'
+              textLayerDiv.style.left = '0'
+              textLayerDiv.style.transformOrigin = transformOrigin
+              
+              // Apply same transform as container if any
+              if (transform && transform !== 'none') {
+                textLayerDiv.style.transform = transform
+              } else {
+                textLayerDiv.style.transform = 'none'
+              }
+            } else {
+              // Fallback: basic positioning if container not found
+              textLayerDiv.style.width = viewport.width + 'px'
+              textLayerDiv.style.height = viewport.height + 'px'
+              textLayerDiv.style.position = 'absolute'
+              textLayerDiv.style.top = '0'
+              textLayerDiv.style.left = '0'
+              textLayerDiv.style.transformOrigin = '0 0'
+            }
             const textContent = await page.getTextContent()
             
             // Manual text layer rendering with proper viewport synchronization
@@ -3814,14 +3846,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   {highlights
                     .filter(h => h.page_number === pageNum)
                     .map(highlight => {
-                      // CSS TRANSFORM APPROACH: Render at base scale 1.0, container transform handles zoom
-                      // Positions are stored normalized at scale 1.0, so render directly without scaling
-                      const baseScale = 1.0
+                      // ROBUST SCALING: Scale positions by current scale (positions are stored normalized at scale 1.0)
+                      // Add safeguards to prevent invalid scale values
+                      const safeScale = Math.max(scale, 0.1)
                       const scaledPosition = {
-                        x: highlight.position_data.x * baseScale,
-                        y: highlight.position_data.y * baseScale,
-                        width: highlight.position_data.width * baseScale,
-                        height: highlight.position_data.height * baseScale
+                        x: highlight.position_data.x * safeScale,
+                        y: highlight.position_data.y * safeScale,
+                        width: highlight.position_data.width * safeScale,
+                        height: highlight.position_data.height * safeScale
                       }
                       
                       return (
@@ -3915,14 +3947,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               {highlights
                 .filter(h => h.page_number === pageNumber)
                 .map(highlight => {
-                  // CSS TRANSFORM APPROACH: Render at base scale 1.0, container transform handles zoom
-                  // Positions are stored normalized at scale 1.0, so render directly without scaling
-                  const baseScale = 1.0
+                  // ROBUST SCALING: Scale positions by current scale (positions are stored normalized at scale 1.0)
+                  // Add safeguards to prevent invalid scale values
+                  const safeScale = Math.max(scale, 0.1)
                   const scaledPosition = {
-                    x: highlight.position_data.x * baseScale,
-                    y: highlight.position_data.y * baseScale,
-                    width: highlight.position_data.width * baseScale,
-                    height: highlight.position_data.height * baseScale
+                    x: highlight.position_data.x * safeScale,
+                    y: highlight.position_data.y * safeScale,
+                    width: highlight.position_data.width * safeScale,
+                    height: highlight.position_data.height * safeScale
                   }
                   
                   return (
