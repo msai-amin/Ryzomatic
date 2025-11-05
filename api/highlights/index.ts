@@ -119,7 +119,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         textStartOffset,
         textEndOffset,
         textContextBefore,
-        textContextAfter
+        textContextAfter,
+        textAnchors
       } = req.body
 
       console.log('🔍 Highlight API received request:', {
@@ -206,7 +207,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           text_start_offset: textStartOffset,
           text_end_offset: textEndOffset,
           text_context_before: textContextBefore,
-          text_context_after: textContextAfter
+          text_context_after: textContextAfter,
+          text_anchors: textAnchors || null
         })
         .select()
         .single()

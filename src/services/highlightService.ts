@@ -12,6 +12,12 @@ export interface HighlightPosition {
   height: number;
 }
 
+export interface TextAnchors {
+  startIndex?: number;
+  endIndex?: number;
+  itemIds?: number[];
+}
+
 export interface Highlight {
   id: string;
   user_id: string;
@@ -25,6 +31,7 @@ export interface Highlight {
   text_end_offset?: number;
   text_context_before?: string;
   text_context_after?: string;
+  text_anchors?: TextAnchors;
   is_orphaned: boolean;
   orphaned_reason?: string;
   created_at: string;
@@ -42,6 +49,7 @@ export interface CreateHighlightData {
   textEndOffset?: number;
   textContextBefore?: string;
   textContextAfter?: string;
+  textAnchors?: TextAnchors;
 }
 
 export interface UpdateHighlightData {
@@ -108,6 +116,7 @@ class HighlightService {
           textEndOffset: data.textEndOffset,
           textContextBefore: data.textContextBefore,
           textContextAfter: data.textContextAfter,
+          textAnchors: data.textAnchors,
         }),
       });
 
@@ -378,6 +387,80 @@ class HighlightService {
       return null;
     } catch (error) {
       console.error('Error attempting rematch:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Recalculate highlight position from text anchors (fallback when coordinates fail)
+   * This uses PDF.js text item IDs to locate the text and calculate bounding box
+   */
+  async recalculatePositionFromTextAnchors(
+    pdfDoc: any,
+    pageNumber: number,
+    highlight: Highlight,
+    viewport: any
+  ): Promise<HighlightPosition | null> {
+    if (!highlight.text_anchors || !highlight.text_anchors.itemIds || highlight.text_anchors.itemIds.length === 0) {
+      return null;
+    }
+
+    try {
+      const page = await pdfDoc.getPage(pageNumber);
+      const textContent = await page.getTextContent();
+      
+      const itemIds = highlight.text_anchors.itemIds;
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+      
+      // Calculate bounding box from text items
+      for (const itemId of itemIds) {
+        if (itemId >= 0 && itemId < textContent.items.length) {
+          const item = textContent.items[itemId] as any;
+          const tx = item.transform;
+          
+          if (tx && tx.length >= 6) {
+            // Transform PDF coordinates to viewport coordinates
+            const pdfX = tx[4];
+            const pdfY = tx[5];
+            const fontSizePDF = Math.abs(tx[3]) || 12;
+            
+            // Convert to viewport coordinates
+            const viewportTransform = viewport.transform || [1, 0, 0, 1, 0, 0];
+            const scaleX = viewportTransform[0] || 1;
+            const scaleY = viewportTransform[3] || 1;
+            
+            const x = pdfX * scaleX;
+            const y = pdfY * scaleY;
+            const fontSize = fontSizePDF * scaleY;
+            
+            // Calculate item width (approximate)
+            const itemWidth = item.width ? item.width * scaleX : item.str.length * fontSize * 0.6;
+            const itemHeight = fontSize;
+            
+            // Update bounding box
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x + itemWidth);
+            minY = Math.min(minY, viewport.height - y - itemHeight);
+            maxY = Math.max(maxY, viewport.height - y);
+          }
+        }
+      }
+      
+      if (minX !== Infinity && maxX !== -Infinity && minY !== Infinity && maxY !== -Infinity) {
+        return {
+          x: minX,
+          y: minY,
+          width: maxX - minX,
+          height: maxY - minY
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error recalculating position from text anchors:', error);
       return null;
     }
   }

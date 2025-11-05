@@ -2,6 +2,12 @@ import { create } from 'zustand'
 import { authService, AuthUser } from '../services/supabaseAuthService'
 import { DocumentRelationshipWithDetails } from '../../lib/supabase'
 
+export interface TextAnchors {
+  startIndex?: number
+  endIndex?: number
+  itemIds?: number[]
+}
+
 export interface Highlight {
   id: string
   user_id: string
@@ -20,6 +26,7 @@ export interface Highlight {
   text_end_offset?: number
   text_context_before?: string
   text_context_after?: string
+  text_anchors?: TextAnchors
   is_orphaned: boolean
   orphaned_reason?: string
   created_at: string
