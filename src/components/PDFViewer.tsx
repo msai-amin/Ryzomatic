@@ -714,11 +714,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 span.style.whiteSpace = 'pre'
                 span.style.overflow = 'hidden'
                 
-                // Calculate width
+                // Calculate width - ensure minimum width for clickability
                 let spanWidth = item.width ? item.width * scaleX : 0
                 if (!spanWidth || spanWidth <= 0) {
                   const avgCharWidth = fontSize * 0.6
                   spanWidth = item.str.length * avgCharWidth
+                }
+                // Ensure minimum width for empty or very short strings
+                if (spanWidth < 1) {
+                  spanWidth = fontSize * 0.5
                 }
                 
                 // Apply horizontal scaling
@@ -731,29 +735,28 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   span.style.width = `${spanWidth}px`
                 }
                 
+                // Ensure minimum height for clickability
+                span.style.minHeight = `${fontSize}px`
+                span.style.minWidth = `${Math.max(spanWidth, 1)}px`
+                
                 // Character spacing
                 if (item.charSpacing !== undefined && item.charSpacing !== 0) {
-                  span.style.letterSpacing = `${item.charSpacing}px`
+                  span.style.letterSpacing = `${item.charSpacing * scaleX}px`
                 }
                 
-                // Text selection behavior
+                // CRITICAL: Text selection behavior - must be set before appending
+                span.style.color = 'transparent' // Invisible but selectable
                 span.style.userSelect = 'text'
                 span.style.setProperty('-webkit-user-select', 'text', 'important')
                 span.style.setProperty('-moz-user-select', 'text', 'important')
                 span.style.setProperty('-ms-user-select', 'text', 'important')
                 span.style.cursor = 'text'
                 span.style.pointerEvents = 'auto'
+                span.style.setProperty('pointer-events', 'auto', 'important')
+                span.style.display = 'inline-block'
                 
                 // Store data attribute for text anchor mapping
                 span.setAttribute('data-text-index', String(index))
-                
-                // Enable sub-pixel rendering
-                if (!span.style.transform || span.style.transform === 'none') {
-                  span.style.transform = 'translateZ(0)'
-                } else {
-                  span.style.transform = `${span.style.transform} translateZ(0)`
-                }
-                span.style.willChange = 'transform'
                 
                 textDivs.push(span)
                 textLayerFrag.appendChild(span)
