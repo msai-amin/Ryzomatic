@@ -761,23 +761,30 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               
               textLayerRef.current.appendChild(textLayerFrag)
               
-              // Make text layer visible and interactive
+              // Make text layer visible and interactive - CRITICAL for selection
               textLayerRef.current.style.setProperty('opacity', '1', 'important')
               textLayerRef.current.style.setProperty('pointer-events', 'auto', 'important')
               textLayerRef.current.style.setProperty('user-select', 'text', 'important')
               textLayerRef.current.style.setProperty('visibility', 'visible', 'important')
+              textLayerRef.current.style.setProperty('z-index', '2', 'important')
+              textLayerRef.current.style.setProperty('position', 'absolute', 'important')
               
-              // Ensure all spans are interactive
-              const spans = textLayerRef.current.querySelectorAll('span')
-              spans.forEach(span => {
-                if (span instanceof HTMLElement && span.style) {
-                  span.style.setProperty('pointer-events', 'auto', 'important')
-                  span.style.setProperty('user-select', 'text', 'important')
-                  span.style.setProperty('-webkit-user-select', 'text', 'important')
-                  span.style.setProperty('-moz-user-select', 'text', 'important')
-                  span.style.setProperty('-ms-user-select', 'text', 'important')
+              // Ensure all spans are interactive - double check after DOM insertion
+              setTimeout(() => {
+                const spans = textLayerRef.current?.querySelectorAll('span')
+                if (spans) {
+                  spans.forEach(span => {
+                    if (span instanceof HTMLElement && span.style) {
+                      span.style.setProperty('pointer-events', 'auto', 'important')
+                      span.style.setProperty('user-select', 'text', 'important')
+                      span.style.setProperty('-webkit-user-select', 'text', 'important')
+                      span.style.setProperty('-moz-user-select', 'text', 'important')
+                      span.style.setProperty('-ms-user-select', 'text', 'important')
+                      span.style.setProperty('color', 'transparent', 'important')
+                    }
+                  })
                 }
-              })
+              }, 0)
               
               console.log('📝 Text layer rendered manually:', {
                 textElements: textContent.items.length,
@@ -1061,11 +1068,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 span.style.whiteSpace = 'pre'
                 span.style.overflow = 'hidden'
                 
-                // Calculate width
+                // Calculate width - ensure minimum width for clickability
                 let spanWidth = item.width ? item.width * scaleX : 0
                 if (!spanWidth || spanWidth <= 0) {
                   const avgCharWidth = fontSize * 0.6
                   spanWidth = item.str.length * avgCharWidth
+                }
+                // Ensure minimum width for empty or very short strings
+                if (spanWidth < 1) {
+                  spanWidth = fontSize * 0.5
                 }
                 
                 // Apply horizontal scaling
@@ -1078,54 +1089,58 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   span.style.width = `${spanWidth}px`
                 }
                 
+                // Ensure minimum height for clickability
+                span.style.minHeight = `${fontSize}px`
+                span.style.minWidth = `${Math.max(spanWidth, 1)}px`
+                
                 // Character spacing
                 if (item.charSpacing !== undefined && item.charSpacing !== 0) {
                   span.style.letterSpacing = `${item.charSpacing * scaleX}px`
                 }
                 
-                // Text selection behavior
+                // CRITICAL: Text selection behavior - must be set before appending
+                span.style.color = 'transparent' // Invisible but selectable
                 span.style.userSelect = 'text'
                 span.style.setProperty('-webkit-user-select', 'text', 'important')
                 span.style.setProperty('-moz-user-select', 'text', 'important')
                 span.style.setProperty('-ms-user-select', 'text', 'important')
                 span.style.cursor = 'text'
                 span.style.pointerEvents = 'auto'
+                span.style.setProperty('pointer-events', 'auto', 'important')
+                span.style.display = 'inline-block'
                 
                 // Store data attribute for text anchor mapping
                 span.setAttribute('data-text-index', String(index))
-                
-                // Enable sub-pixel rendering
-                if (!span.style.transform || span.style.transform === 'none') {
-                  span.style.transform = 'translateZ(0)'
-                } else {
-                  span.style.transform = `${span.style.transform} translateZ(0)`
-                }
-                span.style.willChange = 'transform'
                 
                 textLayerFrag.appendChild(span)
               })
               
               textLayerDiv.appendChild(textLayerFrag)
               
-              // Make text layer visible and interactive
+              // Make text layer visible and interactive - CRITICAL for selection
               textLayerDiv.style.setProperty('opacity', '1', 'important')
               textLayerDiv.style.setProperty('pointer-events', 'auto', 'important')
               textLayerDiv.style.setProperty('user-select', 'text', 'important')
               textLayerDiv.style.setProperty('-webkit-user-select', 'text', 'important')
               textLayerDiv.style.setProperty('-moz-user-select', 'text', 'important')
               textLayerDiv.style.setProperty('-ms-user-select', 'text', 'important')
+              textLayerDiv.style.setProperty('z-index', '2', 'important')
+              textLayerDiv.style.setProperty('position', 'absolute', 'important')
               
-              // Also ensure all spans in this layer are selectable
-              const spans = textLayerDiv.querySelectorAll('span')
-              spans.forEach(span => {
-                if (span instanceof HTMLElement && span.style) {
-                  span.style.setProperty('pointer-events', 'auto', 'important')
-                  span.style.setProperty('user-select', 'text', 'important')
-                  span.style.setProperty('-webkit-user-select', 'text', 'important')
-                  span.style.setProperty('-moz-user-select', 'text', 'important')
-                  span.style.setProperty('-ms-user-select', 'text', 'important')
-                }
-              })
+              // Also ensure all spans in this layer are selectable - double check after DOM insertion
+              setTimeout(() => {
+                const spans = textLayerDiv.querySelectorAll('span')
+                spans.forEach(span => {
+                  if (span instanceof HTMLElement && span.style) {
+                    span.style.setProperty('pointer-events', 'auto', 'important')
+                    span.style.setProperty('user-select', 'text', 'important')
+                    span.style.setProperty('-webkit-user-select', 'text', 'important')
+                    span.style.setProperty('-moz-user-select', 'text', 'important')
+                    span.style.setProperty('-ms-user-select', 'text', 'important')
+                    span.style.setProperty('color', 'transparent', 'important')
+                  }
+                })
+              }, 0)
               
               console.log(`📝 Text layer rendered manually for page ${pageNum}:`, {
                 textElements: textContent.items.length,
@@ -4057,7 +4072,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 );
               })()}
               
-              <canvas ref={canvasRef} className="block" style={{ opacity: pageRendered ? 1 : 0 }} />
+              <canvas ref={canvasRef} className="block" style={{ opacity: pageRendered ? 1 : 0, position: 'relative', zIndex: 1 }} />
               <div
                 ref={textLayerRef}
                 className="textLayer"
@@ -4068,7 +4083,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   WebkitUserSelect: 'text',
                   MozUserSelect: 'text',
                   msUserSelect: 'text',
-                  visibility: 'visible' // Ensure visible
+                  visibility: 'visible', // Ensure visible
+                  position: 'absolute',
+                  zIndex: 2, // Above canvas
+                  top: 0,
+                  left: 0
                 }}
               />
               <div
