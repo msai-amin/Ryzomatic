@@ -3867,17 +3867,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                         height: `${scaledPosition.height}px`,
                         backgroundColor: highlight.color_hex,
                         opacity: highlight.is_orphaned ? 0.2 : 0.4,
-                        pointerEvents: 'auto',
+                        pointerEvents: 'none', // Allow text selection underneath
                         border: selectedHighlightId === highlight.id ? '2px solid #3B82F6' : (highlight.is_orphaned ? '2px dashed #999' : 'none'),
                         zIndex: 3,
                         transformOrigin: '0 0', // Match text layer transform origin
-                        cursor: 'pointer',
                       }}
                       title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setSelectedHighlightId(highlight.id)
-                      }}
                         >
                           {highlight.is_orphaned && (
                             <div className="absolute -top-3 -left-1 bg-yellow-500 text-white text-xs px-1 rounded z-10">
@@ -3940,7 +3935,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               <div
                 ref={textLayerRef}
                 className="textLayer"
-                style={{ opacity: pageRendered ? 1 : 0 }}
+                style={{ 
+                  opacity: pageRendered ? 1 : 0,
+                  pointerEvents: pageRendered ? 'auto' : 'none',
+                  userSelect: 'text',
+                  WebkitUserSelect: 'text'
+                }}
               />
               
               {/* Render highlights */}
@@ -3968,7 +3968,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                         height: `${scaledPosition.height}px`,
                         backgroundColor: highlight.color_hex,
                         opacity: highlight.is_orphaned ? 0.2 : 0.4,
-                        pointerEvents: 'auto',
+                        pointerEvents: 'none', // Allow text selection underneath
                         border: highlight.is_orphaned ? '2px dashed #999' : 'none',
                         zIndex: 3,
                         // Enable sub-pixel rendering for better alignment
@@ -3978,7 +3978,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                         backfaceVisibility: 'hidden',
                         // Ensure pixel-perfect positioning
                         boxSizing: 'border-box',
-                        cursor: 'pointer',
                       }}
                       title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
                     >
