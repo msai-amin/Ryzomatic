@@ -3218,7 +3218,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             </div>
           ) : pdfViewer.scrollMode === 'continuous' ? (
             // Continuous scroll mode - render all pages
-            <div className="mx-auto px-8 py-12" style={{ maxWidth: `${typography.maxWidth}px` }}>
+            <div className="mx-auto px-8 py-12" style={{ maxWidth: `${typography.maxWidth}px`, userSelect: 'text', WebkitUserSelect: 'text' }}>
               {numPages && Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => {
                 // If editing a page, only show that page
                 if (editingPageNum !== null && editingPageNum !== pageNum) {
@@ -3226,7 +3226,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 }
                 
                 return (
-                  <div key={pageNum} className="mb-16 last:mb-0" data-page-number={pageNum}>
+                  <div 
+                    key={pageNum} 
+                    className="mb-16 last:mb-0" 
+                    data-page-number={pageNum}
+                    style={{ userSelect: 'text', WebkitUserSelect: 'text' }}
+                  >
                     {/* Page number indicator with edit icon */}
                     <div className="flex items-center justify-center gap-3 mb-4">
                       <div className={`text-sm ${themeStyles.text} opacity-50`}>
@@ -3857,7 +3862,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   data-page-number={pageNum} 
                   style={{ 
                     minHeight: '600px', 
-                    minWidth: '400px'
+                    minWidth: '400px',
+                    userSelect: 'text',
+                    WebkitUserSelect: 'text'
                   }}
                   onContextMenu={handleContextMenuClick}
                 >
@@ -3936,7 +3943,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             <div 
               ref={pageContainerRef} 
               className="relative bg-white shadow-2xl" 
-              style={{ minHeight: '600px', minWidth: '400px' }}
+              style={{ 
+                minHeight: '600px', 
+                minWidth: '400px',
+                userSelect: 'text',
+                WebkitUserSelect: 'text'
+              }}
               onContextMenu={handleContextMenuClick}
             >
               {/* Loading indicator */}
