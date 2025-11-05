@@ -801,8 +801,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             // Ensure all spans are also interactive
             const spans = textLayerRef.current.querySelectorAll('span')
             spans.forEach(span => {
-              (span as HTMLElement).style.setProperty('pointer-events', 'auto', 'important')
-              (span as HTMLElement).style.setProperty('user-select', 'text', 'important')
+              if (span instanceof HTMLElement && span.style) {
+                span.style.setProperty('pointer-events', 'auto', 'important')
+                span.style.setProperty('user-select', 'text', 'important')
+              }
             })
             
             console.log('📝 Text layer rendered with improved alignment:', {
@@ -1216,8 +1218,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       // Ensure all spans are also interactive
       const spans = textLayerRef.current.querySelectorAll('span')
       spans.forEach(span => {
-        (span as HTMLElement).style.setProperty('pointer-events', 'auto', 'important')
-        (span as HTMLElement).style.setProperty('user-select', 'text', 'important')
+        if (span instanceof HTMLElement && span.style) {
+          span.style.setProperty('pointer-events', 'auto', 'important')
+          span.style.setProperty('user-select', 'text', 'important')
+        }
       })
       
       console.log('🔍 Ensuring text layer visibility and interactivity:', {
