@@ -615,19 +615,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         
         console.log('✅ Canvas rendered successfully')
 
-          // Render text layer using PDF.js built-in TextLayer class
+          // Render text layer using manual rendering (PDF.js TextLayer not available in 5.4)
+          // TODO: When PDF.js TextLayer API is available, use it as primary method
           if (textLayerRef.current) {
             try {
-              // Import PDF.js viewer classes dynamically
-              const pdfjsViewer = await import('pdfjs-dist/web/pdf_viewer')
-              
-              // Check if TextLayer is available and is a constructor
-              const TextLayer = pdfjsViewer.TextLayer || (pdfjsViewer as any).default?.TextLayer
-              
-              if (!TextLayer || typeof TextLayer !== 'function') {
-                throw new Error('TextLayer not found or not a constructor')
-              }
-              
               textLayerRef.current.innerHTML = ''
               
               // Match canvas container's positioning and transform exactly
@@ -660,34 +651,115 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               
               const textContent = await page.getTextContent()
               
-              // Use PDF.js renderTextLayer function if available, otherwise try constructor
-              if (pdfjsViewer.renderTextLayer && typeof pdfjsViewer.renderTextLayer === 'function') {
-                // Use renderTextLayer function (older API)
-                await pdfjsViewer.renderTextLayer({
-                  textContentSource: textContent,
-                  container: textLayerRef.current,
-                  viewport: viewport,
-                  textDivs: []
-                })
-              } else {
-                // Try using TextLayer as a class
-                const textLayer = new TextLayer({
-                  textContentSource: textContent,
-                  container: textLayerRef.current,
-                  viewport: viewport,
-                  textDivs: []
-                })
-                
-                // Store instance for potential cleanup
-                textLayerInstances.current.set(pageNumber, textLayer)
-                
-                // Render text layer
-                if (textLayer.render && typeof textLayer.render === 'function') {
-                  await textLayer.render()
-                } else {
-                  throw new Error('TextLayer.render is not a function')
-                }
+              // Manual text layer rendering with proper viewport synchronization
+              const textLayerFrag = window.document.createDocumentFragment()
+              const textDivs: HTMLSpanElement[] = []
+              
+              // Font family mapping for better PDF font matching
+              const fontMap: Record<string, string> = {
+                'Times-Roman': 'Times, "Times New Roman", serif',
+                'Times-Bold': 'Times, "Times New Roman", serif',
+                'Times-Italic': 'Times, "Times New Roman", serif',
+                'Times-BoldItalic': 'Times, "Times New Roman", serif',
+                'Helvetica': 'Arial, Helvetica, sans-serif',
+                'Helvetica-Bold': 'Arial, Helvetica, sans-serif',
+                'Helvetica-Oblique': 'Arial, Helvetica, sans-serif',
+                'Helvetica-BoldOblique': 'Arial, Helvetica, sans-serif',
+                'Courier': '"Courier New", Courier, monospace',
+                'Courier-Bold': '"Courier New", Courier, monospace',
+                'Courier-Oblique': '"Courier New", Courier, monospace',
+                'Courier-BoldOblique': '"Courier New", Courier, monospace',
               }
+
+              textContent.items.forEach((item: any, index: number) => {
+                const tx = item.transform
+                
+                // Transform PDF coordinates to viewport coordinates
+                const viewportTransform = viewport.transform || [scale, 0, 0, scale, 0, 0]
+                const scaleX = viewportTransform[0] || scale
+                const scaleY = viewportTransform[3] || scale
+                const pdfX = tx[4]
+                const pdfY = tx[5]
+                const x = pdfX * scaleX
+                const y = pdfY * scaleY
+                
+                // Calculate font size
+                const fontSizePDF = Math.abs(tx[3]) || Math.abs(tx[1]) || Math.abs(tx[2]) || 12
+                const fontSize = fontSizePDF * scaleY
+                const fontHeight = fontSize
+                const fontWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1])) * scaleX
+                
+                // Accurate baseline calculation
+                const baselineYViewport = viewport.height - y
+                const baselineToTopRatio = 0.70
+                const baselineOffset = fontSize * baselineToTopRatio
+                const topPosition = baselineYViewport - baselineOffset
+                
+                const span = window.document.createElement('span')
+                span.textContent = item.str
+                span.style.position = 'absolute'
+                span.style.left = `${x}px`
+                span.style.top = `${topPosition}px`
+                span.style.fontSize = `${fontSize}px`
+                
+                // Use actual font family from PDF if available
+                const fontName = item.fontName || ''
+                const baseFontName = fontName.split('+').pop() || fontName
+                const mappedFont = fontMap[baseFontName] || baseFontName
+                span.style.fontFamily = mappedFont
+                
+                // Line height matching
+                span.style.lineHeight = `${fontSize}px`
+                span.style.height = `${fontSize}px`
+                span.style.whiteSpace = 'pre'
+                span.style.overflow = 'hidden'
+                
+                // Calculate width
+                let spanWidth = item.width ? item.width * scaleX : 0
+                if (!spanWidth || spanWidth <= 0) {
+                  const avgCharWidth = fontSize * 0.6
+                  spanWidth = item.str.length * avgCharWidth
+                }
+                
+                // Apply horizontal scaling
+                const charScaleX = fontWidth / fontHeight
+                if (Math.abs(charScaleX - 1) > 0.01) {
+                  span.style.transform = `scaleX(${charScaleX})`
+                  span.style.transformOrigin = '0% 0%'
+                  span.style.width = `${spanWidth / charScaleX}px`
+                } else {
+                  span.style.width = `${spanWidth}px`
+                }
+                
+                // Character spacing
+                if (item.charSpacing !== undefined && item.charSpacing !== 0) {
+                  span.style.letterSpacing = `${item.charSpacing}px`
+                }
+                
+                // Text selection behavior
+                span.style.userSelect = 'text'
+                span.style.setProperty('-webkit-user-select', 'text', 'important')
+                span.style.setProperty('-moz-user-select', 'text', 'important')
+                span.style.setProperty('-ms-user-select', 'text', 'important')
+                span.style.cursor = 'text'
+                span.style.pointerEvents = 'auto'
+                
+                // Store data attribute for text anchor mapping
+                span.setAttribute('data-text-index', String(index))
+                
+                // Enable sub-pixel rendering
+                if (!span.style.transform || span.style.transform === 'none') {
+                  span.style.transform = 'translateZ(0)'
+                } else {
+                  span.style.transform = `${span.style.transform} translateZ(0)`
+                }
+                span.style.willChange = 'transform'
+                
+                textDivs.push(span)
+                textLayerFrag.appendChild(span)
+              })
+              
+              textLayerRef.current.appendChild(textLayerFrag)
               
               // Make text layer visible and interactive
               textLayerRef.current.style.setProperty('opacity', '1', 'important')
@@ -707,7 +779,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 }
               })
               
-              console.log('📝 Text layer rendered using PDF.js TextLayer:', {
+              console.log('📝 Text layer rendered manually:', {
                 textElements: textContent.items.length,
                 spansRendered: spans.length,
                 pageNumber: pageNumber,
@@ -715,141 +787,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 textLayerChildren: textLayerRef.current.children.length
               })
             } catch (error) {
-              console.error('Error rendering text layer with PDF.js TextLayer, falling back to manual rendering:', error)
-              // Fallback to manual rendering
-              try {
-                if (textLayerRef.current) {
-                  textLayerRef.current.innerHTML = ''
-                  const textContent = await page.getTextContent()
-                  
-                  const textLayerFrag = window.document.createDocumentFragment()
-                  const fontMap: Record<string, string> = {
-                    'Times-Roman': 'Times, "Times New Roman", serif',
-                    'Times-Bold': 'Times, "Times New Roman", serif',
-                    'Times-Italic': 'Times, "Times New Roman", serif',
-                    'Times-BoldItalic': 'Times, "Times New Roman", serif',
-                    'Helvetica': 'Arial, Helvetica, sans-serif',
-                    'Helvetica-Bold': 'Arial, Helvetica, sans-serif',
-                    'Helvetica-Oblique': 'Arial, Helvetica, sans-serif',
-                    'Helvetica-BoldOblique': 'Arial, Helvetica, sans-serif',
-                    'Courier': '"Courier New", Courier, monospace',
-                    'Courier-Bold': '"Courier New", Courier, monospace',
-                    'Courier-Oblique': '"Courier New", Courier, monospace',
-                    'Courier-BoldOblique': '"Courier New", Courier, monospace',
-                  }
-
-                  textContent.items.forEach((item: any) => {
-                    const tx = item.transform
-                    const viewportTransform = viewport.transform || [scale, 0, 0, scale, 0, 0]
-                    const scaleX = viewportTransform[0] || scale
-                    const scaleY = viewportTransform[3] || scale
-                    const pdfX = tx[4]
-                    const pdfY = tx[5]
-                    const x = pdfX * scaleX
-                    const y = pdfY * scaleY
-                    const fontSizePDF = Math.abs(tx[3]) || 12
-                    const fontSize = fontSizePDF * scaleY
-                    const baselineYViewport = viewport.height - y
-                    const baselineToTopRatio = 0.70
-                    const baselineOffset = fontSize * baselineToTopRatio
-                    const topPosition = baselineYViewport - baselineOffset
-                    
-                    const span = window.document.createElement('span')
-                    span.textContent = item.str
-                    span.style.position = 'absolute'
-                    span.style.left = `${x}px`
-                    span.style.top = `${topPosition}px`
-                    span.style.fontSize = `${fontSize}px`
-                    
-                    const fontName = item.fontName || ''
-                    const baseFontName = fontName.split('+').pop() || fontName
-                    span.style.fontFamily = fontMap[baseFontName] || baseFontName
-                    span.style.lineHeight = `${fontSize}px`
-                    span.style.height = `${fontSize}px`
-                    span.style.whiteSpace = 'pre'
-                    span.style.overflow = 'hidden'
-                    
-                    let spanWidth = item.width ? item.width * scaleX : item.str.length * fontSize * 0.6
-                    span.style.width = `${spanWidth}px`
-                    span.style.userSelect = 'text'
-                    span.style.pointerEvents = 'auto'
-                    
-                    textLayerFrag.appendChild(span)
-                  })
-                  
-                  textLayerRef.current.appendChild(textLayerFrag)
-                  textLayerRef.current.style.setProperty('opacity', '1', 'important')
-                  textLayerRef.current.style.setProperty('pointer-events', 'auto', 'important')
-                  textLayerRef.current.style.setProperty('user-select', 'text', 'important')
-                }
-              } catch (fallbackError) {
-                console.error('Fallback manual rendering also failed:', fallbackError)
-              }
+              console.error('Error rendering text layer:', error)
             }
           }
           
-          // Render annotation layer for highlights
-          if (annotationLayerRef.current) {
-            try {
-              const pdfjsViewer = await import('pdfjs-dist/web/pdf_viewer')
-              const AnnotationLayer = pdfjsViewer.AnnotationLayer || (pdfjsViewer as any).default?.AnnotationLayer
-              
-              if (!AnnotationLayer || typeof AnnotationLayer !== 'function') {
-                throw new Error('AnnotationLayer not found or not a constructor')
-              }
-              
-              annotationLayerRef.current.innerHTML = ''
-              
-              // Match canvas container positioning
-              const canvasContainer = canvasRef.current?.parentElement
-              if (canvasContainer) {
-                const containerStyles = window.getComputedStyle(canvasContainer)
-                const transform = containerStyles.transform
-                const transformOrigin = containerStyles.transformOrigin || '0 0'
-                
-                annotationLayerRef.current.style.width = viewport.width + 'px'
-                annotationLayerRef.current.style.height = viewport.height + 'px'
-                annotationLayerRef.current.style.position = 'absolute'
-                annotationLayerRef.current.style.top = '0'
-                annotationLayerRef.current.style.left = '0'
-                annotationLayerRef.current.style.transformOrigin = transformOrigin
-                
-                if (transform && transform !== 'none') {
-                  annotationLayerRef.current.style.transform = transform
-                } else {
-                  annotationLayerRef.current.style.transform = 'none'
-                }
-              }
-              
-              // Get annotations from page (PDF-native annotations)
-              const annotations = await page.getAnnotations()
-              
-              // Create AnnotationLayer instance
-              const annotationLayer = new AnnotationLayer({
-                div: annotationLayerRef.current,
-                annotations: annotations,
-                page: page,
-                viewport: viewport,
-                linkService: null, // We don't need link service for highlights
-                downloadManager: null,
-                annotationStorage: null
-              })
-              
-              // Store instance
-              annotationLayerInstances.current.set(pageNumber, annotationLayer)
-              
-              // Render annotation layer
-              annotationLayer.render(viewport)
-              
-              console.log('📎 Annotation layer rendered:', {
-                annotationsCount: annotations.length,
-                pageNumber: pageNumber
-              })
-            } catch (error) {
-              // Annotation layer is optional, so we can silently fail
-              console.warn('Annotation layer not available:', error)
-            }
-          }
+          // Annotation layer for PDF-native annotations (optional)
+          // Note: PDF.js AnnotationLayer not available in 5.4, skipping for now
+          // Our custom highlights are rendered separately via div overlays
           
           // Mark page as rendered
           console.log('🎉 Setting pageRendered to true')
@@ -1049,47 +993,119 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               textLayerDiv.style.left = '0'
               textLayerDiv.style.transformOrigin = '0 0'
             }
-            // Render text layer using PDF.js built-in TextLayer class
+            // Render text layer using manual rendering (PDF.js TextLayer not available in 5.4)
+            // TODO: When PDF.js TextLayer API is available, use it as primary method
             try {
-              const pdfjsViewer = await import('pdfjs-dist/web/pdf_viewer')
-              
-              // Check if TextLayer is available and is a constructor
-              const TextLayer = pdfjsViewer.TextLayer || (pdfjsViewer as any).default?.TextLayer
-              
-              if (!TextLayer || typeof TextLayer !== 'function') {
-                throw new Error('TextLayer not found or not a constructor')
-              }
+              textLayerDiv.innerHTML = ''
               
               const textContent = await page.getTextContent()
               
-              // Use PDF.js renderTextLayer function if available, otherwise try constructor
-              if (pdfjsViewer.renderTextLayer && typeof pdfjsViewer.renderTextLayer === 'function') {
-                // Use renderTextLayer function (older API)
-                await pdfjsViewer.renderTextLayer({
-                  textContentSource: textContent,
-                  container: textLayerDiv,
-                  viewport: viewport,
-                  textDivs: []
-                })
-              } else {
-                // Try using TextLayer as a class
-                const textLayer = new TextLayer({
-                  textContentSource: textContent,
-                  container: textLayerDiv,
-                  viewport: viewport,
-                  textDivs: []
-                })
-                
-                // Store instance for potential cleanup
-                textLayerInstances.current.set(pageNum, textLayer)
-                
-                // Render text layer
-                if (textLayer.render && typeof textLayer.render === 'function') {
-                  await textLayer.render()
-                } else {
-                  throw new Error('TextLayer.render is not a function')
-                }
+              // Manual text layer rendering with proper viewport synchronization
+              const textLayerFrag = window.document.createDocumentFragment()
+              
+              // Font family mapping for better PDF font matching
+              const fontMap: Record<string, string> = {
+                'Times-Roman': 'Times, "Times New Roman", serif',
+                'Times-Bold': 'Times, "Times New Roman", serif',
+                'Times-Italic': 'Times, "Times New Roman", serif',
+                'Times-BoldItalic': 'Times, "Times New Roman", serif',
+                'Helvetica': 'Arial, Helvetica, sans-serif',
+                'Helvetica-Bold': 'Arial, Helvetica, sans-serif',
+                'Helvetica-Oblique': 'Arial, Helvetica, sans-serif',
+                'Helvetica-BoldOblique': 'Arial, Helvetica, sans-serif',
+                'Courier': '"Courier New", Courier, monospace',
+                'Courier-Bold': '"Courier New", Courier, monospace',
+                'Courier-Oblique': '"Courier New", Courier, monospace',
+                'Courier-BoldOblique': '"Courier New", Courier, monospace',
               }
+
+              textContent.items.forEach((item: any, index: number) => {
+                const tx = item.transform
+                
+                // Transform PDF coordinates to viewport coordinates
+                const viewportTransform = viewport.transform || [scale, 0, 0, scale, 0, 0]
+                const scaleX = viewportTransform[0] || scale
+                const scaleY = viewportTransform[3] || scale
+                const pdfX = tx[4]
+                const pdfY = tx[5]
+                const x = pdfX * scaleX
+                const y = pdfY * scaleY
+                
+                // Calculate font size
+                const fontSizePDF = Math.abs(tx[3]) || Math.abs(tx[1]) || Math.abs(tx[2]) || 12
+                const fontSize = fontSizePDF * scaleY
+                const fontHeight = fontSize
+                const fontWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1])) * scaleX
+                
+                // Accurate baseline calculation
+                const baselineYViewport = viewport.height - y
+                const baselineToTopRatio = 0.70
+                const baselineOffset = fontSize * baselineToTopRatio
+                const topPosition = baselineYViewport - baselineOffset
+                
+                const span = window.document.createElement('span')
+                span.textContent = item.str
+                span.style.position = 'absolute'
+                span.style.left = `${x}px`
+                span.style.top = `${topPosition}px`
+                span.style.fontSize = `${fontSize}px`
+                
+                // Use actual font family from PDF if available
+                const fontName = item.fontName || ''
+                const baseFontName = fontName.split('+').pop() || fontName
+                span.style.fontFamily = fontMap[baseFontName] || baseFontName
+                
+                // Line height matching
+                span.style.lineHeight = `${fontSize}px`
+                span.style.height = `${fontSize}px`
+                span.style.whiteSpace = 'pre'
+                span.style.overflow = 'hidden'
+                
+                // Calculate width
+                let spanWidth = item.width ? item.width * scaleX : 0
+                if (!spanWidth || spanWidth <= 0) {
+                  const avgCharWidth = fontSize * 0.6
+                  spanWidth = item.str.length * avgCharWidth
+                }
+                
+                // Apply horizontal scaling
+                const charScaleX = fontWidth / fontHeight
+                if (Math.abs(charScaleX - 1) > 0.01) {
+                  span.style.transform = `scaleX(${charScaleX})`
+                  span.style.transformOrigin = '0% 0%'
+                  span.style.width = `${spanWidth / charScaleX}px`
+                } else {
+                  span.style.width = `${spanWidth}px`
+                }
+                
+                // Character spacing
+                if (item.charSpacing !== undefined && item.charSpacing !== 0) {
+                  span.style.letterSpacing = `${item.charSpacing * scaleX}px`
+                }
+                
+                // Text selection behavior
+                span.style.userSelect = 'text'
+                span.style.setProperty('-webkit-user-select', 'text', 'important')
+                span.style.setProperty('-moz-user-select', 'text', 'important')
+                span.style.setProperty('-ms-user-select', 'text', 'important')
+                span.style.cursor = 'text'
+                span.style.pointerEvents = 'auto'
+                
+                // Store data attribute for text anchor mapping
+                span.setAttribute('data-text-index', String(index))
+                
+                // Enable sub-pixel rendering
+                if (!span.style.transform || span.style.transform === 'none') {
+                  span.style.transform = 'translateZ(0)'
+                } else {
+                  span.style.transform = `${span.style.transform} translateZ(0)`
+                }
+                span.style.willChange = 'transform'
+                
+                textLayerFrag.appendChild(span)
+              })
+              
+              textLayerDiv.appendChild(textLayerFrag)
               
               // Make text layer visible and interactive
               textLayerDiv.style.setProperty('opacity', '1', 'important')
@@ -1111,146 +1127,19 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 }
               })
               
-              console.log(`📝 Text layer rendered for page ${pageNum} using PDF.js TextLayer:`, {
+              console.log(`📝 Text layer rendered manually for page ${pageNum}:`, {
                 textElements: textContent.items.length,
                 spansRendered: spans.length,
                 hasTextLayer: !!textLayerDiv,
                 childSpans: textLayerDiv.children.length
               })
             } catch (error) {
-              console.error(`Error rendering text layer with PDF.js TextLayer for page ${pageNum}:`, error)
-              // Fallback to manual rendering
-              try {
-                if (textLayerDiv) {
-                  textLayerDiv.innerHTML = ''
-                  const textContent = await page.getTextContent()
-                  
-                  const textLayerFrag = window.document.createDocumentFragment()
-                  const fontMap: Record<string, string> = {
-                    'Times-Roman': 'Times, "Times New Roman", serif',
-                    'Times-Bold': 'Times, "Times New Roman", serif',
-                    'Times-Italic': 'Times, "Times New Roman", serif',
-                    'Times-BoldItalic': 'Times, "Times New Roman", serif',
-                    'Helvetica': 'Arial, Helvetica, sans-serif',
-                    'Helvetica-Bold': 'Arial, Helvetica, sans-serif',
-                    'Helvetica-Oblique': 'Arial, Helvetica, sans-serif',
-                    'Helvetica-BoldOblique': 'Arial, Helvetica, sans-serif',
-                    'Courier': '"Courier New", Courier, monospace',
-                    'Courier-Bold': '"Courier New", Courier, monospace',
-                    'Courier-Oblique': '"Courier New", Courier, monospace',
-                    'Courier-BoldOblique': '"Courier New", Courier, monospace',
-                  }
-
-                  textContent.items.forEach((item: any) => {
-                    const tx = item.transform
-                    const viewportTransform = viewport.transform || [scale, 0, 0, scale, 0, 0]
-                    const scaleX = viewportTransform[0] || scale
-                    const scaleY = viewportTransform[3] || scale
-                    const pdfX = tx[4]
-                    const pdfY = tx[5]
-                    const x = pdfX * scaleX
-                    const y = pdfY * scaleY
-                    const fontSizePDF = Math.abs(tx[3]) || 12
-                    const fontSize = fontSizePDF * scaleY
-                    const baselineYViewport = viewport.height - y
-                    const baselineToTopRatio = 0.70
-                    const baselineOffset = fontSize * baselineToTopRatio
-                    const topPosition = baselineYViewport - baselineOffset
-                    
-                    const span = window.document.createElement('span')
-                    span.textContent = item.str
-                    span.style.position = 'absolute'
-                    span.style.left = `${x}px`
-                    span.style.top = `${topPosition}px`
-                    span.style.fontSize = `${fontSize}px`
-                    
-                    const fontName = item.fontName || ''
-                    const baseFontName = fontName.split('+').pop() || fontName
-                    span.style.fontFamily = fontMap[baseFontName] || baseFontName
-                    span.style.lineHeight = `${fontSize}px`
-                    span.style.height = `${fontSize}px`
-                    span.style.whiteSpace = 'pre'
-                    span.style.overflow = 'hidden'
-                    
-                    let spanWidth = item.width ? item.width * scaleX : item.str.length * fontSize * 0.6
-                    span.style.width = `${spanWidth}px`
-                    span.style.userSelect = 'text'
-                    span.style.pointerEvents = 'auto'
-                    
-                    textLayerFrag.appendChild(span)
-                  })
-                  
-                  textLayerDiv.appendChild(textLayerFrag)
-                  textLayerDiv.style.setProperty('opacity', '1', 'important')
-                  textLayerDiv.style.setProperty('pointer-events', 'auto', 'important')
-                  textLayerDiv.style.setProperty('user-select', 'text', 'important')
-                }
-              } catch (fallbackError) {
-                console.error(`Fallback manual rendering also failed for page ${pageNum}:`, fallbackError)
-              }
+              console.error(`Error rendering text layer for page ${pageNum}:`, error)
             }
             
-            // Render annotation layer for this page
-            const annotationLayerDiv = pageAnnotationLayerRefs.current.get(pageNum)
-            if (annotationLayerDiv) {
-              try {
-                const pdfjsViewer = await import('pdfjs-dist/web/pdf_viewer')
-                const AnnotationLayer = pdfjsViewer.AnnotationLayer || (pdfjsViewer as any).default?.AnnotationLayer
-                
-                if (!AnnotationLayer || typeof AnnotationLayer !== 'function') {
-                  throw new Error('AnnotationLayer not found or not a constructor')
-                }
-                
-                annotationLayerDiv.innerHTML = ''
-                
-                // Match canvas container positioning
-                const pageContainer = canvas.parentElement
-                if (pageContainer) {
-                  const containerStyles = window.getComputedStyle(pageContainer)
-                  const transform = containerStyles.transform
-                  const transformOrigin = containerStyles.transformOrigin || '0 0'
-                  
-                  annotationLayerDiv.style.width = viewport.width + 'px'
-                  annotationLayerDiv.style.height = viewport.height + 'px'
-                  annotationLayerDiv.style.position = 'absolute'
-                  annotationLayerDiv.style.top = '0'
-                  annotationLayerDiv.style.left = '0'
-                  annotationLayerDiv.style.transformOrigin = transformOrigin
-                  
-                  if (transform && transform !== 'none') {
-                    annotationLayerDiv.style.transform = transform
-                  } else {
-                    annotationLayerDiv.style.transform = 'none'
-                  }
-                }
-                
-                // Get annotations from page (PDF-native annotations)
-                const annotations = await page.getAnnotations()
-                
-                // Create AnnotationLayer instance
-                const annotationLayer = new AnnotationLayer({
-                  div: annotationLayerDiv,
-                  annotations: annotations,
-                  page: page,
-                  viewport: viewport,
-                  linkService: null,
-                  downloadManager: null,
-                  annotationStorage: null
-                })
-                
-                // Store instance
-                annotationLayerInstances.current.set(pageNum, annotationLayer)
-                
-                // Render annotation layer
-                annotationLayer.render(viewport)
-                
-                console.log(`📎 Annotation layer rendered for page ${pageNum}:`, {
-                  annotationsCount: annotations.length
-                })
-              } catch (error) {
-                console.error(`Error rendering annotation layer for page ${pageNum}:`, error)
-              }
-            }
+            // Annotation layer for PDF-native annotations (optional)
+            // Note: PDF.js AnnotationLayer not available in 5.4, skipping for now
+            // Our custom highlights are rendered separately via div overlays
           }
         } catch (error) {
           console.error(`Error rendering page ${pageNum}:`, error)
