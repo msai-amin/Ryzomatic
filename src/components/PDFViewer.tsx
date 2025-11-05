@@ -1195,7 +1195,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             if (annotationLayerDiv) {
               try {
                 const pdfjsViewer = await import('pdfjs-dist/web/pdf_viewer')
-                const { AnnotationLayer } = pdfjsViewer
+                const AnnotationLayer = pdfjsViewer.AnnotationLayer || (pdfjsViewer as any).default?.AnnotationLayer
+                
+                if (!AnnotationLayer || typeof AnnotationLayer !== 'function') {
+                  throw new Error('AnnotationLayer not found or not a constructor')
+                }
                 
                 annotationLayerDiv.innerHTML = ''
                 
