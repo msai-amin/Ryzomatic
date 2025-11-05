@@ -796,12 +796,23 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             textLayerRef.current.style.setProperty('opacity', '1', 'important')
             textLayerRef.current.style.setProperty('pointer-events', 'auto', 'important')
             textLayerRef.current.style.setProperty('user-select', 'text', 'important')
+            textLayerRef.current.style.setProperty('visibility', 'visible', 'important')
+            
+            // Ensure all spans are also interactive
+            const spans = textLayerRef.current.querySelectorAll('span')
+            spans.forEach(span => {
+              (span as HTMLElement).style.setProperty('pointer-events', 'auto', 'important')
+              (span as HTMLElement).style.setProperty('user-select', 'text', 'important')
+            })
             
             console.log('📝 Text layer rendered with improved alignment:', {
               textElements: textDivs.length,
+              spansRendered: spans.length,
               pageNumber: pageNumber,
               hasTextLayer: !!textLayerRef.current,
-              textLayerOpacity: textLayerRef.current.style.opacity
+              textLayerOpacity: textLayerRef.current.style.opacity,
+              textLayerPointerEvents: textLayerRef.current.style.pointerEvents,
+              textLayerChildren: textLayerRef.current.children.length
             })
           }
           
@@ -1195,12 +1206,26 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
   // Ensure text layer is visible and interactive when pageRendered changes
   useEffect(() => {
-    if (pageRendered && textLayerRef.current) {
+    if (textLayerRef.current) {
       // Use setProperty with important to override inline styles
       textLayerRef.current.style.setProperty('opacity', '1', 'important')
       textLayerRef.current.style.setProperty('pointer-events', 'auto', 'important')
       textLayerRef.current.style.setProperty('user-select', 'text', 'important')
-      console.log('🔍 Ensuring text layer visibility and interactivity after pageRendered change')
+      textLayerRef.current.style.setProperty('visibility', 'visible', 'important')
+      
+      // Ensure all spans are also interactive
+      const spans = textLayerRef.current.querySelectorAll('span')
+      spans.forEach(span => {
+        (span as HTMLElement).style.setProperty('pointer-events', 'auto', 'important')
+        (span as HTMLElement).style.setProperty('user-select', 'text', 'important')
+      })
+      
+      console.log('🔍 Ensuring text layer visibility and interactivity:', {
+        pageRendered,
+        hasTextLayer: !!textLayerRef.current,
+        spansCount: spans.length,
+        childrenCount: textLayerRef.current.children.length
+      })
     }
   }, [pageRendered])
 
@@ -3942,10 +3967,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 ref={textLayerRef}
                 className="textLayer"
                 style={{ 
-                  opacity: pageRendered ? 1 : 0, // Visible when rendered
+                  opacity: 1, // Always visible - programmatically controlled
                   pointerEvents: 'auto', // Always enabled for interaction
                   userSelect: 'text',
-                  WebkitUserSelect: 'text'
+                  WebkitUserSelect: 'text',
+                  visibility: 'visible' // Ensure visible
                 }}
               />
               
