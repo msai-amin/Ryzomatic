@@ -466,7 +466,6 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
               <>
                 {currentDocument ? (
                   <RelatedDocumentsPanel
-                    currentDocument={currentDocument}
                     relatedDocuments={relatedDocuments}
                     isLoading={relatedDocsLoading}
                     onAddRelatedDocument={handleAddRelatedDocument}
