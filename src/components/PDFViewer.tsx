@@ -792,10 +792,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             textLayerRef.current.appendChild(textLayerFrag)
             
             // CRITICAL: Make text layer visible and interactive immediately after rendering
-            // Don't wait for pageRendered state to change
-            textLayerRef.current.style.opacity = '1'
-            textLayerRef.current.style.pointerEvents = 'auto'
-            textLayerRef.current.style.userSelect = 'text'
+            // Don't wait for pageRendered state to change - override inline style
+            textLayerRef.current.style.setProperty('opacity', '1', 'important')
+            textLayerRef.current.style.setProperty('pointer-events', 'auto', 'important')
+            textLayerRef.current.style.setProperty('user-select', 'text', 'important')
             
             console.log('📝 Text layer rendered with improved alignment:', {
               textElements: textDivs.length,
@@ -1143,9 +1143,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             textLayerDiv.appendChild(textLayerFrag)
             
             // CRITICAL: Make text layer visible and interactive immediately after rendering
-            textLayerDiv.style.opacity = '1'
-            textLayerDiv.style.pointerEvents = 'auto'
-            textLayerDiv.style.userSelect = 'text'
+            // Use setProperty with important to ensure styles are applied
+            textLayerDiv.style.setProperty('opacity', '1', 'important')
+            textLayerDiv.style.setProperty('pointer-events', 'auto', 'important')
+            textLayerDiv.style.setProperty('user-select', 'text', 'important')
             
             console.log(`📝 Text layer rendered for page ${pageNum}:`, {
               textElements: textContent.items.length,
@@ -1175,9 +1176,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const checkTimer = setTimeout(() => {
         pageTextLayerRefs.current.forEach((textLayerDiv, pageNum) => {
           if (textLayerDiv) {
-            textLayerDiv.style.opacity = '1'
-            textLayerDiv.style.pointerEvents = 'auto'
-            textLayerDiv.style.userSelect = 'text'
+            // Use setProperty with important to ensure styles are applied
+            textLayerDiv.style.setProperty('opacity', '1', 'important')
+            textLayerDiv.style.setProperty('pointer-events', 'auto', 'important')
+            textLayerDiv.style.setProperty('user-select', 'text', 'important')
             
             // Log if text layer is empty (potential issue)
             if (textLayerDiv.children.length === 0) {
@@ -1194,9 +1196,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   // Ensure text layer is visible and interactive when pageRendered changes
   useEffect(() => {
     if (pageRendered && textLayerRef.current) {
-      textLayerRef.current.style.opacity = '1'
-      textLayerRef.current.style.pointerEvents = 'auto'
-      textLayerRef.current.style.userSelect = 'text'
+      // Use setProperty with important to override inline styles
+      textLayerRef.current.style.setProperty('opacity', '1', 'important')
+      textLayerRef.current.style.setProperty('pointer-events', 'auto', 'important')
+      textLayerRef.current.style.setProperty('user-select', 'text', 'important')
       console.log('🔍 Ensuring text layer visibility and interactivity after pageRendered change')
     }
   }, [pageRendered])
@@ -3917,7 +3920,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   numPages
                 });
                 return shouldShowLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
+                  <div 
+                    className="absolute inset-0 flex items-center justify-center bg-white z-10"
+                    style={{ pointerEvents: 'none' }}
+                  >
                     <div className="text-center">
                       <div 
                         className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4"
@@ -3936,8 +3942,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 ref={textLayerRef}
                 className="textLayer"
                 style={{ 
-                  opacity: pageRendered ? 1 : 0,
-                  pointerEvents: pageRendered ? 'auto' : 'none',
+                  opacity: pageRendered ? 1 : 0, // Visible when rendered
+                  pointerEvents: 'auto', // Always enabled for interaction
                   userSelect: 'text',
                   WebkitUserSelect: 'text'
                 }}
