@@ -620,7 +620,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             try {
               // Import PDF.js viewer classes dynamically
               const pdfjsViewer = await import('pdfjs-dist/web/pdf_viewer')
-              const { TextLayer } = pdfjsViewer
+              
+              // Check if TextLayer is available and is a constructor
+              const TextLayer = pdfjsViewer.TextLayer || (pdfjsViewer as any).default?.TextLayer
+              
+              if (!TextLayer || typeof TextLayer !== 'function') {
+                throw new Error('TextLayer not found or not a constructor')
+              }
               
               textLayerRef.current.innerHTML = ''
               
@@ -654,19 +660,34 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               
               const textContent = await page.getTextContent()
               
-              // Create TextLayer instance
-              const textLayer = new TextLayer({
-                textContentSource: textContent,
-                container: textLayerRef.current,
-                viewport: viewport,
-                textDivs: []
-              })
-              
-              // Store instance for potential cleanup
-              textLayerInstances.current.set(pageNumber, textLayer)
-              
-              // Render text layer
-              await textLayer.render()
+              // Use PDF.js renderTextLayer function if available, otherwise try constructor
+              if (pdfjsViewer.renderTextLayer && typeof pdfjsViewer.renderTextLayer === 'function') {
+                // Use renderTextLayer function (older API)
+                await pdfjsViewer.renderTextLayer({
+                  textContentSource: textContent,
+                  container: textLayerRef.current,
+                  viewport: viewport,
+                  textDivs: []
+                })
+              } else {
+                // Try using TextLayer as a class
+                const textLayer = new TextLayer({
+                  textContentSource: textContent,
+                  container: textLayerRef.current,
+                  viewport: viewport,
+                  textDivs: []
+                })
+                
+                // Store instance for potential cleanup
+                textLayerInstances.current.set(pageNumber, textLayer)
+                
+                // Render text layer
+                if (textLayer.render && typeof textLayer.render === 'function') {
+                  await textLayer.render()
+                } else {
+                  throw new Error('TextLayer.render is not a function')
+                }
+              }
               
               // Make text layer visible and interactive
               textLayerRef.current.style.setProperty('opacity', '1', 'important')
@@ -695,8 +716,75 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               })
             } catch (error) {
               console.error('Error rendering text layer with PDF.js TextLayer, falling back to manual rendering:', error)
-              // Fallback to manual rendering if TextLayer fails
-              // (Keep existing manual rendering code as fallback)
+              // Fallback to manual rendering
+              try {
+                if (textLayerRef.current) {
+                  textLayerRef.current.innerHTML = ''
+                  const textContent = await page.getTextContent()
+                  
+                  const textLayerFrag = window.document.createDocumentFragment()
+                  const fontMap: Record<string, string> = {
+                    'Times-Roman': 'Times, "Times New Roman", serif',
+                    'Times-Bold': 'Times, "Times New Roman", serif',
+                    'Times-Italic': 'Times, "Times New Roman", serif',
+                    'Times-BoldItalic': 'Times, "Times New Roman", serif',
+                    'Helvetica': 'Arial, Helvetica, sans-serif',
+                    'Helvetica-Bold': 'Arial, Helvetica, sans-serif',
+                    'Helvetica-Oblique': 'Arial, Helvetica, sans-serif',
+                    'Helvetica-BoldOblique': 'Arial, Helvetica, sans-serif',
+                    'Courier': '"Courier New", Courier, monospace',
+                    'Courier-Bold': '"Courier New", Courier, monospace',
+                    'Courier-Oblique': '"Courier New", Courier, monospace',
+                    'Courier-BoldOblique': '"Courier New", Courier, monospace',
+                  }
+
+                  textContent.items.forEach((item: any) => {
+                    const tx = item.transform
+                    const viewportTransform = viewport.transform || [scale, 0, 0, scale, 0, 0]
+                    const scaleX = viewportTransform[0] || scale
+                    const scaleY = viewportTransform[3] || scale
+                    const pdfX = tx[4]
+                    const pdfY = tx[5]
+                    const x = pdfX * scaleX
+                    const y = pdfY * scaleY
+                    const fontSizePDF = Math.abs(tx[3]) || 12
+                    const fontSize = fontSizePDF * scaleY
+                    const baselineYViewport = viewport.height - y
+                    const baselineToTopRatio = 0.70
+                    const baselineOffset = fontSize * baselineToTopRatio
+                    const topPosition = baselineYViewport - baselineOffset
+                    
+                    const span = window.document.createElement('span')
+                    span.textContent = item.str
+                    span.style.position = 'absolute'
+                    span.style.left = `${x}px`
+                    span.style.top = `${topPosition}px`
+                    span.style.fontSize = `${fontSize}px`
+                    
+                    const fontName = item.fontName || ''
+                    const baseFontName = fontName.split('+').pop() || fontName
+                    span.style.fontFamily = fontMap[baseFontName] || baseFontName
+                    span.style.lineHeight = `${fontSize}px`
+                    span.style.height = `${fontSize}px`
+                    span.style.whiteSpace = 'pre'
+                    span.style.overflow = 'hidden'
+                    
+                    let spanWidth = item.width ? item.width * scaleX : item.str.length * fontSize * 0.6
+                    span.style.width = `${spanWidth}px`
+                    span.style.userSelect = 'text'
+                    span.style.pointerEvents = 'auto'
+                    
+                    textLayerFrag.appendChild(span)
+                  })
+                  
+                  textLayerRef.current.appendChild(textLayerFrag)
+                  textLayerRef.current.style.setProperty('opacity', '1', 'important')
+                  textLayerRef.current.style.setProperty('pointer-events', 'auto', 'important')
+                  textLayerRef.current.style.setProperty('user-select', 'text', 'important')
+                }
+              } catch (fallbackError) {
+                console.error('Fallback manual rendering also failed:', fallbackError)
+              }
             }
           }
           
@@ -754,7 +842,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 pageNumber: pageNumber
               })
             } catch (error) {
-              console.error('Error rendering annotation layer:', error)
+              // Annotation layer is optional, so we can silently fail
+              console.warn('Annotation layer not available:', error)
             }
           }
           
@@ -1005,7 +1094,75 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               })
             } catch (error) {
               console.error(`Error rendering text layer with PDF.js TextLayer for page ${pageNum}:`, error)
-              // Fallback to manual rendering if TextLayer fails
+              // Fallback to manual rendering
+              try {
+                if (textLayerDiv) {
+                  textLayerDiv.innerHTML = ''
+                  const textContent = await page.getTextContent()
+                  
+                  const textLayerFrag = window.document.createDocumentFragment()
+                  const fontMap: Record<string, string> = {
+                    'Times-Roman': 'Times, "Times New Roman", serif',
+                    'Times-Bold': 'Times, "Times New Roman", serif',
+                    'Times-Italic': 'Times, "Times New Roman", serif',
+                    'Times-BoldItalic': 'Times, "Times New Roman", serif',
+                    'Helvetica': 'Arial, Helvetica, sans-serif',
+                    'Helvetica-Bold': 'Arial, Helvetica, sans-serif',
+                    'Helvetica-Oblique': 'Arial, Helvetica, sans-serif',
+                    'Helvetica-BoldOblique': 'Arial, Helvetica, sans-serif',
+                    'Courier': '"Courier New", Courier, monospace',
+                    'Courier-Bold': '"Courier New", Courier, monospace',
+                    'Courier-Oblique': '"Courier New", Courier, monospace',
+                    'Courier-BoldOblique': '"Courier New", Courier, monospace',
+                  }
+
+                  textContent.items.forEach((item: any) => {
+                    const tx = item.transform
+                    const viewportTransform = viewport.transform || [scale, 0, 0, scale, 0, 0]
+                    const scaleX = viewportTransform[0] || scale
+                    const scaleY = viewportTransform[3] || scale
+                    const pdfX = tx[4]
+                    const pdfY = tx[5]
+                    const x = pdfX * scaleX
+                    const y = pdfY * scaleY
+                    const fontSizePDF = Math.abs(tx[3]) || 12
+                    const fontSize = fontSizePDF * scaleY
+                    const baselineYViewport = viewport.height - y
+                    const baselineToTopRatio = 0.70
+                    const baselineOffset = fontSize * baselineToTopRatio
+                    const topPosition = baselineYViewport - baselineOffset
+                    
+                    const span = window.document.createElement('span')
+                    span.textContent = item.str
+                    span.style.position = 'absolute'
+                    span.style.left = `${x}px`
+                    span.style.top = `${topPosition}px`
+                    span.style.fontSize = `${fontSize}px`
+                    
+                    const fontName = item.fontName || ''
+                    const baseFontName = fontName.split('+').pop() || fontName
+                    span.style.fontFamily = fontMap[baseFontName] || baseFontName
+                    span.style.lineHeight = `${fontSize}px`
+                    span.style.height = `${fontSize}px`
+                    span.style.whiteSpace = 'pre'
+                    span.style.overflow = 'hidden'
+                    
+                    let spanWidth = item.width ? item.width * scaleX : item.str.length * fontSize * 0.6
+                    span.style.width = `${spanWidth}px`
+                    span.style.userSelect = 'text'
+                    span.style.pointerEvents = 'auto'
+                    
+                    textLayerFrag.appendChild(span)
+                  })
+                  
+                  textLayerDiv.appendChild(textLayerFrag)
+                  textLayerDiv.style.setProperty('opacity', '1', 'important')
+                  textLayerDiv.style.setProperty('pointer-events', 'auto', 'important')
+                  textLayerDiv.style.setProperty('user-select', 'text', 'important')
+                }
+              } catch (fallbackError) {
+                console.error(`Fallback manual rendering also failed for page ${pageNum}:`, fallbackError)
+              }
             }
             
             // Render annotation layer for this page
