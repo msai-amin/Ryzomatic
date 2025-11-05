@@ -2565,15 +2565,26 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               )
               
               if (intersects) {
-                // Find corresponding text item in textContent
-                const spanText = span.textContent || ''
-                for (let i = 0; i < textContent.items.length; i++) {
-                  const item = textContent.items[i] as any
-                  if (item.str === spanText && !itemIds.includes(i)) {
-                    itemIds.push(i)
-                    if (startIndex === undefined) startIndex = i
-                    endIndex = i
-                    break
+                // Use data-text-index attribute if available (from manual rendering)
+                const textIndexAttr = span.getAttribute('data-text-index')
+                if (textIndexAttr !== null) {
+                  const index = parseInt(textIndexAttr, 10)
+                  if (!isNaN(index) && !itemIds.includes(index)) {
+                    itemIds.push(index)
+                    if (startIndex === undefined || index < startIndex) startIndex = index
+                    if (endIndex === undefined || index > endIndex) endIndex = index
+                  }
+                } else {
+                  // Fallback: try to match by text content
+                  const spanText = span.textContent || ''
+                  for (let i = 0; i < textContent.items.length; i++) {
+                    const item = textContent.items[i] as any
+                    if (item.str === spanText && !itemIds.includes(i)) {
+                      itemIds.push(i)
+                      if (startIndex === undefined) startIndex = i
+                      endIndex = i
+                      break
+                    }
                   }
                 }
               }
