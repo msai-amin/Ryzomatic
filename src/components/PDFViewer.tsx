@@ -792,7 +792,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           if (annotationLayerRef.current) {
             try {
               const pdfjsViewer = await import('pdfjs-dist/web/pdf_viewer')
-              const { AnnotationLayer } = pdfjsViewer
+              const AnnotationLayer = pdfjsViewer.AnnotationLayer || (pdfjsViewer as any).default?.AnnotationLayer
+              
+              if (!AnnotationLayer || typeof AnnotationLayer !== 'function') {
+                throw new Error('AnnotationLayer not found or not a constructor')
+              }
               
               annotationLayerRef.current.innerHTML = ''
               
@@ -1048,23 +1052,44 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             // Render text layer using PDF.js built-in TextLayer class
             try {
               const pdfjsViewer = await import('pdfjs-dist/web/pdf_viewer')
-              const { TextLayer } = pdfjsViewer
+              
+              // Check if TextLayer is available and is a constructor
+              const TextLayer = pdfjsViewer.TextLayer || (pdfjsViewer as any).default?.TextLayer
+              
+              if (!TextLayer || typeof TextLayer !== 'function') {
+                throw new Error('TextLayer not found or not a constructor')
+              }
               
               const textContent = await page.getTextContent()
               
-              // Create TextLayer instance
-              const textLayer = new TextLayer({
-                textContentSource: textContent,
-                container: textLayerDiv,
-                viewport: viewport,
-                textDivs: []
-              })
-              
-              // Store instance for potential cleanup
-              textLayerInstances.current.set(pageNum, textLayer)
-              
-              // Render text layer
-              await textLayer.render()
+              // Use PDF.js renderTextLayer function if available, otherwise try constructor
+              if (pdfjsViewer.renderTextLayer && typeof pdfjsViewer.renderTextLayer === 'function') {
+                // Use renderTextLayer function (older API)
+                await pdfjsViewer.renderTextLayer({
+                  textContentSource: textContent,
+                  container: textLayerDiv,
+                  viewport: viewport,
+                  textDivs: []
+                })
+              } else {
+                // Try using TextLayer as a class
+                const textLayer = new TextLayer({
+                  textContentSource: textContent,
+                  container: textLayerDiv,
+                  viewport: viewport,
+                  textDivs: []
+                })
+                
+                // Store instance for potential cleanup
+                textLayerInstances.current.set(pageNum, textLayer)
+                
+                // Render text layer
+                if (textLayer.render && typeof textLayer.render === 'function') {
+                  await textLayer.render()
+                } else {
+                  throw new Error('TextLayer.render is not a function')
+                }
+              }
               
               // Make text layer visible and interactive
               textLayerDiv.style.setProperty('opacity', '1', 'important')
