@@ -656,7 +656,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               }
               
               // Create TextLayerBuilder instance (Firefox's approach)
-              // TextLayerBuilder creates its own div, so we'll replace it with our container
               const textLayerBuilder = new TextLayerBuilder({
                 pdfPage: page,
                 onAppend: () => {
@@ -664,20 +663,20 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 }
               })
               
-              // Replace TextLayerBuilder's auto-created div with our container
-              // This ensures proper positioning and styling
-              const builderDiv = textLayerBuilder.div
+              // CRITICAL: Replace builder's div with our container BEFORE render
+              // This ensures event listeners (#bindMouse) are bound to our container
+              // Store the original div for reference
+              const originalBuilderDiv = textLayerBuilder.div
+              
+              // Set our container as the builder's div before render
+              // This way all event listeners and content will be in our container
               textLayerBuilder.div = textLayerRef.current
               
-              // Copy any important attributes from builder's div to our container
-              if (builderDiv.className) {
-                textLayerRef.current.className = builderDiv.className
-              }
-              if (builderDiv.tabIndex !== undefined) {
-                textLayerRef.current.tabIndex = builderDiv.tabIndex
-              }
+              // Copy important attributes from builder's original div setup
+              textLayerRef.current.className = originalBuilderDiv.className || 'textLayer'
+              textLayerRef.current.tabIndex = originalBuilderDiv.tabIndex || 0
               
-              // Render the text layer
+              // Render the text layer - it will now render into our container
               await textLayerBuilder.render({
                 viewport: viewport
               })
@@ -916,7 +915,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               }
               
               // Create TextLayerBuilder instance (Firefox's approach)
-              // TextLayerBuilder creates its own div, so we'll replace it with our container
               const textLayerBuilder = new TextLayerBuilder({
                 pdfPage: page,
                 onAppend: () => {
@@ -924,20 +922,20 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 }
               })
               
-              // Replace TextLayerBuilder's auto-created div with our container
-              // This ensures proper positioning and styling
-              const builderDiv = textLayerBuilder.div
+              // CRITICAL: Replace builder's div with our container BEFORE render
+              // This ensures event listeners (#bindMouse) are bound to our container
+              // Store the original div for reference
+              const originalBuilderDiv = textLayerBuilder.div
+              
+              // Set our container as the builder's div before render
+              // This way all event listeners and content will be in our container
               textLayerBuilder.div = textLayerDiv
               
-              // Copy any important attributes from builder's div to our container
-              if (builderDiv.className) {
-                textLayerDiv.className = builderDiv.className
-              }
-              if (builderDiv.tabIndex !== undefined) {
-                textLayerDiv.tabIndex = builderDiv.tabIndex
-              }
+              // Copy important attributes from builder's original div setup
+              textLayerDiv.className = originalBuilderDiv.className || 'textLayer'
+              textLayerDiv.tabIndex = originalBuilderDiv.tabIndex || 0
               
-              // Render the text layer
+              // Render the text layer - it will now render into our container
               await textLayerBuilder.render({
                 viewport: viewport
               })
