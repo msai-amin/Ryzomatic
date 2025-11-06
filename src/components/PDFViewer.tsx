@@ -56,6 +56,23 @@ import { supabase } from '../../lib/supabase'
 import { configurePDFWorker } from '../utils/pdfjsConfig'
 // TextLayerBuilder will be imported dynamically after PDF.js is initialized
 
+// Helper function to ensure globalThis.pdfjsLib is set before importing pdf_viewer
+async function ensurePDFjsLib(): Promise<void> {
+  if (!globalThis.pdfjsLib) {
+    const pdfjsModule = await import('pdfjs-dist')
+    const pdfjsLib = pdfjsModule.default || pdfjsModule
+    globalThis.pdfjsLib = pdfjsLib
+    console.log('✅ globalThis.pdfjsLib set via ensurePDFjsLib')
+  }
+}
+
+// Helper function to safely import TextLayerBuilder
+async function getTextLayerBuilder() {
+  await ensurePDFjsLib()
+  const { TextLayerBuilder } = await import('pdfjs-dist/web/pdf_viewer.mjs')
+  return TextLayerBuilder
+}
+
 // Text segment interface for structured rendering in READING MODE ONLY
 interface TextSegment {
   type: 'word' | 'break' | 'table' | 'formula'
