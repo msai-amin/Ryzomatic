@@ -701,15 +701,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 textLayerRef.current.style.transformOrigin = '0 0'
               }
               
-              // Ensure globalThis.pdfjsLib is set (should already be set by mount effect)
-              if (!globalThis.pdfjsLib) {
-                const pdfjsModule = await import('pdfjs-dist')
-                const pdfjsLib = pdfjsModule.default || pdfjsModule
-                globalThis.pdfjsLib = pdfjsLib
-              }
-              
-              // Dynamically import TextLayerBuilder (must be after PDF.js is initialized)
-              const { TextLayerBuilder } = await import('pdfjs-dist/web/pdf_viewer.mjs')
+              // Safely import TextLayerBuilder (ensures globalThis.pdfjsLib is set first)
+              const TextLayerBuilder = await getTextLayerBuilder()
               
               // Create TextLayerBuilder instance (Firefox's approach)
               const textLayerBuilder = new TextLayerBuilder({
@@ -970,15 +963,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 textLayerDiv.style.transformOrigin = '0 0'
               }
               
-              // Ensure globalThis.pdfjsLib is set (should already be set by mount effect)
-              if (!globalThis.pdfjsLib) {
-                const pdfjsModule = await import('pdfjs-dist')
-                const pdfjsLib = pdfjsModule.default || pdfjsModule
-                globalThis.pdfjsLib = pdfjsLib
-              }
-              
-              // Dynamically import TextLayerBuilder (must be after PDF.js is initialized)
-              const { TextLayerBuilder } = await import('pdfjs-dist/web/pdf_viewer.mjs')
+              // Safely import TextLayerBuilder (ensures globalThis.pdfjsLib is set first)
+              const TextLayerBuilder = await getTextLayerBuilder()
               
               // Create TextLayerBuilder instance (Firefox's approach)
               const textLayerBuilder = new TextLayerBuilder({
