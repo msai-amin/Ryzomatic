@@ -12,10 +12,10 @@ import * as Sentry from '@sentry/react'
 
 initSentry()
 
-// CRITICAL: Initialize globalThis.pdfjsLib as early as possible
+// CRITICAL: Initialize globalThis.pdfjsLib BEFORE rendering React
 // This must happen before any pdf_viewer.mjs imports are evaluated
-// We do this here to ensure it's set before React components render
-;(async () => {
+// We initialize it synchronously here to ensure it's ready when modules are loaded
+async function initializeApp() {
   try {
     if (!(globalThis as any).pdfjsLib) {
       const pdfjsModule = await import('pdfjs-dist')
@@ -25,11 +25,11 @@ initSentry()
     }
   } catch (error) {
     console.error('❌ Failed to initialize PDF.js in main.tsx:', error)
-    // Don't throw - let the app continue, PDF viewer will handle the error
+    // Continue anyway - PDF viewer will handle errors gracefully
   }
-})()
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
+  
+  // Render React after PDF.js is initialized
+  ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <Sentry.ErrorBoundary fallback={<div>Something went wrong</div>} showDialog>
       <ThemeProvider>
@@ -39,6 +39,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       </ThemeProvider>
     </Sentry.ErrorBoundary>
   </React.StrictMode>,
-)
+  )
+}
+
+// Initialize and render
+initializeApp().catch(console.error)
 
 
