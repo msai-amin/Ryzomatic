@@ -58,19 +58,41 @@ import { configurePDFWorker } from '../utils/pdfjsConfig'
 
 // Helper function to ensure globalThis.pdfjsLib is set before importing pdf_viewer
 async function ensurePDFjsLib(): Promise<void> {
-  if (!globalThis.pdfjsLib) {
-    const pdfjsModule = await import('pdfjs-dist')
-    const pdfjsLib = pdfjsModule.default || pdfjsModule
-    globalThis.pdfjsLib = pdfjsLib
-    console.log('✅ globalThis.pdfjsLib set via ensurePDFjsLib')
+  if (!(globalThis as any).pdfjsLib) {
+    try {
+      const pdfjsModule = await import('pdfjs-dist')
+      const pdfjsLib = pdfjsModule.default || pdfjsModule
+      
+      // CRITICAL: Set as globalThis.pdfjsLib BEFORE any pdf_viewer imports
+      // This must be set before pdf_viewer.mjs is evaluated, as it tries to destructure from it
+      (globalThis as any).pdfjsLib = pdfjsLib
+      console.log('✅ globalThis.pdfjsLib initialized')
+    } catch (error) {
+      console.error('❌ Failed to initialize PDF.js:', error)
+      throw error
+    }
   }
 }
 
 // Helper function to safely import TextLayerBuilder
 async function getTextLayerBuilder() {
+  // CRITICAL: Ensure globalThis.pdfjsLib is set FIRST
   await ensurePDFjsLib()
-  const { TextLayerBuilder } = await import('pdfjs-dist/web/pdf_viewer.mjs')
-  return TextLayerBuilder
+  
+  // Double-check it's set before importing
+  if (!(globalThis as any).pdfjsLib) {
+    throw new Error('globalThis.pdfjsLib is not set - cannot import TextLayerBuilder')
+  }
+  
+  // Now safe to import pdf_viewer.mjs
+  try {
+    const viewerModule = await import('pdfjs-dist/web/pdf_viewer.mjs')
+    return viewerModule.TextLayerBuilder
+  } catch (error) {
+    console.error('❌ Failed to import TextLayerBuilder:', error)
+    console.error('globalThis.pdfjsLib exists:', !!(globalThis as any).pdfjsLib)
+    throw error
+  }
 }
 
 // Text segment interface for structured rendering in READING MODE ONLY
