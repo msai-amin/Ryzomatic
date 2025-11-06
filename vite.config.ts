@@ -72,6 +72,7 @@ export default defineConfig(({ mode }) => ({
     },
     exclude: [
       'pdfjs-dist',
+      'pdfjs-dist/web/pdf_viewer.mjs',
       '@google-cloud/text-to-speech',
       '@google-cloud/storage',
       'googleapis',
