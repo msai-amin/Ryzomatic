@@ -431,7 +431,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
       try {
         // Dynamic import of PDF.js to avoid ES module issues with Vite
-        const pdfjsLib = await import('pdfjs-dist')
+        const pdfjsModule = await import('pdfjs-dist')
+        
+        // Access the actual library - it might be under .default or directly available
+        const pdfjsLib = pdfjsModule.default || pdfjsModule
         
         // CRITICAL: Set pdfjsLib as globalThis.pdfjsLib BEFORE importing pdf_viewer
         // This is required by pdf_viewer.mjs which destructures from globalThis.pdfjsLib

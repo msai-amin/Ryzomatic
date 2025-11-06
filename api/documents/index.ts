@@ -11,7 +11,7 @@ import { uploadFile, generateDocumentKey } from '../../lib/s3';
 import { GPT5NanoService, OCR_LIMITS } from '../../lib/gpt5nano';
 import { geminiService } from '../../lib/gemini';
 import { documentDescriptionService } from '../../lib/documentDescriptionService';
-import { checkRateLimit, getRateLimitHeaders } from '../../lib/rateLimiter';
+import { checkRateLimit, getRateLimitHeaders } from '../../lib/rateLimiter.js';
 import formidable from 'formidable';
 import fs from 'fs/promises';
 

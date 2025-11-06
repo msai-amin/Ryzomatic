@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { geminiService } from '../../lib/gemini';
 import { contextBuilder } from '../../lib/contextBuilder';
 import { memoryService } from '../../lib/memoryService';
-import { checkRateLimit, getRateLimitHeaders } from '../../lib/rateLimiter';
+import { checkRateLimit, getRateLimitHeaders } from '../../lib/rateLimiter.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,

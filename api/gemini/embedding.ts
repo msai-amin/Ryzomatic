@@ -1,7 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
-import { checkRateLimit, getRateLimitHeaders } from '../../lib/rateLimiter';
+import { checkRateLimit, getRateLimitHeaders } from '../../lib/rateLimiter.js';
 
 const geminiKey = process.env.GEMINI_API_KEY;
 
