@@ -755,6 +755,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 span.style.pointerEvents = 'auto'
                 span.style.setProperty('pointer-events', 'auto', 'important')
                 span.style.display = 'inline-block'
+                span.style.position = 'absolute'
+                span.style.visibility = 'visible'
+                span.style.opacity = '1'
                 
                 // Store data attribute for text anchor mapping
                 span.setAttribute('data-text-index', String(index))
@@ -1116,6 +1119,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 span.style.pointerEvents = 'auto'
                 span.style.setProperty('pointer-events', 'auto', 'important')
                 span.style.display = 'inline-block'
+                span.style.position = 'absolute'
+                span.style.visibility = 'visible'
+                span.style.opacity = '1'
                 
                 // Store data attribute for text anchor mapping
                 span.setAttribute('data-text-index', String(index))
