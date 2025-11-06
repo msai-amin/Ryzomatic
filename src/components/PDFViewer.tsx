@@ -373,8 +373,28 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   const pageCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map())
   const pageTextLayerRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const pageAnnotationLayerRefs = useRef<Map<number, HTMLDivElement>>(new Map())
-  const textLayerInstances = useRef<Map<number, TextLayerBuilder>>(new Map())
+  const textLayerInstances = useRef<Map<number, any>>(new Map())
   const annotationLayerInstances = useRef<Map<number, any>>(new Map())
+
+  // CRITICAL: Initialize globalThis.pdfjsLib as early as possible
+  // This must happen before any pdf_viewer.mjs imports are evaluated
+  useEffect(() => {
+    const initPDFjs = async () => {
+      try {
+        const pdfjsModule = await import('pdfjs-dist')
+        const pdfjsLib = pdfjsModule.default || pdfjsModule
+        
+        if (typeof globalThis !== 'undefined') {
+          globalThis.pdfjsLib = pdfjsLib
+          console.log('✅ globalThis.pdfjsLib initialized')
+        }
+      } catch (error) {
+        console.error('Failed to initialize PDF.js:', error)
+      }
+    }
+    
+    initPDFjs()
+  }, []) // Run once on mount
 
   // Define removeHighlight early to avoid circular dependency issues
   const removeHighlight = useCallback(async (id: string) => {
@@ -664,6 +684,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 textLayerRef.current.style.transformOrigin = '0 0'
               }
               
+              // Ensure globalThis.pdfjsLib is set (should already be set by mount effect)
+              if (!globalThis.pdfjsLib) {
+                const pdfjsModule = await import('pdfjs-dist')
+                const pdfjsLib = pdfjsModule.default || pdfjsModule
+                globalThis.pdfjsLib = pdfjsLib
+              }
+              
               // Dynamically import TextLayerBuilder (must be after PDF.js is initialized)
               const { TextLayerBuilder } = await import('pdfjs-dist/web/pdf_viewer.mjs')
               
@@ -924,6 +951,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 textLayerDiv.style.top = '0'
                 textLayerDiv.style.left = '0'
                 textLayerDiv.style.transformOrigin = '0 0'
+              }
+              
+              // Ensure globalThis.pdfjsLib is set (should already be set by mount effect)
+              if (!globalThis.pdfjsLib) {
+                const pdfjsModule = await import('pdfjs-dist')
+                const pdfjsLib = pdfjsModule.default || pdfjsModule
+                globalThis.pdfjsLib = pdfjsLib
               }
               
               // Dynamically import TextLayerBuilder (must be after PDF.js is initialized)
