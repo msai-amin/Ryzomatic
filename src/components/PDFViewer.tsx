@@ -1140,6 +1140,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               textLayerDiv.style.setProperty('-ms-user-select', 'text', 'important')
               textLayerDiv.style.setProperty('z-index', '2', 'important')
               textLayerDiv.style.setProperty('position', 'absolute', 'important')
+              textLayerDiv.style.setProperty('top', '0', 'important')
+              textLayerDiv.style.setProperty('left', '0', 'important')
+              textLayerDiv.style.setProperty('width', viewport.width + 'px', 'important')
+              textLayerDiv.style.setProperty('height', viewport.height + 'px', 'important')
+              textLayerDiv.style.setProperty('visibility', 'visible', 'important')
               
               // Also ensure all spans in this layer are selectable - double check after DOM insertion
               setTimeout(() => {
