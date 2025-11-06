@@ -723,37 +723,81 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 textLayerRef.current.style.transformOrigin = '0 0'
               }
               
-              // Safely import TextLayerBuilder (ensures globalThis.pdfjsLib is set first)
-              const TextLayerBuilder = await getTextLayerBuilder()
-              
-              // Create TextLayerBuilder instance (Firefox's approach)
-              const textLayerBuilder = new TextLayerBuilder({
-                pdfPage: page,
-                onAppend: () => {
-                  // Optional callback when text layer is appended
-                }
-              })
-              
-              // CRITICAL: Replace builder's div with our container BEFORE render
-              // This ensures event listeners (#bindMouse) are bound to our container
-              // Store the original div for reference
-              const originalBuilderDiv = textLayerBuilder.div
-              
-              // Set our container as the builder's div before render
-              // This way all event listeners and content will be in our container
-              textLayerBuilder.div = textLayerRef.current
-              
-              // Copy important attributes from builder's original div setup
-              textLayerRef.current.className = originalBuilderDiv.className || 'textLayer'
-              textLayerRef.current.tabIndex = originalBuilderDiv.tabIndex || 0
-              
-              // Render the text layer - it will now render into our container
-              await textLayerBuilder.render({
-                viewport: viewport
-              })
-              
-              // Store instance for cleanup
-              textLayerInstances.current.set(pageNumber, textLayerBuilder)
+              // Try to use TextLayerBuilder (Firefox's approach)
+              try {
+                const TextLayerBuilder = await getTextLayerBuilder()
+                
+                // Create TextLayerBuilder instance
+                const textLayerBuilder = new TextLayerBuilder({
+                  pdfPage: page,
+                  onAppend: () => {
+                    // Optional callback when text layer is appended
+                  }
+                })
+                
+                // CRITICAL: Replace builder's div with our container BEFORE render
+                // This ensures event listeners (#bindMouse) are bound to our container
+                // Store the original div for reference
+                const originalBuilderDiv = textLayerBuilder.div
+                
+                // Set our container as the builder's div before render
+                // This way all event listeners and content will be in our container
+                textLayerBuilder.div = textLayerRef.current
+                
+                // Copy important attributes from builder's original div setup
+                textLayerRef.current.className = originalBuilderDiv.className || 'textLayer'
+                textLayerRef.current.tabIndex = originalBuilderDiv.tabIndex || 0
+                
+                // Render the text layer - it will now render into our container
+                await textLayerBuilder.render({
+                  viewport: viewport
+                })
+                
+                // Store instance for cleanup
+                textLayerInstances.current.set(pageNumber, textLayerBuilder)
+              } catch (error) {
+                console.error('Failed to use TextLayerBuilder, falling back to manual rendering:', error)
+                // Fallback to manual rendering if TextLayerBuilder fails
+                // This ensures text selection still works even if pdf_viewer.mjs has issues
+                const textContent = await page.getTextContent()
+                const textLayerFrag = document.createDocumentFragment()
+                
+                textContent.items.forEach((item: any, index: number) => {
+                  const tx = item.transform
+                  const scaleX = scale
+                  const scaleY = scale
+                  const pdfX = tx[4]
+                  const pdfY = tx[5]
+                  const x = pdfX * scaleX
+                  const y = pdfY * scaleY
+                  
+                  const fontSizePDF = Math.abs(tx[3]) || 12
+                  const fontSize = fontSizePDF * scaleY
+                  const baselineYViewport = viewport.height - y
+                  const baselineOffset = fontSize * 0.7
+                  const topPosition = baselineYViewport - baselineOffset
+                  
+                  const span = document.createElement('span')
+                  span.textContent = item.str
+                  span.style.cssText = `
+                    position: absolute;
+                    left: ${x}px;
+                    top: ${topPosition}px;
+                    font-size: ${fontSize}px;
+                    color: transparent;
+                    user-select: text;
+                    -webkit-user-select: text;
+                    -moz-user-select: text;
+                    pointer-events: auto;
+                    display: inline-block;
+                    white-space: pre;
+                  `
+                  span.setAttribute('data-text-index', String(index))
+                  textLayerFrag.appendChild(span)
+                })
+                
+                textLayerRef.current.appendChild(textLayerFrag)
+              }
               
               // Ensure text layer is visible and interactive
               textLayerRef.current.style.setProperty('opacity', '1', 'important')
@@ -985,37 +1029,87 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 textLayerDiv.style.transformOrigin = '0 0'
               }
               
-              // Safely import TextLayerBuilder (ensures globalThis.pdfjsLib is set first)
-              const TextLayerBuilder = await getTextLayerBuilder()
-              
-              // Create TextLayerBuilder instance (Firefox's approach)
-              const textLayerBuilder = new TextLayerBuilder({
-                pdfPage: page,
-                onAppend: () => {
-                  // Optional callback when text layer is appended
-                }
-              })
-              
-              // CRITICAL: Replace builder's div with our container BEFORE render
-              // This ensures event listeners (#bindMouse) are bound to our container
-              // Store the original div for reference
-              const originalBuilderDiv = textLayerBuilder.div
-              
-              // Set our container as the builder's div before render
-              // This way all event listeners and content will be in our container
-              textLayerBuilder.div = textLayerDiv
-              
-              // Copy important attributes from builder's original div setup
-              textLayerDiv.className = originalBuilderDiv.className || 'textLayer'
-              textLayerDiv.tabIndex = originalBuilderDiv.tabIndex || 0
-              
-              // Render the text layer - it will now render into our container
-              await textLayerBuilder.render({
-                viewport: viewport
-              })
-              
-              // Store instance for cleanup
-              textLayerInstances.current.set(pageNum, textLayerBuilder)
+              // Try to use TextLayerBuilder (Firefox's approach)
+              try {
+                const TextLayerBuilder = await getTextLayerBuilder()
+                
+                // Create TextLayerBuilder instance
+                const textLayerBuilder = new TextLayerBuilder({
+                  pdfPage: page,
+                  onAppend: () => {
+                    // Optional callback when text layer is appended
+                  }
+                })
+                
+                // CRITICAL: Replace builder's div with our container BEFORE render
+                // This ensures event listeners (#bindMouse) are bound to our container
+                // Store the original div for reference
+                const originalBuilderDiv = textLayerBuilder.div
+                
+                // Set our container as the builder's div before render
+                // This way all event listeners and content will be in our container
+                textLayerBuilder.div = textLayerDiv
+                
+                // Copy important attributes from builder's original div setup
+                textLayerDiv.className = originalBuilderDiv.className || 'textLayer'
+                textLayerDiv.tabIndex = originalBuilderDiv.tabIndex || 0
+                
+                // Render the text layer - it will now render into our container
+                await textLayerBuilder.render({
+                  viewport: viewport
+                })
+                
+                // Store instance for cleanup
+                textLayerInstances.current.set(pageNum, textLayerBuilder)
+                
+                const spans = textLayerDiv.querySelectorAll('span')
+                console.log(`📝 Text layer rendered with TextLayerBuilder for page ${pageNum}:`, {
+                  hasTextLayer: !!textLayerDiv,
+                  textLayerChildren: textLayerDiv.children.length,
+                  spansRendered: spans.length
+                })
+              } catch (error) {
+                console.error(`Failed to use TextLayerBuilder for page ${pageNum}, falling back to manual rendering:`, error)
+                // Fallback to manual rendering if TextLayerBuilder fails
+                const textContent = await page.getTextContent()
+                const textLayerFrag = document.createDocumentFragment()
+                
+                textContent.items.forEach((item: any, index: number) => {
+                  const tx = item.transform
+                  const scaleX = scale
+                  const scaleY = scale
+                  const pdfX = tx[4]
+                  const pdfY = tx[5]
+                  const x = pdfX * scaleX
+                  const y = pdfY * scaleY
+                  
+                  const fontSizePDF = Math.abs(tx[3]) || 12
+                  const fontSize = fontSizePDF * scaleY
+                  const baselineYViewport = viewport.height - y
+                  const baselineOffset = fontSize * 0.7
+                  const topPosition = baselineYViewport - baselineOffset
+                  
+                  const span = document.createElement('span')
+                  span.textContent = item.str
+                  span.style.cssText = `
+                    position: absolute;
+                    left: ${x}px;
+                    top: ${topPosition}px;
+                    font-size: ${fontSize}px;
+                    color: transparent;
+                    user-select: text;
+                    -webkit-user-select: text;
+                    -moz-user-select: text;
+                    pointer-events: auto;
+                    display: inline-block;
+                    white-space: pre;
+                  `
+                  span.setAttribute('data-text-index', String(index))
+                  textLayerFrag.appendChild(span)
+                })
+                
+                textLayerDiv.appendChild(textLayerFrag)
+              }
               
               // Ensure text layer is visible and interactive
               textLayerDiv.style.setProperty('opacity', '1', 'important')
@@ -1024,15 +1118,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               textLayerDiv.style.setProperty('visibility', 'visible', 'important')
               textLayerDiv.style.setProperty('z-index', '2', 'important')
               textLayerDiv.style.setProperty('position', 'absolute', 'important')
-              
-              const spans = textLayerDiv.querySelectorAll('span')
-              console.log(`📝 Text layer rendered with TextLayerBuilder for page ${pageNum}:`, {
-                hasTextLayer: !!textLayerDiv,
-                textLayerChildren: textLayerDiv.children.length,
-                spansRendered: spans.length
-              })
             } catch (error) {
-              console.error(`Error rendering text layer with TextLayerBuilder for page ${pageNum}:`, error)
+              console.error(`Error rendering text layer for page ${pageNum}:`, error)
             }
             
             // Annotation layer for PDF-native annotations (optional)
