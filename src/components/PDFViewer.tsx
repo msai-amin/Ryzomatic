@@ -789,6 +789,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 }
               }, 0)
               
+              // Query spans for logging (they were just appended to DOM)
+              const spans = textLayerRef.current?.querySelectorAll('span') || []
+              
               console.log('📝 Text layer rendered manually:', {
                 textElements: textContent.items.length,
                 spansRendered: spans.length,
@@ -1144,6 +1147,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   }
                 })
               }, 0)
+              
+              // Query spans for logging (they were just appended to DOM)
+              const spans = textLayerDiv.querySelectorAll('span')
               
               console.log(`📝 Text layer rendered manually for page ${pageNum}:`, {
                 textElements: textContent.items.length,
