@@ -588,7 +588,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         canvas.width = viewport.width * dpr
         canvas.style.width = viewport.width + 'px'
         canvas.style.height = viewport.height + 'px'
-
+        canvas.style.pointerEvents = 'none'
+        
         console.log('📐 Canvas dimensions set:', {
           width: canvas.width,
           height: canvas.height,
@@ -952,6 +953,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           canvas.width = viewport.width * dpr
           canvas.style.width = viewport.width + 'px'
           canvas.style.height = viewport.height + 'px'
+          canvas.style.pointerEvents = 'none'
           
           // Clear canvas and reset transformations
           context.setTransform(1, 0, 0, 1, 0, 0)
@@ -4081,7 +4083,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 );
               })()}
               
-              <canvas ref={canvasRef} className="block" style={{ opacity: pageRendered ? 1 : 0, position: 'relative', zIndex: 1 }} />
+              <canvas ref={canvasRef} className="block" style={{ opacity: pageRendered ? 1 : 0, position: 'relative', zIndex: 1, pointerEvents: 'none' }} />
               <div
                 ref={textLayerRef}
                 className="textLayer"
