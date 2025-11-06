@@ -61,11 +61,11 @@ async function ensurePDFjsLib(): Promise<void> {
   if (!(globalThis as any).pdfjsLib) {
     try {
       const pdfjsModule = await import('pdfjs-dist')
-      const pdfjsLib = pdfjsModule.default || pdfjsModule
+      const pdfjsLibValue = pdfjsModule.default || pdfjsModule
       
       // CRITICAL: Set as globalThis.pdfjsLib BEFORE any pdf_viewer imports
       // This must be set before pdf_viewer.mjs is evaluated, as it tries to destructure from it
-      (globalThis as any).pdfjsLib = pdfjsLib
+      ;(globalThis as any).pdfjsLib = pdfjsLibValue
       console.log('✅ globalThis.pdfjsLib initialized')
     } catch (error) {
       console.error('❌ Failed to initialize PDF.js:', error)
