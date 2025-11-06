@@ -54,7 +54,7 @@ import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { supabase } from '../../lib/supabase'
 import { configurePDFWorker } from '../utils/pdfjsConfig'
-import { TextLayerBuilder } from 'pdfjs-dist/web/pdf_viewer.mjs'
+// TextLayerBuilder will be imported dynamically after PDF.js is initialized
 
 // Text segment interface for structured rendering in READING MODE ONLY
 interface TextSegment {
@@ -433,6 +433,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         // Dynamic import of PDF.js to avoid ES module issues with Vite
         const pdfjsLib = await import('pdfjs-dist')
         
+        // CRITICAL: Set pdfjsLib as globalThis.pdfjsLib BEFORE importing pdf_viewer
+        // This is required by pdf_viewer.mjs which destructures from globalThis.pdfjsLib
+        if (typeof globalThis !== 'undefined') {
+          globalThis.pdfjsLib = pdfjsLib
+        }
+        
         // Set up PDF.js worker
         configurePDFWorker(pdfjsLib)
 
@@ -654,6 +660,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 textLayerRef.current.style.left = '0'
                 textLayerRef.current.style.transformOrigin = '0 0'
               }
+              
+              // Dynamically import TextLayerBuilder (must be after PDF.js is initialized)
+              const { TextLayerBuilder } = await import('pdfjs-dist/web/pdf_viewer.mjs')
               
               // Create TextLayerBuilder instance (Firefox's approach)
               const textLayerBuilder = new TextLayerBuilder({
@@ -913,6 +922,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 textLayerDiv.style.left = '0'
                 textLayerDiv.style.transformOrigin = '0 0'
               }
+              
+              // Dynamically import TextLayerBuilder (must be after PDF.js is initialized)
+              const { TextLayerBuilder } = await import('pdfjs-dist/web/pdf_viewer.mjs')
               
               // Create TextLayerBuilder instance (Firefox's approach)
               const textLayerBuilder = new TextLayerBuilder({
