@@ -760,7 +760,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 // Fallback to manual rendering if TextLayerBuilder fails
                 // This ensures text selection still works even if pdf_viewer.mjs has issues
                 const textContent = await page.getTextContent()
-                const textLayerFrag = document.createDocumentFragment()
+                const textLayerFrag = globalThis.document.createDocumentFragment()
                 
                 textContent.items.forEach((item: any, index: number) => {
                   const tx = item.transform
@@ -777,7 +777,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   const baselineOffset = fontSize * 0.7
                   const topPosition = baselineYViewport - baselineOffset
                   
-                  const span = document.createElement('span')
+                  const span = globalThis.document.createElement('span')
                   span.textContent = item.str
                   span.style.cssText = `
                     position: absolute;
@@ -1072,7 +1072,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 console.error(`Failed to use TextLayerBuilder for page ${pageNum}, falling back to manual rendering:`, error)
                 // Fallback to manual rendering if TextLayerBuilder fails
                 const textContent = await page.getTextContent()
-                const textLayerFrag = document.createDocumentFragment()
+                const textLayerFrag = globalThis.document.createDocumentFragment()
                 
                 textContent.items.forEach((item: any, index: number) => {
                   const tx = item.transform
@@ -1089,7 +1089,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   const baselineOffset = fontSize * 0.7
                   const topPosition = baselineYViewport - baselineOffset
                   
-                  const span = document.createElement('span')
+                  const span = globalThis.document.createElement('span')
                   span.textContent = item.str
                   span.style.cssText = `
                     position: absolute;
