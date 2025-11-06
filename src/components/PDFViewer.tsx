@@ -54,8 +54,7 @@ import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { supabase } from '../../lib/supabase'
 import { configurePDFWorker } from '../utils/pdfjsConfig'
-
-// PDF.js will be imported dynamically
+import { TextLayerBuilder } from 'pdfjs-dist/web/pdf_viewer.mjs'
 
 // Text segment interface for structured rendering in READING MODE ONLY
 interface TextSegment {
@@ -374,7 +373,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   const pageCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map())
   const pageTextLayerRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const pageAnnotationLayerRefs = useRef<Map<number, HTMLDivElement>>(new Map())
-  const textLayerInstances = useRef<Map<number, any>>(new Map())
+  const textLayerInstances = useRef<Map<number, TextLayerBuilder>>(new Map())
   const annotationLayerInstances = useRef<Map<number, any>>(new Map())
 
   // Define removeHighlight early to avoid circular dependency issues
@@ -616,10 +615,16 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         
         console.log('✅ Canvas rendered successfully')
 
-          // Render text layer using manual rendering (PDF.js TextLayer not available in 5.4)
-          // TODO: When PDF.js TextLayer API is available, use it as primary method
+          // Render text layer using PDF.js TextLayerBuilder (Firefox's implementation)
           if (textLayerRef.current) {
             try {
+              // Cancel any existing text layer builder for this page
+              const existingBuilder = textLayerInstances.current.get(pageNumber)
+              if (existingBuilder) {
+                existingBuilder.cancel()
+              }
+              
+              // Clear the container
               textLayerRef.current.innerHTML = ''
               
               // Match canvas container's positioning and transform exactly
@@ -650,125 +655,37 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 textLayerRef.current.style.transformOrigin = '0 0'
               }
               
-              const textContent = await page.getTextContent()
-              
-              // Manual text layer rendering with proper viewport synchronization
-              const textLayerFrag = window.document.createDocumentFragment()
-              const textDivs: HTMLSpanElement[] = []
-              
-              // Font family mapping for better PDF font matching
-              const fontMap: Record<string, string> = {
-                'Times-Roman': 'Times, "Times New Roman", serif',
-                'Times-Bold': 'Times, "Times New Roman", serif',
-                'Times-Italic': 'Times, "Times New Roman", serif',
-                'Times-BoldItalic': 'Times, "Times New Roman", serif',
-                'Helvetica': 'Arial, Helvetica, sans-serif',
-                'Helvetica-Bold': 'Arial, Helvetica, sans-serif',
-                'Helvetica-Oblique': 'Arial, Helvetica, sans-serif',
-                'Helvetica-BoldOblique': 'Arial, Helvetica, sans-serif',
-                'Courier': '"Courier New", Courier, monospace',
-                'Courier-Bold': '"Courier New", Courier, monospace',
-                'Courier-Oblique': '"Courier New", Courier, monospace',
-                'Courier-BoldOblique': '"Courier New", Courier, monospace',
-              }
-
-              textContent.items.forEach((item: any, index: number) => {
-                const tx = item.transform
-                
-                // Transform PDF coordinates to viewport coordinates
-                const viewportTransform = viewport.transform || [scale, 0, 0, scale, 0, 0]
-                const scaleX = viewportTransform[0] || scale
-                const scaleY = viewportTransform[3] || scale
-                const pdfX = tx[4]
-                const pdfY = tx[5]
-                const x = pdfX * scaleX
-                const y = pdfY * scaleY
-                
-                // Calculate font size
-                const fontSizePDF = Math.abs(tx[3]) || Math.abs(tx[1]) || Math.abs(tx[2]) || 12
-                const fontSize = fontSizePDF * scaleY
-                const fontHeight = fontSize
-                const fontWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1])) * scaleX
-                
-                // Accurate baseline calculation
-                const baselineYViewport = viewport.height - y
-                const baselineToTopRatio = 0.70
-                const baselineOffset = fontSize * baselineToTopRatio
-                const topPosition = baselineYViewport - baselineOffset
-                
-                const span = window.document.createElement('span')
-                span.textContent = item.str
-                span.style.position = 'absolute'
-                span.style.left = `${x}px`
-                span.style.top = `${topPosition}px`
-                span.style.fontSize = `${fontSize}px`
-                
-                // Use actual font family from PDF if available
-                const fontName = item.fontName || ''
-                const baseFontName = fontName.split('+').pop() || fontName
-                const mappedFont = fontMap[baseFontName] || baseFontName
-                span.style.fontFamily = mappedFont
-                
-                // Line height matching
-                span.style.lineHeight = `${fontSize}px`
-                span.style.height = `${fontSize}px`
-                span.style.whiteSpace = 'pre'
-                span.style.overflow = 'hidden'
-                
-                // Calculate width - ensure minimum width for clickability
-                let spanWidth = item.width ? item.width * scaleX : 0
-                if (!spanWidth || spanWidth <= 0) {
-                  const avgCharWidth = fontSize * 0.6
-                  spanWidth = item.str.length * avgCharWidth
+              // Create TextLayerBuilder instance (Firefox's approach)
+              // TextLayerBuilder creates its own div, so we'll replace it with our container
+              const textLayerBuilder = new TextLayerBuilder({
+                pdfPage: page,
+                onAppend: () => {
+                  // Optional callback when text layer is appended
                 }
-                // Ensure minimum width for empty or very short strings
-                if (spanWidth < 1) {
-                  spanWidth = fontSize * 0.5
-                }
-                
-                // Apply horizontal scaling
-                const charScaleX = fontWidth / fontHeight
-                if (Math.abs(charScaleX - 1) > 0.01) {
-                  span.style.transform = `scaleX(${charScaleX})`
-                  span.style.transformOrigin = '0% 0%'
-                  span.style.width = `${spanWidth / charScaleX}px`
-                } else {
-                  span.style.width = `${spanWidth}px`
-                }
-                
-                // Ensure minimum height for clickability
-                span.style.minHeight = `${fontSize}px`
-                span.style.minWidth = `${Math.max(spanWidth, 1)}px`
-                
-                // Character spacing
-                if (item.charSpacing !== undefined && item.charSpacing !== 0) {
-                  span.style.letterSpacing = `${item.charSpacing * scaleX}px`
-                }
-                
-                // CRITICAL: Text selection behavior - must be set before appending
-                span.style.color = 'transparent' // Invisible but selectable
-                span.style.userSelect = 'text'
-                span.style.setProperty('-webkit-user-select', 'text', 'important')
-                span.style.setProperty('-moz-user-select', 'text', 'important')
-                span.style.setProperty('-ms-user-select', 'text', 'important')
-                span.style.cursor = 'text'
-                span.style.pointerEvents = 'auto'
-                span.style.setProperty('pointer-events', 'auto', 'important')
-                span.style.display = 'inline-block'
-                span.style.position = 'absolute'
-                span.style.visibility = 'visible'
-                span.style.opacity = '1'
-                
-                // Store data attribute for text anchor mapping
-                span.setAttribute('data-text-index', String(index))
-                
-                textDivs.push(span)
-                textLayerFrag.appendChild(span)
               })
               
-              textLayerRef.current.appendChild(textLayerFrag)
+              // Replace TextLayerBuilder's auto-created div with our container
+              // This ensures proper positioning and styling
+              const builderDiv = textLayerBuilder.div
+              textLayerBuilder.div = textLayerRef.current
               
-              // Make text layer visible and interactive - CRITICAL for selection
+              // Copy any important attributes from builder's div to our container
+              if (builderDiv.className) {
+                textLayerRef.current.className = builderDiv.className
+              }
+              if (builderDiv.tabIndex !== undefined) {
+                textLayerRef.current.tabIndex = builderDiv.tabIndex
+              }
+              
+              // Render the text layer
+              await textLayerBuilder.render({
+                viewport: viewport
+              })
+              
+              // Store instance for cleanup
+              textLayerInstances.current.set(pageNumber, textLayerBuilder)
+              
+              // Ensure text layer is visible and interactive
               textLayerRef.current.style.setProperty('opacity', '1', 'important')
               textLayerRef.current.style.setProperty('pointer-events', 'auto', 'important')
               textLayerRef.current.style.setProperty('user-select', 'text', 'important')
@@ -776,35 +693,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               textLayerRef.current.style.setProperty('z-index', '2', 'important')
               textLayerRef.current.style.setProperty('position', 'absolute', 'important')
               
-              // Ensure all spans are interactive - double check after DOM insertion
-              setTimeout(() => {
-                const spans = textLayerRef.current?.querySelectorAll('span')
-                if (spans) {
-                  spans.forEach(span => {
-                    if (span instanceof HTMLElement && span.style) {
-                      span.style.setProperty('pointer-events', 'auto', 'important')
-                      span.style.setProperty('user-select', 'text', 'important')
-                      span.style.setProperty('-webkit-user-select', 'text', 'important')
-                      span.style.setProperty('-moz-user-select', 'text', 'important')
-                      span.style.setProperty('-ms-user-select', 'text', 'important')
-                      span.style.setProperty('color', 'transparent', 'important')
-                    }
-                  })
-                }
-              }, 0)
-              
-              // Query spans for logging (they were just appended to DOM)
-              const spans = textLayerRef.current?.querySelectorAll('span') || []
-              
-              console.log('📝 Text layer rendered manually:', {
-                textElements: textContent.items.length,
-                spansRendered: spans.length,
+              const spans = textLayerRef.current.querySelectorAll('span')
+              console.log('📝 Text layer rendered with TextLayerBuilder:', {
                 pageNumber: pageNumber,
                 hasTextLayer: !!textLayerRef.current,
-                textLayerChildren: textLayerRef.current.children.length
+                textLayerChildren: textLayerRef.current.children.length,
+                spansRendered: spans.length
               })
             } catch (error) {
-              console.error('Error rendering text layer:', error)
+              console.error('Error rendering text layer with TextLayerBuilder:', error)
             }
           }
           
@@ -972,206 +869,98 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
           await page.render(renderContext).promise
           
-          // Render text layer for selection using the SAME viewport
-          // CRITICAL: This text layer must be perfectly aligned with the canvas
-          // Any changes to positioning, sizing, or transforms will break selection accuracy
+          // Render text layer using PDF.js TextLayerBuilder (Firefox's implementation)
           if (textLayerDiv) {
-            textLayerDiv.innerHTML = ''
-            
-            // CRITICAL: Match canvas container's positioning and transform exactly
-            // Get the page container (parent of canvas and textLayer)
-            const pageContainer = canvas.parentElement
-            if (pageContainer) {
-              const containerStyles = window.getComputedStyle(pageContainer)
-              
-              // Match container's transform if present
-              const transform = containerStyles.transform
-              const transformOrigin = containerStyles.transformOrigin || '0 0'
-              
-              // Set text layer container size to match canvas exactly
-              textLayerDiv.style.width = viewport.width + 'px'
-              textLayerDiv.style.height = viewport.height + 'px'
-              textLayerDiv.style.position = 'absolute'
-              textLayerDiv.style.top = '0'
-              textLayerDiv.style.left = '0'
-              textLayerDiv.style.transformOrigin = transformOrigin
-              
-              // Apply same transform as container if any
-              if (transform && transform !== 'none') {
-                textLayerDiv.style.transform = transform
-              } else {
-                textLayerDiv.style.transform = 'none'
-              }
-            } else {
-              // Fallback: basic positioning if container not found
-              textLayerDiv.style.width = viewport.width + 'px'
-              textLayerDiv.style.height = viewport.height + 'px'
-              textLayerDiv.style.position = 'absolute'
-              textLayerDiv.style.top = '0'
-              textLayerDiv.style.left = '0'
-              textLayerDiv.style.transformOrigin = '0 0'
-            }
-            // Render text layer using manual rendering (PDF.js TextLayer not available in 5.4)
-            // TODO: When PDF.js TextLayer API is available, use it as primary method
             try {
+              // Cancel any existing text layer builder for this page
+              const existingBuilder = textLayerInstances.current.get(pageNum)
+              if (existingBuilder) {
+                existingBuilder.cancel()
+              }
+              
+              // Clear the container
               textLayerDiv.innerHTML = ''
               
-              const textContent = await page.getTextContent()
-              
-              // Manual text layer rendering with proper viewport synchronization
-              const textLayerFrag = window.document.createDocumentFragment()
-              
-              // Font family mapping for better PDF font matching
-              const fontMap: Record<string, string> = {
-                'Times-Roman': 'Times, "Times New Roman", serif',
-                'Times-Bold': 'Times, "Times New Roman", serif',
-                'Times-Italic': 'Times, "Times New Roman", serif',
-                'Times-BoldItalic': 'Times, "Times New Roman", serif',
-                'Helvetica': 'Arial, Helvetica, sans-serif',
-                'Helvetica-Bold': 'Arial, Helvetica, sans-serif',
-                'Helvetica-Oblique': 'Arial, Helvetica, sans-serif',
-                'Helvetica-BoldOblique': 'Arial, Helvetica, sans-serif',
-                'Courier': '"Courier New", Courier, monospace',
-                'Courier-Bold': '"Courier New", Courier, monospace',
-                'Courier-Oblique': '"Courier New", Courier, monospace',
-                'Courier-BoldOblique': '"Courier New", Courier, monospace',
-              }
-
-              textContent.items.forEach((item: any, index: number) => {
-                const tx = item.transform
+              // CRITICAL: Match canvas container's positioning and transform exactly
+              // Get the page container (parent of canvas and textLayer)
+              const pageContainer = canvas.parentElement
+              if (pageContainer) {
+                const containerStyles = window.getComputedStyle(pageContainer)
                 
-                // Transform PDF coordinates to viewport coordinates
-                const viewportTransform = viewport.transform || [scale, 0, 0, scale, 0, 0]
-                const scaleX = viewportTransform[0] || scale
-                const scaleY = viewportTransform[3] || scale
-                const pdfX = tx[4]
-                const pdfY = tx[5]
-                const x = pdfX * scaleX
-                const y = pdfY * scaleY
+                // Match container's transform if present
+                const transform = containerStyles.transform
+                const transformOrigin = containerStyles.transformOrigin || '0 0'
                 
-                // Calculate font size
-                const fontSizePDF = Math.abs(tx[3]) || Math.abs(tx[1]) || Math.abs(tx[2]) || 12
-                const fontSize = fontSizePDF * scaleY
-                const fontHeight = fontSize
-                const fontWidth = Math.sqrt((tx[0] * tx[0]) + (tx[1] * tx[1])) * scaleX
+                // Set text layer container size to match canvas exactly
+                textLayerDiv.style.width = viewport.width + 'px'
+                textLayerDiv.style.height = viewport.height + 'px'
+                textLayerDiv.style.position = 'absolute'
+                textLayerDiv.style.top = '0'
+                textLayerDiv.style.left = '0'
+                textLayerDiv.style.transformOrigin = transformOrigin
                 
-                // Accurate baseline calculation
-                const baselineYViewport = viewport.height - y
-                const baselineToTopRatio = 0.70
-                const baselineOffset = fontSize * baselineToTopRatio
-                const topPosition = baselineYViewport - baselineOffset
-                
-                const span = window.document.createElement('span')
-                span.textContent = item.str
-                span.style.position = 'absolute'
-                span.style.left = `${x}px`
-                span.style.top = `${topPosition}px`
-                span.style.fontSize = `${fontSize}px`
-                
-                // Use actual font family from PDF if available
-                const fontName = item.fontName || ''
-                const baseFontName = fontName.split('+').pop() || fontName
-                span.style.fontFamily = fontMap[baseFontName] || baseFontName
-                
-                // Line height matching
-                span.style.lineHeight = `${fontSize}px`
-                span.style.height = `${fontSize}px`
-                span.style.whiteSpace = 'pre'
-                span.style.overflow = 'hidden'
-                
-                // Calculate width - ensure minimum width for clickability
-                let spanWidth = item.width ? item.width * scaleX : 0
-                if (!spanWidth || spanWidth <= 0) {
-                  const avgCharWidth = fontSize * 0.6
-                  spanWidth = item.str.length * avgCharWidth
-                }
-                // Ensure minimum width for empty or very short strings
-                if (spanWidth < 1) {
-                  spanWidth = fontSize * 0.5
-                }
-                
-                // Apply horizontal scaling
-                const charScaleX = fontWidth / fontHeight
-                if (Math.abs(charScaleX - 1) > 0.01) {
-                  span.style.transform = `scaleX(${charScaleX})`
-                  span.style.transformOrigin = '0% 0%'
-                  span.style.width = `${spanWidth / charScaleX}px`
+                // Apply same transform as container if any
+                if (transform && transform !== 'none') {
+                  textLayerDiv.style.transform = transform
                 } else {
-                  span.style.width = `${spanWidth}px`
+                  textLayerDiv.style.transform = 'none'
                 }
-                
-                // Ensure minimum height for clickability
-                span.style.minHeight = `${fontSize}px`
-                span.style.minWidth = `${Math.max(spanWidth, 1)}px`
-                
-                // Character spacing
-                if (item.charSpacing !== undefined && item.charSpacing !== 0) {
-                  span.style.letterSpacing = `${item.charSpacing * scaleX}px`
+              } else {
+                // Fallback: basic positioning if container not found
+                textLayerDiv.style.width = viewport.width + 'px'
+                textLayerDiv.style.height = viewport.height + 'px'
+                textLayerDiv.style.position = 'absolute'
+                textLayerDiv.style.top = '0'
+                textLayerDiv.style.left = '0'
+                textLayerDiv.style.transformOrigin = '0 0'
+              }
+              
+              // Create TextLayerBuilder instance (Firefox's approach)
+              // TextLayerBuilder creates its own div, so we'll replace it with our container
+              const textLayerBuilder = new TextLayerBuilder({
+                pdfPage: page,
+                onAppend: () => {
+                  // Optional callback when text layer is appended
                 }
-                
-                // CRITICAL: Text selection behavior - must be set before appending
-                span.style.color = 'transparent' // Invisible but selectable
-                span.style.userSelect = 'text'
-                span.style.setProperty('-webkit-user-select', 'text', 'important')
-                span.style.setProperty('-moz-user-select', 'text', 'important')
-                span.style.setProperty('-ms-user-select', 'text', 'important')
-                span.style.cursor = 'text'
-                span.style.pointerEvents = 'auto'
-                span.style.setProperty('pointer-events', 'auto', 'important')
-                span.style.display = 'inline-block'
-                span.style.position = 'absolute'
-                span.style.visibility = 'visible'
-                span.style.opacity = '1'
-                
-                // Store data attribute for text anchor mapping
-                span.setAttribute('data-text-index', String(index))
-                
-                textLayerFrag.appendChild(span)
               })
               
-              textLayerDiv.appendChild(textLayerFrag)
+              // Replace TextLayerBuilder's auto-created div with our container
+              // This ensures proper positioning and styling
+              const builderDiv = textLayerBuilder.div
+              textLayerBuilder.div = textLayerDiv
               
-              // Make text layer visible and interactive - CRITICAL for selection
+              // Copy any important attributes from builder's div to our container
+              if (builderDiv.className) {
+                textLayerDiv.className = builderDiv.className
+              }
+              if (builderDiv.tabIndex !== undefined) {
+                textLayerDiv.tabIndex = builderDiv.tabIndex
+              }
+              
+              // Render the text layer
+              await textLayerBuilder.render({
+                viewport: viewport
+              })
+              
+              // Store instance for cleanup
+              textLayerInstances.current.set(pageNum, textLayerBuilder)
+              
+              // Ensure text layer is visible and interactive
               textLayerDiv.style.setProperty('opacity', '1', 'important')
               textLayerDiv.style.setProperty('pointer-events', 'auto', 'important')
               textLayerDiv.style.setProperty('user-select', 'text', 'important')
-              textLayerDiv.style.setProperty('-webkit-user-select', 'text', 'important')
-              textLayerDiv.style.setProperty('-moz-user-select', 'text', 'important')
-              textLayerDiv.style.setProperty('-ms-user-select', 'text', 'important')
+              textLayerDiv.style.setProperty('visibility', 'visible', 'important')
               textLayerDiv.style.setProperty('z-index', '2', 'important')
               textLayerDiv.style.setProperty('position', 'absolute', 'important')
-              textLayerDiv.style.setProperty('top', '0', 'important')
-              textLayerDiv.style.setProperty('left', '0', 'important')
-              textLayerDiv.style.setProperty('width', viewport.width + 'px', 'important')
-              textLayerDiv.style.setProperty('height', viewport.height + 'px', 'important')
-              textLayerDiv.style.setProperty('visibility', 'visible', 'important')
               
-              // Also ensure all spans in this layer are selectable - double check after DOM insertion
-              setTimeout(() => {
-                const spans = textLayerDiv.querySelectorAll('span')
-                spans.forEach(span => {
-                  if (span instanceof HTMLElement && span.style) {
-                    span.style.setProperty('pointer-events', 'auto', 'important')
-                    span.style.setProperty('user-select', 'text', 'important')
-                    span.style.setProperty('-webkit-user-select', 'text', 'important')
-                    span.style.setProperty('-moz-user-select', 'text', 'important')
-                    span.style.setProperty('-ms-user-select', 'text', 'important')
-                    span.style.setProperty('color', 'transparent', 'important')
-                  }
-                })
-              }, 0)
-              
-              // Query spans for logging (they were just appended to DOM)
               const spans = textLayerDiv.querySelectorAll('span')
-              
-              console.log(`📝 Text layer rendered manually for page ${pageNum}:`, {
-                textElements: textContent.items.length,
-                spansRendered: spans.length,
+              console.log(`📝 Text layer rendered with TextLayerBuilder for page ${pageNum}:`, {
                 hasTextLayer: !!textLayerDiv,
-                childSpans: textLayerDiv.children.length
+                textLayerChildren: textLayerDiv.children.length,
+                spansRendered: spans.length
               })
             } catch (error) {
-              console.error(`Error rendering text layer for page ${pageNum}:`, error)
+              console.error(`Error rendering text layer with TextLayerBuilder for page ${pageNum}:`, error)
             }
             
             // Annotation layer for PDF-native annotations (optional)
@@ -1187,6 +976,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     }
 
     renderAllPages()
+    
+    // Cleanup function: cancel all text layer builders when dependencies change
+    return () => {
+      textLayerInstances.current.forEach((builder) => {
+        builder.cancel()
+      })
+      textLayerInstances.current.clear()
+    }
   }, [pdfViewer.readingMode, pdfViewer.scrollMode, numPages, scale, rotation])
   
   // Force text layer interactivity after any render (additional safety net)
