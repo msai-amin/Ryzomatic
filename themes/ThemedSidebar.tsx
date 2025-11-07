@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { FileText, Clock, BookOpen, Tag, Timer, ChevronLeft, ChevronRight, Flame, Trophy, BarChart3, Target, Plus, ChevronDown, ChevronUp, History, GitBranch, TrendingUp, Activity } from 'lucide-react'
+import { FileText, Clock, BookOpen, Tag, Timer, ChevronLeft, ChevronRight, Flame, Trophy, BarChart3, Target, Plus, ChevronDown, ChevronUp, History, GitBranch, TrendingUp, Activity, Network, X } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
 import { pomodoroService } from '../src/services/pomodoroService'
@@ -9,6 +9,7 @@ import { PomodoroDashboard } from '../src/components/PomodoroDashboard'
 import { RelatedDocumentsPanel } from '../src/components/RelatedDocumentsPanel'
 import { AddRelatedDocumentModal } from '../src/components/AddRelatedDocumentModal'
 import { DocumentPreviewModal } from '../src/components/DocumentPreviewModal'
+import { DocumentGraphViewer } from '../src/components/DocumentGraphViewer'
 import { useTheme } from './ThemeProvider'
 import { userBooks, documentRelationships, DocumentRelationshipWithDetails } from '../lib/supabase'
 
@@ -42,6 +43,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
   const [relatedDocsLoading, setRelatedDocsLoading] = useState(false)
   const [showAddRelatedModal, setShowAddRelatedModal] = useState(false)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
+  const [showGraphModal, setShowGraphModal] = useState(false)
   const [selectedRelationship, setSelectedRelationship] = useState<DocumentRelationshipWithDetails | null>(null)
   
   // Collapsible sections state - all collapsed by default
@@ -166,6 +168,12 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
 
     loadRelatedDocuments()
   }, [currentDocument?.id, user, relatedDocumentsRefreshTrigger, setRelatedDocuments])
+
+  useEffect(() => {
+    if (!currentDocument) {
+      setShowGraphModal(false)
+    }
+  }, [currentDocument])
 
   // Poll for AI analysis completion (refresh every 10 seconds if any relationship is processing)
   useEffect(() => {
@@ -471,6 +479,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
                     onAddRelatedDocument={handleAddRelatedDocument}
                     onPreviewDocument={handlePreviewDocument}
                     onDeleteRelationship={handleDeleteRelationship}
+                    onOpenGraphView={() => setShowGraphModal(true)}
                   />
                 ) : (
                   <div className="text-center py-6">
@@ -780,6 +789,45 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
               }}
               onDeleteRelationship={handleDeleteRelationship}
             />
+          )}
+
+          {showGraphModal && user && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+              <div
+                className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden"
+                style={{
+                  backgroundColor: 'var(--color-surface)',
+                  color: 'var(--color-text-primary)',
+                  border: '1px solid var(--color-border)'
+                }}
+              >
+                <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                  <div className="flex items-center space-x-3">
+                    <Network className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
+                    <div>
+                      <h2 className="text-xl font-semibold">Document Relationship Graph</h2>
+                      <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                        Visualize how this document connects to related sources, notes, and memories
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowGraphModal(false)}
+                    className="p-2 rounded-lg transition-colors hover:bg-gray-100"
+                    style={{ color: 'var(--color-text-secondary)' }}
+                    aria-label="Close graph view"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="p-6 max-h-[70vh] overflow-y-auto">
+                  <DocumentGraphViewer
+                    documentId={currentDocument.id}
+                    userId={user.id}
+                  />
+                </div>
+              </div>
+            </div>
           )}
         </>
       )}

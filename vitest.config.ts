@@ -33,7 +33,7 @@ export default defineConfig({
       },
     },
     include: ['**/*.{test,spec}.{js,ts,jsx,tsx}'],
-    exclude: ['node_modules', 'dist', 'build', 'archive'],
+    exclude: ['node_modules', 'dist', 'build', 'archive', 'tests/e2e/**'],
     testTimeout: 10000,
     hookTimeout: 10000,
   },

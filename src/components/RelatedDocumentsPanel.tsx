@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Plus, Eye, Trash2, Loader, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { FileText, Plus, Eye, Trash2, Loader, CheckCircle, AlertCircle, Clock, Network } from 'lucide-react';
 import { DocumentRelationshipWithDetails } from '../../lib/supabase';
 import { Tooltip } from './Tooltip';
 
@@ -9,6 +9,7 @@ interface RelatedDocumentsPanelProps {
   onAddRelatedDocument: () => void;
   onPreviewDocument: (relationship: DocumentRelationshipWithDetails) => void;
   onDeleteRelationship: (relationshipId: string) => void;
+  onOpenGraphView?: () => void;
 }
 
 export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
@@ -16,7 +17,8 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
   isLoading,
   onAddRelatedDocument,
   onPreviewDocument,
-  onDeleteRelationship
+  onDeleteRelationship,
+  onOpenGraphView
 }) => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const hasActiveAnalysis = relatedDocuments.some((relationship) =>
@@ -101,15 +103,28 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
         <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
           Related Documents
         </h3>
-        <Tooltip content="Add Related Document" position="left">
-          <button
-            onClick={onAddRelatedDocument}
-            className="p-1 rounded transition-colors hover:bg-gray-100"
-            style={{ color: 'var(--color-text-secondary)' }}
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </Tooltip>
+        <div className="flex items-center gap-1">
+          {onOpenGraphView && (
+            <Tooltip content="View Document Graph" position="left">
+              <button
+                onClick={onOpenGraphView}
+                className="p-1 rounded transition-colors hover:bg-gray-100"
+                style={{ color: 'var(--color-text-secondary)' }}
+              >
+                <Network className="w-4 h-4" />
+              </button>
+            </Tooltip>
+          )}
+          <Tooltip content="Add Related Document" position="left">
+            <button
+              onClick={onAddRelatedDocument}
+              className="p-1 rounded transition-colors hover:bg-gray-100"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </Tooltip>
+        </div>
       </div>
 
       {/* Document Count */}

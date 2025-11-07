@@ -59,11 +59,16 @@ export function analyzePageQuality(pageText: string, pageNumber: number): PageQu
   }
 
   if (charCount < 50) {
-    issues.push('Very low character count (< 50)')
-    qualityScore -= 40
+    issues.push('Low character count (< 50)')
+    qualityScore -= 20
+
+    if (charCount < 20 && wordCount <= 1) {
+      issues.push('Extremely low textual content (single short word)')
+      qualityScore -= 25
+    }
   } else if (charCount < 100) {
-    issues.push('Low character count (< 100)')
-    qualityScore -= 25
+    issues.push('Reduced character count (< 100)')
+    qualityScore -= 15
   }
 
   // 2. Text density analysis
@@ -74,8 +79,14 @@ export function analyzePageQuality(pageText: string, pageNumber: number): PageQu
   }
 
   // 3. Special character ratio (detect gibberish)
-  const specialChars = pageText.match(/[^a-zA-Z0-9\s\.\,\!\?\:\;\-\(\)\[\]\{\}\"\']/g) || []
-  const specialCharRatio = charCount > 0 ? specialChars.length / charCount : 0
+  const allowedCharRegex = /[\p{L}\p{N}\s.,!?;:()\[\]{}'"-]/u
+  let specialCharCount = 0
+  for (const char of pageText) {
+    if (!allowedCharRegex.test(char)) {
+      specialCharCount++
+    }
+  }
+  const specialCharRatio = charCount > 0 ? specialCharCount / charCount : 0
   
   if (specialCharRatio > 0.3) {
     issues.push('High special character ratio (> 30%) - possible gibberish')
@@ -116,7 +127,6 @@ export function analyzePageQuality(pageText: string, pageNumber: number): PageQu
   // 7. Detect random character sequences (encoding issues)
   const suspiciousPatterns = [
     /\uFFFD{2,}/, // Replacement characters
-    /[^\x00-\x7F]{20,}/, // Long sequences of non-ASCII
     /(.)\1{10,}/, // Same character repeated 10+ times
   ]
   

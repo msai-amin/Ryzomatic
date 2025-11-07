@@ -122,19 +122,18 @@ class ErrorHandler {
     const errorId = this.generateErrorId();
     const timestamp = new Date().toISOString();
 
-    const appError: AppError = {
-      name: 'AppError',
-      message,
-      type,
-      severity,
-      context,
-      recoverable,
-      userMessage: userMessage || this.getDefaultUserMessage(type, severity),
-      technicalDetails,
-      timestamp,
-      errorId,
-      stack: new Error().stack
-    };
+    const baseError = new Error(message);
+    baseError.name = 'AppError';
+
+    const appError = baseError as AppError;
+    appError.type = type;
+    appError.severity = severity;
+    appError.context = context;
+    appError.recoverable = recoverable;
+    appError.userMessage = userMessage || this.getDefaultUserMessage(type, severity);
+    appError.technicalDetails = technicalDetails;
+    appError.timestamp = timestamp;
+    appError.errorId = errorId;
 
     this.addToHistory(appError);
     return appError;

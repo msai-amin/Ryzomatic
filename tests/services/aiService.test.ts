@@ -3,38 +3,62 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { sendMessageToAI, analyzeWithGPT } from '../../src/services/aiService';
+import { 
+  sendMessageToAI, 
+  analyzeWithGPT,
+  __setOpenAIClientForTests,
+  __setGeminiClientForTests
+} from '../../src/services/aiService';
 import { errorHandler } from '../../src/services/errorHandler';
 import { logger } from '../../src/services/logger';
 
-// Mock the AI clients
+// Provide lightweight mocks for external SDKs to prevent actual initialization
 vi.mock('openai', () => ({
-  default: vi.fn().mockImplementation(() => ({
-    chat: {
-      completions: {
-        create: vi.fn()
-      }
-    }
-  }))
+  default: class MockOpenAI {}
 }));
 
 vi.mock('@google/generative-ai', () => ({
-  GoogleGenerativeAI: vi.fn().mockImplementation(() => ({
-    getGenerativeModel: vi.fn().mockReturnValue({
-      generateContent: vi.fn()
-    })
-  }))
+  GoogleGenerativeAI: class MockGemini {}
 }));
+
+const createMockGeminiClient = () => {
+  const generateContent = vi.fn();
+  return {
+    client: {
+      getGenerativeModel: vi.fn().mockReturnValue({ generateContent })
+    },
+    generateContent
+  };
+};
+
+const createMockOpenAIClient = () => {
+  const createCompletion = vi.fn();
+  return {
+    client: {
+      chat: {
+        completions: {
+          create: createCompletion
+        }
+      }
+    },
+    createCompletion
+  };
+};
 
 describe('AI Service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     logger.clearLogs();
     errorHandler.clearErrorHistory();
+    __setGeminiClientForTests(null);
+    __setOpenAIClientForTests(null);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    __setGeminiClientForTests(null);
+    __setOpenAIClientForTests(null);
   });
 
   describe('sendMessageToAI', () => {
@@ -54,24 +78,22 @@ describe('AI Service', () => {
         }
       };
 
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const mockGenAI = new GoogleGenerativeAI('test-key');
-      const mockModel = mockGenAI.getGenerativeModel();
-      mockModel.generateContent.mockResolvedValue(mockGeminiResponse);
-
-      // Mock environment variable
+      const geminiMock = createMockGeminiClient();
+      geminiMock.generateContent.mockResolvedValue(mockGeminiResponse as any);
+      __setGeminiClientForTests(geminiMock.client as any);
       vi.stubEnv('VITE_GEMINI_API_KEY', 'test-key');
 
       const result = await sendMessageToAI('Test message', 'Document content');
+      expect(geminiMock.client.getGenerativeModel).toHaveBeenCalled();
       expect(result).toBe('Gemini response');
     });
 
     it('should handle Gemini API failure and fallback to OpenAI', async () => {
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const mockGenAI = new GoogleGenerativeAI('test-key');
-      const mockModel = mockGenAI.getGenerativeModel();
-      mockModel.generateContent.mockRejectedValue(new Error('Gemini API error'));
+      const geminiMock = createMockGeminiClient();
+      geminiMock.generateContent.mockRejectedValue(new Error('Gemini API error'));
+      __setGeminiClientForTests(geminiMock.client as any);
 
+      const openAIMock = createMockOpenAIClient();
       const mockOpenAIResponse = {
         choices: [{
           message: {
@@ -79,30 +101,26 @@ describe('AI Service', () => {
           }
         }]
       };
+      openAIMock.createCompletion.mockResolvedValue(mockOpenAIResponse as any);
+      __setOpenAIClientForTests(openAIMock.client as any);
 
-      const OpenAI = (await import('openai')).default;
-      const mockOpenAI = new OpenAI({ apiKey: 'test-key' });
-      mockOpenAI.chat.completions.create.mockResolvedValue(mockOpenAIResponse);
-
-      // Mock environment variables
       vi.stubEnv('VITE_GEMINI_API_KEY', 'test-key');
       vi.stubEnv('VITE_OPENAI_API_KEY', 'test-key');
 
       const result = await sendMessageToAI('Test message', 'Document content');
+      expect(openAIMock.createCompletion).toHaveBeenCalled();
       expect(result).toBe('OpenAI response');
     });
 
     it('should handle OpenAI API failure and fallback to mock', async () => {
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const mockGenAI = new GoogleGenerativeAI('test-key');
-      const mockModel = mockGenAI.getGenerativeModel();
-      mockModel.generateContent.mockRejectedValue(new Error('Gemini API error'));
+      const geminiMock = createMockGeminiClient();
+      geminiMock.generateContent.mockRejectedValue(new Error('Gemini API error'));
+      __setGeminiClientForTests(geminiMock.client as any);
 
-      const OpenAI = (await import('openai')).default;
-      const mockOpenAI = new OpenAI({ apiKey: 'test-key' });
-      mockOpenAI.chat.completions.create.mockRejectedValue(new Error('OpenAI API error'));
+      const openAIMock = createMockOpenAIClient();
+      openAIMock.createCompletion.mockRejectedValue(new Error('OpenAI API error'));
+      __setOpenAIClientForTests(openAIMock.client as any);
 
-      // Mock environment variables
       vi.stubEnv('VITE_GEMINI_API_KEY', 'test-key');
       vi.stubEnv('VITE_OPENAI_API_KEY', 'test-key');
 
@@ -125,21 +143,18 @@ describe('AI Service', () => {
       // Mock environment variables
       vi.stubEnv('VITE_GEMINI_API_KEY', 'test-key');
 
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const mockGenAI = new GoogleGenerativeAI('test-key');
-      const mockModel = mockGenAI.getGenerativeModel();
-      
+      const geminiMock = createMockGeminiClient();
       const mockGeminiResponse = {
         response: {
           text: vi.fn().mockReturnValue('Response')
         }
       };
-      mockModel.generateContent.mockResolvedValue(mockGeminiResponse);
+      geminiMock.generateContent.mockResolvedValue(mockGeminiResponse as any);
+      __setGeminiClientForTests(geminiMock.client as any);
 
       await sendMessageToAI('Test message', largeContent);
-      
-      // Verify that the content was truncated
-      const callArgs = mockModel.generateContent.mock.calls[0][0];
+
+      const callArgs = geminiMock.generateContent.mock.calls[0][0];
       expect(callArgs).toContain('x'.repeat(12000)); // Should be truncated to 12000 chars
     });
 
@@ -174,13 +189,13 @@ describe('AI Service', () => {
         }]
       };
 
-      const OpenAI = (await import('openai')).default;
-      const mockOpenAI = new OpenAI({ apiKey: 'test-key' });
-      mockOpenAI.chat.completions.create.mockResolvedValue(mockResponse);
-
+      const openAIMock = createMockOpenAIClient();
+      openAIMock.createCompletion.mockResolvedValue(mockResponse as any);
+      __setOpenAIClientForTests(openAIMock.client as any);
       vi.stubEnv('VITE_OPENAI_API_KEY', 'test-key');
 
       const result = await analyzeWithGPT('Test text', 'framework');
+      expect(openAIMock.createCompletion).toHaveBeenCalled();
       expect(result).toBe('Framework analysis result');
     });
 
@@ -193,10 +208,9 @@ describe('AI Service', () => {
         }]
       };
 
-      const OpenAI = (await import('openai')).default;
-      const mockOpenAI = new OpenAI({ apiKey: 'test-key' });
-      mockOpenAI.chat.completions.create.mockResolvedValue(mockResponse);
-
+      const openAIMock = createMockOpenAIClient();
+      openAIMock.createCompletion.mockResolvedValue(mockResponse as any);
+      __setOpenAIClientForTests(openAIMock.client as any);
       vi.stubEnv('VITE_OPENAI_API_KEY', 'test-key');
 
       const result = await analyzeWithGPT('Test text', 'literary');
@@ -212,10 +226,9 @@ describe('AI Service', () => {
         }]
       };
 
-      const OpenAI = (await import('openai')).default;
-      const mockOpenAI = new OpenAI({ apiKey: 'test-key' });
-      mockOpenAI.chat.completions.create.mockResolvedValue(mockResponse);
-
+      const openAIMock = createMockOpenAIClient();
+      openAIMock.createCompletion.mockResolvedValue(mockResponse as any);
+      __setOpenAIClientForTests(openAIMock.client as any);
       vi.stubEnv('VITE_OPENAI_API_KEY', 'test-key');
 
       const result = await analyzeWithGPT('Test text', 'argument');
@@ -231,10 +244,9 @@ describe('AI Service', () => {
         }]
       };
 
-      const OpenAI = (await import('openai')).default;
-      const mockOpenAI = new OpenAI({ apiKey: 'test-key' });
-      mockOpenAI.chat.completions.create.mockResolvedValue(mockResponse);
-
+      const openAIMock = createMockOpenAIClient();
+      openAIMock.createCompletion.mockResolvedValue(mockResponse as any);
+      __setOpenAIClientForTests(openAIMock.client as any);
       vi.stubEnv('VITE_OPENAI_API_KEY', 'test-key');
 
       const result = await analyzeWithGPT('Test text', 'synthesis');
@@ -243,15 +255,15 @@ describe('AI Service', () => {
 
     it('should throw error when OpenAI is not configured', async () => {
       vi.stubEnv('VITE_OPENAI_API_KEY', undefined);
+      __setOpenAIClientForTests(null);
 
       await expect(analyzeWithGPT('Test text')).rejects.toThrow('OpenAI API is not configured');
     });
 
     it('should handle OpenAI API errors', async () => {
-      const OpenAI = (await import('openai')).default;
-      const mockOpenAI = new OpenAI({ apiKey: 'test-key' });
-      mockOpenAI.chat.completions.create.mockRejectedValue(new Error('OpenAI API error'));
-
+      const openAIMock = createMockOpenAIClient();
+      openAIMock.createCompletion.mockRejectedValue(new Error('OpenAI API error'));
+      __setOpenAIClientForTests(openAIMock.client as any);
       vi.stubEnv('VITE_OPENAI_API_KEY', 'test-key');
 
       await expect(analyzeWithGPT('Test text')).rejects.toThrow('OpenAI API error');
@@ -266,30 +278,25 @@ describe('AI Service', () => {
         }]
       };
 
-      const OpenAI = (await import('openai')).default;
-      const mockOpenAI = new OpenAI({ apiKey: 'test-key' });
-      mockOpenAI.chat.completions.create.mockResolvedValue(mockResponse);
-
+      const openAIMock = createMockOpenAIClient();
+      openAIMock.createCompletion.mockResolvedValue(mockResponse as any);
+      __setOpenAIClientForTests(openAIMock.client as any);
       vi.stubEnv('VITE_OPENAI_API_KEY', 'test-key');
 
-      // Test framework analysis
       await analyzeWithGPT('Test text', 'framework');
-      let callArgs = mockOpenAI.chat.completions.create.mock.calls[0][0];
+      let callArgs = openAIMock.createCompletion.mock.calls[0][0];
       expect(callArgs.messages[0].content).toContain('theoretical frameworks');
 
-      // Test literary analysis
       await analyzeWithGPT('Test text', 'literary');
-      callArgs = mockOpenAI.chat.completions.create.mock.calls[1][0];
+      callArgs = openAIMock.createCompletion.mock.calls[1][0];
       expect(callArgs.messages[0].content).toContain('Rhetorical devices');
 
-      // Test argument analysis
       await analyzeWithGPT('Test text', 'argument');
-      callArgs = mockOpenAI.chat.completions.create.mock.calls[2][0];
+      callArgs = openAIMock.createCompletion.mock.calls[2][0];
       expect(callArgs.messages[0].content).toContain('philosophical argument');
 
-      // Test synthesis analysis
       await analyzeWithGPT('Test text', 'synthesis');
-      callArgs = mockOpenAI.chat.completions.create.mock.calls[3][0];
+      callArgs = openAIMock.createCompletion.mock.calls[3][0];
       expect(callArgs.messages[0].content).toContain('Synthesize the key ideas');
     });
   });
@@ -298,16 +305,14 @@ describe('AI Service', () => {
     it('should track performance metrics for sendMessageToAI', async () => {
       vi.stubEnv('VITE_GEMINI_API_KEY', 'test-key');
 
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const mockGenAI = new GoogleGenerativeAI('test-key');
-      const mockModel = mockGenAI.getGenerativeModel();
-      
+      const geminiMock = createMockGeminiClient();
       const mockGeminiResponse = {
         response: {
           text: vi.fn().mockReturnValue('Response')
         }
       };
-      mockModel.generateContent.mockResolvedValue(mockGeminiResponse);
+      geminiMock.generateContent.mockResolvedValue(mockGeminiResponse as any);
+      __setGeminiClientForTests(geminiMock.client as any);
 
       await sendMessageToAI('Test message', 'Document content');
 
@@ -326,10 +331,9 @@ describe('AI Service', () => {
         }]
       };
 
-      const OpenAI = (await import('openai')).default;
-      const mockOpenAI = new OpenAI({ apiKey: 'test-key' });
-      mockOpenAI.chat.completions.create.mockResolvedValue(mockResponse);
-
+      const openAIMock = createMockOpenAIClient();
+      openAIMock.createCompletion.mockResolvedValue(mockResponse as any);
+      __setOpenAIClientForTests(openAIMock.client as any);
       vi.stubEnv('VITE_OPENAI_API_KEY', 'test-key');
 
       await analyzeWithGPT('Test text', 'framework');
@@ -351,19 +355,17 @@ describe('AI Service', () => {
     });
 
     it('should handle API errors gracefully', async () => {
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const mockGenAI = new GoogleGenerativeAI('test-key');
-      const mockModel = mockGenAI.getGenerativeModel();
-      mockModel.generateContent.mockRejectedValue(new Error('API Error'));
+      const geminiMock = createMockGeminiClient();
+      geminiMock.generateContent.mockRejectedValue(new Error('API Error'));
+      __setGeminiClientForTests(geminiMock.client as any);
 
-      const OpenAI = (await import('openai')).default;
-      const mockOpenAI = new OpenAI({ apiKey: 'test-key' });
-      mockOpenAI.chat.completions.create.mockRejectedValue(new Error('API Error'));
+      const openAIMock = createMockOpenAIClient();
+      openAIMock.createCompletion.mockRejectedValue(new Error('API Error'));
+      __setOpenAIClientForTests(openAIMock.client as any);
 
       vi.stubEnv('VITE_GEMINI_API_KEY', 'test-key');
       vi.stubEnv('VITE_OPENAI_API_KEY', 'test-key');
 
-      // Should not throw, should return mock response
       const result = await sendMessageToAI('Test message', 'Document content');
       expect(result).toContain('I understand you\'re asking about the document');
     });

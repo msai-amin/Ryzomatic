@@ -21,20 +21,65 @@ logger.info('AI Service Initialization', {
 });
 
 // Initialize OpenAI client
-const openai = openaiApiKey ? new OpenAI({
-  apiKey: openaiApiKey,
-  dangerouslyAllowBrowser: true // Only for client-side usage
-}) : null;
+const createOpenAIClient = () => {
+  if (!openaiApiKey) {
+    return null;
+  }
+
+  const config = {
+    apiKey: openaiApiKey,
+    dangerouslyAllowBrowser: true // Only for client-side usage
+  } as const;
+
+  try {
+    const OpenAIConstructor = OpenAI as unknown as new (options: typeof config) => OpenAI;
+    return new OpenAIConstructor(config);
+  } catch (error) {
+    if (error instanceof TypeError) {
+      const factory = OpenAI as unknown as (options: typeof config) => OpenAI;
+      return factory(config);
+    }
+    throw error;
+  }
+};
+
+let openaiClient = createOpenAIClient();
 
 // Initialize Gemini client
-const genAI = geminiApiKey ? new GoogleGenerativeAI(geminiApiKey) : null;
+const createGeminiClient = () => {
+  if (!geminiApiKey) {
+    return null;
+  }
+
+  try {
+    const GeminiConstructor = GoogleGenerativeAI as unknown as new (apiKey: string) => GoogleGenerativeAI;
+    return new GeminiConstructor(geminiApiKey);
+  } catch (error) {
+    if (error instanceof TypeError) {
+      const factory = GoogleGenerativeAI as unknown as (apiKey: string) => GoogleGenerativeAI;
+      return factory(geminiApiKey);
+    }
+    throw error;
+  }
+};
+
+let geminiClient = createGeminiClient();
+
+// Test hooks for injecting mock clients
+export const __setOpenAIClientForTests = (client: any) => {
+  openaiClient = client;
+};
+
+export const __setGeminiClientForTests = (client: any) => {
+  geminiClient = client;
+};
 
 // Helper function to get the appropriate Gemini model based on tier
 const getGeminiModel = (tier: 'free' | 'pro' | 'premium' | 'enterprise' = 'free') => {
-  if (!genAI) return null;
+  if (!geminiClient) return null;
   
   const modelName = tier === 'free' ? 'gemini-2.5-flash-lite' : 'gemini-2.5-pro';
-  return genAI.getGenerativeModel({ model: modelName });
+  return geminiClient.getGenerativeModel({ model: modelName });
 };
 
 // Load the SQ3R system prompt
@@ -87,10 +132,14 @@ export const sendMessageToAI = async (
   if (documentContent) {
     const contentValidation = validateDocumentContent(documentContent, context);
     if (!contentValidation.isValid) {
-      logger.warn('Document content validation failed', context, undefined, {
-        errors: contentValidation.errors,
-        warnings: contentValidation.warnings
-      });
+      const error = errorHandler.createError(
+        `Invalid document content: ${contentValidation.errors.join(', ')}`,
+        ErrorType.VALIDATION,
+        ErrorSeverity.MEDIUM,
+        context,
+        { validationErrors: contentValidation.errors }
+      );
+      throw error;
     }
   }
 
@@ -116,7 +165,7 @@ export const sendMessageToAI = async (
     }
 
     // Try Gemini first (better for large contexts and free tier)
-    if (genAI) {
+    if (geminiClient) {
       try {
         logger.info('Using Gemini API', context, {
           messageLength: message.length,
@@ -159,7 +208,7 @@ Please provide a helpful, accurate response:`;
     }
 
     // Try GPT-4o-mini next (cost-effective for academic analysis)
-    if (openai && openaiApiKey && openaiApiKey !== 'your_openai_api_key_here') {
+    if (openaiClient) {
       try {
         logger.info('Using OpenAI GPT-4o-mini API', context, {
           messageLength: message.length,
@@ -169,7 +218,7 @@ Please provide a helpful, accurate response:`;
 
         const baseSystemPrompt = mode === 'study' || mode === 'notes' ? sq3rPrompt : '';
         
-        const completion = await openai.chat.completions.create({
+        const completion = await openaiClient.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
             {
@@ -208,8 +257,8 @@ ${truncatedContent ?
 
     // If both APIs are unavailable or failed, use mock responses
     logger.warn('No AI API keys configured, using mock responses', context, undefined, {
-      openaiConfigured: !!openaiApiKey,
-      geminiConfigured: !!geminiApiKey
+      openaiConfigured: !!openaiClient,
+      geminiConfigured: !!geminiClient
     });
     
     return getMockResponse(message, documentContent);
@@ -226,17 +275,6 @@ const getMockResponse = (message: string, documentContent?: string): string => {
   // const delay = 1000 + Math.random() * 2000
   
   // Mock AI responses based on the message content
-  const responses = [
-    "I understand you're asking about the document. Let me help you with that.",
-    "Based on the content I can see, here's what I found...",
-    "That's an interesting question about the text. Let me analyze it for you.",
-    "I can help you understand this better. Here's my analysis...",
-    "Looking at the document content, I can provide some insights...",
-    "Let me break this down for you based on what I can see in the text.",
-    "I'd be happy to help you with that. Here's what I think...",
-    "That's a great question! Based on the document, here's my response...",
-  ]
-
   // Simple keyword-based responses for demo purposes
   if (message.toLowerCase().includes('summary') || message.toLowerCase().includes('summarize')) {
     return `Here's a summary of the document content:\n\n${documentContent ? 
@@ -264,8 +302,8 @@ const getMockResponse = (message: string, documentContent?: string): string => {
   }
 
   // Default response
-  const randomResponse = responses[Math.floor(Math.random() * responses.length)]
-  return `${randomResponse}\n\n${documentContent ? 
+  const baseResponse = "I understand you're asking about the document. Let me help you with that."
+  return `${baseResponse}\n\n${documentContent ? 
     `I can see you have a document with ${documentContent.length} characters. ` +
     `In a real implementation, I would analyze this content to provide more specific answers.` :
     'To provide more helpful responses, please upload a document first.'
@@ -296,9 +334,9 @@ export const analyzeWithGPT = async (
     throw error;
   }
 
-  if (!openai) {
+  if (!openaiClient) {
     const error = errorHandler.createError(
-      'OpenAI API is not configured. Please set VITE_OPENAI_API_KEY in your .env file',
+      'OpenAI API is not configured. Please set VITE_OPENAI_API_KEY in your .env file.',
       ErrorType.AI_SERVICE,
       ErrorSeverity.HIGH,
       context
@@ -351,7 +389,7 @@ Text: ${text}`
         analysisType
       });
 
-      const completion = await openai.chat.completions.create({
+      const completion = await openaiClient.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [{
           role: 'user',
@@ -409,7 +447,7 @@ Please provide:
 
 Please be clear, concise, and helpful.`;
 
-    if (genAI) {
+    if (geminiClient) {
       try {
         logger.info('Using Gemini for clarification', logContext, {
           selectedTextLength: selectedText.length,
@@ -431,14 +469,14 @@ Please be clear, concise, and helpful.`;
       }
     }
 
-    if (openai && openaiApiKey && openaiApiKey !== 'your_openai_api_key_here') {
+    if (openaiClient) {
       try {
         logger.info('Using OpenAI for clarification', logContext, {
           selectedTextLength: selectedText.length,
           contextLength: context.length
         });
 
-        const completion = await openai.chat.completions.create({
+        const completion = await openaiClient.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
             {
@@ -506,7 +544,7 @@ Please provide:
 
 Be specific and actionable in your suggestions.`;
 
-    if (genAI) {
+    if (geminiClient) {
       try {
         logger.info('Using Gemini for further reading suggestions', logContext, {
           selectedTextLength: selectedText.length,
@@ -528,14 +566,14 @@ Be specific and actionable in your suggestions.`;
       }
     }
 
-    if (openai && openaiApiKey && openaiApiKey !== 'your_openai_api_key_here') {
+    if (openaiClient) {
       try {
         logger.info('Using OpenAI for further reading suggestions', logContext, {
           selectedTextLength: selectedText.length,
           contextLength: context.length
         });
 
-        const completion = await openai.chat.completions.create({
+        const completion = await openaiClient.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
             {
@@ -570,9 +608,6 @@ Be specific and actionable in your suggestions.`;
     contextLength: context.length
   });
 };
-
-// Export the AI clients for advanced usage
-export { openai, genAI };
 
 // In a real implementation, you would replace this with actual API calls:
 /*
