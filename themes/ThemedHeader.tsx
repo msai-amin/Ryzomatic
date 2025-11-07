@@ -335,6 +335,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
           {/* Show Library and Upload only when user is signed in */}
           {user && (
             <>
+              <div id="pomodoro-collapsed-anchor" className="flex items-center mr-2 min-w-0" />
               <Tooltip content="View Library" position="bottom">
                 <button
                   data-tour="library-button"

@@ -636,11 +636,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   })),
   
   addChatMessage: (message) => set((state) => ({
-    chatMessages: [...state.chatMessages, {
-      ...message,
-      id: crypto.randomUUID(),
-      timestamp: new Date()
-    }]
+    chatMessages: [
+      ...state.chatMessages,
+      {
+        ...message,
+        id: message.id || crypto.randomUUID(),
+        timestamp: message.timestamp || new Date()
+      }
+    ]
   })),
   
   clearChat: () => set({ chatMessages: [] }),

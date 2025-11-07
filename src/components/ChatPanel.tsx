@@ -103,12 +103,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ onClose }) => {
     }
   }
 
+  const createMessageId = () => `${Date.now()}_${Math.random().toString(36).slice(2)}`
+
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isTyping) return
 
     const userMessage = inputValue.trim()
+    const userMessageId = createMessageId()
     setInputValue('')
-    addChatMessage({ role: 'user', content: userMessage })
+    addChatMessage({ role: 'user', content: userMessage, id: userMessageId })
 
     try {
       setTyping(true)
@@ -140,11 +143,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ onClose }) => {
       }
       
       const response = await sendMessageToAI(userMessage, documentContext, user?.tier || 'free')
-      addChatMessage({ role: 'assistant', content: response })
+      addChatMessage({ role: 'assistant', content: response, id: createMessageId() })
     } catch (error) {
       addChatMessage({ 
         role: 'assistant', 
-        content: 'Sorry, I encountered an error. Please try again.' 
+        content: 'Sorry, I encountered an error. Please try again.',
+        id: createMessageId() 
       })
     } finally {
       setTyping(false)
@@ -152,7 +156,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ onClose }) => {
   }
 
   const handleSaveAsNote = async (message: typeof chatMessages[0]) => {
-    if (!currentDocument || message.role !== 'assistant') return
+    if (!currentDocument || message.role !== 'assistant' || !message.id) return
 
     setSavingNoteId(message.id)
     
@@ -169,7 +173,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ onClose }) => {
         message.content,
         currentDocument.id,
         currentDocument.name,
-        currentDocument.totalPages ? 1 : 1, // Use current page if available
+        Math.max(1, currentDocument.currentPage || 1),
         selectedTextContext?.selectedText,
         mode
       )

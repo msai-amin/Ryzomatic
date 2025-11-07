@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Play, Pause, Square, Settings, ChevronUp, ChevronDown, Timer } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { Tooltip } from './Tooltip'
@@ -86,22 +87,32 @@ export const PomodoroBottomBar: React.FC<PomodoroBottomBarProps> = ({ onExpand }
   }
 
   if (isCollapsed) {
-    return (
-      <div 
-        className="fixed top-4 right-20 z-50 transition-all duration-300"
+    const renderInHeader = typeof document !== 'undefined' && !!document.getElementById('pomodoro-collapsed-anchor')
+
+    const collapsedButton = (
+      <div
+        className={`${renderInHeader ? 'inline-flex items-center transition-all duration-300 mr-2' : 'fixed top-4 right-20 z-50 transition-all duration-300'}`}
         style={{
           backgroundColor: modeInfo.bgColor,
           border: `1px solid ${modeInfo.borderColor}`,
           borderRadius: 'var(--border-radius-lg)',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          boxShadow: renderInHeader ? 'none' : '0 4px 12px rgba(0, 0, 0, 0.15)'
         }}
       >
         <button
           onClick={() => setIsCollapsed(false)}
-          className="flex items-center space-x-2 p-3 rounded-lg transition-colors"
-          style={{ color: modeInfo.color }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+          className="flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors"
+          style={{ color: modeInfo.color, backgroundColor: 'transparent' }}
+          onMouseEnter={(e) => {
+            if (!renderInHeader) {
+              e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)'
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!renderInHeader) {
+              e.currentTarget.style.backgroundColor = 'transparent'
+            }
+          }}
         >
           <span className="text-lg">{modeInfo.icon}</span>
           <span className="text-sm font-medium">{formatTime(timerState.timeLeft)}</span>
@@ -109,6 +120,13 @@ export const PomodoroBottomBar: React.FC<PomodoroBottomBarProps> = ({ onExpand }
         </button>
       </div>
     )
+
+    if (renderInHeader) {
+      const anchor = document.getElementById('pomodoro-collapsed-anchor')!
+      return createPortal(collapsedButton, anchor)
+    }
+
+    return collapsedButton
   }
 
   return (
