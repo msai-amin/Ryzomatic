@@ -19,6 +19,10 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
   onDeleteRelationship
 }) => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const hasActiveAnalysis = relatedDocuments.some((relationship) =>
+    relationship.relevance_calculation_status === 'processing' ||
+    relationship.relevance_calculation_status === 'pending'
+  );
 
   const getRelevanceColor = (percentage?: number) => {
     if (!percentage) return 'var(--color-text-tertiary)';
@@ -78,6 +82,20 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
 
   return (
     <div className="space-y-3">
+      {hasActiveAnalysis && (
+        <div
+          className="flex items-center space-x-2 px-3 py-2 rounded-lg border text-xs"
+          style={{
+            borderColor: 'var(--color-border)',
+            backgroundColor: 'var(--color-primary-light)',
+            color: 'var(--color-primary-dark)'
+          }}
+        >
+          <Loader className="w-3 h-3 animate-spin" />
+          <span>AI is building the relationship between documents...</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
