@@ -1,7 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const runtimeEnv =
+  typeof process !== 'undefined' && process.env
+    ? (process.env as Record<string, string | undefined>)
+    : {};
+
+const supabaseUrl =
+  import.meta.env.VITE_SUPABASE_URL ||
+  runtimeEnv.VITE_SUPABASE_URL ||
+  runtimeEnv.SUPABASE_URL;
+
+const supabaseAnonKey =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  runtimeEnv.VITE_SUPABASE_ANON_KEY ||
+  runtimeEnv.SUPABASE_ANON_KEY;
 
 console.log('=== Supabase Environment Variables Debug ===');
 console.log('VITE_SUPABASE_URL:', supabaseUrl);
@@ -13,25 +25,26 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('URL:', supabaseUrl);
   console.error('Key present:', !!supabaseAnonKey);
   console.warn('Running without Supabase - some features may not work');
-  // Don't throw error in development, just warn
   if (import.meta.env.DEV) {
     console.warn('Development mode: Supabase not configured');
-  } else {
-    throw new Error('Missing Supabase environment variables');
   }
 }
 
-export const supabase = supabaseUrl && supabaseAnonKey 
-  ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        storage: window.localStorage,
-        storageKey: 'sb-auth-token',
-      }
-    })
-  : null;
+const authStorage =
+  typeof window !== 'undefined' ? window.localStorage : undefined;
+
+export const supabase =
+  supabaseUrl && supabaseAnonKey
+    ? createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          storage: authStorage,
+          storageKey: 'sb-auth-token',
+        },
+      })
+    : null;
 
 export interface AuthUser {
   id: string;
