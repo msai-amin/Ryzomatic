@@ -44,6 +44,7 @@ export interface Document {
   epubData?: Blob
   totalPages?: number
   pageTexts?: string[]
+  pageHtml?: string[]
   cleanedPageTexts?: string[] // Array of cleaned text for each page (for TTS in reading mode)
   metadata?: Record<string, any>
   // OCR properties

@@ -933,4 +933,15 @@
   color: #f97316;
 }
 
+.epub-search-highlight {
+  background-color: rgba(250, 204, 21, 0.6);
+  color: inherit;
+  padding: 0 0.1em;
+  border-radius: 0.15em;
+}
+
+.dark .epub-search-highlight {
+  background-color: rgba(250, 204, 21, 0.35);
+}
+
 

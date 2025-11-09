@@ -14,6 +14,7 @@ import { SmartCollectionItem } from './library/SmartCollectionItem';
 import { RecentBookCard } from './library/RecentBookCard';
 import { BulkActionsToolbar } from './library/BulkActionsToolbar';
 import { DocumentUpload } from './DocumentUpload';
+import { extractEpub } from '../services/epubExtractionOrchestrator';
 
 interface ModernLibraryModalProps {
   isOpen: boolean;
@@ -193,8 +194,10 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
       }
 
       // Convert to Document format
-      const cleanedPageTexts = sanitizePageTexts(bookData.pageTexts);
-      const combinedContent =
+      let cleanedPageTexts = sanitizePageTexts(bookData.pageTexts);
+      let metadata: Record<string, any> = bookData.custom_metadata || {}
+      let pageHtml: string[] | undefined;
+      let combinedContent =
         cleanedPageTexts.length > 0
           ? cleanedPageTexts.join('\n\n')
           : typeof bookData.text_content === 'string'
@@ -202,6 +205,26 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
             : typeof bookData.fileData === 'string'
               ? bookData.fileData
               : '';
+      let totalPages = bookData.totalPages;
+      const epubBlob =
+        bookData.type === 'epub' && bookData.fileData instanceof ArrayBuffer
+          ? new Blob([bookData.fileData], { type: 'application/epub+zip' })
+          : undefined;
+
+      if (bookData.type === 'epub' && epubBlob) {
+        try {
+          const extraction = await extractEpub(epubBlob);
+          if (extraction.success && extraction.sections.length > 0) {
+            cleanedPageTexts = extraction.sections;
+            pageHtml = extraction.sectionsHtml;
+            combinedContent = extraction.content;
+            totalPages = extraction.totalSections;
+            metadata = { ...metadata, ...extraction.metadata }
+          }
+        } catch (extractionError) {
+          console.warn('Failed to parse EPUB content when opening search result:', extractionError);
+        }
+      }
 
       const document = {
         id: bookData.id,
@@ -210,14 +233,13 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
         type: bookData.type as 'text' | 'pdf' | 'epub',
         uploadedAt: bookData.savedAt,
         pdfData: bookData.type === 'pdf' ? bookData.fileData : undefined,
-        epubData:
-          bookData.type === 'epub' && bookData.fileData instanceof ArrayBuffer
-            ? new Blob([bookData.fileData], { type: 'application/epub+zip' })
-            : undefined,
-        totalPages: bookData.totalPages,
+        epubData: epubBlob,
+        totalPages,
         lastReadPage: bookData.lastReadPage,
         pageTexts: cleanedPageTexts,
-        cleanedPageTexts: bookData.cleanedPageTexts || cleanedPageTexts
+        pageHtml,
+        cleanedPageTexts: bookData.cleanedPageTexts || cleanedPageTexts,
+        metadata
       };
 
       // Set the current document and close the library

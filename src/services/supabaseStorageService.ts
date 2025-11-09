@@ -15,6 +15,7 @@ export interface SavedBook {
   fileData?: ArrayBuffer | string | Blob;
   pdfDataBase64?: string;
   pageTexts?: string[];
+  pageHtml?: string[];
   cleanedPageTexts?: string[]; // Cleaned text for TTS in reading mode
   notes?: Note[];
   googleDriveId?: string;

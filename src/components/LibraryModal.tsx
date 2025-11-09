@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Book, FileText, Music, Trash2, Download, Upload, HardDrive, Cloud, CloudOff, RefreshCw } from 'lucide-react';
 import { storageService, SavedBook, Note, SavedAudio } from '../services/storageService'
+import { extractEpub } from '../services/epubExtractionOrchestrator'
 import { supabaseStorageService } from '../services/supabaseStorageService';
 import { useAppStore } from '../store/appStore';
 // import { googleAuthService } from '../services/googleAuthService';
@@ -109,7 +110,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
     return pageTexts.map(text => typeof text === 'string' ? text : String(text || ''));
   };
 
-  const handleOpenBook = (book: SavedBook) => {
+  const handleOpenBook = async (book: SavedBook) => {
     try {
       console.log('Opening book from Library:', {
         id: book.id,
@@ -206,13 +207,35 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       }
     }
 
-    const cleanedPageTexts = sanitizePageTexts(book.pageTexts);
-    const combinedContent =
+    let cleanedPageTexts = sanitizePageTexts(book.pageTexts);
+    let metadata: Record<string, any> = book.custom_metadata || {}
+    let pageHtml: string[] | undefined;
+    let combinedContent =
       cleanedPageTexts.length > 0
         ? cleanedPageTexts.join('\n\n')
         : typeof book.fileData === 'string'
           ? book.fileData
           : book.text_content || '';
+    let totalPages = book.totalPages;
+    let epubBlob: Blob | undefined =
+      book.type === 'epub' && book.fileData instanceof ArrayBuffer
+        ? new Blob([book.fileData], { type: 'application/epub+zip' })
+        : undefined;
+
+    if (book.type === 'epub' && epubBlob) {
+      try {
+        const extraction = await extractEpub(epubBlob);
+        if (extraction.success && extraction.sections.length > 0) {
+          cleanedPageTexts = extraction.sections;
+          pageHtml = extraction.sectionsHtml;
+          combinedContent = extraction.content;
+          totalPages = extraction.totalSections;
+          metadata = { ...metadata, ...extraction.metadata }
+        }
+      } catch (extractionError) {
+        console.warn('Failed to parse EPUB content when opening book:', extractionError);
+      }
+    }
 
     const doc = {
       id: book.id,
@@ -221,14 +244,13 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       type: book.type,
       uploadedAt: book.savedAt,
       pdfData: book.type === 'pdf' ? book.fileData as ArrayBuffer : undefined,
-      epubData:
-        book.type === 'epub' && book.fileData instanceof ArrayBuffer
-          ? new Blob([book.fileData], { type: 'application/epub+zip' })
-          : undefined,
-      totalPages: book.totalPages,
+      epubData: epubBlob,
+      totalPages,
       lastReadPage: book.lastReadPage,
       pageTexts: cleanedPageTexts,
-      cleanedPageTexts
+      pageHtml,
+      cleanedPageTexts,
+      metadata
     };
 
       console.log('Document created for app store:', {

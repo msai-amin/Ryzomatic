@@ -348,7 +348,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
 
         setExtractionProgress(`✓ ${extractionResult.totalSections} sections extracted successfully`);
 
-        const { content, sections, metadata } = extractionResult;
+        const { content, sections, sectionsHtml, metadata } = extractionResult;
 
         const document = {
           id: crypto.randomUUID(),
@@ -359,6 +359,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
           epubData: file,
           totalPages: extractionResult.totalSections,
           pageTexts: sections,
+          pageHtml: sectionsHtml,
           cleanedPageTexts: sections,
           needsOCR: false,
           ocrStatus: 'not_needed' as const,

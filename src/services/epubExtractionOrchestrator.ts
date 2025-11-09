@@ -14,6 +14,7 @@ export interface EpubExtractionResult {
   success: boolean
   content: string
   sections: string[]
+  sectionsHtml: string[]
   totalSections: number
   metadata: {
     title?: string
@@ -134,6 +135,7 @@ export async function extractEpub(
       rootfilePath.lastIndexOf('/') >= 0 ? rootfilePath.slice(0, rootfilePath.lastIndexOf('/') + 1) : ''
 
     const sections: string[] = []
+    const sectionsHtml: string[] = []
     const chapters: EpubExtractionResult['metadata']['chapters'] = []
 
     for (const spineItem of spine) {
@@ -160,10 +162,16 @@ export async function extractEpub(
       contentDoc.querySelectorAll('script').forEach((node) => node.remove())
       contentDoc.querySelectorAll('style').forEach((node) => node.remove())
 
-      const bodyText = cleanText(contentDoc.body?.textContent || '')
-      if (!bodyText) continue
+      const bodyElement = contentDoc.body
+      const bodyText = cleanText(bodyElement?.textContent || '')
+      const rawHtml = bodyElement?.innerHTML?.trim() || ''
+
+      if (!bodyText && !rawHtml) {
+        continue
+      }
 
       sections.push(bodyText)
+      sectionsHtml.push(rawHtml)
 
       const chapterTitle =
         cleanText(
@@ -183,6 +191,7 @@ export async function extractEpub(
       success: true,
       content,
       sections,
+      sectionsHtml,
       totalSections: sections.length,
       metadata: {
         title,
@@ -198,6 +207,7 @@ export async function extractEpub(
       success: false,
       content: '',
       sections: [],
+      sectionsHtml: [],
       totalSections: 0,
       metadata: {
         chapters: []

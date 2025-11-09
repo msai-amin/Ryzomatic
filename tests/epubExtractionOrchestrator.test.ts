@@ -74,6 +74,8 @@ describe('extractEpub', () => {
     expect(result.sections).toHaveLength(2)
     expect(result.sections[0]).toContain('This is the first chapter.')
     expect(result.sections[1]).toContain('This is the second chapter.')
+    expect(result.sectionsHtml).toHaveLength(2)
+    expect(result.sectionsHtml[0]).toMatch(/<p[^>]*>This is the first chapter\./)
     expect(result.metadata.title).toBe('Test EPUB')
     expect(result.metadata.chapters).toHaveLength(2)
   })
@@ -87,6 +89,7 @@ describe('extractEpub', () => {
 
     expect(result.success).toBe(false)
     expect(result.sections).toHaveLength(0)
+    expect(result.sectionsHtml).toHaveLength(0)
     expect(result.content).toBe('')
   })
 })

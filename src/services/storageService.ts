@@ -18,6 +18,7 @@ export interface SavedBook {
   fileData?: ArrayBuffer | string | Blob;
   pdfDataBase64?: string; // Base64 encoded PDF data for storage
   pageTexts?: string[]; // Add pageTexts for PDF documents
+  pageHtml?: string[];
   notes?: Note[];
   googleDriveId?: string; // Google Drive file ID for sync
   syncedAt?: Date; // Last sync timestamp
