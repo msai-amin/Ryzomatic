@@ -122,8 +122,11 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         fileDataLength: book.fileData ? (book.fileData as any).byteLength || (book.fileData as any).length : 0
       });
 
-    // Ensure PDF data is properly loaded
-    if (book.type === 'pdf') {
+    // Ensure binary data is properly loaded for PDF/EPUB books
+    if (book.type === 'pdf' || book.type === 'epub') {
+      const isPdf = book.type === 'pdf';
+      const formatLabel = isPdf ? 'PDF' : 'EPUB';
+
       if (!book.fileData && book.pdfDataBase64) {
         console.log('Converting base64 to ArrayBuffer...');
         try {
@@ -140,16 +143,16 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
           });
         } catch (error) {
           console.error('Error converting base64 to ArrayBuffer:', error);
-          throw new Error('Failed to load PDF data from library');
+          throw new Error(`Failed to load ${formatLabel} data from library`);
         }
       } else if (!book.fileData && !book.pdfDataBase64) {
-        console.error('PDF book has no data:', {
+        console.error(`${formatLabel} book has no data:`, {
           id: book.id,
           title: book.title,
           hasFileData: !!book.fileData,
           hasPdfDataBase64: !!book.pdfDataBase64
         });
-        throw new Error('PDF data is missing from library. Please re-upload the file.');
+        throw new Error(`${formatLabel} data is missing from library. Please re-upload the file.`);
       } else if (book.fileData && !(book.fileData instanceof ArrayBuffer)) {
         console.log('FileData is not ArrayBuffer, attempting conversion...');
         try {
@@ -162,16 +165,16 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
             book.fileData = bytes.buffer as ArrayBuffer;
           } else if (typeof book.fileData === 'object' && book.fileData !== null) {
             // Handle legacy data format - this is likely corrupted data from before base64 conversion
-            console.warn('Legacy PDF data detected, this book may need to be re-uploaded:', {
+            console.warn(`Legacy ${formatLabel} data detected, this book may need to be re-uploaded:`, {
               fileDataType: typeof book.fileData,
               fileDataConstructor: book.fileData.constructor?.name,
               fileDataKeys: Object.keys(book.fileData),
               hasPdfDataBase64: !!book.pdfDataBase64
             });
-            throw new Error('This PDF was saved in an old format and cannot be loaded. Please re-upload the PDF file.');
+            throw new Error(`This ${formatLabel} was saved in an old format and cannot be loaded. Please re-upload the file.`);
           } else {
             console.error('Unknown fileData type:', typeof book.fileData, book.fileData?.constructor?.name);
-            throw new Error('Invalid PDF data format in library');
+            throw new Error(`Invalid ${formatLabel} data format in library`);
           }
           console.log('Conversion successful:', {
             byteLength: book.fileData.byteLength,
@@ -179,13 +182,13 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
           });
         } catch (error) {
           console.error('Error converting fileData to ArrayBuffer:', error);
-          throw new Error('Failed to convert PDF data to proper format');
+          throw new Error(`Failed to convert ${formatLabel} data to proper format`);
         }
       }
       
       // Final validation
       if (!book.fileData || !(book.fileData instanceof ArrayBuffer)) {
-        console.error('PDF data validation failed:', {
+        console.error(`${formatLabel} data validation failed:`, {
           hasFileData: !!book.fileData,
           fileDataType: typeof book.fileData,
           fileDataConstructor: book.fileData?.constructor?.name,
@@ -196,23 +199,36 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         
         // Try to provide a more helpful error message
         if (book.pdfDataBase64) {
-          throw new Error('PDF data conversion failed. The file may be corrupted. Please try re-uploading the PDF.');
+          throw new Error(`${formatLabel} data conversion failed. The file may be corrupted. Please try re-uploading.`);
         } else {
-          throw new Error('PDF data is missing. Please try re-uploading the PDF file.');
+          throw new Error(`${formatLabel} data is missing. Please try re-uploading the file.`);
         }
       }
     }
 
+    const cleanedPageTexts = sanitizePageTexts(book.pageTexts);
+    const combinedContent =
+      cleanedPageTexts.length > 0
+        ? cleanedPageTexts.join('\n\n')
+        : typeof book.fileData === 'string'
+          ? book.fileData
+          : book.text_content || '';
+
     const doc = {
       id: book.id,
       name: book.title,
-      content: typeof book.fileData === 'string' ? book.fileData : '',
+      content: combinedContent,
       type: book.type,
       uploadedAt: book.savedAt,
       pdfData: book.type === 'pdf' ? book.fileData as ArrayBuffer : undefined,
+      epubData:
+        book.type === 'epub' && book.fileData instanceof ArrayBuffer
+          ? new Blob([book.fileData], { type: 'application/epub+zip' })
+          : undefined,
       totalPages: book.totalPages,
       lastReadPage: book.lastReadPage,
-      pageTexts: sanitizePageTexts(book.pageTexts), // Include pageTexts for TTS functionality
+      pageTexts: cleanedPageTexts,
+      cleanedPageTexts
     };
 
       console.log('Document created for app store:', {

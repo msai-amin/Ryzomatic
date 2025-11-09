@@ -1,5 +1,5 @@
 import React from 'react';
-import { Book, FileText } from 'lucide-react';
+import { Book, FileText, MessageSquare } from 'lucide-react';
 import { SearchResult } from '../../services/librarySearchService';
 
 interface RecentBookCardProps {
@@ -29,7 +29,8 @@ export const RecentBookCard: React.FC<RecentBookCardProps> = ({
     return date.toLocaleDateString();
   };
 
-  const Icon = book.file_type === 'pdf' ? Book : FileText;
+  const isBinaryFormat = book.file_type === 'pdf' || book.file_type === 'epub';
+  const Icon = isBinaryFormat ? Book : FileText;
 
   return (
     <button
@@ -50,8 +51,8 @@ export const RecentBookCard: React.FC<RecentBookCardProps> = ({
         <div 
           className="flex-shrink-0 w-12 h-12 rounded flex items-center justify-center"
           style={{ 
-            backgroundColor: `${book.file_type === 'pdf' ? '#3B82F6' : '#10B981'}20`,
-            color: book.file_type === 'pdf' ? '#3B82F6' : '#10B981'
+            backgroundColor: `${isBinaryFormat ? '#3B82F6' : '#10B981'}20`,
+            color: isBinaryFormat ? '#3B82F6' : '#10B981'
           }}
         >
           <Icon className="w-6 h-6" />

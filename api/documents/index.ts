@@ -14,6 +14,8 @@ import { documentDescriptionService } from '../../lib/documentDescriptionService
 import { checkRateLimit, getRateLimitHeaders } from '../../lib/rateLimiter.js';
 import formidable from 'formidable';
 import fs from 'fs/promises';
+import JSZip from 'jszip';
+import { XMLParser } from 'fast-xml-parser';
 
 // Disable body parser for file uploads when needed
 export const config = {
@@ -159,6 +161,7 @@ async function handleUpload(req: VercelRequest, res: VercelResponse) {
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/markdown',
+      'application/epub+zip',
     ];
 
     if (!allowedTypes.includes(file.mimetype || '')) {
@@ -170,7 +173,19 @@ async function handleUpload(req: VercelRequest, res: VercelResponse) {
     }
 
     // Extract text content
-    const content = await extractTextContent(file.filepath, file.mimetype || 'text/plain');
+    const mimeType = file.mimetype || 'text/plain';
+    const content = await extractTextContent(file.filepath, mimeType);
+
+    const normalizedFileType: 'pdf' | 'text' | 'epub' = (() => {
+      switch (mimeType) {
+        case 'application/pdf':
+          return 'pdf';
+        case 'application/epub+zip':
+          return 'epub';
+        default:
+          return 'text';
+      }
+    })();
 
     // Check content moderation
     if (content) {
@@ -220,7 +235,7 @@ async function handleUpload(req: VercelRequest, res: VercelResponse) {
         title,
         file_name: file.originalFilename || 'unknown',
         file_size_bytes: file.size,
-        file_type: file.mimetype || 'application/octet-stream',
+        file_type: normalizedFileType,
         s3_key: s3Key,
         content,
         embedding_status: 'pending',
@@ -246,7 +261,7 @@ async function handleUpload(req: VercelRequest, res: VercelResponse) {
       metadata: {
         documentId: document.id,
         fileSize: file.size,
-        fileType: file.mimetype,
+        fileType: normalizedFileType,
       },
     });
 
@@ -571,6 +586,125 @@ async function streamToBuffer(stream: Readable): Promise<Buffer> {
   });
 }
 
+const EPUB_WHITESPACE_REGEX = /\s+/g;
+const EPUB_SCRIPT_REGEX = /<script[\s\S]*?<\/script>/gi;
+const EPUB_STYLE_REGEX = /<style[\s\S]*?<\/style>/gi;
+const EPUB_TAG_REGEX = /<[^>]+>/g;
+
+function ensureArray<T>(value: T | T[] | undefined): T[] {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function cleanHtmlText(html: string): string {
+  const withoutScripts = html.replace(EPUB_SCRIPT_REGEX, ' ');
+  const withoutStyles = withoutScripts.replace(EPUB_STYLE_REGEX, ' ');
+  const withoutTags = withoutStyles.replace(EPUB_TAG_REGEX, ' ');
+  return withoutTags.replace(EPUB_WHITESPACE_REGEX, ' ').trim();
+}
+
+function resolveEpubPath(basePath: string, relativePath: string): string {
+  if (!basePath) return relativePath;
+  if (relativePath.startsWith('/')) {
+    return relativePath.slice(1);
+  }
+
+  const baseSegments = basePath.split('/').filter(Boolean);
+  const relativeSegments = relativePath.split('/');
+
+  for (const segment of relativeSegments) {
+    if (segment === '..') {
+      baseSegments.pop();
+    } else if (segment !== '.') {
+      baseSegments.push(segment);
+    }
+  }
+
+  return baseSegments.join('/');
+}
+
+async function extractEpubText(buffer: Buffer): Promise<string> {
+  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+  const zip = await JSZip.loadAsync(buffer);
+
+  const containerEntry = zip.file('META-INF/container.xml');
+  if (!containerEntry) {
+    throw new Error('EPUB container.xml not found');
+  }
+
+  const containerXml = await containerEntry.async('string');
+  const containerJson = parser.parse(containerXml);
+  const rootfilePath =
+    containerJson?.container?.rootfiles?.rootfile?.['@_full-path'] ||
+    containerJson?.container?.rootfiles?.rootfile?.['@_fullPath'];
+
+  if (!rootfilePath) {
+    throw new Error('EPUB package (OPF) file not located');
+  }
+
+  const opfEntry = zip.file(rootfilePath);
+  if (!opfEntry) {
+    throw new Error(`EPUB package file ${rootfilePath} missing`);
+  }
+
+  const opfXml = await opfEntry.async('string');
+  const opfJson = parser.parse(opfXml);
+
+  const manifestItems = ensureArray(opfJson?.package?.manifest?.item);
+  const spineItems = ensureArray(opfJson?.package?.spine?.itemref);
+
+  if (manifestItems.length === 0 || spineItems.length === 0) {
+    throw new Error('EPUB manifest or spine is empty');
+  }
+
+  const manifestMap = new Map<string, { href: string; mediaType: string }>();
+  manifestItems.forEach((item: any) => {
+    const id = item?.['@_id'];
+    const href = item?.['@_href'];
+    const mediaType = item?.['@_media-type'];
+    if (id && href && mediaType) {
+      manifestMap.set(id, { href, mediaType });
+    }
+  });
+
+  const opfDir =
+    rootfilePath.lastIndexOf('/') >= 0 ? rootfilePath.slice(0, rootfilePath.lastIndexOf('/') + 1) : '';
+
+  const sections: string[] = [];
+
+  for (const spineItem of spineItems) {
+    const idref = spineItem?.['@_idref'];
+    if (!idref) continue;
+
+    const manifestItem = manifestMap.get(idref);
+    if (!manifestItem) continue;
+
+    const { mediaType, href } = manifestItem;
+    if (
+      !mediaType ||
+      (
+        mediaType !== 'application/xhtml+xml' &&
+        mediaType !== 'application/xml' &&
+        !mediaType.includes('html')
+      )
+    ) {
+      continue;
+    }
+
+    const entryPath = resolveEpubPath(opfDir, href);
+    const entryFile = zip.file(entryPath);
+    if (!entryFile) continue;
+
+    const entryContent = await entryFile.async('string');
+    const text = cleanHtmlText(entryContent);
+    if (text) {
+      sections.push(text);
+    }
+  }
+
+  return sections.join('\n\n').trim();
+}
+
 async function extractTextContent(filePath: string, mimeType: string): Promise<string> {
   const buffer = await fs.readFile(filePath);
   
@@ -580,6 +714,16 @@ async function extractTextContent(filePath: string, mimeType: string): Promise<s
   
   if (mimeType === 'application/pdf') {
     return '[PDF content extraction pending]';
+  }
+
+  if (mimeType === 'application/epub+zip') {
+    try {
+      const text = await extractEpubText(buffer);
+      return text || '[EPUB content extraction pending]';
+    } catch (error) {
+      console.error('Failed to extract EPUB text:', error);
+      return '[EPUB content extraction pending]';
+    }
   }
   
   return '';

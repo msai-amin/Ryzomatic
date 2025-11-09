@@ -16,7 +16,7 @@ export interface BookStorageMetadata {
   bookId: string;
   title: string;
   fileName: string;
-  fileType: 'pdf' | 'text';
+  fileType: 'pdf' | 'text' | 'epub';
   fileSize: number;
   totalPages?: number;
 }
@@ -38,8 +38,10 @@ export class BookStorageService {
    * Pattern for AWS S3: books/{userId}/{bookId}.pdf
    * Pattern for Supabase Storage: {userId}/{bookId}.pdf (bucket name is separate)
    */
-  private generateBookKey(userId: string, bookId: string, fileType: 'pdf' | 'text', includeBookPrefix: boolean = false): string {
-    const extension = fileType === 'pdf' ? 'pdf' : 'txt';
+  private generateBookKey(userId: string, bookId: string, fileType: 'pdf' | 'text' | 'epub', includeBookPrefix: boolean = false): string {
+    let extension = 'txt';
+    if (fileType === 'pdf') extension = 'pdf';
+    else if (fileType === 'epub') extension = 'epub';
     const path = `${userId}/${bookId}.${extension}`;
     return includeBookPrefix ? `books/${path}` : path;
   }
@@ -81,7 +83,11 @@ export class BookStorageService {
         .storage
         .from(bucketName)
         .upload(supabaseKey, file, {
-          contentType: file.type || (metadata.fileType === 'pdf' ? 'application/pdf' : 'text/plain'),
+          contentType: file.type || (metadata.fileType === 'pdf'
+            ? 'application/pdf'
+            : metadata.fileType === 'epub'
+              ? 'application/epub+zip'
+              : 'text/plain'),
           upsert: true // Overwrite if exists
         });
 
@@ -103,7 +109,11 @@ export class BookStorageService {
             body: JSON.stringify({
               operation: 'GET_UPLOAD_URL',
               s3Key, // Use full path for AWS S3
-              contentType: file.type || 'application/pdf',
+              contentType: file.type || (metadata.fileType === 'pdf'
+                ? 'application/pdf'
+                : metadata.fileType === 'epub'
+                  ? 'application/epub+zip'
+                  : 'text/plain'),
               userId: metadata.userId
             })
           });
@@ -124,7 +134,11 @@ export class BookStorageService {
           const uploadResponse = await fetch(uploadUrl, {
             method: 'PUT',
             headers: {
-              'Content-Type': file.type || 'application/pdf',
+              'Content-Type': file.type || (metadata.fileType === 'pdf'
+                ? 'application/pdf'
+                : metadata.fileType === 'epub'
+                  ? 'application/epub+zip'
+                  : 'text/plain'),
             },
             body: file
           });

@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { logger } from './logger';
 import { errorHandler, ErrorType, ErrorSeverity } from './errorHandler';
 
@@ -7,7 +7,7 @@ export interface BookRecommendation {
   id: string;
   title: string;
   file_name: string;
-  file_type: 'pdf' | 'text';
+  file_type: 'pdf' | 'text' | 'epub';
   score: number;
   reason: string;
 }

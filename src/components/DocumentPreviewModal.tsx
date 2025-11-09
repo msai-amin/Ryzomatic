@@ -55,7 +55,9 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       if (document.file_type === 'pdf' && document.page_texts) {
         // Show first page or first few pages
         content = document.page_texts.slice(0, 2).join(' ');
-      } else if (document.file_type === 'text' && document.text_content) {
+      } else if (document.file_type === 'epub' && document.page_texts) {
+        content = document.page_texts.slice(0, 2).join(' ');
+      } else if (document.text_content) {
         // Show first part of text content
         content = document.text_content;
       }
@@ -87,7 +89,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
         id: document.id,
         name: document.title || document.file_name || 'Untitled Document',
         content: document.text_content || '',
-        type: (document.file_type === 'pdf' ? 'pdf' : 'text') as 'pdf' | 'text',
+        type: (document.file_type === 'pdf' || document.file_type === 'epub' ? document.file_type : 'text') as 'pdf' | 'text' | 'epub',
         uploadedAt: new Date(document.created_at),
         totalPages: document.total_pages,
         pageTexts: document.page_texts || [],

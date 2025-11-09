@@ -54,6 +54,7 @@ export const BookCard: React.FC<BookCardProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const isBinaryFormat = book.file_type === 'pdf' || book.file_type === 'epub';
   
   const { 
     toggleBookSelection, 
@@ -238,7 +239,7 @@ export const BookCard: React.FC<BookCardProps> = ({
 
         {/* Book icon */}
         <div className="flex-shrink-0 mr-3">
-          {book.file_type === 'pdf' ? (
+          {isBinaryFormat ? (
             <FileText className="w-6 h-6 text-red-500" />
           ) : (
             <Book className="w-6 h-6 text-blue-500" />
@@ -425,7 +426,7 @@ export const BookCard: React.FC<BookCardProps> = ({
         className="aspect-[3/4] rounded-t-lg flex items-center justify-center"
         style={{ backgroundColor: 'var(--color-surface-hover)' }}
       >
-        {book.file_type === 'pdf' ? (
+        {isBinaryFormat ? (
           <FileText className="w-12 h-12 text-red-500" />
         ) : (
           <Book className="w-12 h-12 text-blue-500" />

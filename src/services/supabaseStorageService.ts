@@ -8,7 +8,7 @@ export interface SavedBook {
   id: string;
   title: string;
   fileName: string;
-  type: 'pdf' | 'text';
+  type: 'pdf' | 'text' | 'epub';
   savedAt: Date;
   lastReadPage?: number;
   totalPages?: number;
@@ -145,7 +145,7 @@ class SupabaseStorageService {
       // NEW: Upload file to S3 instead of storing in database
       let s3Key: string | undefined;
       
-      if (book.type === 'pdf' && book.fileData) {
+      if ((book.type === 'pdf' || book.type === 'epub') && book.fileData) {
         logger.info('Uploading PDF to S3', context, {
           fileSize: fileSize / 1024 / 1024 + 'MB'
         });
@@ -155,9 +155,10 @@ class SupabaseStorageService {
         if (book.fileData instanceof Blob) {
           fileBlob = book.fileData;
         } else if (book.fileData instanceof ArrayBuffer) {
-          fileBlob = new Blob([book.fileData], { type: 'application/pdf' });
+          const contentType = book.type === 'pdf' ? 'application/pdf' : 'application/epub+zip';
+          fileBlob = new Blob([book.fileData], { type: contentType });
         } else {
-          throw new Error('Unsupported file data format for PDF');
+          throw new Error('Unsupported file data format for binary book upload');
         }
 
         // Upload to S3
@@ -387,95 +388,100 @@ class SupabaseStorageService {
         cleanedPageTexts: data.page_texts_cleaned || undefined  // Include cleaned texts if available
       };
 
-      // NEW: Download from S3 if s3_key exists
-      if (data.file_type === 'pdf' && data.s3_key) {
+      // NEW: Download from S3 if s3_key exists for binary formats
+      if ((data.file_type === 'pdf' || data.file_type === 'epub') && data.s3_key) {
         try {
-          logger.info('Downloading PDF from S3', context, { s3Key: data.s3_key });
+          logger.info('Downloading book from S3', context, { s3Key: data.s3_key, fileType: data.file_type });
           
           book.fileData = await bookStorageService.downloadBook(
             data.s3_key,
             this.currentUserId!
           );
           
-          logger.info('PDF downloaded from S3 successfully', context, {
+          logger.info('Book downloaded from S3 successfully', context, {
             size: book.fileData.byteLength / 1024 / 1024 + 'MB'
           });
 
-          // EXTRACT PAGETEXTS ON-DEMAND for TTS functionality
-          // Since page_texts column was removed to save storage, extract them now
-          try {
-            logger.info('Extracting pageTexts for TTS functionality', context);
-            const { extractStructuredText } = await import('../utils/pdfTextExtractor');
-            
-            // Import PDF.js dynamically
-            const pdfjsLib = await import('pdfjs-dist');
-            configurePDFWorker(pdfjsLib);
-            
-            // CRITICAL: Create a copy of the ArrayBuffer to prevent detachment
-            // The original ArrayBuffer will be used by PDFViewer, so we need a copy for text extraction
-            const pdfDataCopy = book.fileData.slice(0);
-            
-            // Load PDF and extract text using the copy
-            const pdf = await pdfjsLib.getDocument({ data: pdfDataCopy }).promise;
-            const pageTexts: string[] = [];
-            
-            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-              try {
-                const page = await pdf.getPage(pageNum);
-                const textContent = await page.getTextContent();
-                const pageText = extractStructuredText(textContent.items);
-                // Ensure pageText is always a string
-                const safePageText = typeof pageText === 'string' ? pageText : String(pageText || '');
-                pageTexts.push(safePageText);
-              } catch (pageError) {
-                logger.warn(`Error extracting text from page ${pageNum}`, context, pageError as Error);
-                pageTexts.push(''); // Empty string for failed pages
+          if (data.file_type === 'pdf') {
+            // EXTRACT PAGETEXTS ON-DEMAND for TTS functionality
+            // Since page_texts column was removed to save storage, extract them now
+            try {
+              logger.info('Extracting pageTexts for TTS functionality', context);
+              const { extractStructuredText } = await import('../utils/pdfTextExtractor');
+              
+              // Import PDF.js dynamically
+              const pdfjsLib = await import('pdfjs-dist');
+              configurePDFWorker(pdfjsLib);
+              
+              // CRITICAL: Create a copy of the ArrayBuffer to prevent detachment
+              // The original ArrayBuffer will be used by PDFViewer, so we need a copy for text extraction
+              const pdfDataCopy = book.fileData.slice(0);
+              
+              // Load PDF and extract text using the copy
+              const pdf = await pdfjsLib.getDocument({ data: pdfDataCopy }).promise;
+              const pageTexts: string[] = [];
+              
+              for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                try {
+                  const page = await pdf.getPage(pageNum);
+                  const textContent = await page.getTextContent();
+                  const pageText = extractStructuredText(textContent.items);
+                  // Ensure pageText is always a string
+                  const safePageText = typeof pageText === 'string' ? pageText : String(pageText || '');
+                  pageTexts.push(safePageText);
+                } catch (pageError) {
+                  logger.warn(`Error extracting text from page ${pageNum}`, context, pageError as Error);
+                  pageTexts.push(''); // Empty string for failed pages
+                }
               }
+              
+              // Comprehensive sanitization of pageTexts to ensure they are strings
+              const sanitizedPageTexts = pageTexts.map((text, index) => {
+                if (text === null || text === undefined) {
+                  logger.warn(`PageText ${index} is null/undefined, converting to empty string`, context);
+                  return '';
+                }
+                
+                if (typeof text === 'string') {
+                  return text;
+                }
+                
+                if (typeof text === 'object') {
+                  console.warn(`PageText ${index} is object, stringifying:`, {
+                    textType: typeof text,
+                    constructor: (text as any)?.constructor?.name,
+                    keys: Object.keys(text || {}),
+                    value: JSON.stringify(text).substring(0, 100)
+                  });
+                  return JSON.stringify(text);
+                }
+                
+                logger.warn(`PageText ${index} is ${typeof text}, converting to string`, context);
+                return String(text);
+              });
+              book.pageTexts = sanitizedPageTexts;
+              logger.info('PageTexts extracted successfully', context, {
+                totalPages: pdf.numPages,
+                extractedPages: pageTexts.length,
+                totalTextLength: pageTexts.map(text => typeof text === 'string' ? text : String(text || '')).join('').length,
+                originalArrayBufferSize: book.fileData.byteLength,
+                copyArrayBufferSize: pdfDataCopy.byteLength
+              });
+              
+              // Clean up the PDF document to free memory
+              pdf.destroy();
+              
+            } catch (extractError) {
+              logger.warn('Failed to extract pageTexts, TTS will not be available', context, extractError as Error);
+              book.pageTexts = []; // Empty array if extraction fails
             }
-            
-            // Comprehensive sanitization of pageTexts to ensure they are strings
-            const sanitizedPageTexts = pageTexts.map((text, index) => {
-              if (text === null || text === undefined) {
-                logger.warn(`PageText ${index} is null/undefined, converting to empty string`, context);
-                return '';
-              }
-              
-              if (typeof text === 'string') {
-                return text;
-              }
-              
-              if (typeof text === 'object') {
-                console.warn(`PageText ${index} is object, stringifying:`, {
-                  textType: typeof text,
-                  constructor: (text as any)?.constructor?.name,
-                  keys: Object.keys(text || {}),
-                  value: JSON.stringify(text).substring(0, 100)
-                });
-                return JSON.stringify(text);
-              }
-              
-              logger.warn(`PageText ${index} is ${typeof text}, converting to string`, context);
-              return String(text);
-            });
-            book.pageTexts = sanitizedPageTexts;
-            logger.info('PageTexts extracted successfully', context, {
-              totalPages: pdf.numPages,
-              extractedPages: pageTexts.length,
-              totalTextLength: pageTexts.map(text => typeof text === 'string' ? text : String(text || '')).join('').length,
-              originalArrayBufferSize: book.fileData.byteLength,
-              copyArrayBufferSize: pdfDataCopy.byteLength
-            });
-            
-            // Clean up the PDF document to free memory
-            pdf.destroy();
-            
-          } catch (extractError) {
-            logger.warn('Failed to extract pageTexts, TTS will not be available', context, extractError as Error);
-            book.pageTexts = []; // Empty array if extraction fails
+          } else {
+            // EPUB extraction handled by dedicated pipeline; placeholder for now
+            book.pageTexts = [];
           }
           
         } catch (error) {
-          logger.error('Error downloading PDF from S3', context, error as Error);
+          logger.error('Error downloading book from S3', context, error as Error);
           throw errorHandler.createError(
             'Failed to download book file. Please try again.',
             ErrorType.STORAGE,
@@ -490,8 +496,8 @@ class SupabaseStorageService {
           ? data.text_content 
           : String(data.text_content || '');
         book.pageTexts = [sanitizedTextContent];
-      } else if (data.file_type === 'pdf' && !data.s3_key) {
-        logger.error('PDF book has no S3 key', context);
+      } else if ((data.file_type === 'pdf' || data.file_type === 'epub') && !data.s3_key) {
+        logger.error('Binary book has no S3 key', context, undefined, { fileType: data.file_type });
         throw errorHandler.createError(
           'Book file not found. Please re-upload the book.',
           ErrorType.STORAGE,
@@ -588,7 +594,7 @@ class SupabaseStorageService {
           );
         }
         
-        logger.info('Book moved to Trash collection successfully', context, undefined, {
+        logger.info('Book moved to Trash collection successfully', context, {
           trashCollectionId: trashCollectionId
         });
       } catch (error) {
@@ -653,7 +659,7 @@ class SupabaseStorageService {
         );
       }
       
-      logger.info('Book permanently deleted from database', context, undefined, {
+      logger.info('Book permanently deleted from database', context, {
         deletedRows: deleteData
       });
       
@@ -1095,7 +1101,7 @@ class SupabaseStorageService {
   async searchLibrary(
     searchQuery: string,
     filters: {
-      fileType?: 'pdf' | 'text' | 'all';
+      fileType?: 'pdf' | 'text' | 'epub' | 'all';
       collections?: string[];
       tags?: string[];
       isFavorite?: boolean;

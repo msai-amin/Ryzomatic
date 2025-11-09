@@ -12,6 +12,7 @@ import { OCRConsentDialog } from './OCRConsentDialog'
 import { calculateOCRCredits } from '../utils/ocrUtils'
 import { extractStructuredText } from '../utils/pdfTextExtractor'
 import { extractWithFallback } from '../services/pdfExtractionOrchestrator'
+import { extractEpub } from '../services/epubExtractionOrchestrator'
 import { canPerformVisionExtraction } from '../services/visionUsageService'
 import { configurePDFWorker } from '../utils/pdfjsConfig'
 import { supabase } from '../../lib/supabase'
@@ -95,11 +96,34 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
           );
           throw error;
         }
+      } else if (file.type === 'application/epub+zip') {
+        const validation = validateFile(
+          file,
+          {
+            maxSize: 50 * 1024 * 1024, // 50MB limit similar to PDFs
+            allowedTypes: ['application/epub+zip']
+          },
+          context
+        );
+        if (!validation.isValid) {
+          const error = errorHandler.createError(
+            `Invalid EPUB file: ${validation.errors.join(', ')}`,
+            ErrorType.VALIDATION,
+            ErrorSeverity.MEDIUM,
+            context,
+            { validationErrors: validation.errors }
+          );
+          throw error;
+        }
       } else {
-        const validation = validateFile(file, { 
-          maxSize: 10 * 1024 * 1024, // 10MB
-          allowedTypes: ['text/plain', 'text/markdown']
-        }, context);
+        const validation = validateFile(
+          file,
+          { 
+            maxSize: 10 * 1024 * 1024, // 10MB
+            allowedTypes: ['text/plain', 'text/markdown']
+          },
+          context
+        );
         if (!validation.isValid) {
           const error = errorHandler.createError(
             `Invalid file: ${validation.errors.join(', ')}`,
@@ -225,7 +249,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
               // CRITICAL: Update document with database ID if different
               if (databaseId !== document.id) {
                 console.log('🔄 Updating document ID from', document.id, 'to database ID:', databaseId);
-                document.id = databaseId;
+                document.id = databaseId as typeof document.id;
               }
               setUploadedDocumentId(databaseId);
               saveSucceeded = true; // Mark save as succeeded
@@ -290,11 +314,144 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
           addDocument(document, setAsCurrentDocument)
         } else {
           // Save failed and saveToLibrary was true - don't add document
-          logger.warn('Not adding document to store because save failed', context, {
-            documentId: document.id,
-            documentName: document.name
-          });
+          logger.warn(
+            'Not adding document to store because save failed',
+            context,
+            undefined,
+            {
+              documentId: document.id,
+              documentName: document.name
+            }
+          );
           throw new Error('Failed to save document to library. Please try again.');
+        }
+      } else if (file.type === 'application/epub+zip') {
+        setExtractionProgress('Parsing EPUB chapters...')
+
+        const extractionResult = await trackPerformance(
+          'extractEpub',
+          () => extractEpub(file),
+          context,
+          { fileName: file.name, fileSize: file.size }
+        );
+
+        if (!extractionResult.success || extractionResult.sections.length === 0) {
+          const error = errorHandler.createError(
+            'Failed to extract text from EPUB document.',
+            ErrorType.DOCUMENT_PROCESSING,
+            ErrorSeverity.HIGH,
+            context,
+            { fileName: file.name }
+          );
+          throw error;
+        }
+
+        setExtractionProgress(`✓ ${extractionResult.totalSections} sections extracted successfully`);
+
+        const { content, sections, metadata } = extractionResult;
+
+        const document = {
+          id: crypto.randomUUID(),
+          name: file.name,
+          content,
+          type: 'epub' as const,
+          uploadedAt: new Date(),
+          epubData: file,
+          totalPages: extractionResult.totalSections,
+          pageTexts: sections,
+          cleanedPageTexts: sections,
+          needsOCR: false,
+          ocrStatus: 'not_needed' as const,
+          metadata
+        };
+
+        logger.info('EPUB document processed successfully', context, {
+          documentId: document.id,
+          totalSections: extractionResult.totalSections,
+          contentLength: content.length,
+          sampleSections: sections.slice(0, 3).map((text, index) => ({
+            section: index + 1,
+            textLength: text.length,
+            textPreview: text.substring(0, 80) + (text.length > 80 ? '...' : '')
+          })),
+          metadata
+        });
+
+        let saveSucceeded = !saveToLibrary;
+        if (saveToLibrary) {
+          await trackPerformance('saveEpubToLibrary', async () => {
+            try {
+              const databaseId = await supabaseStorageService.saveBook({
+                id: document.id,
+                title: document.name,
+                fileName: file.name,
+                type: 'epub',
+                savedAt: new Date(),
+                totalPages: extractionResult.totalSections,
+                fileData: file,
+                pageTexts: sections
+              });
+
+              if (databaseId !== document.id) {
+                console.log('🔄 Updating document ID from', document.id, 'to database ID:', databaseId);
+                document.id = databaseId as typeof document.id;
+              }
+              setUploadedDocumentId(databaseId);
+              saveSucceeded = true;
+
+              logger.info('EPUB saved to Supabase', context, {
+                documentId: databaseId,
+                totalPages: extractionResult.totalSections
+              });
+
+              try {
+                await storageService.saveBook({
+                  id: databaseId,
+                  title: document.name,
+                  fileName: file.name,
+                  type: 'epub',
+                  savedAt: new Date(),
+                  totalPages: extractionResult.totalSections,
+                  fileData: file,
+                  pageTexts: sections
+                });
+
+                logger.info('EPUB saved to local library (backup)', context, {
+                  documentId: databaseId
+                });
+              } catch (localStorageError) {
+                logger.warn(
+                  'localStorage backup failed, but Supabase save succeeded',
+                  context,
+                  localStorageError as Error
+                );
+              }
+
+              refreshLibrary();
+            } catch (err) {
+              logger.error('Failed to save EPUB to library', context, err as Error);
+              saveSucceeded = false;
+              const errorMessage = err instanceof Error ? err.message : 'Failed to save document to library';
+              setError(
+                `Failed to save document to library: ${errorMessage}. The document will not be available for notes or highlights.`
+              );
+            }
+          }, context);
+        }
+
+        if (saveSucceeded) {
+          addDocument(document, setAsCurrentDocument);
+        } else {
+          logger.warn(
+            'Not adding EPUB document to store because save failed',
+            context,
+            undefined,
+            {
+              documentId: document.id,
+              documentName: document.name
+            }
+          );
+          throw new Error('Failed to save EPUB to library. Please try again.');
         }
       } else {
         const content = await trackPerformance(
@@ -336,7 +493,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
               // CRITICAL: Update document with database ID if different
               if (databaseId !== document.id) {
                 console.log('🔄 Updating document ID from', document.id, 'to database ID:', databaseId);
-                document.id = databaseId;
+                document.id = databaseId as typeof document.id;
               }
               setUploadedDocumentId(databaseId);
               saveSucceeded = true; // Mark save as succeeded
@@ -385,10 +542,15 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
           addDocument(document, setAsCurrentDocument)
         } else {
           // Save failed and saveToLibrary was true - don't add document
-          logger.warn('Not adding document to store because save failed', context, {
-            documentId: document.id,
-            documentName: document.name
-          });
+          logger.warn(
+            'Not adding document to store because save failed',
+            context,
+            undefined,
+            {
+              documentId: document.id,
+              documentName: document.name
+            }
+          );
           throw new Error('Failed to save document to library. Please try again.');
         }
       }
@@ -437,7 +599,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
         // CRITICAL: Update document with database ID if different
         if (databaseId !== document.id) {
           console.log('🔄 OCR Approve: Updating document ID from', document.id, 'to database ID:', databaseId);
-          document.id = databaseId;
+          document.id = databaseId as typeof document.id;
         }
         setUploadedDocumentId(databaseId);
         
@@ -490,7 +652,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
         // CRITICAL: Update document with database ID if different
         if (databaseId !== document.id) {
           console.log('🔄 OCR Decline: Updating document ID from', document.id, 'to database ID:', databaseId);
-          document.id = databaseId;
+          document.id = databaseId as typeof document.id;
         }
         setUploadedDocumentId(databaseId);
         
@@ -695,7 +857,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
             </p>
             <input
               type="file"
-              accept=".txt,.pdf"
+              accept=".txt,.pdf,.epub"
               onChange={handleFileInput}
               className="hidden"
               id="file-upload"
@@ -745,6 +907,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
             <ul className="space-y-1 text-caption">
               <li>• Text files (.txt)</li>
               <li>• PDF documents (.pdf)</li>
+              <li>• EPUB books (.epub)</li>
             </ul>
             <p className="mt-3 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
               Note: PDFs use intelligent 3-tier extraction with AI vision enhancement for poor quality pages.

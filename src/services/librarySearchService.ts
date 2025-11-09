@@ -7,7 +7,7 @@ export interface SearchResult {
   id: string;
   title: string;
   file_name: string;
-  file_type: 'pdf' | 'text';
+  file_type: 'pdf' | 'text' | 'epub';
   file_size_bytes: number;
   total_pages?: number;
   reading_progress: number;

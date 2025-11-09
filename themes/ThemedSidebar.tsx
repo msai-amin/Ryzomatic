@@ -25,7 +25,7 @@ interface DocumentWithProgress {
   progress: number
   readingTime: string
   isActive: boolean
-  type: 'text' | 'pdf'
+  type: 'text' | 'pdf' | 'epub'
   uploadedAt: string
   totalPages?: number
   currentPage?: number
@@ -219,7 +219,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           id: dbDoc.id,
           name: dbDoc.title || dbDoc.file_name || 'Untitled Document',
           content: dbDoc.text_content || '',
-          type: dbDoc.file_type === 'pdf' ? 'pdf' : 'text',
+          type: (dbDoc.file_type === 'pdf' || dbDoc.file_type === 'epub' ? dbDoc.file_type : 'text') as 'pdf' | 'text' | 'epub',
           uploadedAt: new Date(dbDoc.created_at),
           totalPages: dbDoc.total_pages,
           pageTexts: [], // Will be loaded separately when needed

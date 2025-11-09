@@ -193,17 +193,31 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
       }
 
       // Convert to Document format
+      const cleanedPageTexts = sanitizePageTexts(bookData.pageTexts);
+      const combinedContent =
+        cleanedPageTexts.length > 0
+          ? cleanedPageTexts.join('\n\n')
+          : typeof bookData.text_content === 'string'
+            ? bookData.text_content
+            : typeof bookData.fileData === 'string'
+              ? bookData.fileData
+              : '';
+
       const document = {
         id: bookData.id,
         name: bookData.title,
-        content: (bookData.text_content || bookData.fileData || '') as string,
-        type: bookData.type as 'text' | 'pdf',
+        content: combinedContent,
+        type: bookData.type as 'text' | 'pdf' | 'epub',
         uploadedAt: bookData.savedAt,
-        pdfData: bookData.type === 'pdf' ? bookData.fileData : undefined, // ArrayBuffer for PDFs
+        pdfData: bookData.type === 'pdf' ? bookData.fileData : undefined,
+        epubData:
+          bookData.type === 'epub' && bookData.fileData instanceof ArrayBuffer
+            ? new Blob([bookData.fileData], { type: 'application/epub+zip' })
+            : undefined,
         totalPages: bookData.totalPages,
         lastReadPage: bookData.lastReadPage,
-        pageTexts: sanitizePageTexts(bookData.pageTexts), // CRITICAL: Include pageTexts for TTS functionality
-        cleanedPageTexts: bookData.cleanedPageTexts || undefined, // Include cleaned texts for TTS in reading mode
+        pageTexts: cleanedPageTexts,
+        cleanedPageTexts: bookData.cleanedPageTexts || cleanedPageTexts
       };
 
       // Set the current document and close the library

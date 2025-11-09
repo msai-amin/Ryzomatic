@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react'
 import { useAppStore } from '../store/appStore'
 import { EmptyState } from './EmptyState'
 import { PDFViewer } from './PDFViewer'
+import { EPUBViewer } from './EPUBViewer'
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { storageService, Note } from '../services/storageService'
@@ -76,6 +77,10 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ onUploadClick })
   // Use PDF viewer for PDF documents
   if (currentDocument.type === 'pdf' && currentDocument.pdfData && currentDocument.totalPages) {
     return <PDFViewer />
+  }
+
+  if (currentDocument.type === 'epub') {
+    return <EPUBViewer />
   }
 
   // Use text viewer for text documents

@@ -361,6 +361,7 @@ const LibraryFiltersPanel: React.FC<LibraryFiltersProps> = ({
         >
           <option value="all">All Types</option>
           <option value="pdf">PDF</option>
+          <option value="epub">EPUB</option>
           <option value="text">Text</option>
         </select>
       </div>

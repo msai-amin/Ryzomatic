@@ -56,7 +56,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
           </div>
           <h3 className="text-heading-3 mb-2" style={{ color: 'var(--color-text-primary)' }}>Upload Documents</h3>
           <p className="text-caption" style={{ color: 'var(--color-text-secondary)' }}>
-            Support for text files and PDFs with automatic content extraction
+            Support for text files, PDFs, and EPUBs with automatic content extraction
           </p>
         </div>
         
