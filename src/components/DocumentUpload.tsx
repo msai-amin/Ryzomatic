@@ -857,7 +857,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
             </p>
             <input
               type="file"
-              accept=".txt,.pdf,.epub"
+              accept=".txt,.pdf,.epub,application/pdf,application/epub+zip,text/plain,text/markdown"
               onChange={handleFileInput}
               className="hidden"
               id="file-upload"
@@ -905,7 +905,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
           <div className="mt-6" style={{ color: 'var(--color-text-secondary)' }}>
             <p className="text-caption font-medium mb-2">Supported formats:</p>
             <ul className="space-y-1 text-caption">
-              <li>• Text files (.txt)</li>
+              <li>• Text files (.txt, .md)</li>
               <li>• PDF documents (.pdf)</li>
               <li>• EPUB books (.epub)</li>
             </ul>
