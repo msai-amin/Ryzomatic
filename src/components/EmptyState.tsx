@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useCallback } from 'react'
 import { Upload, FileText, Sparkles } from 'lucide-react'
 
 interface EmptyStateProps {
@@ -6,6 +6,14 @@ interface EmptyStateProps {
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
+  const handleUpload = useCallback(() => {
+    if (onUploadClick) {
+      onUploadClick()
+    } else {
+      window.dispatchEvent(new CustomEvent('app:open-upload'))
+    }
+  }, [onUploadClick])
+
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4">
       <div 
@@ -36,13 +44,13 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
             boxShadow: 'var(--shadow-sm)',
             borderRadius: 'var(--border-radius-lg)',
           }}
-          onClick={onUploadClick}
+          onClick={() => handleUpload()}
           role="button"
           tabIndex={0}
           onKeyPress={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault()
-              onUploadClick?.()
+              handleUpload()
             }
           }}
         >
@@ -83,7 +91,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
           </p>
         </div>
         
-        <div 
+        <button
           className="text-center p-6 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg"
           style={{
             backgroundColor: 'var(--color-surface)',
@@ -91,6 +99,8 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
             boxShadow: 'var(--shadow-sm)',
             borderRadius: 'var(--border-radius-lg)',
           }}
+          onClick={handleUpload}
+          type="button"
         >
           <div 
             className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
@@ -104,7 +114,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
           <p className="text-caption" style={{ color: 'var(--color-text-secondary)' }}>
             Adjust typography, themes, and layout for optimal reading experience
           </p>
-        </div>
+        </button>
       </div>
     </div>
   )

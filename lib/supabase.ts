@@ -456,7 +456,7 @@ export const userBooks = {
   async list(userId: string, limit = 20) {  // Reduced from 50 to 20
     const { data, error } = await supabase
       .from('user_books')
-      .select('id, user_id, title, file_name, file_type, file_size_bytes, total_pages, last_read_page, reading_progress, created_at, updated_at, last_read_at, tts_metadata')  // Exclude large columns
+      .select('id, user_id, title, file_name, file_type, file_size_bytes, total_pages, last_read_page, reading_progress, created_at, updated_at, last_read_at, tts_metadata, is_favorite')  // Exclude large columns
       .eq('user_id', userId)
       .order('last_read_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
@@ -505,7 +505,7 @@ export const userBooks = {
     const { data, error } = await supabase.rpc('update_reading_progress', {
       book_uuid: bookId,
       page_num: pageNumber,
-      total_pages: totalPages
+      total_pages_param: totalPages
     });
     return { data, error };
   },

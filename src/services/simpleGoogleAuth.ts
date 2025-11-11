@@ -220,11 +220,58 @@ class SimpleGoogleAuth {
     }
   }
 
+  syncFromGoogleAuth(user: { id: string; email: string; name: string; picture: string; givenName?: string; familyName?: string }): void {
+    const derivedUser: GoogleUser = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      picture: user.picture,
+      given_name: user.givenName || user.name?.split(' ')[0] || '',
+      family_name: user.familyName || ''
+    };
+
+    this.currentUser = derivedUser;
+
+    try {
+      localStorage.setItem('google_user', JSON.stringify(this.currentUser));
+    } catch (error) {
+      console.warn('simpleGoogleAuth: failed to persist bridged Google user', error);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('googleSignIn', {
+        detail: this.currentUser
+      }));
+    }
+  }
+
+  private hydrateFromStorage(): void {
+    if (this.currentUser) {
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      const stored = window.localStorage.getItem('google_user');
+      if (stored) {
+        this.currentUser = JSON.parse(stored) as GoogleUser;
+      }
+    } catch (error) {
+      console.warn('simpleGoogleAuth: failed to hydrate from storage', error);
+      window.localStorage.removeItem('google_user');
+    }
+  }
+
   getCurrentUser(): GoogleUser | null {
+    this.hydrateFromStorage();
     return this.currentUser;
   }
 
   isSignedIn(): boolean {
+    this.hydrateFromStorage();
     return this.currentUser !== null;
   }
 }

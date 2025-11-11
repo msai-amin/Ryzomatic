@@ -2,17 +2,7 @@ import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Sparkles, CheckCircle, AlertCircle, Volume2 } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
-
-interface CleanupPreferences {
-  reorganizeParagraphs: boolean
-  removeFormulae: boolean
-  removeFootnotes: boolean
-  removeSideNotes: boolean
-  removeHeadersFooters: boolean
-  simplifyFormatting: boolean
-  reorganizationStyle: 'logical' | 'chronological' | 'topic-based'
-  optimizeForTTS: boolean
-}
+import { CleanupPreferences } from '../services/textCleanupService'
 
 interface TextCleanupModalProps {
   onClose: () => void

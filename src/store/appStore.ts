@@ -45,6 +45,7 @@ export interface Document {
   totalPages?: number
   pageTexts?: string[]
   cleanedPageTexts?: string[] // Array of cleaned text for each page (for TTS in reading mode)
+  currentPage?: number
   metadata?: Record<string, any>
   // OCR properties
   needsOCR?: boolean
@@ -62,12 +63,27 @@ export interface Document {
   highlightsLoaded?: boolean
 }
 
+export type CustomReadingWizardStep = 'welcome' | 'upload' | 'optimize' | 'complete'
+export type CustomReadingWizardStatus = 'idle' | 'uploading' | 'optimizing' | 'ready' | 'error'
+export type CustomReadingWizardSource = 'empty-state' | 'header'
+
+export interface CustomReadingWizardState {
+  isOpen: boolean
+  step: CustomReadingWizardStep
+  source: CustomReadingWizardSource | null
+  documentId: string | null
+  status: CustomReadingWizardStatus
+  error: string | null
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
 }
+
+type NewChatMessage = Omit<ChatMessage, 'id' | 'timestamp'> & Partial<Pick<ChatMessage, 'id' | 'timestamp'>>
 
 export interface TypographySettings {
   fontFamily: 'serif' | 'sans' | 'mono'
@@ -179,6 +195,11 @@ interface AppState {
   // UI state
   isChatOpen: boolean
   isRightSidebarOpen: boolean
+  rightSidebarTab: 'notes' | 'highlights'
+  rightSidebarWidth: number
+  chatWindowPosition: { top: number; left: number }
+  chatWindowSize: { width: number; height: number }
+  isNavRailExpanded: boolean
   isLoading: boolean
   
   // Text selection and AI context
@@ -207,6 +228,17 @@ interface AppState {
   // Library view settings
   libraryView: LibraryViewSettings
   
+  // Library organization UI state
+  collectionDragState: {
+    activeId: string | null
+    overId: string | null
+  }
+  tagManagerOpen: boolean
+  pendingAssignmentTargets: {
+    collectionIds: string[]
+    tagIds: string[]
+  }
+  
   // Pomodoro state
   activePomodoroSessionId: string | null
   activePomodoroBookId: string | null
@@ -234,11 +266,15 @@ interface AppState {
   // Study mode and notes state
   studyMode: boolean
   noteTemplateType: 'freeform' | 'cornell' | 'outline' | 'mindmap' | 'chart' | 'boxing' | null
+
+  // Customizable Reading wizard
+  customReadingWizard: CustomReadingWizardState
+
   
   // Actions
   setUser: (user: AuthUser | null) => void
   setAuthenticated: (authenticated: boolean) => void
-  checkAuth: () => Promise<void>
+  checkAuth: (sessionFromContext?: any) => Promise<void>
   logout: () => Promise<void>
   setCurrentDocument: (document: Document | null) => void
   addDocument: (document: Document, setAsCurrent?: boolean) => void
@@ -246,12 +282,17 @@ interface AppState {
   removeDocument: (id: string) => void
   toggleChat: () => void
   setIsRightSidebarOpen: (open: boolean) => void
+  setRightSidebarTab: (tab: 'notes' | 'highlights') => void
+  setRightSidebarWidth: (width: number) => void
+  setChatWindowPosition: (position: { top: number; left: number }) => void
+  setChatWindowSize: (size: { width: number; height: number }) => void
+  setNavRailExpanded: (expanded: boolean) => void
   setLoading: (loading: boolean) => void
   updateTypography: (settings: Partial<TypographySettings>) => void
   updateTheme: (settings: Partial<ThemeSettings>) => void
   updatePDFViewer: (settings: Partial<PDFViewerSettings>) => void
   updateTTS: (settings: Partial<TTSSettings>) => void
-  addChatMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void
+  addChatMessage: (message: NewChatMessage) => void
   clearChat: () => void
   setTyping: (typing: boolean) => void
   refreshLibrary: () => void
@@ -266,6 +307,9 @@ interface AppState {
   toggleBookSelection: (bookId: string) => void
   clearSelection: () => void
   selectAllBooks: (bookIds: string[]) => void
+  setCollectionDragState: (state: Partial<AppState['collectionDragState']>) => void
+  setTagManagerOpen: (open: boolean) => void
+  setPendingAssignmentTargets: (targets: Partial<AppState['pendingAssignmentTargets']>) => void
   
   setPomodoroSession: (sessionId: string | null, bookId: string | null, startTime: number | null) => void
   updatePomodoroTimer: (timeLeft: number | null, isRunning: boolean, mode: 'work' | 'shortBreak' | 'longBreak') => void
@@ -299,6 +343,33 @@ interface AppState {
   // TTS position tracking actions
   saveTTSPosition: (documentId: string, position: TTSPosition) => void
   loadTTSPosition: (documentId: string) => TTSPosition | null
+  openCustomReadingWizard: (source?: CustomReadingWizardSource) => void
+  advanceCustomReadingWizard: (step: CustomReadingWizardStep, extra?: Partial<CustomReadingWizardState>) => void
+  setCustomReadingWizardStatus: (status: CustomReadingWizardStatus, error?: string | null) => void
+  closeCustomReadingWizard: () => void
+}
+
+const readBooleanPreference = (key: string, fallback: boolean): boolean => {
+  if (typeof window === 'undefined') return fallback
+  const stored = window.localStorage.getItem(key)
+  if (stored === 'true') return true
+  if (stored === 'false') return false
+  return fallback
+}
+
+const readRightSidebarTabPreference = (fallback: 'notes' | 'highlights'): 'notes' | 'highlights' => {
+  if (typeof window === 'undefined') return fallback
+  const stored = window.localStorage.getItem('rightSidebarTab')
+  if (stored === 'highlights') return 'highlights'
+  return 'notes'
+}
+
+const readNumberPreference = (key: string, fallback: number): number => {
+  if (typeof window === 'undefined') return fallback
+  const stored = window.localStorage.getItem(key)
+  if (!stored) return fallback
+  const parsed = Number(stored)
+  return Number.isFinite(parsed) ? parsed : fallback
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -307,8 +378,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   user: null,
   currentDocument: null,
   documents: [],
-  isChatOpen: false,
+  isChatOpen: readBooleanPreference('chatWindowOpen', false),
   isRightSidebarOpen: false,
+  rightSidebarTab: readRightSidebarTabPreference('notes'),
+  rightSidebarWidth: readNumberPreference('rightSidebarWidth', 360),
+  chatWindowPosition: {
+    top: readNumberPreference('chatWindowTop', 120),
+    left: readNumberPreference('chatWindowLeft', 80)
+  },
+  chatWindowSize: {
+    width: readNumberPreference('chatWindowWidth', 420),
+    height: readNumberPreference('chatWindowHeight', 600)
+  },
+  isNavRailExpanded: readBooleanPreference('navRailExpanded', false),
   isLoading: false,
   typography: {
     fontFamily: 'serif',
@@ -373,6 +455,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     filters: {},
     selectedBooks: []
   },
+  collectionDragState: {
+    activeId: null,
+    overId: null
+  },
+  tagManagerOpen: false,
+  pendingAssignmentTargets: {
+    collectionIds: [],
+    tagIds: []
+  },
   
   // Pomodoro state
   activePomodoroSessionId: null,
@@ -401,6 +492,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Study mode and notes state
   studyMode: false,
   noteTemplateType: null,
+  customReadingWizard: {
+    isOpen: false,
+    step: 'welcome',
+    source: null,
+    documentId: null,
+    status: 'idle',
+    error: null
+  },
   
   // Authentication actions
   setUser: (user) => set({ user }),
@@ -615,9 +714,52 @@ export const useAppStore = create<AppState>((set, get) => ({
     currentDocument: state.currentDocument?.id === id ? null : state.currentDocument
   })),
   
-  toggleChat: () => set((state) => ({ isChatOpen: !state.isChatOpen })),
+  toggleChat: () => set((state) => {
+    const next = !state.isChatOpen
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('chatWindowOpen', String(next))
+    }
+    return { isChatOpen: next }
+  }),
   
-  setIsRightSidebarOpen: (open) => set({ isRightSidebarOpen: open }),
+  setIsRightSidebarOpen: (open) => set(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('rightSidebarOpen', String(open))
+    }
+    return { isRightSidebarOpen: open }
+  }),
+  setRightSidebarTab: (tab) => set(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('rightSidebarTab', tab)
+    }
+    return { rightSidebarTab: tab }
+  }),
+  setRightSidebarWidth: (width) => set(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('rightSidebarWidth', String(width))
+    }
+    return { rightSidebarWidth: width }
+  }),
+  setChatWindowPosition: (position) => set(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('chatWindowTop', String(position.top))
+      window.localStorage.setItem('chatWindowLeft', String(position.left))
+    }
+    return { chatWindowPosition: position }
+  }),
+  setChatWindowSize: (size) => set(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('chatWindowWidth', String(size.width))
+      window.localStorage.setItem('chatWindowHeight', String(size.height))
+    }
+    return { chatWindowSize: size }
+  }),
+  setNavRailExpanded: (expanded) => set(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('navRailExpanded', String(expanded))
+    }
+    return { isNavRailExpanded: expanded }
+  }),
   
   setLoading: (loading) => set({ isLoading: loading }),
   
@@ -738,6 +880,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectAllBooks: (bookIds) => set((state) => ({
     libraryView: { ...state.libraryView, selectedBooks: bookIds }
   })),
+
+  setCollectionDragState: (dragState) => set((state) => ({
+    collectionDragState: { ...state.collectionDragState, ...dragState }
+  })),
+
+  setTagManagerOpen: (open) => set({ tagManagerOpen: open }),
+
+  setPendingAssignmentTargets: (targets) => set((state) => ({
+    pendingAssignmentTargets: {
+      collectionIds: targets.collectionIds ?? state.pendingAssignmentTargets.collectionIds,
+      tagIds: targets.tagIds ?? state.pendingAssignmentTargets.tagIds
+    }
+  })),
   
   // Text selection and AI mode actions
   setSelectedTextContext: (context) => set({ selectedTextContext: context }),
@@ -747,6 +902,42 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Study mode and notes actions
   setStudyMode: (enabled) => set({ studyMode: enabled }),
   setNoteTemplateType: (type) => set({ noteTemplateType: type }),
+
+  // Custom Reading Wizard
+  openCustomReadingWizard: (source?: CustomReadingWizardSource) => set({
+    customReadingWizard: {
+      isOpen: true,
+      step: 'welcome',
+      source: source || 'empty-state',
+      documentId: null,
+      status: 'idle',
+      error: null
+    }
+  }),
+  advanceCustomReadingWizard: (step: CustomReadingWizardStep, extra: Partial<CustomReadingWizardState> = {}) => set((state) => ({
+    customReadingWizard: {
+      ...state.customReadingWizard,
+      step,
+      ...extra
+    }
+  })),
+  setCustomReadingWizardStatus: (status: CustomReadingWizardStatus, error: string | null = null) => set((state) => ({
+    customReadingWizard: {
+      ...state.customReadingWizard,
+      status,
+      error
+    }
+  })),
+  closeCustomReadingWizard: () => set({
+    customReadingWizard: {
+      isOpen: false,
+      step: 'welcome',
+      source: null,
+      documentId: null,
+      status: 'idle',
+      error: null
+    }
+  }),
   
   // Related Documents actions
   setRelatedDocuments: (documents) => set({ relatedDocuments: documents }),

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { FileText, Clock, BookOpen, Tag, Timer, ChevronLeft, ChevronRight, Flame, Trophy, BarChart3, Target, Plus, ChevronDown, ChevronUp, History, GitBranch, TrendingUp, Activity, Network, X } from 'lucide-react'
+import { FileText, Clock, Timer, ChevronLeft, ChevronRight, Flame, Trophy, BarChart3, ChevronDown, ChevronUp, History, GitBranch, TrendingUp, Activity, Network, X } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
 import { pomodoroService } from '../src/services/pomodoroService'
@@ -10,7 +10,6 @@ import { RelatedDocumentsPanel } from '../src/components/RelatedDocumentsPanel'
 import { AddRelatedDocumentModal } from '../src/components/AddRelatedDocumentModal'
 import { DocumentPreviewModal } from '../src/components/DocumentPreviewModal'
 import { DocumentGraphViewer } from '../src/components/DocumentGraphViewer'
-import { useTheme } from './ThemeProvider'
 import { userBooks, documentRelationships, DocumentRelationshipWithDetails } from '../lib/supabase'
 
 interface ThemedSidebarProps {
@@ -30,6 +29,9 @@ interface DocumentWithProgress {
   totalPages?: number
   currentPage?: number
 }
+
+const SIDEBAR_COLLAPSED_WIDTH = 72
+const SIDEBAR_EXPANDED_WIDTH = 320
 
 export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, refreshTrigger }) => {
   const { currentDocument, user, showPomodoroDashboard, setShowPomodoroDashboard, documents: appDocuments, setCurrentDocument, relatedDocuments, setRelatedDocuments, relatedDocumentsRefreshTrigger, refreshRelatedDocuments, recentlyViewedDocuments } = useAppStore()
@@ -54,7 +56,53 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
     activity: false,
     achievements: false
   })
+
+  const toggleSection = (section: keyof typeof sectionsExpanded) => {
+    setSectionsExpanded(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }))
+  }
   
+  const handleDocumentClick = (doc: DocumentWithProgress) => {
+    const targetDocument = appDocuments.find((document) => document.id === doc.id)
+    if (targetDocument) {
+      setCurrentDocument(targetDocument)
+    }
+  }
+
+  const handleAddRelatedDocument = () => {
+    if (!currentDocument) return
+    setShowAddRelatedModal(true)
+  }
+
+  const handlePreviewDocument = (relationship: DocumentRelationshipWithDetails) => {
+    setSelectedRelationship(relationship)
+    setShowPreviewModal(true)
+  }
+
+  const handleDeleteRelationship = async (relationshipId: string) => {
+    try {
+      const { error } = await documentRelationships.delete(relationshipId)
+      if (error) {
+        console.error('Failed to delete document relationship:', error)
+        return
+      }
+      if (selectedRelationship?.relationship_id === relationshipId) {
+        setSelectedRelationship(null)
+        setShowPreviewModal(false)
+      }
+      refreshRelatedDocuments()
+    } catch (error) {
+      console.error('Unexpected error deleting relationship:', error)
+    }
+  }
+
+  const handleRelationshipCreated = () => {
+    setShowAddRelatedModal(false)
+    refreshRelatedDocuments()
+  }
+
 
   // Convert recently viewed documents to display format
   useEffect(() => {
@@ -190,568 +238,496 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
       refreshRelatedDocuments()
     }, 10000) // Poll every 10 seconds (reduced frequency)
 
-    return () => clearInterval(intervalId)
+    return () => {
+      clearInterval(intervalId)
+    }
   }, [relatedDocuments, currentDocument?.id, user, refreshRelatedDocuments])
 
-  // Close section collapse/expand handlers
-  const toggleSection = (section: keyof typeof sectionsExpanded) => {
-    setSectionsExpanded(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }))
-  }
+  const railItems: Array<{
+    id: string
+    icon: React.ElementType
+    label: string
+    section?: keyof typeof sectionsExpanded
+    action?: 'pomodoro'
+  }> = [
+    { id: 'library', icon: History, label: 'Recently Viewed', section: 'library' },
+    { id: 'related', icon: GitBranch, label: 'Related Documents', section: 'related' },
+    { id: 'stats', icon: TrendingUp, label: 'Productivity Stats', section: 'stats' },
+    { id: 'activity', icon: Activity, label: 'Recent Activity', section: 'activity' },
+    { id: 'achievements', icon: Trophy, label: 'Achievements', section: 'achievements' },
+    { id: 'pomodoro', icon: Timer, label: 'Pomodoro Dashboard', action: 'pomodoro' }
+  ]
 
-  const handleDocumentClick = async (doc: DocumentWithProgress) => {
-    try {
-      // Find the document in appDocuments or load it from database
-      let documentToLoad = appDocuments.find(d => d.id === doc.id)
-      
-      if (!documentToLoad) {
-        // Load document from database if not in app store
-        const { data: dbDoc, error } = await userBooks.get(doc.id)
-        if (error || !dbDoc) {
-          console.error('Error loading document:', error)
-          return
-        }
-        
-        // Convert database document to app store format
-        documentToLoad = {
-          id: dbDoc.id,
-          name: dbDoc.title || dbDoc.file_name || 'Untitled Document',
-          content: dbDoc.text_content || '',
-          type: (dbDoc.file_type === 'pdf' || dbDoc.file_type === 'epub' ? dbDoc.file_type : 'text') as 'pdf' | 'text' | 'epub',
-          uploadedAt: new Date(dbDoc.created_at),
-          totalPages: dbDoc.total_pages,
-          pageTexts: [], // Will be loaded separately when needed
-          highlights: [],
-          highlightsLoaded: false
-        }
-      }
-      
-      setCurrentDocument(documentToLoad)
-    } catch (error) {
-      console.error('Error opening document:', error)
+  const handleRailItemClick = (item: typeof railItems[number]) => {
+    if (item.action === 'pomodoro') {
+      setShowPomodoroDashboard(true)
+      return
+    }
+
+    onToggle()
+    if (item.section) {
+      setSectionsExpanded(prev => ({
+        ...prev,
+        [item.section!]: true
+      }))
     }
   }
 
-  // Related Documents handlers
-  const handleAddRelatedDocument = () => {
-    if (!currentDocument) return
-    setShowAddRelatedModal(true)
-  }
-
-  const handlePreviewDocument = (relationship: DocumentRelationshipWithDetails) => {
-    setSelectedRelationship(relationship)
-    setShowPreviewModal(true)
-  }
-
-  const handleDeleteRelationship = async (relationshipId: string) => {
-    try {
-      const { error } = await documentRelationships.delete(relationshipId)
-      if (error) {
-        console.error('Error deleting relationship:', error)
-        return
-      }
-      
-      // Refresh related documents
-      refreshRelatedDocuments()
-    } catch (error) {
-      console.error('Error deleting relationship:', error)
-    }
-  }
-
-  const handleRelationshipCreated = () => {
-    refreshRelatedDocuments()
-  }
+  const sidebarWidth = isOpen ? `min(${SIDEBAR_EXPANDED_WIDTH}px, 80vw)` : `min(${SIDEBAR_COLLAPSED_WIDTH}px, 22vw)`
 
   return (
     <>
-      {/* Toggle Button (visible when sidebar is closed) */}
-      {!isOpen && (
-        <button
-          onClick={onToggle}
-          className="fixed top-24 left-4 z-50 p-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
-          style={{
-            backgroundColor: 'var(--color-primary)',
-            color: 'var(--color-text-inverse)',
-            border: '1px solid var(--color-primary)',
-          }}
-          aria-label="Open sidebar"
-          title="Open sidebar"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
-      )}
-
-      <aside 
-        className="overflow-y-auto transition-transform duration-300 ease-in-out"
+      <aside
+        className="transition-all duration-300 ease-in-out"
         style={{
-          width: 'var(--sidebar-width)',
+          width: sidebarWidth,
+          maxWidth: isOpen ? '80vw' : '22vw',
           background: 'linear-gradient(180deg, var(--color-surface) 0%, rgba(17, 24, 39, 0.98) 100%)',
           borderRight: '1px solid var(--color-border)',
           height: 'calc(100vh - var(--header-height))',
-          transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
-          marginLeft: isOpen ? '0' : 'calc(-1 * var(--sidebar-width))',
-          zIndex: 50,
           position: 'sticky',
           top: 'var(--header-height)',
+          flexShrink: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          zIndex: 50
         }}
       >
-        <div className="p-4 pt-6">
-          {/* Close Sidebar Button */}
-          <div className="flex justify-end items-center mb-4">
-            <button
-              onClick={onToggle}
-              className="p-2 rounded-lg transition-all duration-300 hover:scale-110 shadow-md hover:shadow-lg"
-              style={{
-                backgroundColor: 'var(--color-surface-hover)',
-                color: 'var(--color-text-primary)',
-                border: '1px solid var(--color-border)',
-              }}
-              aria-label="Close sidebar"
-              title="Close sidebar"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-          </div>
+        <div
+          className={`flex items-center ${isOpen ? 'justify-between px-4' : 'justify-center px-2'} py-4 border-b`}
+          style={{ borderColor: 'var(--color-border)' }}
+        >
+          <button
+            onClick={onToggle}
+            className="p-2 rounded-lg transition-colors"
+            style={{
+              backgroundColor: 'var(--color-surface-hover)',
+              color: 'var(--color-text-primary)',
+              border: '1px solid var(--color-border)'
+            }}
+            aria-label={isOpen ? 'Collapse navigation' : 'Expand navigation'}
+            title={isOpen ? 'Collapse navigation' : 'Expand navigation'}
+          >
+            {isOpen ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+          </button>
 
-          {/* Recently Viewed Section */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-2">
-                <History className="w-5 h-5" style={{ color: '#3b82f6' }} />
-                <h2 
-                  className="text-lg font-semibold"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
-                  Recently Viewed
-                </h2>
-              </div>
-              <button
-                onClick={() => toggleSection('library')}
-                className="p-1 rounded transition-colors"
+          {isOpen && (
+            <div className="flex items-center gap-3">
+              <span
+                className="text-sm font-semibold uppercase tracking-wide"
                 style={{ color: 'var(--color-text-secondary)' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
-                {sectionsExpanded.library ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </button>
-            </div>
-            
-            
-            {sectionsExpanded.library && (
-              <div className="space-y-3">
-                {userDocuments.length === 0 ? (
-                  <div className="text-center py-8">
-                    <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" style={{ color: 'var(--color-text-tertiary)' }} />
-                    <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                      No recently viewed documents. Open a document to see it here!
-                    </p>
-                  </div>
-                ) : (
-                  userDocuments.map((doc) => (
-              <div
-                key={doc.id}
-                className="p-3 rounded-lg border transition-colors cursor-pointer"
+                Navigation
+              </span>
+              <button
+                onClick={() => setShowPomodoroDashboard(true)}
+                className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
                 style={{
-                  backgroundColor: doc.isActive ? 'var(--color-primary-light)' : 'var(--color-surface)',
-                  borderColor: doc.isActive ? 'var(--color-primary)' : 'var(--color-border)',
-                }}
-                onClick={() => handleDocumentClick(doc)}
-                onMouseEnter={(e) => {
-                  if (!doc.isActive) {
-                    e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!doc.isActive) {
-                    e.currentTarget.style.backgroundColor = 'var(--color-surface)'
-                  }
+                  borderColor: 'var(--color-border)',
+                  color: 'var(--color-text-primary)',
+                  backgroundColor: 'var(--color-surface-hover)'
                 }}
               >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <Tooltip content={doc.isActive ? "Currently Active" : "Click to Open"} position="right">
-                      <FileText className="w-4 h-4" style={{ color: 'var(--color-text-secondary)' }} />
-                    </Tooltip>
-                    <h3 
-                      className={`text-sm ${doc.isActive ? 'font-semibold' : 'font-medium'}`}
-                      style={{ 
-                        color: doc.isActive ? '#000000' : 'var(--color-text-primary)' 
-                      }}
-                    >
-                      {doc.name}
-                    </h3>
-                  </div>
-                  {doc.isActive && (
-                    <div 
-                      className="text-xs px-2 py-1 rounded-full"
-                      style={{
-                        backgroundColor: 'var(--color-primary)',
-                        color: 'var(--color-text-inverse)',
-                      }}
-                    >
-                      Active
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center space-x-2">
-                    <Tooltip content="Reading Progress" position="right">
-                      <Clock className="w-3 h-3" style={{ color: doc.isActive ? '#4b5563' : 'var(--color-text-tertiary)' }} />
-                    </Tooltip>
-                    <span style={{ color: doc.isActive ? '#374151' : 'var(--color-text-secondary)' }}>
-                      {doc.progress}% complete
-                    </span>
-                  </div>
-                  <Tooltip content="Estimated Reading Time" position="left">
-                    <span style={{ color: doc.isActive ? '#4b5563' : 'var(--color-text-tertiary)' }}>
-                      {doc.readingTime} reading
-                    </span>
-                  </Tooltip>
-                </div>
-                
-                {/* Pomodoro Time Display */}
-                {pomodoroStats[doc.id] && pomodoroStats[doc.id].timeMinutes > 0 && (
-                  <div className="flex items-center space-x-2 text-xs mt-2">
-                    <Tooltip content="Time Spent (Pomodoro)" position="right">
-                      <Timer className="w-3 h-3" style={{ color: '#ef4444' }} />
-                    </Tooltip>
-                    <span style={{ color: 'var(--color-text-secondary)' }}>
-                      {pomodoroStats[doc.id].timeMinutes} min
-                    </span>
-                    <span style={{ color: 'var(--color-text-tertiary)' }}>
-                      ({pomodoroStats[doc.id].sessions} sessions)
-                    </span>
-                  </div>
-                )}
-                
-                {/* Progress Bar */}
-                <div 
-                  className="w-full rounded-full h-1.5 mt-2"
-                  style={{ backgroundColor: 'var(--color-border-light)' }}
-                >
-                  <div
-                    className="h-1.5 rounded-full transition-all duration-300"
-                    style={{
-                      width: `${doc.progress}%`,
-                      backgroundColor: doc.isActive ? 'var(--color-primary)' : 'var(--color-text-tertiary)',
-                    }}
-                  />
-                </div>
-              </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Related Documents Section */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-2">
-                <GitBranch className="w-5 h-5" style={{ color: '#10b981' }} />
-                <h3 
-                  className="text-lg font-semibold"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
-                  Related Documents
-                </h3>
-              </div>
-              <button
-                onClick={() => toggleSection('related')}
-                className="p-1 rounded transition-colors"
-                style={{ color: 'var(--color-text-secondary)' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                {sectionsExpanded.related ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                <Timer className="h-4 w-4" />
+                Focus Timer
               </button>
             </div>
-            
-            {sectionsExpanded.related && (
-              <>
-                {currentDocument ? (
-                  <RelatedDocumentsPanel
-                    relatedDocuments={relatedDocuments}
-                    isLoading={relatedDocsLoading}
-                    onAddRelatedDocument={handleAddRelatedDocument}
-                    onPreviewDocument={handlePreviewDocument}
-                    onDeleteRelationship={handleDeleteRelationship}
-                    onOpenGraphView={() => setShowGraphModal(true)}
-                  />
-                ) : (
-                  <div className="text-center py-6">
-                    <FileText className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--color-text-tertiary)' }} />
-                    <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                      Open a document to see related documents
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+          )}
+        </div>
 
-          {/* Productivity Stats Section */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-2">
-                <TrendingUp className="w-5 h-5" style={{ color: '#f59e0b' }} />
-                <h3 
-                  className="text-lg font-semibold"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
-                  Productivity Stats
-                </h3>
-              </div>
-              <button
-                onClick={() => toggleSection('stats')}
-                className="p-1 rounded transition-colors"
-                style={{ color: 'var(--color-text-secondary)' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                {sectionsExpanded.stats ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </button>
-            </div>
-            
-            {sectionsExpanded.stats && (
-              <div className="space-y-4" data-tour="sidebar-stats">
-                <div className="flex items-center justify-between">
+        <div className="flex-1 overflow-y-auto">
+          {isOpen ? (
+            <div className="px-4 pb-6">
+
+              {/* Recently Viewed Section */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-2">
-                    <BarChart3 className="w-4 h-4" style={{ color: 'var(--color-text-secondary)' }} />
-                    <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Analytics</span>
+                    <History className="w-5 h-5" style={{ color: '#3b82f6' }} />
+                    <h2
+                      className="text-lg font-semibold"
+                      style={{ color: 'var(--color-text-primary)' }}
+                    >
+                      Recently Viewed
+                    </h2>
                   </div>
                   <button
-                    onClick={() => setShowPomodoroDashboard(true)}
-                    className="p-1 rounded hover:bg-gray-100 transition-colors"
+                    onClick={() => toggleSection('library')}
+                    className="p-1 rounded transition-colors"
                     style={{ color: 'var(--color-text-secondary)' }}
-                    title="View Analytics Dashboard"
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                   >
-                    <BarChart3 className="w-4 h-4" />
+                    {sectionsExpanded.library ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </button>
                 </div>
-          
-          {/* Streak Display */}
-          {streak && (
-            <div 
-              className="p-3 rounded-lg"
-              style={{
-                backgroundColor: streak.current_streak > 0 ? '#fef2f2' : '#f8fafc',
-                border: `1px solid ${streak.current_streak > 0 ? '#fecaca' : 'var(--color-border)'}`,
-              }}
-            >
-              <div className="flex items-center space-x-2 mb-2">
-                <Flame className="w-5 h-5" style={{ color: streak.current_streak > 0 ? '#ef4444' : '#9ca3af' }} />
-                <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                  Current Streak
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold" style={{ color: streak.current_streak > 0 ? '#ef4444' : '#6b7280' }}>
-                  {streak.current_streak}
-                </div>
-                <div className="text-xs text-right" style={{ color: 'var(--color-text-secondary)' }}>
-                  <div>Best: {streak.longest_streak}</div>
-                  <div>Week: {streak.weekly_progress}/{streak.weekly_goal}</div>
-                </div>
-              </div>
-            </div>
-          )}
 
-          {/* Achievement Summary */}
-          {achievements.length > 0 && (
-            <div 
-              className="p-3 rounded-lg"
-              style={{
-                backgroundColor: '#f0f9ff',
-                border: '1px solid #bae6fd',
-              }}
-            >
-              <div className="flex items-center space-x-2 mb-2">
-                <Trophy className="w-4 h-4" style={{ color: '#0ea5e9' }} />
-                <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                  Achievements
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold" style={{ color: '#0ea5e9' }}>
-                  {achievements.length}
-                </div>
-                <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                  {achievements.length === 9 ? 'All unlocked! 🎉' : `${achievements.length}/9 unlocked`}
-                </div>
-              </div>
-            </div>
-          )}
+                {sectionsExpanded.library && (
+                  <div className="space-y-3">
+                    {userDocuments.length === 0 ? (
+                      <div className="text-center py-8">
+                        <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" style={{ color: 'var(--color-text-tertiary)' }} />
+                        <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                          No recently viewed documents. Open a document to see it here!
+                        </p>
+                      </div>
+                    ) : (
+                      userDocuments.map((doc) => (
+                        <div
+                          key={doc.id}
+                          className="p-3 rounded-lg border transition-colors cursor-pointer"
+                          style={{
+                            backgroundColor: doc.isActive ? 'var(--color-primary-light)' : 'var(--color-surface)',
+                            borderColor: doc.isActive ? 'var(--color-primary)' : 'var(--color-border)'
+                          }}
+                          onClick={() => handleDocumentClick(doc)}
+                          onMouseEnter={(e) => {
+                            if (!doc.isActive) {
+                              e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!doc.isActive) {
+                              e.currentTarget.style.backgroundColor = 'var(--color-surface)'
+                            }
+                          }}
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <Tooltip content={doc.isActive ? 'Currently Active' : 'Click to Open'} position="right">
+                                <FileText className="w-4 h-4" style={{ color: 'var(--color-text-secondary)' }} />
+                              </Tooltip>
+                              <h3
+                                className={`text-sm ${doc.isActive ? 'font-semibold' : 'font-medium'}`}
+                                style={{ color: doc.isActive ? '#000000' : 'var(--color-text-primary)' }}
+                              >
+                                {doc.name}
+                              </h3>
+                            </div>
+                            {doc.isActive && (
+                              <div
+                                className="text-xs px-2 py-1 rounded-full"
+                                style={{
+                                  backgroundColor: 'var(--color-primary)',
+                                  color: 'var(--color-text-inverse)'
+                                }}
+                              >
+                                Active
+                              </div>
+                            )}
+                          </div>
 
-          {/* Basic Stats */}
-          <div className="grid grid-cols-2 gap-4">
-            <div 
-              className="p-3 rounded-lg text-center"
-              style={{
-                backgroundColor: 'var(--color-background)',
-                border: '1px solid var(--color-border)',
-              }}
-            >
-              <div 
-                className="text-2xl font-bold"
-                style={{ color: 'var(--color-primary)' }}
-              >
-                {userDocuments.length}
-              </div>
-              <div 
-                className="text-xs"
-                style={{ color: 'var(--color-text-secondary)' }}
-              >
-                Documents
-              </div>
-            </div>
-            
-            <div 
-              className="p-3 rounded-lg text-center"
-              style={{
-                backgroundColor: 'var(--color-background)',
-                border: '1px solid var(--color-border)',
-              }}
-            >
-              <div 
-                className="text-2xl font-bold"
-                style={{ color: 'var(--color-secondary)' }}
-              >
-                47
-              </div>
-              <div 
-                className="text-xs"
-                style={{ color: 'var(--color-text-secondary)' }}
-              >
-                Annotations
-              </div>
-            </div>
-          </div>
-              </div>
-            )}
-          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center space-x-2">
+                              <Tooltip content="Reading Progress" position="right">
+                                <Clock className="w-3 h-3" style={{ color: doc.isActive ? '#4b5563' : 'var(--color-text-tertiary)' }} />
+                              </Tooltip>
+                              <span style={{ color: doc.isActive ? '#374151' : 'var(--color-text-secondary)' }}>
+                                {doc.progress}% complete
+                              </span>
+                            </div>
+                            <Tooltip content="Estimated Reading Time" position="left">
+                              <span style={{ color: doc.isActive ? '#4b5563' : 'var(--color-text-tertiary)' }}>
+                                {doc.readingTime} reading
+                              </span>
+                            </Tooltip>
+                          </div>
 
-          {/* Recent Activity Section */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-2">
-                <Activity className="w-5 h-5" style={{ color: '#8b5cf6' }} />
-                <h3 
-                  className="text-lg font-semibold"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
-                  Recent Activity
-                </h3>
-              </div>
-              <button
-                onClick={() => toggleSection('activity')}
-                className="p-1 rounded transition-colors"
-                style={{ color: 'var(--color-text-secondary)' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                {sectionsExpanded.activity ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </button>
-            </div>
-            
-            {sectionsExpanded.activity && (
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-              <div 
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: 'var(--color-highlight-yellow)' }}
-              />
-              <div className="flex-1">
-                <p 
-                  className="text-sm"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
-                  Added annotation to Research Paper
-                </p>
-                <p 
-                  className="text-xs"
-                  style={{ color: 'var(--color-text-tertiary)' }}
-                >
-                  2 hours ago
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-3">
-              <div 
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: 'var(--color-highlight-blue)' }}
-              />
-              <div className="flex-1">
-                <p 
-                  className="text-sm"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
-                  Created new note in Literature Review
-                </p>
-                <p 
-                  className="text-xs"
-                  style={{ color: 'var(--color-text-tertiary)' }}
-                >
-                  4 hours ago
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-3">
-              <div 
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: 'var(--color-highlight-green)' }}
-              />
-              <div className="flex-1">
-                <p 
-                  className="text-sm"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
-                  Completed Methodology Notes
-                </p>
-                <p 
-                  className="text-xs"
-                  style={{ color: 'var(--color-text-tertiary)' }}
-                >
-                  1 day ago
-                </p>
-              </div>
-            </div>
-              </div>
-            )}
-          </div>
+                          {pomodoroStats[doc.id] && pomodoroStats[doc.id].timeMinutes > 0 && (
+                            <div className="flex items-center space-x-2 text-xs mt-2">
+                              <Tooltip content="Time Spent (Pomodoro)" position="right">
+                                <Timer className="w-3 h-3" style={{ color: '#ef4444' }} />
+                              </Tooltip>
+                              <span style={{ color: 'var(--color-text-secondary)' }}>{pomodoroStats[doc.id].timeMinutes} min</span>
+                              <span style={{ color: 'var(--color-text-tertiary)' }}>({pomodoroStats[doc.id].sessions} sessions)</span>
+                            </div>
+                          )}
 
-          {/* Achievements Panel - Collapsible */}
-          {user && (
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <Trophy className="w-5 h-5" style={{ color: '#f59e0b' }} />
-                  <h3 
-                    className="text-lg font-semibold"
-                    style={{ color: 'var(--color-text-primary)' }}
+                          <div className="w-full rounded-full h-1.5 mt-2" style={{ backgroundColor: 'var(--color-border-light)' }}>
+                            <div
+                              className="h-1.5 rounded-full transition-all duration-300"
+                              style={{
+                                width: `${doc.progress}%`,
+                                backgroundColor: doc.isActive ? 'var(--color-primary)' : 'var(--color-text-tertiary)'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Related Documents Section */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <GitBranch className="w-5 h-5" style={{ color: '#10b981' }} />
+                    <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                      Related Documents
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => toggleSection('related')}
+                    className="p-1 rounded transition-colors"
+                    style={{ color: 'var(--color-text-secondary)' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                   >
-                    Achievements
-                  </h3>
+                    {sectionsExpanded.related ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
                 </div>
-                <button
-                  onClick={() => toggleSection('achievements')}
-                  className="p-1 rounded transition-colors"
-                  style={{ color: 'var(--color-text-secondary)' }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  {sectionsExpanded.achievements ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </button>
+
+                {sectionsExpanded.related && (
+                  <>
+                    {currentDocument ? (
+                      <RelatedDocumentsPanel
+                        relatedDocuments={relatedDocuments}
+                        isLoading={relatedDocsLoading}
+                        onAddRelatedDocument={handleAddRelatedDocument}
+                        onPreviewDocument={handlePreviewDocument}
+                        onDeleteRelationship={handleDeleteRelationship}
+                        onOpenGraphView={() => setShowGraphModal(true)}
+                      />
+                    ) : (
+                      <div className="text-center py-6">
+                        <FileText className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--color-text-tertiary)' }} />
+                        <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                          Open a document to see related documents
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-              
-              {sectionsExpanded.achievements && (
-                <AchievementPanel userId={user.id} />
+
+              {/* Productivity Stats Section */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <TrendingUp className="w-5 h-5" style={{ color: '#f59e0b' }} />
+                    <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                      Productivity Stats
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => toggleSection('stats')}
+                    className="p-1 rounded transition-colors"
+                    style={{ color: 'var(--color-text-secondary)' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    {sectionsExpanded.stats ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {sectionsExpanded.stats && (
+                  <div className="space-y-4" data-tour="sidebar-stats">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <BarChart3 className="w-4 h-4" style={{ color: 'var(--color-text-secondary)' }} />
+                        <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                          Analytics
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setShowPomodoroDashboard(true)}
+                        className="p-1 rounded hover:bg-gray-100 transition-colors"
+                        style={{ color: 'var(--color-text-secondary)' }}
+                        title="View Analytics Dashboard"
+                      >
+                        <BarChart3 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {streak && (
+                      <div
+                        className="p-3 rounded-lg"
+                        style={{
+                          backgroundColor: streak.current_streak > 0 ? '#fef2f2' : '#f8fafc',
+                          border: `1px solid ${streak.current_streak > 0 ? '#fecaca' : 'var(--color-border)'}`
+                        }}
+                      >
+                        <div className="flex items-center space-x-2 mb-2">
+                          <Flame className="w-5 h-5" style={{ color: streak.current_streak > 0 ? '#ef4444' : '#9ca3af' }} />
+                          <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                            Current Streak
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="text-2xl font-bold" style={{ color: streak.current_streak > 0 ? '#ef4444' : '#6b7280' }}>
+                            {streak.current_streak}
+                          </div>
+                          <div className="text-xs text-right" style={{ color: 'var(--color-text-secondary)' }}>
+                            <div>Best: {streak.longest_streak}</div>
+                            <div>Week: {streak.weekly_progress}/{streak.weekly_goal}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {achievements.length > 0 && (
+                      <div
+                        className="p-3 rounded-lg"
+                        style={{
+                          backgroundColor: '#f0f9ff',
+                          border: '1px solid #bae6fd'
+                        }}
+                      >
+                        <div className="flex items-center space-x-2 mb-2">
+                          <Trophy className="w-4 h-4" style={{ color: '#0ea5e9' }} />
+                          <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                            Achievements
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="text-2xl font-bold" style={{ color: '#0ea5e9' }}>
+                            {achievements.length}
+                          </div>
+                          <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                            {achievements.length === 9 ? 'All unlocked! 🎉' : `${achievements.length}/9 unlocked`}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div
+                        className="p-3 rounded-lg text-center"
+                        style={{
+                          backgroundColor: 'var(--color-background)',
+                          border: '1px solid var(--color-border)'
+                        }}
+                      >
+                        <div className="text-2xl font-bold" style={{ color: 'var(--color-primary)' }}>
+                          {userDocuments.length}
+                        </div>
+                        <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                          Documents
+                        </div>
+                      </div>
+                      <div
+                        className="p-3 rounded-lg text-center"
+                        style={{
+                          backgroundColor: 'var(--color-background)',
+                          border: '1px solid var(--color-border)'
+                        }}
+                      >
+                        <div className="text-2xl font-bold" style={{ color: 'var(--color-secondary)' }}>
+                          47
+                        </div>
+                        <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                          Annotations
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Recent Activity Section */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <Activity className="w-5 h-5" style={{ color: '#8b5cf6' }} />
+                    <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                      Recent Activity
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => toggleSection('activity')}
+                    className="p-1 rounded transition-colors"
+                    style={{ color: 'var(--color-text-secondary)' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    {sectionsExpanded.activity ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {sectionsExpanded.activity && (
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--color-highlight-yellow)' }} />
+                      <div className="flex-1">
+                        <p className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
+                          Added annotation to Research Paper
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+                          2 hours ago
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--color-highlight-blue)' }} />
+                      <div className="flex-1">
+                        <p className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
+                          Created new note in Literature Review
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+                          4 hours ago
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--color-highlight-green)' }} />
+                      <div className="flex-1">
+                        <p className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
+                          Completed Methodology Notes
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+                          1 day ago
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {user && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-2">
+                      <Trophy className="w-5 h-5" style={{ color: '#f59e0b' }} />
+                      <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                        Achievements
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => toggleSection('achievements')}
+                      className="p-1 rounded transition-colors"
+                      style={{ color: 'var(--color-text-secondary)' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      {sectionsExpanded.achievements ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {sectionsExpanded.achievements && <AchievementPanel userId={user.id} />}
+                </div>
               )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-4 py-6">
+              {railItems.map((item) => (
+                <Tooltip key={item.id} content={item.label} position="right">
+                  <button
+                onClick={() => handleRailItemClick(item)}
+                    className="p-2 rounded-lg transition-colors"
+                    style={{
+                      backgroundColor: 'var(--color-surface)',
+                      color: 'var(--color-text-secondary)',
+                      border: '1px solid var(--color-border)'
+                    }}
+                    aria-label={item.label}
+                    title={item.label}
+                  >
+                    <item.icon className="w-5 h-5" />
+                  </button>
+                </Tooltip>
+              ))}
             </div>
           )}
         </div>
@@ -759,7 +735,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
 
       {/* Pomodoro Dashboard Modal */}
       {user && (
-        <PomodoroDashboard 
+        <PomodoroDashboard
           isOpen={showPomodoroDashboard}
           onClose={() => setShowPomodoroDashboard(false)}
         />
@@ -774,7 +750,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
             sourceDocumentId={currentDocument.id}
             onRelationshipCreated={handleRelationshipCreated}
           />
-          
+
           {selectedRelationship && (
             <DocumentPreviewModal
               isOpen={showPreviewModal}
@@ -784,7 +760,6 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
               }}
               relationship={selectedRelationship}
               onEditRelationship={(relationshipId) => {
-                // TODO: Implement edit relationship functionality
                 console.log('Edit relationship:', relationshipId)
               }}
               onDeleteRelationship={handleDeleteRelationship}
@@ -821,17 +796,13 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
                   </button>
                 </div>
                 <div className="p-6 max-h-[70vh] overflow-y-auto">
-                  <DocumentGraphViewer
-                    documentId={currentDocument.id}
-                    userId={user.id}
-                  />
+                  <DocumentGraphViewer documentId={currentDocument.id} userId={user.id} />
                 </div>
               </div>
             </div>
           )}
         </>
       )}
-      
     </>
   )
 }

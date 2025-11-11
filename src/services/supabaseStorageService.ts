@@ -3,6 +3,7 @@ import { logger } from './logger';
 import { errorHandler, ErrorType, ErrorSeverity } from './errorHandler';
 import { bookStorageService } from './bookStorageService';
 import { configurePDFWorker } from '../utils/pdfjsConfig';
+import { googleAuthService } from './googleAuthService';
 
 export interface SavedBook {
   id: string;
@@ -22,6 +23,8 @@ export interface SavedBook {
   s3_key?: string;
   text_content?: string;
   reading_progress?: number;
+  readingProgress?: number;
+  isFavorite?: boolean;
 }
 
 export interface Note {
@@ -53,9 +56,13 @@ class SupabaseStorageService {
   private currentUserId: string | null = null;
 
   // Initialize with current user
-  setCurrentUser(userId: string) {
+  setCurrentUser(userId: string | null) {
     this.currentUserId = userId;
-    logger.info('SupabaseStorageService initialized', { userId });
+    if (userId) {
+      logger.info('SupabaseStorageService initialized', { userId });
+    } else {
+      logger.info('SupabaseStorageService cleared user context', { userId: null });
+    }
   }
 
   // Check if user is authenticated
@@ -318,6 +325,21 @@ class SupabaseStorageService {
       }
 
       const books: SavedBook[] = data.map(book => {
+        const rawProgress =
+          typeof book.reading_progress === 'number'
+            ? book.reading_progress
+            : undefined;
+        const normalizedProgress =
+          typeof rawProgress === 'number'
+            ? Math.max(
+                0,
+                Math.min(
+                  100,
+                  Math.round((rawProgress <= 1 ? rawProgress * 100 : rawProgress))
+                )
+              )
+            : undefined;
+
         const savedBook: SavedBook = {
           id: book.id,
           title: book.title,
@@ -328,7 +350,24 @@ class SupabaseStorageService {
           totalPages: book.total_pages,
           pageTexts: [], // Not loaded by default to save I/O
           notes: [],
-          syncedAt: new Date(book.updated_at)
+          syncedAt: new Date(book.updated_at),
+          readingProgress:
+            normalizedProgress !== undefined
+              ? normalizedProgress
+              : typeof book.total_pages === 'number' &&
+                book.total_pages > 0 &&
+                typeof book.last_read_page === 'number'
+              ? Math.max(
+                  0,
+                  Math.min(
+                    100,
+                    Math.round(
+                      (book.last_read_page / Math.max(book.total_pages, 1)) * 100
+                    )
+                  )
+                )
+              : undefined,
+          isFavorite: !!book.is_favorite
         };
 
         // NOTE: PDF data (pdf_data_base64 and page_texts) are NOT loaded here
@@ -384,8 +423,22 @@ class SupabaseStorageService {
         syncedAt: new Date(data.updated_at),
         s3_key: data.s3_key,
         text_content: data.text_content,
-        reading_progress: data.reading_progress,
-        cleanedPageTexts: data.page_texts_cleaned || undefined  // Include cleaned texts if available
+        cleanedPageTexts: data.page_texts_cleaned || undefined,  // Include cleaned texts if available
+        readingProgress:
+          typeof data.reading_progress === 'number'
+            ? Math.max(
+                0,
+                Math.min(
+                  100,
+                  Math.round(
+                    (data.reading_progress <= 1
+                      ? data.reading_progress * 100
+                      : data.reading_progress)
+                  )
+                )
+              )
+            : undefined,
+        isFavorite: !!data.is_favorite
       };
 
       // NEW: Download from S3 if s3_key exists for binary formats
@@ -983,15 +1036,32 @@ class SupabaseStorageService {
     };
   }
 
-  // Google Drive integration (placeholder)
   async isGoogleDriveEnabled(): Promise<boolean> {
-    return false; // Not implemented yet
+    try {
+      return await googleAuthService.hasDriveScope();
+    } catch (error) {
+      console.warn('supabaseStorageService: failed to determine Google Drive availability', error);
+      return false;
+    }
   }
 
   async getSyncStatus() {
+    let lastSync: Date | null = null;
+    if (typeof window !== 'undefined') {
+      const raw = window.localStorage.getItem('smart_reader_last_sync');
+      if (raw) {
+        const parsed = new Date(raw);
+        if (!Number.isNaN(parsed.getTime())) {
+          lastSync = parsed;
+        }
+      }
+    }
+
+    const isEnabled = await this.isGoogleDriveEnabled();
+
     return {
-      lastSync: null,
-      isEnabled: false
+      lastSync,
+      isEnabled
     };
   }
 

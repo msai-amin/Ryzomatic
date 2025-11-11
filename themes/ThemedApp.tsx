@@ -1,26 +1,33 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useTheme, ThemeSwitcher } from './ThemeProvider'
 import { ThemedHeader } from './ThemedHeader'
 import { ThemedSidebar } from './ThemedSidebar'
 import { ThemedMainContent } from './ThemedMainContent'
 import { DocumentViewer } from '../src/components/DocumentViewer'
-import { ChatPanel } from '../src/components/ChatPanel'
-import { DocumentUpload } from '../src/components/DocumentUpload'
 import { PomodoroBottomBar } from '../src/components/PomodoroBottomBar'
-import { FloatingActionButtons } from '../src/components/FloatingActionButtons'
+import { DetachedChatWindow } from '../src/components/DetachedChatWindow'
 import { useAchievementToasts } from '../src/components/AchievementToast'
 import { useAppStore } from '../src/store/appStore'
 import { useKeyboardShortcuts } from '../src/hooks/useKeyboardShortcuts'
 import { OnboardingProvider, OnboardingOverlay, ContextualHelp } from '../src/components/onboarding'
 import { backgroundProcessingService } from '../src/services/backgroundProcessingService'
 import { timerService, TimerState } from '../src/services/timerService'
+import { CustomizableReadingWizard } from '../src/components/customReading/CustomizableReadingWizard'
+import { DocumentUpload } from '../src/components/DocumentUpload'
 
 const ThemedAppContent: React.FC = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
-  const [showUpload, setShowUpload] = useState(false)
   const [timerState, setTimerState] = useState<TimerState>(timerService.getState())
   const { currentTheme } = useTheme()
-  const { isChatOpen, toggleChat, user, currentDocument, pomodoroIsRunning, libraryRefreshTrigger } = useAppStore()
+  const {
+    user,
+    currentDocument,
+    pomodoroIsRunning,
+    libraryRefreshTrigger,
+    isNavRailExpanded,
+    setNavRailExpanded,
+    isChatOpen,
+    openCustomReadingWizard
+  } = useAppStore()
   const { showAchievement, AchievementToastContainer } = useAchievementToasts()
   
   // Enable keyboard shortcuts
@@ -35,6 +42,19 @@ const ThemedAppContent: React.FC = () => {
     return () => {
       console.log('ThemedApp: Stopping background processing service')
       backgroundProcessingService.stop()
+    }
+  }, [])
+
+  const [showUploadModal, setShowUploadModal] = useState(false)
+
+  const handleOpenUpload = () => setShowUploadModal(true)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handleEventUpload = () => handleOpenUpload()
+    window.addEventListener('app:open-upload', handleEventUpload as EventListener)
+    return () => {
+      window.removeEventListener('app:open-upload', handleEventUpload as EventListener)
     }
   }, [])
 
@@ -57,36 +77,31 @@ const ThemedAppContent: React.FC = () => {
       >
       {/* Header */}
       <ThemedHeader 
-        onUploadClick={() => setShowUpload(true)} 
-        isSidebarOpen={isSidebarOpen}
-        onSidebarToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+        onUploadClick={handleOpenUpload} 
+        isSidebarOpen={isNavRailExpanded}
       />
 
       {/* Main Layout */}
       <div className="flex">
         {/* Sidebar */}
         <ThemedSidebar 
-          isOpen={isSidebarOpen} 
-          onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+          isOpen={isNavRailExpanded} 
+          onToggle={() => setNavRailExpanded(!isNavRailExpanded)}
           refreshTrigger={libraryRefreshTrigger}
         />
 
         {/* Main Content */}
         <ThemedMainContent>
-          <DocumentViewer onUploadClick={() => setShowUpload(true)} />
+          <DocumentViewer onUploadClick={handleOpenUpload} />
         </ThemedMainContent>
       </div>
 
-      {/* Chat Panel */}
-      {isChatOpen && (
-        <ChatPanel onClose={() => toggleChat()} />
-      )}
+      {isChatOpen && <DetachedChatWindow />}
 
-      {/* Upload Modal */}
-      {showUpload && (
-        <DocumentUpload onClose={() => setShowUpload(false)} />
+      <CustomizableReadingWizard />
+      {showUploadModal && (
+        <DocumentUpload onClose={() => setShowUploadModal(false)} />
       )}
-
 
       {/* Pomodoro Bottom Bar - Visible when user is authenticated, has uploaded a file, and Pomodoro IS running */}
       {user && currentDocument && timerState.isRunning && (
@@ -101,9 +116,6 @@ const ThemedAppContent: React.FC = () => {
         />
       )}
 
-
-      {/* Floating Action Buttons */}
-      <FloatingActionButtons />
 
       {/* Achievement Toast Container */}
       <AchievementToastContainer />

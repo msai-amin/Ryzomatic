@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { 
   FolderPlus, 
   Tag, 
+  MinusCircle,
   Star, 
   Archive, 
   Download, 
@@ -14,6 +15,7 @@ interface BulkActionsProps {
   selectedCount: number;
   onAddToCollection: () => void;
   onAddTags: () => void;
+  onRemoveTags: () => void;
   onToggleFavorite: (isFavorite: boolean) => void;
   onArchive: () => void;
   onDelete: () => void;
@@ -26,6 +28,7 @@ export const BulkActionsToolbar: React.FC<BulkActionsProps> = ({
   selectedCount,
   onAddToCollection,
   onAddTags,
+  onRemoveTags,
   onToggleFavorite,
   onArchive,
   onDelete,
@@ -106,6 +109,16 @@ export const BulkActionsToolbar: React.FC<BulkActionsProps> = ({
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
         >
           <Tag className="w-5 h-5" />
+        </button>
+        <button 
+          onClick={onRemoveTags} 
+          className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          title="Remove Tags"
+          style={{ color: 'var(--color-text-secondary)' }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+        >
+          <MinusCircle className="w-5 h-5" />
         </button>
         
         <button 

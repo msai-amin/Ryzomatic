@@ -54,6 +54,10 @@ import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { supabase } from '../../lib/supabase'
 import { configurePDFWorker } from '../utils/pdfjsConfig'
+import {
+  cleanupDocumentText,
+  CleanupPreferences
+} from '../services/textCleanupService'
 // TextLayerBuilder will be imported dynamically after PDF.js is initialized
 
 // Helper function to ensure globalThis.pdfjsLib is set before importing pdf_viewer
@@ -314,8 +318,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     setChatMode,
     toggleChat,
     isChatOpen,
-    user
+    user,
+    isRightSidebarOpen,
+    setIsRightSidebarOpen,
+    setRightSidebarTab
   } = useAppStore()
+
+  const userId = user?.id ?? null
   
   // Get document from store (which is sanitized)
   const document = currentDocument
@@ -368,13 +377,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     y: number
     text: string
   } | null>(null)
-  const [showNotesPanel, setShowNotesPanel] = useState<boolean>(false)
   const [isToolbarStuck, setIsToolbarStuck] = useState<boolean>(false)
   const [showLibrary, setShowLibrary] = useState<boolean>(false)
   const [showUpload, setShowUpload] = useState<boolean>(false)
   const toolbarRef = useRef<HTMLDivElement>(null)
   const highlightColorButtonRef = useRef<HTMLButtonElement>(null)
-  const [selectedTextForNote, setSelectedTextForNote] = useState<string>('')
   const [selectionMode, setSelectionMode] = useState(false)
   const [showVoiceSelector, setShowVoiceSelector] = useState(false)
   const [showTypographySettings, setShowTypographySettings] = useState(false)
@@ -1227,7 +1234,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      if (showNotesPanel && e.key !== 'Escape') return
 
       switch (e.key) {
         case 'ArrowLeft':
@@ -1299,8 +1305,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           }
           break
         case 'Escape':
-          if (showNotesPanel) {
-            setShowNotesPanel(false)
+          if (isRightSidebarOpen) {
+            setIsRightSidebarOpen(false)
           } else if (isEditing) {
             // Cancel editing
             setIsEditing(false)
@@ -1322,19 +1328,38 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           break
         case 'Delete':
         case 'Backspace':
-          // Delete selected highlight
           if (selectedHighlightId && !isEditing) {
             e.preventDefault()
             removeHighlight(selectedHighlightId)
             setSelectedHighlightId(null)
           }
           break
+        default:
+          break
       }
     }
 
     window.addEventListener('keydown', handleKeyPress)
-    return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [pageNumber, numPages, scale, rotation, showNotesPanel, pdfViewer.readingMode, updatePDFViewer, typography.textAlign, typography.focusMode, typography.readingGuide, updateTypography, isEditing, selectedHighlightId, removeHighlight])
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress)
+    }
+  }, [
+    pageNumber,
+    numPages,
+    scale,
+    rotation,
+    pdfViewer.readingMode,
+    updatePDFViewer,
+    typography.textAlign,
+    typography.focusMode,
+    typography.readingGuide,
+    updateTypography,
+    isEditing,
+    selectedHighlightId,
+    removeHighlight,
+    document.pageTexts,
+    isRightSidebarOpen
+  ])
 
   // Intersection observer for toolbar visual feedback
   useEffect(() => {
@@ -1751,154 +1776,43 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   }, [pdfViewer.readingMode, updatePDFViewer])
 
   // Handle text cleanup
-  const handleTextCleanup = useCallback(async (
-    preferences: {
-      reorganizeParagraphs: boolean
-      removeFormulae: boolean
-      removeFootnotes: boolean
-      removeSideNotes: boolean
-      removeHeadersFooters: boolean
-      simplifyFormatting: boolean
-      reorganizationStyle: 'logical' | 'chronological' | 'topic-based'
-      optimizeForTTS: boolean
-    },
-    applyToAllPages: boolean
-  ) => {
+  const handleTextCleanup = useCallback(async (preferences: CleanupPreferences, applyToAllPages: boolean) => {
     setIsCleaning(true)
-    setCleaningProgress({ current: 0, total: 0 })
+    const totalTargets =
+      applyToAllPages && (document.pageTexts?.length || numPages)
+        ? document.pageTexts?.length || numPages || 0
+        : 1
+    setCleaningProgress({ current: 0, total: totalTargets })
 
     try {
-      const pagesToClean = applyToAllPages && numPages
-        ? Array.from({ length: numPages }, (_, i) => i + 1)
-        : [pageNumber]
+      const { cleanedTexts, processedPages } = await cleanupDocumentText({
+        document,
+        preferences,
+        pageNumbers: applyToAllPages ? undefined : [pageNumber],
+        onProgress: ({ current, total }) => setCleaningProgress({ current, total }),
+        userId,
+        existingCleaned: document.cleanedPageTexts ?? null
+      })
 
-      setCleaningProgress({ current: 0, total: pagesToClean.length })
-
-      const newCleanedTexts: { [pageNum: number]: string } = { ...cleanedPageTexts }
-
-      // Process pages sequentially to avoid overwhelming the API
-      for (let i = 0; i < pagesToClean.length; i++) {
-        const pageNum = pagesToClean[i]
-        const rawPageText = document.pageTexts?.[pageNum - 1]
-        
-        if (!rawPageText) {
-          console.warn(`No text found for page ${pageNum}`)
-          continue
-        }
-
-        // Ensure pageText is a string
-        const pageText = typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
-
-        if (!pageText.trim()) {
-          console.warn(`Empty text for page ${pageNum}`)
-          continue
-        }
-
-        try {
-          // Call cleanup API
-          const response = await fetch('/api/text/cleanup', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              text: pageText,
-              preferences,
-            }),
-          })
-
-          if (!response.ok) {
-            throw new Error(`Cleanup API error: ${response.statusText}`)
-          }
-
-          const data = await response.json()
-
-          if (data.success && data.cleanedText) {
-            newCleanedTexts[pageNum] = data.cleanedText
-            console.log(`✅ Successfully cleaned page ${pageNum}`)
+      setCleanedPageTexts((prev) => {
+        const next = { ...prev }
+        processedPages.forEach((pageNum) => {
+          const text = cleanedTexts[pageNum - 1] || ''
+          if (text.trim().length > 0) {
+            next[pageNum] = text
           } else {
-            console.warn(`Cleanup failed for page ${pageNum}:`, data.error || 'Unknown error')
-            if (data.fallback) {
-              // Keep original text in cleanedPageTexts so user knows something happened
-              // But we won't overwrite if it's just a fallback
-            }
+            delete next[pageNum]
           }
-        } catch (error) {
-          console.error(`Error cleaning page ${pageNum}:`, error)
-          // Continue with next page instead of failing completely
-        }
+        })
+        return next
+      })
 
-        setCleaningProgress({ current: i + 1, total: pagesToClean.length })
-      }
+      setCurrentDocument({
+        ...document,
+        cleanedPageTexts: cleanedTexts
+      })
 
-      setCleanedPageTexts(newCleanedTexts)
-      
-      // Save cleaned text to database
-      const cleanedCount = Object.keys(newCleanedTexts).length
-      if (cleanedCount > 0 && document?.id && user?.id) {
-        try {
-          // Convert cleanedPageTexts object { [pageNum: number]: string } to array format
-          // Create array with same length as pageTexts, using cleaned text where available
-          const totalPages = document.pageTexts?.length || numPages || 0
-          const cleanedTextsArray: string[] = new Array(totalPages).fill(null)
-          
-          // Fill in cleaned texts at their respective page indices (1-indexed to 0-indexed)
-          Object.entries(newCleanedTexts).forEach(([pageNum, cleanedText]) => {
-            const pageIndex = parseInt(pageNum, 10) - 1
-            if (pageIndex >= 0 && pageIndex < totalPages && cleanedText) {
-              cleanedTextsArray[pageIndex] = cleanedText
-            }
-          })
-          
-          // Get existing cleaned texts from database to preserve pages that weren't cleaned in this batch
-          const { data: existingBook } = await supabase
-            .from('user_books')
-            .select('page_texts_cleaned')
-            .eq('id', document.id)
-            .eq('user_id', user.id)
-            .single()
-          
-          // Merge with existing cleaned texts (preserve previously cleaned pages)
-          if (existingBook?.page_texts_cleaned) {
-            existingBook.page_texts_cleaned.forEach((existingText: string | null, index: number) => {
-              if (existingText && (!cleanedTextsArray[index] || cleanedTextsArray[index] === null)) {
-                cleanedTextsArray[index] = existingText
-              }
-            })
-          }
-          
-          // Update database with merged cleaned texts
-          const { error: updateError } = await supabase
-            .from('user_books')
-            .update({ page_texts_cleaned: cleanedTextsArray })
-            .eq('id', document.id)
-            .eq('user_id', user.id)
-          
-          if (updateError) {
-            console.error('Failed to save cleaned text to database:', updateError)
-            // Don't throw - user already sees cleaned text in UI, this is just persistence
-          } else {
-            console.log(`✅ Saved cleaned text for ${cleanedCount} page(s) to database`)
-            
-            // Update currentDocument in store to include cleaned texts
-            setCurrentDocument({
-              ...document,
-              cleanedPageTexts: cleanedTextsArray
-            })
-          }
-        } catch (dbError) {
-          console.error('Error saving cleaned text to database:', dbError)
-          // Continue even if database save fails - cleaned text is still in state
-        }
-      }
-      
       setShowCleanupModal(false)
-
-      // Show success notification
-      if (cleanedCount > 0) {
-        // Simple success feedback - could be enhanced with toast notification
-        console.log(`Successfully cleaned ${cleanedCount} page(s)`)
-      }
     } catch (error) {
       console.error('Text cleanup error:', error)
       alert('Failed to clean text. Please try again.')
@@ -1906,7 +1820,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       setIsCleaning(false)
       setCleaningProgress({ current: 0, total: 0 })
     }
-  }, [document, pageNumber, numPages, cleanedPageTexts, user, setCurrentDocument])
+  }, [document, pageNumber, numPages, setCurrentDocument, setShowCleanupModal, userId])
 
   // Restore original text for a page
   const handleRestoreOriginal = useCallback(async (pageNum: number) => {
@@ -1976,10 +1890,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   }, [document, user, setCurrentDocument])
 
   const handleAddNote = useCallback((text: string) => {
-    setSelectedTextForNote(text)
-    setShowNotesPanel(true)
+    setRightSidebarTab('notes')
+    setIsRightSidebarOpen(true)
     setContextMenu(null)
-  }, [])
+  }, [setIsRightSidebarOpen, setRightSidebarTab])
 
   // Load highlights when document loads
   useEffect(() => {
@@ -4155,16 +4069,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           onClose={() => setContextMenu(null)}
         />
       )}
-
-      {/* Notes Panel */}
-      <NotesPanel
-        isOpen={showNotesPanel}
-        onClose={() => setShowNotesPanel(false)}
-        bookName={document.name}
-        bookId={document.id}
-        currentPage={pageNumber}
-        selectedText={selectedTextForNote}
-      />
 
       {/* Highlight Color Picker */}
       <HighlightColorPicker

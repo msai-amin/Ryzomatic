@@ -68,9 +68,13 @@ class LibraryOrganizationService {
   private currentUserId: string | null = null;
 
   // Initialize with current user
-  setCurrentUser(userId: string) {
+  setCurrentUser(userId: string | null) {
     this.currentUserId = userId;
-    logger.info('LibraryOrganizationService initialized', { userId });
+    if (userId) {
+      logger.info('LibraryOrganizationService initialized', { userId });
+    } else {
+      logger.info('LibraryOrganizationService cleared user context', { userId: null });
+    }
   }
 
   // Check if user is authenticated
@@ -538,14 +542,11 @@ class LibraryOrganizationService {
     this.ensureAuthenticated();
     
     try {
-      const assignments = bookIds.map(bookId => ({
-        book_id: bookId,
-        collection_id: collectionId
-      }));
-
-      const { error } = await supabase
-        .from('book_collections')
-        .insert(assignments);
+      const { error } = await supabase.rpc('bulk_assign_books_to_collection', {
+        user_uuid: this.currentUserId,
+        collection_uuid: collectionId,
+        book_ids: bookIds
+      });
 
       if (error) {
         throw errorHandler.createError(
@@ -787,6 +788,40 @@ class LibraryOrganizationService {
     }
   }
 
+  async reorderCollections(parentId: string | null, orderedIds: string[]): Promise<void> {
+    this.ensureAuthenticated();
+
+    if (orderedIds.length === 0) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.rpc('reorder_user_collections', {
+        user_uuid: this.currentUserId,
+        parent_uuid: parentId,
+        ordered_ids: orderedIds
+      });
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to reorder collections: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'reorderCollections', parentId, orderedIds, error: error.message }
+        );
+      }
+
+      logger.info('Collections reordered', {
+        parentId,
+        orderedIds,
+        userId: this.currentUserId
+      });
+    } catch (error) {
+      logger.error('Error reordering collections', { parentId, orderedIds }, error as Error);
+      throw error;
+    }
+  }
+
   // Enhanced Batch Operations
   async batchAddTags(bookIds: string[], tagIds: string[]): Promise<void> {
     this.ensureAuthenticated();
@@ -812,6 +847,40 @@ class LibraryOrganizationService {
       logger.info('Tags batch added', { bookCount: bookIds.length, tagCount: tagIds.length, userId: this.currentUserId });
     } catch (error) {
       logger.error('Error batch adding tags', { bookIds, tagIds }, error as Error);
+      throw error;
+    }
+  }
+
+  async batchRemoveTags(bookIds: string[], tagIds: string[]): Promise<void> {
+    this.ensureAuthenticated();
+
+    if (bookIds.length === 0 || tagIds.length === 0) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('book_tag_assignments')
+        .delete()
+        .in('book_id', bookIds)
+        .in('tag_id', tagIds);
+
+      if (error) {
+        throw errorHandler.createError(
+          `Failed to batch remove tags: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'batchRemoveTags', bookIds, tagIds, error: error.message }
+        );
+      }
+
+      logger.info('Tags batch removed', {
+        bookCount: bookIds.length,
+        tagCount: tagIds.length,
+        userId: this.currentUserId
+      });
+    } catch (error) {
+      logger.error('Error batch removing tags', { bookIds, tagIds }, error as Error);
       throw error;
     }
   }

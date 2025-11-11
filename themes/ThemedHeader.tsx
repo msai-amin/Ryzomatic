@@ -3,24 +3,23 @@ import { createPortal } from 'react-dom'
 import {
   Upload,
   Settings,
-  Library,
   User,
   LogOut,
-  Bot,
+  Sparkles,
   Timer,
   HelpCircle,
   ChevronLeft,
   ChevronDown,
-  Sidebar as SidebarIcon,
-  Search,
   X,
   FileText,
-  Volume2
+  Volume2,
+  StickyNote,
+  Library
 } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { TypographySettings } from '../src/components/TypographySettings'
 import { GeneralSettings } from '../src/components/GeneralSettings'
-import { ModernLibraryModal } from '../src/components/ModernLibraryModal'
+import { LibraryModal } from '../src/components/LibraryModal'
 import { AuthModal } from '../src/components/AuthModal'
 import { Tooltip } from '../src/components/Tooltip'
 import { timerService, TimerState } from '../src/services/timerService'
@@ -28,14 +27,9 @@ import { timerService, TimerState } from '../src/services/timerService'
 interface ThemedHeaderProps {
   onUploadClick: () => void
   isSidebarOpen: boolean
-  onSidebarToggle: () => void
 }
 
-export const ThemedHeader: React.FC<ThemedHeaderProps> = ({
-  onUploadClick,
-  isSidebarOpen,
-  onSidebarToggle
-}) => {
+export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSidebarOpen }) => {
   const headerRef = useRef<HTMLDivElement>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const userButtonRef = useRef<HTMLButtonElement>(null)
@@ -49,11 +43,13 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({
     libraryRefreshTrigger,
     pdfViewer,
     isChatOpen,
-    libraryView,
     pomodoroIsRunning,
     pomodoroTimeLeft,
     hasSeenPomodoroTour,
-    setCurrentDocument
+    setCurrentDocument,
+    isRightSidebarOpen,
+    setIsRightSidebarOpen,
+    setRightSidebarTab
   } = useAppStore()
 
   const [showSettings, setShowSettings] = useState(false)
@@ -127,6 +123,15 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({
     }
   }, [isUserMenuOpen])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handleOpenLibrary = () => setShowLibrary(true)
+    window.addEventListener('app:open-library', handleOpenLibrary as EventListener)
+    return () => {
+      window.removeEventListener('app:open-library', handleOpenLibrary as EventListener)
+    }
+  }, [])
+
   const openLibrary = () => {
     if (user) {
       setShowLibrary(true)
@@ -160,48 +165,38 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({
         backdropFilter: 'blur(10px)'
       }}
     >
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleLogoClick}
-              className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors"
+      <div className="flex w-full flex-col gap-3">
+        <div className="flex w-full flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-6">
+            <div
+              className="flex items-center gap-2 rounded-lg px-2 py-1"
               style={{ color: 'var(--color-text-primary)' }}
-              aria-label="Go to library"
             >
               <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-6 w-6" />
-              <span
-                className="text-sm font-bold uppercase tracking-[0.18em]"
-                style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}
-              >
+              <span className="text-sm font-semibold tracking-[0.18em]" style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}>
                 ryzomatic
               </span>
-            </button>
+            </div>
 
-            <Tooltip content="Browse your library" position="bottom">
+            <nav
+              className="flex items-center gap-4 text-sm font-medium"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
               <button
                 onClick={openLibrary}
-                className="text-sm font-medium transition-colors"
-                style={{ color: 'var(--color-text-secondary)' }}
+                className="transition-colors hover:text-[var(--color-text-primary)]"
+                style={{
+                  color: 'var(--color-text-primary)',
+                  letterSpacing: '0.04em'
+                }}
               >
                 Library
               </button>
-            </Tooltip>
+              {/* Future navigation links can be added here */}
+            </nav>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Tooltip content="Search your documents" position="bottom">
-              <button
-                className="rounded-lg p-2 transition-colors"
-                style={{ color: 'var(--color-text-primary)' }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                aria-label="Search"
-              >
-                <Search className="h-5 w-5" />
-              </button>
-            </Tooltip>
-
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
             {user && currentDocument && !timerState.isRunning && (
               <Tooltip
                 content={
@@ -234,32 +229,32 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({
                 }`}
                 style={{
                   color: 'var(--color-text-primary)',
-                  border: '1px solid var(--color-border)'
+                  border: '1px solid var(--color-border)',
+                  boxShadow: isChatOpen
+                    ? '0 8px 20px rgba(56, 189, 248, 0.25)'
+                    : '0 6px 16px rgba(148, 163, 184, 0.18)',
+                  background:
+                    'linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(236, 72, 153, 0.08))'
                 }}
+                aria-pressed={isChatOpen}
+                aria-expanded={isChatOpen}
                 aria-label="Toggle AI assistant"
               >
-                <Bot className="h-5 w-5" />
+                <Sparkles className="h-5 w-5" />
               </button>
             </Tooltip>
 
             {user && (
-              <Tooltip
-                content={
-                  libraryView.selectedBooks.length > 0
-                    ? 'Please deselect books to upload'
-                    : 'Upload new material'
-                }
-                position="bottom"
-              >
+              <Tooltip content="Upload new material" position="bottom">
                 <button
                   data-tour="upload-button"
                   onClick={onUploadClick}
-                  disabled={libraryView.selectedBooks.length > 0}
-                  className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors hover:opacity-90"
                   style={{
                     backgroundColor: 'var(--color-primary)',
                     color: 'var(--color-text-inverse)',
-                    border: 'none'
+                    border: 'none',
+                    boxShadow: '0 12px 28px rgba(56, 189, 248, 0.22)'
                   }}
                 >
                   <Upload className="h-4 w-4" />
@@ -273,16 +268,14 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({
                 <button
                   ref={userButtonRef}
                   onClick={() => setIsUserMenuOpen((prev) => !prev)}
-                  className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors"
-                  style={{
-                    borderColor: 'var(--color-border)',
-                    color: 'var(--color-text-primary)'
-                  }}
+                  className="flex items-center gap-1 px-2 py-1 text-sm font-medium transition-colors hover:text-[var(--color-primary)]"
+                  style={{ color: 'var(--color-text-primary)' }}
                   aria-haspopup="menu"
                   aria-expanded={isUserMenuOpen}
                 >
-                  <User className="h-4 w-4" />
-                  <span className="max-w-[140px] truncate">{user.full_name || user.email}</span>
+                  <span className="max-w-[180px] truncate">
+                    {user.full_name || user.email}
+                  </span>
                   <ChevronDown className={`h-4 w-4 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
 
@@ -349,6 +342,32 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({
                       >
                         <HelpCircle className="h-4 w-4" />
                         <span>Help</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          openLibrary()
+                          setIsUserMenuOpen(false)
+                        }}
+                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm transition-colors"
+                        style={{ color: 'var(--color-text-primary)' }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      >
+                        <Library className="h-4 w-4" />
+                        <span>Library</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          onUploadClick()
+                          setIsUserMenuOpen(false)
+                        }}
+                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm transition-colors"
+                        style={{ color: 'var(--color-text-primary)' }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      >
+                        <Upload className="h-4 w-4" />
+                        <span>New Material</span>
                       </button>
                     </div>
                     <div className="border-t px-4 py-2" style={{ borderColor: 'var(--color-border)' }}>
@@ -427,19 +446,25 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({
               )}
 
               <Tooltip
-                content={isSidebarOpen ? 'Hide notes & insights' : 'Show notes & insights'}
+                content={isRightSidebarOpen ? 'Hide notes & highlights' : 'Show notes & highlights'}
                 position="bottom"
               >
                 <button
-                  onClick={onSidebarToggle}
+                  onClick={() => {
+                    const nextOpen = !isRightSidebarOpen
+                    setIsRightSidebarOpen(nextOpen)
+                    if (nextOpen) {
+                      setRightSidebarTab('notes')
+                    }
+                  }}
                   className="flex items-center gap-2 rounded-lg border px-3 py-1 text-sm transition-colors"
                   style={{
                     color: 'var(--color-text-primary)',
                     borderColor: 'var(--color-border)'
                   }}
                 >
-                  <SidebarIcon className="h-4 w-4" />
-                  <span>{isSidebarOpen ? 'Hide Sidebar' : 'Show Sidebar'}</span>
+                  <StickyNote className="h-4 w-4" />
+                  <span>{isRightSidebarOpen ? 'Hide Panel' : 'Notes & Highlights'}</span>
                 </button>
               </Tooltip>
             </div>
@@ -456,7 +481,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({
       )}
 
       {showLibrary && (
-        <ModernLibraryModal
+        <LibraryModal
           isOpen={showLibrary}
           onClose={() => setShowLibrary(false)}
           refreshTrigger={libraryRefreshTrigger}
@@ -510,7 +535,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <div className="space-y-4">
                     <div className="flex items-center space-x-3">
-                      <Bot className="h-6 w-6" style={{ color: 'var(--color-primary)' }} />
+                      <Sparkles className="h-6 w-6" style={{ color: 'var(--color-primary)' }} />
                       <h3
                         className="text-lg font-semibold"
                         style={{ color: 'var(--color-text-primary)' }}

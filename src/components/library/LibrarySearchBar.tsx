@@ -80,6 +80,18 @@ export const LibrarySearchBar: React.FC<LibrarySearchBarProps> = ({
     loadSuggestions();
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    const handleFocusRequest = () => {
+      if (searchRef.current) {
+        searchRef.current.focus();
+        requestAnimationFrame(() => searchRef.current?.select());
+      }
+    };
+
+    window.addEventListener('library:focus-search', handleFocusRequest);
+    return () => window.removeEventListener('library:focus-search', handleFocusRequest);
+  }, []);
+
   // Handle click outside to close suggestions
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

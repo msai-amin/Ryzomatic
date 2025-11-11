@@ -64,9 +64,13 @@ class LibrarySearchService {
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   // Initialize with current user
-  setCurrentUser(userId: string) {
+  setCurrentUser(userId: string | null) {
     this.currentUserId = userId;
-    logger.info('LibrarySearchService initialized', { userId });
+    if (userId) {
+      logger.info('LibrarySearchService initialized', { userId });
+    } else {
+      logger.info('LibrarySearchService cleared user context', { userId: null });
+    }
   }
 
   // Check if user is authenticated

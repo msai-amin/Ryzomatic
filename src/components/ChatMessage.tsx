@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useRef, useState } from 'react'
-import { Bot, User } from 'lucide-react'
+import { Sparkles, User } from 'lucide-react'
 import { marked } from 'marked'
 import Prism from 'prismjs'
 import 'prismjs/themes/prism-tomorrow.css'
@@ -28,9 +28,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   useEffect(() => {
     marked.setOptions({
       breaks: true,
-      gfm: true, // GitHub Flavored Markdown
-      headerIds: false,
-      mangle: false,
+      gfm: true // GitHub Flavored Markdown
     })
   }, [])
 
@@ -144,13 +142,13 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
       <div 
         className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
         style={{
-          backgroundColor: isUser ? 'var(--color-primary)' : 'var(--color-background)',
+          backgroundColor: isUser ? 'var(--color-primary)' : 'rgba(56, 189, 248, 0.12)',
         }}
       >
         {isUser ? (
           <User className="w-4 h-4" style={{ color: 'var(--color-text-inverse)' }} />
         ) : (
-          <Bot className="w-4 h-4" style={{ color: 'var(--color-text-secondary)' }} />
+          <Sparkles className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
         )}
       </div>
 
@@ -161,10 +159,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         <div 
           className={`inline-block p-3 rounded-lg ${isUser ? '' : 'chat-message-content'}`}
           style={{
-            backgroundColor: isUser ? 'var(--color-primary)' : 'var(--color-background)',
+            backgroundColor: isUser ? 'var(--color-primary)' : 'rgba(56, 189, 248, 0.08)',
             color: isUser ? 'var(--color-text-inverse)' : 'var(--color-text-primary)',
             borderRadius: 'var(--border-radius-md)',
-            border: isUser ? 'none' : '1px solid var(--color-border)',
+            border: isUser ? 'none' : '1px solid rgba(56, 189, 248, 0.2)',
             maxWidth: isUser ? '100%' : '800px',
           }}
         >

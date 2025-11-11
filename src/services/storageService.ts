@@ -21,6 +21,9 @@ export interface SavedBook {
   notes?: Note[];
   googleDriveId?: string; // Google Drive file ID for sync
   syncedAt?: Date; // Last sync timestamp
+  readingProgress?: number;
+  isFavorite?: boolean;
+  text_content?: string;
 }
 
 export interface Note {
@@ -351,10 +354,37 @@ class StorageService {
       });
       
       return books.map((book: any) => {
-        const savedBook = {
+        const savedBook: SavedBook = {
           ...book,
           savedAt: new Date(book.savedAt),
         };
+        
+        savedBook.isFavorite = !!savedBook.isFavorite;
+        if (typeof savedBook.readingProgress === 'number') {
+          const normalized =
+            savedBook.readingProgress <= 1
+              ? savedBook.readingProgress * 100
+              : savedBook.readingProgress;
+          savedBook.readingProgress = Math.max(
+            0,
+            Math.min(100, Math.round(normalized))
+          );
+        }
+        if (
+          (savedBook.readingProgress === undefined ||
+            Number.isNaN(savedBook.readingProgress)) &&
+          typeof savedBook.totalPages === 'number' &&
+          savedBook.totalPages > 0 &&
+          typeof savedBook.lastReadPage === 'number'
+        ) {
+          savedBook.readingProgress = Math.max(
+            0,
+            Math.min(
+              100,
+              Math.round((savedBook.lastReadPage / savedBook.totalPages) * 100)
+            )
+          );
+        }
         
         // Convert base64 back to ArrayBuffer for PDF files
         if ((book.type === 'pdf' || book.type === 'epub') && book.pdfDataBase64) {
@@ -739,21 +769,33 @@ class StorageService {
   }
 
   async isGoogleDriveEnabled(): Promise<boolean> {
-    return googleAuthService.isSignedIn();
+    return googleAuthService.hasDriveScope();
   }
 
   async getSyncStatus(): Promise<{ lastSync: Date | null; isEnabled: boolean }> {
     const isEnabled = await this.isGoogleDriveEnabled();
-    const lastSync = localStorage.getItem('smart_reader_last_sync');
+    let lastSyncDate: Date | null = null;
+    if (typeof window !== 'undefined') {
+      const lastSync = window.localStorage.getItem('smart_reader_last_sync');
+      if (lastSync) {
+        const parsed = new Date(lastSync);
+        if (!Number.isNaN(parsed.getTime())) {
+          lastSyncDate = parsed;
+        }
+      }
+    }
     
     return {
       isEnabled,
-      lastSync: lastSync ? new Date(lastSync) : null,
+      lastSync: lastSyncDate,
     };
   }
 
   async setLastSyncTime(): Promise<void> {
-    localStorage.setItem('smart_reader_last_sync', new Date().toISOString());
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.localStorage.setItem('smart_reader_last_sync', new Date().toISOString());
   }
 }
 

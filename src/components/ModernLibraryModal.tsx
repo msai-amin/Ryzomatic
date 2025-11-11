@@ -1,6 +1,23 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Settings, RefreshCw, Check, Trash2, Move, Share2, Upload } from 'lucide-react';
+import { 
+  X, 
+  Plus, 
+  Settings, 
+  RefreshCw, 
+  Check, 
+  Trash2, 
+  Move, 
+  Share2, 
+  Upload,
+  Palette,
+  Bookmark,
+  Layers,
+  Sparkles,
+  BookOpen,
+  Tag as TagIcon,
+  Folder
+} from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { librarySearchService, SearchResult } from '../services/librarySearchService';
 import { libraryOrganizationService, Collection, Tag } from '../services/libraryOrganizationService';
@@ -15,6 +32,162 @@ import { RecentBookCard } from './library/RecentBookCard';
 import { BulkActionsToolbar } from './library/BulkActionsToolbar';
 import { DocumentUpload } from './DocumentUpload';
 
+const COLLECTION_COLOR_OPTIONS = [
+  '#3B82F6',
+  '#EC4899',
+  '#22C55E',
+  '#F59E0B',
+  '#8B5CF6',
+  '#0EA5E9',
+  '#F97316',
+  '#14B8A6'
+];
+
+const COLLECTION_ICON_OPTIONS = [
+  { value: 'folder', label: 'Folder', Icon: Folder },
+  { value: 'book-open', label: 'Book', Icon: BookOpen },
+  { value: 'bookmark', label: 'Bookmark', Icon: Bookmark },
+  { value: 'sparkles', label: 'Sparkles', Icon: Sparkles },
+  { value: 'layers', label: 'Layers', Icon: Layers },
+  { value: 'tag', label: 'Tag', Icon: TagIcon }
+];
+
+type NotificationType = 'success' | 'error' | 'info';
+
+interface LibraryNotification {
+  id: string;
+  type: NotificationType;
+  message: string;
+}
+
+interface CollectionDetailsDialogProps {
+  collection: Collection;
+  open: boolean;
+  saving: boolean;
+  onClose: () => void;
+  onSave: (updates: Partial<Collection>) => Promise<void> | void;
+}
+
+const CollectionDetailsDialog: React.FC<CollectionDetailsDialogProps> = ({
+  collection,
+  open,
+  saving,
+  onClose,
+  onSave
+}) => {
+  const [color, setColor] = useState(collection.color);
+  const [icon, setIcon] = useState(collection.icon || 'folder');
+
+  useEffect(() => {
+    if (open) {
+      setColor(collection.color);
+      setIcon(collection.icon || 'folder');
+    }
+  }, [collection, open]);
+
+  const IconPreview = COLLECTION_ICON_OPTIONS.find(option => option.value === icon)?.Icon ?? Folder;
+
+  const handleSubmit = async () => {
+    try {
+      await onSave({ color, icon });
+      onClose();
+    } catch (error) {
+      console.error('Failed to save collection details:', error);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="w-full max-w-md rounded-xl border shadow-xl bg-white dark:bg-slate-900"
+        style={{ borderColor: 'var(--color-border)' }}>
+        <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            Edit Collection
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-1 rounded transition-colors"
+            style={{ color: 'var(--color-text-tertiary)' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-6">
+          <div className="flex items-center gap-3">
+            <IconPreview className="w-6 h-6" style={{ color }} />
+            <div>
+              <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{collection.name}</p>
+              <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>Choose color and icon</p>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--color-text-primary)' }}>
+              <Palette className="w-4 h-4" />
+              Color
+            </h3>
+            <div className="grid grid-cols-4 gap-2">
+              {COLLECTION_COLOR_OPTIONS.map(option => (
+                <button
+                  key={option}
+                  onClick={() => setColor(option)}
+                  className={`h-10 rounded-lg border transition-transform ${
+                    color === option ? 'ring-2 ring-offset-2 ring-blue-500 scale-105' : ''
+                  }`}
+                  style={{ backgroundColor: option, borderColor: 'rgba(0,0,0,0.1)' }}
+                  aria-label={`Select color ${option}`}
+                />
+              ))}
+            </div>
+          </div>
+
+  <div>
+            <h3 className="text-sm font-medium mb-2" style={{ color: 'var(--color-text-primary)' }}>
+              Icon
+            </h3>
+            <div className="grid grid-cols-3 gap-2">
+              {COLLECTION_ICON_OPTIONS.map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => setIcon(option.value)}
+                  className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg border transition-colors ${
+                    icon === option.value ? 'border-blue-500 text-blue-600 bg-blue-50 dark:bg-slate-800' : 'border-transparent'
+                  }`}
+                  style={{ color: icon === option.value ? '#2563EB' : 'var(--color-text-secondary)' }}
+                >
+                  <option.Icon className="w-5 h-5" />
+                  <span className="text-xs">{option.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 p-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm rounded-md border"
+            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+          >
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 interface ModernLibraryModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -37,6 +210,80 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
   const [showCreateTag, setShowCreateTag] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showCollectionPicker, setShowCollectionPicker] = useState(false);
+  const [collectionPickerSelection, setCollectionPickerSelection] = useState<string[]>([]);
+  const [editingCollectionDetails, setEditingCollectionDetails] = useState<Collection | null>(null);
+  const [isSavingCollection, setIsSavingCollection] = useState(false);
+  const [tagManagerMode, setTagManagerMode] = useState<'assign' | 'remove' | null>(null);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [isApplyingTags, setIsApplyingTags] = useState(false);
+  const [showMoveCollectionModal, setShowMoveCollectionModal] = useState(false);
+  const [collectionToMove, setCollectionToMove] = useState<Collection | null>(null);
+  const [moveCollectionParentId, setMoveCollectionParentId] = useState<string | null>(null);
+  const [isMovingCollection, setIsMovingCollection] = useState(false);
+  const [notifications, setNotifications] = useState<LibraryNotification[]>([]);
+
+  const generateNotificationId = () =>
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `notice_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+  const dismissNotification = useCallback((id: string) => {
+    setNotifications(prev => prev.filter(notification => notification.id !== id));
+  }, [setNotifications]);
+
+  const pushNotification = useCallback((type: NotificationType, message: string) => {
+    const id = generateNotificationId();
+    setNotifications(prev => [...prev, { id, type, message }]);
+
+    const timeoutMs = type === 'error' ? 7000 : 4000;
+    if (typeof window !== 'undefined') {
+      window.setTimeout(() => {
+        dismissNotification(id);
+      }, timeoutMs);
+    }
+  }, [dismissNotification, setNotifications]);
+
+  const refreshCollections = useCallback(async () => {
+    try {
+      const latestCollections = await libraryOrganizationService.getCollections();
+      setCollections(latestCollections);
+    } catch (refreshError) {
+      console.error('Failed to refresh collections after error:', refreshError);
+    }
+  }, [setCollections]);
+
+  const refreshTags = useCallback(async () => {
+    try {
+      const latestTags = await libraryOrganizationService.getTags();
+      setTags(latestTags);
+    } catch (refreshError) {
+      console.error('Failed to refresh tags after error:', refreshError);
+    }
+  }, [setTags]);
+
+  const getNotificationStyle = useCallback((type: NotificationType) => {
+    switch (type) {
+      case 'success':
+        return {
+          backgroundColor: 'rgba(34, 197, 94, 0.12)',
+          borderColor: 'rgba(34, 197, 94, 0.35)',
+          textColor: '#166534'
+        };
+      case 'error':
+        return {
+          backgroundColor: 'rgba(239, 68, 68, 0.12)',
+          borderColor: 'rgba(239, 68, 68, 0.35)',
+          textColor: '#b91c1c'
+        };
+      default:
+        return {
+          backgroundColor: 'rgba(59, 130, 246, 0.12)',
+          borderColor: 'rgba(59, 130, 246, 0.35)',
+          textColor: '#1d4ed8'
+        };
+    }
+  }, []);
   
   const {
     libraryView,
@@ -47,6 +294,10 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
     setSelectedTags,
     toggleBookSelection,
     clearSelection,
+    tagManagerOpen,
+    setTagManagerOpen,
+    pendingAssignmentTargets,
+    setPendingAssignmentTargets,
     isAuthenticated
   } = useAppStore();
 
@@ -294,11 +545,13 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
       
       setCollections([...collections, collection]);
       setShowCreateCollection(false);
+      pushNotification('success', 'Collection created successfully.');
     } catch (error) {
       console.error('Failed to create collection:', error);
-      alert('Failed to create collection');
+      pushNotification('error', 'Failed to create collection. Please try again.');
+      await refreshCollections();
     }
-  }, [collections]);
+  }, [collections, pushNotification, refreshCollections]);
 
   const handleCreateTag = useCallback(async (name: string, color: string) => {
     try {
@@ -310,25 +563,329 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
       
       setTags([...tags, tag]);
       setShowCreateTag(false);
+      pushNotification('success', 'Tag created successfully.');
     } catch (error) {
       console.error('Failed to create tag:', error);
-      alert('Failed to create tag');
+      pushNotification('error', 'Failed to create tag. Please try again.');
+      await refreshTags();
     }
-  }, [tags]);
+  }, [tags, pushNotification, refreshTags]);
 
   const handleSmartCollectionSelect = useCallback((collectionId: string) => {
     handleCollectionSelect(collectionId);
   }, [handleCollectionSelect]);
 
+  const handleStartMoveCollection = useCallback((collectionId: string) => {
+    const target = collections.find(collection => collection.id === collectionId);
+    if (!target) {
+      return;
+    }
+
+    setCollectionToMove(target);
+    setMoveCollectionParentId(target.parent_id ?? null);
+    setShowMoveCollectionModal(true);
+  }, [collections]);
+
+  const handleCloseMoveCollectionModal = useCallback(() => {
+    setShowMoveCollectionModal(false);
+    setCollectionToMove(null);
+    setMoveCollectionParentId(null);
+    setIsMovingCollection(false);
+  }, []);
+
+  const handleSubmitMoveCollection = useCallback(async () => {
+    if (!collectionToMove) {
+      return;
+    }
+
+    const originalParentId = collectionToMove.parent_id ?? null;
+    if (originalParentId === moveCollectionParentId) {
+      handleCloseMoveCollectionModal();
+      return;
+    }
+
+    setIsMovingCollection(true);
+    try {
+      await libraryOrganizationService.moveCollection(collectionToMove.id, moveCollectionParentId);
+      await refreshCollections();
+      pushNotification('success', 'Collection moved.');
+      handleCloseMoveCollectionModal();
+    } catch (error) {
+      console.error('Failed to move collection:', error);
+      pushNotification('error', 'Failed to move collection. Please try again.');
+      await refreshCollections();
+      setIsMovingCollection(false);
+    }
+  }, [collectionToMove, moveCollectionParentId, refreshCollections, pushNotification, handleCloseMoveCollectionModal]);
+
+  const flattenedCollections = useMemo(() => {
+    const map = new Map<string, Collection[]>();
+    const ordered: Array<{ collection: Collection; depth: number }> = [];
+
+    collections.forEach(collection => {
+      const parentKey = collection.parent_id ?? 'root';
+      if (!map.has(parentKey)) {
+        map.set(parentKey, []);
+      }
+      map.get(parentKey)!.push(collection);
+    });
+
+    const sortByDisplay = (a: Collection, b: Collection) =>
+      (a.display_order ?? 0) - (b.display_order ?? 0);
+
+    const traverse = (parentId: string | null, depth: number) => {
+      const key = parentId ?? 'root';
+      const siblings = (map.get(key) || []).sort(sortByDisplay);
+      siblings.forEach(collection => {
+        ordered.push({ collection, depth });
+        traverse(collection.id, depth + 1);
+      });
+    };
+
+    traverse(null, 0);
+    return ordered;
+  }, [collections]);
+
+  const moveCollectionOptions = useMemo(
+    () => flattenedCollections.filter(({ collection }) => !collection.is_smart),
+    [flattenedCollections]
+  );
+
+  const blockedCollectionIds = useMemo(() => {
+    if (!collectionToMove) {
+      return new Set<string>();
+    }
+
+    const blocked = new Set<string>([collectionToMove.id]);
+    const stack = [collectionToMove.id];
+
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      collections.forEach(candidate => {
+        if (!candidate.is_smart && candidate.parent_id === current && !blocked.has(candidate.id)) {
+          blocked.add(candidate.id);
+          stack.push(candidate.id);
+        }
+      });
+    }
+
+    return blocked;
+  }, [collectionToMove, collections]);
+
+  const availableMoveOptions = useMemo(() => {
+    if (!collectionToMove) {
+      return moveCollectionOptions;
+    }
+    return moveCollectionOptions.filter(({ collection }) => collection.id !== collectionToMove.id);
+  }, [moveCollectionOptions, collectionToMove]);
+
+  const moveSelectionChanged = useMemo(() => {
+    if (!collectionToMove) {
+      return false;
+    }
+    return (collectionToMove.parent_id ?? null) !== moveCollectionParentId;
+  }, [collectionToMove, moveCollectionParentId]);
+
+  const handleRenameCollection = useCallback(async (collectionId: string, name: string) => {
+    try {
+      await libraryOrganizationService.updateCollection(collectionId, { name });
+      setCollections(prev =>
+        prev.map(collection =>
+          collection.id === collectionId ? { ...collection, name } : collection
+        )
+      );
+    } catch (error) {
+      console.error('Failed to rename collection:', error);
+      pushNotification('error', 'Failed to rename collection. Changes were not saved.');
+      await refreshCollections();
+      throw error;
+    }
+  }, [pushNotification, refreshCollections]);
+
+  const handleReorderCollections = useCallback(async (parentId: string | null, orderedIds: string[]) => {
+    try {
+      await libraryOrganizationService.reorderCollections(parentId, orderedIds);
+      setCollections(prev =>
+        prev.map(collection => {
+          if ((collection.parent_id ?? null) === (parentId ?? null)) {
+            const index = orderedIds.indexOf(collection.id);
+            if (index !== -1) {
+              return { ...collection, display_order: index };
+            }
+          }
+          return collection;
+        })
+      );
+    } catch (error) {
+      console.error('Failed to reorder collections:', error);
+      pushNotification('error', 'Failed to reorder collections. Display refreshed to match the server.');
+      await refreshCollections();
+    }
+  }, [pushNotification, refreshCollections]);
+
+  const handleOpenCollectionDetails = useCallback((collection: Collection) => {
+    setEditingCollectionDetails(collection);
+  }, []);
+
+  const handleDeleteCollection = useCallback(async (collectionId: string) => {
+    const confirmed = window.confirm('Delete this collection? Books inside will remain in your library.');
+    if (!confirmed) return;
+
+    try {
+      await libraryOrganizationService.deleteCollection(collectionId);
+      setCollections(prev => prev.filter(collection => collection.id !== collectionId));
+      if (libraryView.selectedCollectionId === collectionId) {
+        setActiveCollection(null);
+        setLibraryFilters({ collections: [] });
+      }
+      pushNotification('success', 'Collection deleted.');
+    } catch (error) {
+      console.error('Failed to delete collection:', error);
+      pushNotification('error', 'Failed to delete collection. Please try again.');
+      await refreshCollections();
+    }
+  }, [libraryView.selectedCollectionId, setActiveCollection, setLibraryFilters, pushNotification, refreshCollections]);
+
+  const handleToggleCollectionFavorite = useCallback(async (collectionId: string, isFavorite: boolean) => {
+    try {
+      await libraryOrganizationService.updateCollection(collectionId, { is_favorite: isFavorite });
+      setCollections(prev =>
+        prev.map(collection =>
+          collection.id === collectionId ? { ...collection, is_favorite: isFavorite } : collection
+        )
+      );
+    } catch (error) {
+      console.error('Failed to update collection favorite status:', error);
+      pushNotification('error', 'Failed to update collection favorite status.');
+      await refreshCollections();
+    }
+  }, [pushNotification, refreshCollections]);
+
   const handleBulkAddToCollection = useCallback(() => {
-    // TODO: Show collection picker modal
-    console.log('Bulk add to collection');
+    setCollectionPickerSelection([]);
+    setShowCollectionPicker(true);
   }, []);
 
   const handleBulkAddTags = useCallback(() => {
-    // TODO: Show tag picker modal
-    console.log('Bulk add tags');
+    setTagManagerMode('assign');
+    setSelectedTagIds([]);
+    setTagManagerOpen(true);
+  }, [setTagManagerOpen]);
+
+  const handleBulkRemoveTags = useCallback(() => {
+    setTagManagerMode('remove');
+    setSelectedTagIds([]);
+    setTagManagerOpen(true);
+  }, [setTagManagerOpen]);
+
+  const handleSaveCollectionDetails = useCallback(async (updates: Partial<Collection>) => {
+    if (!editingCollectionDetails) return;
+
+    setIsSavingCollection(true);
+    try {
+      await libraryOrganizationService.updateCollection(editingCollectionDetails.id, updates);
+      setCollections(prev =>
+        prev.map(collection =>
+          collection.id === editingCollectionDetails.id
+            ? { ...collection, ...updates }
+            : collection
+        )
+      );
+      setEditingCollectionDetails(prev =>
+        prev ? { ...prev, ...updates } : prev
+      );
+      pushNotification('success', 'Collection details updated.');
+    } catch (error) {
+      console.error('Failed to update collection details:', error);
+      pushNotification('error', 'Failed to update collection details. Display refreshed to match the server.');
+      await refreshCollections();
+    } finally {
+      setIsSavingCollection(false);
+    }
+  }, [editingCollectionDetails, pushNotification, refreshCollections]);
+
+  const handleApplyCollectionAssignment = useCallback(async () => {
+    if (collectionPickerSelection.length === 0 || libraryView.selectedBooks.length === 0) {
+      setShowCollectionPicker(false);
+      setCollectionPickerSelection([]);
+      return;
+    }
+
+    try {
+      await Promise.all(
+        collectionPickerSelection.flatMap(collectionId =>
+          libraryView.selectedBooks.map(bookId =>
+            libraryOrganizationService
+              .addBookToCollection(bookId, collectionId)
+              .catch(error => {
+                const message = (error as Error)?.message ?? '';
+                if (message.includes('duplicate')) {
+                  return;
+                }
+                throw error;
+              })
+          )
+        )
+      );
+      await searchBooks();
+      clearSelection();
+      setShowCollectionPicker(false);
+      setCollectionPickerSelection([]);
+    } catch (error) {
+      console.error('Failed to assign collection:', error);
+      alert('Failed to assign collection');
+    }
+  }, [collectionPickerSelection, libraryView.selectedBooks, searchBooks, clearSelection]);
+
+  const toggleCollectionSelection = useCallback((collectionId: string) => {
+    setCollectionPickerSelection(prev =>
+      prev.includes(collectionId)
+        ? prev.filter(id => id !== collectionId)
+        : [...prev, collectionId]
+    );
   }, []);
+
+  const toggleSelectedTag = useCallback((tagId: string) => {
+    setSelectedTagIds(prev =>
+      prev.includes(tagId)
+        ? prev.filter(id => id !== tagId)
+        : [...prev, tagId]
+    );
+  }, []);
+
+  const handleApplyTags = useCallback(async () => {
+    if (!tagManagerMode || libraryView.selectedBooks.length === 0) {
+      setTagManagerOpen(false);
+      setTagManagerMode(null);
+      setSelectedTagIds([]);
+      return;
+    }
+
+    if (selectedTagIds.length === 0) {
+      setTagManagerOpen(false);
+      setTagManagerMode(null);
+      return;
+    }
+
+    setIsApplyingTags(true);
+    try {
+      if (tagManagerMode === 'assign') {
+        await libraryOrganizationService.batchAddTags(libraryView.selectedBooks, selectedTagIds);
+      } else {
+        await libraryOrganizationService.batchRemoveTags(libraryView.selectedBooks, selectedTagIds);
+      }
+      await searchBooks();
+      clearSelection();
+      setTagManagerOpen(false);
+      setTagManagerMode(null);
+      setSelectedTagIds([]);
+    } catch (error) {
+      console.error('Failed to update tags:', error);
+      alert('Failed to update tags');
+    } finally {
+      setIsApplyingTags(false);
+    }
+  }, [tagManagerMode, selectedTagIds, libraryView.selectedBooks, searchBooks, clearSelection, setTagManagerOpen]);
 
   const handleBulkToggleFavorite = useCallback(async (isFavorite: boolean) => {
     try {
@@ -686,6 +1243,39 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
               borderColor: 'var(--color-border)',
             }}
           >
+            {notifications.length > 0 && (
+              <div
+                className="p-4 border-b space-y-2"
+                style={{ borderColor: 'var(--color-border)' }}
+              >
+                {notifications.map(notification => {
+                  const style = getNotificationStyle(notification.type);
+                  return (
+                    <div
+                      key={notification.id}
+                      className="flex items-start justify-between gap-3 rounded-md text-sm"
+                      style={{
+                        backgroundColor: style.backgroundColor,
+                        border: `1px solid ${style.borderColor}`,
+                        color: style.textColor,
+                        padding: '0.75rem'
+                      }}
+                    >
+                      <span className="flex-1">{notification.message}</span>
+                      <button
+                        onClick={() => dismissNotification(notification.id)}
+                        className="p-1 rounded transition-colors"
+                        style={{ color: style.textColor }}
+                        aria-label="Dismiss notification"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Smart Collections */}
             {collections.filter(c => c.is_smart).length > 0 && (
               <div 
@@ -740,9 +1330,12 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
                 selectedCollectionId={libraryView.selectedCollectionId}
                 onSelectCollection={handleCollectionSelect}
                 onCreateCollection={handleCreateCollection}
-                onEditCollection={(collection) => console.log('Edit collection:', collection)}
-                onDeleteCollection={(id) => console.log('Delete collection:', id)}
-                onToggleFavorite={(id, isFavorite) => console.log('Toggle favorite:', id, isFavorite)}
+                onRenameCollection={handleRenameCollection}
+                onOpenCollectionDetails={handleOpenCollectionDetails}
+                onDeleteCollection={handleDeleteCollection}
+                onToggleFavorite={handleToggleCollectionFavorite}
+                onReorderCollections={handleReorderCollections}
+                onMoveCollection={handleStartMoveCollection}
               />
             </div>
 
@@ -967,12 +1560,315 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
             selectedCount={libraryView.selectedBooks.length}
             onAddToCollection={handleBulkAddToCollection}
             onAddTags={handleBulkAddTags}
+            onRemoveTags={handleBulkRemoveTags}
             onToggleFavorite={handleBulkToggleFavorite}
             onArchive={handleBulkArchive}
             onDelete={handleBulkDelete}
             onExport={handleBulkExport}
             onDetectDuplicates={handleBulkDetectDuplicates}
             onClearSelection={clearSelection}
+          />
+        )}
+
+        {/* Collection assignment picker */}
+        {showCollectionPicker && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+            <div
+              className="w-full max-w-md rounded-xl border shadow-xl"
+              style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+            >
+              <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                  Add to Collections
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowCollectionPicker(false);
+                    setCollectionPickerSelection([]);
+                  }}
+                  className="p-1 rounded transition-colors"
+                  style={{ color: 'var(--color-text-tertiary)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="max-h-72 overflow-y-auto p-4 space-y-1">
+                {flattenedCollections.length === 0 && (
+                  <p className="text-sm text-center py-4" style={{ color: 'var(--color-text-secondary)' }}>
+                    No collections yet. Create one from the sidebar.
+                  </p>
+                )}
+                {flattenedCollections.map(({ collection, depth }) => (
+                  <label
+                    key={collection.id}
+                    className="flex items-center gap-3 px-2 py-1 rounded transition-colors cursor-pointer"
+                    style={{ color: 'var(--color-text-primary)' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={collectionPickerSelection.includes(collection.id)}
+                      onChange={() => toggleCollectionSelection(collection.id)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="flex-1 text-sm" style={{ paddingLeft: depth * 12 }}>
+                      {collection.name}
+                    </span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="flex justify-end gap-2 p-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                <button
+                  onClick={() => {
+                    setShowCollectionPicker(false);
+                    setCollectionPickerSelection([]);
+                  }}
+                  className="px-4 py-2 text-sm rounded-md border"
+                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleApplyCollectionAssignment}
+                  disabled={collectionPickerSelection.length === 0}
+                  className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+                >
+                  Assign
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Move collection modal */}
+        {showMoveCollectionModal && collectionToMove && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+            <div
+              className="w-full max-w-md rounded-xl border shadow-xl"
+              style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+            >
+              <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                <div>
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                    Move “{collectionToMove.name}”
+                  </h2>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+                    Choose a new parent collection
+                  </p>
+                </div>
+                <button
+                  onClick={handleCloseMoveCollectionModal}
+                  className="p-1 rounded transition-colors"
+                  style={{ color: 'var(--color-text-tertiary)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
+                  aria-label="Close move collection modal"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="max-h-72 overflow-y-auto p-4 space-y-2">
+                <label
+                  className="flex items-center gap-3 px-2 py-1 rounded transition-colors cursor-pointer"
+                  style={{ color: 'var(--color-text-primary)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <input
+                    type="radio"
+                    name="move-parent"
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={moveCollectionParentId === null}
+                    onChange={() => setMoveCollectionParentId(null)}
+                  />
+                  <span className="flex-1 text-sm">
+                    Top level (no parent)
+                  </span>
+                </label>
+
+                {availableMoveOptions.length === 0 && (
+                  <p className="text-sm text-center py-4" style={{ color: 'var(--color-text-secondary)' }}>
+                    No other collections available.
+                  </p>
+                )}
+
+                {availableMoveOptions.map(({ collection, depth }) => {
+                  const isBlocked = blockedCollectionIds.has(collection.id);
+                  return (
+                    <label
+                      key={collection.id}
+                      className="flex items-center gap-3 px-2 py-1 rounded transition-colors cursor-pointer"
+                      style={{
+                        color: isBlocked ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
+                        opacity: isBlocked ? 0.6 : 1
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isBlocked) {
+                          e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="move-parent"
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        checked={moveCollectionParentId === collection.id}
+                        onChange={() => setMoveCollectionParentId(collection.id)}
+                        disabled={isBlocked}
+                      />
+                      <span className="flex-1 text-sm" style={{ paddingLeft: depth * 12 }}>
+                        {collection.name}
+                      </span>
+                      {isBlocked && (
+                        <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+                          (descendant)
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div className="flex justify-end gap-2 p-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                <button
+                  onClick={handleCloseMoveCollectionModal}
+                  className="px-4 py-2 text-sm rounded-md border"
+                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                  disabled={isMovingCollection}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitMoveCollection}
+                  disabled={isMovingCollection || !moveSelectionChanged}
+                  className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {isMovingCollection ? 'Moving…' : 'Move'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tag manager */}
+        {tagManagerOpen && tagManagerMode && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+            <div
+              className="w-full max-w-md rounded-xl border shadow-xl"
+              style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+            >
+              <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                <div>
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                    {tagManagerMode === 'assign' ? 'Add Tags' : 'Remove Tags'}
+                  </h2>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+                    {libraryView.selectedBooks.length} document(s) selected
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setTagManagerOpen(false);
+                    setTagManagerMode(null);
+                    setSelectedTagIds([]);
+                  }}
+                  className="p-1 rounded transition-colors"
+                  style={{ color: 'var(--color-text-tertiary)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="max-h-72 overflow-y-auto p-4 space-y-1">
+                {tags.length === 0 && (
+                  <p className="text-sm text-center py-4" style={{ color: 'var(--color-text-secondary)' }}>
+                    No tags yet. Create one below.
+                  </p>
+                )}
+                {tags.map(tag => (
+                  <label
+                    key={tag.id}
+                    className="flex items-center gap-3 px-2 py-1 rounded transition-colors cursor-pointer"
+                    style={{ color: 'var(--color-text-primary)' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedTagIds.includes(tag.id)}
+                      onChange={() => toggleSelectedTag(tag.id)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: tag.color }}
+                    />
+                    <span className="flex-1 text-sm">{tag.name}</span>
+                    <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+                      ({tag.usage_count})
+                    </span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between p-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                <button
+                  onClick={() => {
+                    setShowCreateTag(true);
+                    setTagManagerOpen(false);
+                  }}
+                  className="px-3 py-2 text-sm rounded-md border"
+                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                >
+                  + New Tag
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setTagManagerOpen(false);
+                      setTagManagerMode(null);
+                      setSelectedTagIds([]);
+                    }}
+                    className="px-4 py-2 text-sm rounded-md border"
+                    style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleApplyTags}
+                    disabled={selectedTagIds.length === 0 || isApplyingTags}
+                    className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+                  >
+                    {isApplyingTags
+                      ? 'Applying...'
+                      : tagManagerMode === 'assign'
+                        ? 'Add Tags'
+                        : 'Remove Tags'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {editingCollectionDetails && (
+          <CollectionDetailsDialog
+            collection={editingCollectionDetails}
+            open={!!editingCollectionDetails}
+            saving={isSavingCollection}
+            onClose={() => setEditingCollectionDetails(null)}
+            onSave={handleSaveCollectionDetails}
           />
         )}
       </div>

@@ -22,9 +22,15 @@ interface DocumentUploadProps {
   onClose: () => void
   onUploadComplete?: (documentId: string) => void // Optional callback for when upload completes
   setAsCurrentDocument?: boolean // Control whether uploaded doc becomes current
+  zIndexClass?: string
 }
 
-export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploadComplete, setAsCurrentDocument = true }) => {
+export const DocumentUpload: React.FC<DocumentUploadProps> = ({
+  onClose,
+  onUploadComplete,
+  setAsCurrentDocument = true,
+  zIndexClass = 'z-50'
+}) => {
   const { addDocument, setLoading, refreshLibrary } = useAppStore()
   const [dragActive, setDragActive] = useState(false)
   const [showOCRDialog, setShowOCRDialog] = useState(false)
@@ -33,7 +39,6 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
   const [saveToLibrary, setSaveToLibrary] = useState(true)
   const [userProfile, setUserProfile] = useState<any>({ tier: 'free', credits: 0, ocr_count_monthly: 0 })
   const [extractionProgress, setExtractionProgress] = useState<string>('')
-  const [uploadedDocumentId, setUploadedDocumentId] = useState<string | null>(null)
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -75,6 +80,8 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
     setError(null)
     setExtractionProgress('')
     setLoading(true)
+
+    let resultingDocumentId: string | null = null
 
     try {
       logger.info('Starting file upload', context, {
@@ -251,7 +258,6 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
                 console.log('🔄 Updating document ID from', document.id, 'to database ID:', databaseId);
                 document.id = databaseId as typeof document.id;
               }
-              setUploadedDocumentId(databaseId);
               saveSucceeded = true; // Mark save as succeeded
               
               logger.info('Document saved to Supabase', context, {
@@ -312,6 +318,8 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
         // This prevents adding documents with wrong IDs that will cause foreign key errors
         if (saveSucceeded) {
           addDocument(document, setAsCurrentDocument)
+          resultingDocumentId = document.id
+          resultingDocumentId = document.id
         } else {
           // Save failed and saveToLibrary was true - don't add document
           logger.warn(
@@ -396,7 +404,6 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
                 console.log('🔄 Updating document ID from', document.id, 'to database ID:', databaseId);
                 document.id = databaseId as typeof document.id;
               }
-              setUploadedDocumentId(databaseId);
               saveSucceeded = true;
 
               logger.info('EPUB saved to Supabase', context, {
@@ -441,6 +448,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
 
         if (saveSucceeded) {
           addDocument(document, setAsCurrentDocument);
+          resultingDocumentId = document.id
         } else {
           logger.warn(
             'Not adding EPUB document to store because save failed',
@@ -495,7 +503,6 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
                 console.log('🔄 Updating document ID from', document.id, 'to database ID:', databaseId);
                 document.id = databaseId as typeof document.id;
               }
-              setUploadedDocumentId(databaseId);
               saveSucceeded = true; // Mark save as succeeded
               
               logger.info('Document saved to Supabase', context, {
@@ -556,9 +563,9 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
       }
       
       // Call the upload complete callback if provided
-      if (onUploadComplete && uploadedDocumentId) {
-        console.log('DocumentUpload: Calling onUploadComplete with document:', uploadedDocumentId);
-        onUploadComplete(uploadedDocumentId);
+      if (resultingDocumentId && onUploadComplete) {
+        console.log('DocumentUpload: Calling onUploadComplete with document:', resultingDocumentId);
+        onUploadComplete(resultingDocumentId);
       }
       
       onClose()
@@ -601,7 +608,6 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
           console.log('🔄 OCR Approve: Updating document ID from', document.id, 'to database ID:', databaseId);
           document.id = databaseId as typeof document.id;
         }
-        setUploadedDocumentId(databaseId);
         
         console.log('DocumentUpload: Calling refreshLibrary() after OCR approval')
         refreshLibrary();
@@ -654,7 +660,6 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
           console.log('🔄 OCR Decline: Updating document ID from', document.id, 'to database ID:', databaseId);
           document.id = databaseId as typeof document.id;
         }
-        setUploadedDocumentId(databaseId);
         
         refreshLibrary();
       }
@@ -820,7 +825,10 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onClose, onUploa
   }
 
   return (
-    <div className="fixed inset-0 flex items-start justify-center z-50 pt-20 pb-8 px-4 overflow-y-auto" style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}>
+    <div
+      className={`fixed inset-0 flex items-start justify-center pt-20 pb-8 px-4 overflow-y-auto ${zIndexClass}`}
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
+    >
       <div className="rounded-xl shadow-xl max-w-2xl w-full mx-4 animate-scale-in my-auto" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
         <div className="flex items-center justify-between p-6" style={{ borderBottom: '1px solid var(--color-border)' }}>
           <h2 className="text-heading-3" style={{ color: 'var(--color-text-primary)' }}>Upload Document</h2>

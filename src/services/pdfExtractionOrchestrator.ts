@@ -102,7 +102,7 @@ export async function extractWithFallback(
       throw new Error('getDocument function not found in PDF.js module')
     }
     
-    logger.info('Loading PDF with PDF.js', context, undefined, {
+    logger.info('Loading PDF with PDF.js', context, {
       dataSize: fileArrayBuffer.byteLength,
       workerSrc: pdfjsLib.GlobalWorkerOptions?.workerSrc
     })

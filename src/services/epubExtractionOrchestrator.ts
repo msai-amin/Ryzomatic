@@ -33,9 +33,9 @@ function cleanText(text: string): string {
   return text.replace(WHITESPACE_REGEX, ' ').trim()
 }
 
-function getFirstTextContent(doc: Document, selectors: string[]): string | undefined {
+function getFirstTextContent(root: Document | Element, selectors: string[]): string | undefined {
   for (const selector of selectors) {
-    const node = doc.querySelector(selector)
+    const node = root.querySelector(selector)
     const value = node?.textContent
     if (value && cleanText(value)) {
       return cleanText(value)
@@ -65,12 +65,18 @@ export async function extractEpub(
   file: File | ArrayBuffer | Uint8Array
 ): Promise<EpubExtractionResult> {
   try {
-    const arrayBuffer =
-      file instanceof File
-        ? await file.arrayBuffer()
-        : file instanceof Uint8Array
-          ? file.buffer
-          : file
+    let arrayBuffer: ArrayBuffer
+    if (file instanceof File) {
+      arrayBuffer = await file.arrayBuffer()
+    } else if (file instanceof Uint8Array) {
+      arrayBuffer = file.slice().buffer
+    } else if (file instanceof ArrayBuffer) {
+      arrayBuffer = file
+    } else {
+      const view = new Uint8Array(file as ArrayBufferLike)
+      const cloned = view.slice()
+      arrayBuffer = cloned.buffer
+    }
 
     const zip = await JSZip.loadAsync(arrayBuffer)
 
@@ -119,7 +125,7 @@ export async function extractEpub(
       throw new Error('EPUB spine is empty')
     }
 
-    const metadataNode = opfDoc.getElementsByTagName('metadata')?.[0]
+    const metadataNode = opfDoc.querySelector('metadata') as Element | null
     const title = metadataNode
       ? getFirstTextContent(metadataNode, ['dc\\:title', 'title'])
       : undefined

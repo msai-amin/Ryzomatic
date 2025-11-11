@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { HelpCircle, X, BookOpen, Zap, Settings, Brain } from 'lucide-react'
 import { useOnboarding } from './OnboardingProvider'
 
@@ -86,6 +86,20 @@ const helpTopics: HelpTopic[] = [
 export const ContextualHelp: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [selectedTopic, setSelectedTopic] = useState<HelpTopic | null>(null)
+  const [helpDismissed, setHelpDismissed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    return window.localStorage.getItem('helpButtonDismissed') === 'true'
+  })
+  const [position, setPosition] = useState<{ top: number; left: number }>({ top: 120, left: 120 })
+
+  const dragStateRef = useRef<{
+    startX: number
+    startY: number
+    top: number
+    left: number
+  } | null>(null)
+  const draggedRef = useRef(false)
+
   const { startOnboarding } = useOnboarding()
 
   const handleTopicSelect = (topic: HelpTopic) => {
@@ -97,21 +111,153 @@ export const ContextualHelp: React.FC = () => {
     setIsOpen(false)
   }
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const storedTop = Number(window.localStorage.getItem('helpButtonTop'))
+    const storedLeft = Number(window.localStorage.getItem('helpButtonLeft'))
+
+    const defaultTop = window.innerHeight - 120
+    const defaultLeft = window.innerWidth - 96
+
+    setPosition({
+      top: Number.isFinite(storedTop) ? storedTop : defaultTop,
+      left: Number.isFinite(storedLeft) ? storedLeft : defaultLeft
+    })
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleResize = () => {
+      setPosition((prev) => ({
+        top: Math.min(prev.top, window.innerHeight - 80),
+        left: Math.min(prev.left, window.innerWidth - 80)
+      }))
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('helpButtonTop', String(position.top))
+    window.localStorage.setItem('helpButtonLeft', String(position.left))
+  }, [position.top, position.left])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('helpButtonDismissed', String(helpDismissed))
+  }, [helpDismissed])
+
+  const handleDismiss = () => {
+    setIsOpen(false)
+    setHelpDismissed(true)
+  }
+
+  const handleFloatingMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return
+    event.preventDefault()
+    draggedRef.current = false
+    dragStateRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      top: position.top,
+      left: position.left
+    }
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!dragStateRef.current) return
+      const deltaX = moveEvent.clientX - dragStateRef.current.startX
+      const deltaY = moveEvent.clientY - dragStateRef.current.startY
+
+      if (!draggedRef.current && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {
+        draggedRef.current = true
+      }
+
+      const nextTop = Math.min(
+        Math.max(dragStateRef.current.top + deltaY, 24),
+        window.innerHeight - 80
+      )
+      const nextLeft = Math.min(
+        Math.max(dragStateRef.current.left + deltaX, 24),
+        window.innerWidth - 80
+      )
+
+      setPosition({ top: nextTop, left: nextLeft })
+    }
+
+    const handleMouseUp = () => {
+      dragStateRef.current = null
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }
+
+  const handleFloatingButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (draggedRef.current) {
+      event.preventDefault()
+      event.stopPropagation()
+      draggedRef.current = false
+      return
+    }
+    setHelpDismissed(false)
+    setIsOpen(true)
+  }
+
+  const handleFloatingButtonKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      setHelpDismissed(false)
+      setIsOpen(true)
+    }
+  }
+
+  if (!isOpen && helpDismissed) {
+    return null
+  }
+
   if (!isOpen) {
     return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-72 p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 z-40"
-        style={{
-          backgroundColor: 'var(--color-primary)',
-          color: 'var(--color-text-inverse)',
-          border: '1px solid var(--color-primary)',
-        }}
-        title="Get help and take a tour"
-        aria-label="Get help and take a tour"
+      <div
+        className="fixed z-40 flex items-center gap-2"
+        style={{ top: position.top, left: position.left }}
+        onMouseDown={handleFloatingMouseDown}
       >
-        <HelpCircle className="w-5 h-5" />
-      </button>
+        <button
+          onClick={handleFloatingButtonClick}
+          onKeyDown={handleFloatingButtonKeyDown}
+          className="p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
+          style={{
+            backgroundColor: 'var(--color-primary)',
+            color: 'var(--color-text-inverse)',
+            border: '1px solid var(--color-primary)',
+          }}
+          title="Get help and take a tour"
+          aria-label="Get help and take a tour"
+        >
+          <HelpCircle className="w-5 h-5" />
+        </button>
+        <button
+          onClick={handleDismiss}
+          className="flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold transition-colors hover:bg-[var(--color-surface-hover)]"
+          style={{
+            borderColor: 'var(--color-border)',
+            color: 'var(--color-text-secondary)',
+            backgroundColor: 'var(--color-surface)'
+          }}
+          title="Hide help button"
+          aria-label="Hide help button"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </div>
     )
   }
 

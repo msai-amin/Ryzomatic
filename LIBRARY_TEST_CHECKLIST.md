@@ -90,7 +90,7 @@ Check console for:
   - [ ] Metadata (notes count, audio sessions, last read date)
 
 ### If Failed:
-- Modal doesn't appear → Check `ModernLibraryModal` is imported in `ThemedHeader`
+- Modal doesn't appear → Check `LibraryModal` is imported in `ThemedHeader`
 - Modal masked by sidebar → Already fixed with portal + z-index
 - No books showing → Check database query and console logs
 
@@ -160,11 +160,42 @@ Check console for:
 ### Expected Results:
 - [ ] Collections tree is visible (may be empty)
 - [ ] Tags list is visible (may be empty)
+- [ ] Notification drawer (at top of sidebar) remains empty until actions occur
 - [ ] No console errors loading these
 - [ ] See log: `[INFO] Collections retrieved`
 
-### Note:
-Collections and tags CRUD operations are implemented but UI for creating them is basic (prompt dialogs). Advanced UI is pending.
+### Sidebar Smoke Checklist:
+- [ ] Click the **+** button next to Collections and create `QA Temp Collection`
+  - Toast appears: "Collection created successfully."
+  - New collection shows in tree.
+- [ ] Right-click the new collection → **Rename** → change to `QA Temp Collection (Renamed)`
+  - Toast appears confirming the rename.
+  - Name updates immediately in tree.
+- [ ] Drag the renamed collection above/below another root collection
+  - Order updates without page refresh.
+  - No duplicate/ghost entries appear.
+- [ ] Right-click the collection → **Move to...** → choose another collection as parent (or root)
+  - Toast appears: "Collection moved."
+  - Tree refreshes to show new nesting.
+- [ ] Toggle the star icon to favorite/unfavorite
+  - Star icon fills/unfills.
+  - Close and reopen Library → state persists.
+- [ ] Right-click → **Delete** the temp collection
+  - Confirm prompt appears.
+  - Toast appears: "Collection deleted."
+  - Collection disappears from tree.
+
+### Tag Smoke Checklist:
+- [ ] Click the **+** button next to Tags and create `QA Temp Tag`
+  - Toast appears: "Tag created successfully."
+  - Tag chip appears under Tags list.
+- [ ] (Optional) Assign the tag via bulk toolbar and verify chip count increments.
+- [ ] Close/reopen Library → tag persists.
+
+### Error Handling (Optional):
+- [ ] Toggle offline mode (DevTools → Network → Offline), attempt to rename a collection
+  - Error toast appears.
+  - After restoring connectivity, toast clears and tree refetches without stale state.
 
 ---
 
@@ -224,7 +255,7 @@ Collections and tags CRUD operations are implemented but UI for creating them is
 ### Issue: Library modal doesn't open
 **Solution**:
 - Check browser console for errors
-- Verify `ModernLibraryModal` is imported in `ThemedHeader`
+- Verify `LibraryModal` is imported in `ThemedHeader`
 - Check if `showLibrary` state is toggling
 
 ### Issue: Console shows duplicate initialization logs
@@ -250,9 +281,9 @@ Library is working if ALL these pass:
 
 These are expected and will be enhanced later:
 
-1. **Collections Management**: Basic (prompt dialogs) - advanced drag-and-drop UI pending
-2. **Tag Management**: Basic (prompt dialogs) - color picker UI pending
-3. **Bulk Operations**: UI exists but operations are placeholders
+1. **Collections Management**: Cross-parent drag via DnD not yet supported (use “Move to…” action)
+2. **Tag Management**: Reordering and archival are not yet implemented
+3. **Bulk Operations**: Some toolbar actions still pending backend wiring
 4. **Virtual Scrolling**: Not yet implemented (loads all books at once)
 5. **Advanced Filters**: UI exists but some filters not connected yet
 

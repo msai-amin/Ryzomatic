@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseAuthService';
+import { googleAuthService } from '../services/googleAuthService';
+import { simpleGoogleAuth } from '../services/simpleGoogleAuth';
 import type { Session } from '@supabase/supabase-js';
 
 // Define the shape of the context
@@ -51,6 +53,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription?.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    if (typeof window === 'undefined') return;
+
+    const provider = session?.user?.app_metadata?.provider;
+    if (provider !== 'google') return;
+
+    let cancelled = false;
+
+    const ensureDriveConsent = async () => {
+      try {
+        const granted = await googleAuthService.ensureDriveAccess();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (granted) {
+          const user = googleAuthService.getCurrentUser();
+          if (user) {
+            simpleGoogleAuth.syncFromGoogleAuth(user);
+          }
+        } else {
+          // Fall back to lightweight GIS so UI elements relying on it still function
+          await simpleGoogleAuth.initialize().catch(error => {
+            console.warn('Failed to initialize simpleGoogleAuth after Google login', error);
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to ensure Google Drive consent after login', error);
+        try {
+          await simpleGoogleAuth.initialize();
+        } catch (fallbackError) {
+          console.warn('Fallback Google Identity initialization also failed', fallbackError);
+        }
+      }
+    };
+
+    ensureDriveConsent();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, session?.user?.app_metadata?.provider, session?.user?.id]);
 
   const value = {
     session,

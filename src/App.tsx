@@ -58,9 +58,9 @@ function App() {
       setUser(null);
       
       // Clear services when there's no session
-      supabaseStorageService.setCurrentUser(null as any);
-      libraryOrganizationService.setCurrentUser(null as any);
-      librarySearchService.setCurrentUser(null as any);
+      supabaseStorageService.setCurrentUser(null);
+      libraryOrganizationService.setCurrentUser(null);
+      librarySearchService.setCurrentUser(null);
     }
   }, [session, authLoading, checkAuth]);
 

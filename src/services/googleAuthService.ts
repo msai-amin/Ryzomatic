@@ -10,6 +10,8 @@ export interface GoogleUser {
   picture: string;
   accessToken: string;
   refreshToken?: string;
+  givenName?: string;
+  familyName?: string;
 }
 
 export interface GoogleDriveFile {
@@ -30,6 +32,7 @@ class GoogleAuthService {
     'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'
   ];
   private scopes: string = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
+  private driveScope = 'https://www.googleapis.com/auth/drive.file';
   private gapi: any = null;
   private isInitialized = false;
   private currentUser: GoogleUser | null = null;
@@ -180,6 +183,7 @@ class GoogleAuthService {
       if (authInstance && authInstance.isSignedIn.get()) {
         const user = authInstance.currentUser.get();
         this.currentUser = this.mapGoogleUser(user);
+        this.persistCurrentUser();
         console.log('User already signed in:', this.currentUser.email);
       }
     } catch (error) {
@@ -228,10 +232,7 @@ class GoogleAuthService {
       });
       
       this.currentUser = this.mapGoogleUser(user);
-      
-      // Store user info in localStorage
-      localStorage.setItem('google_user', JSON.stringify(this.currentUser));
-      
+      this.persistCurrentUser();
       return this.currentUser;
     } catch (error) {
       console.error('Error signing in:', error);
@@ -245,12 +246,113 @@ class GoogleAuthService {
         });
         
         this.currentUser = this.mapGoogleUser(user);
-        localStorage.setItem('google_user', JSON.stringify(this.currentUser));
+        this.persistCurrentUser();
         return this.currentUser;
       } catch (redirectError) {
         console.error('Redirect sign in also failed:', redirectError);
         throw new Error('Failed to sign in with Google');
       }
+    }
+  }
+
+  private persistCurrentUser(): void {
+    if (!this.currentUser) {
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      const storagePayload = {
+        id: this.currentUser.id,
+        email: this.currentUser.email,
+        name: this.currentUser.name,
+        picture: this.currentUser.picture,
+        given_name: this.currentUser.givenName || this.currentUser.name?.split(' ')[0] || '',
+        family_name: this.currentUser.familyName || '',
+      };
+
+      window.localStorage.setItem('google_user', JSON.stringify(storagePayload));
+      window.localStorage.setItem('google_auth_user', JSON.stringify(this.currentUser));
+    } catch (error) {
+      console.warn('Failed to persist Google user to storage', error);
+    }
+  }
+
+  async hasDriveScope(): Promise<boolean> {
+    try {
+      if (!this.isInitialized) {
+        await this.initialize();
+      }
+
+      const authInstance = this.gapi?.auth2?.getAuthInstance?.();
+      if (!authInstance) {
+        return false;
+      }
+
+      const user = authInstance.currentUser.get();
+      if (!user || typeof user.hasGrantedScopes !== 'function') {
+        return false;
+      }
+
+      const hasScope = user.hasGrantedScopes(this.driveScope);
+      if (hasScope && !this.currentUser) {
+        this.currentUser = this.mapGoogleUser(user);
+        this.persistCurrentUser();
+      }
+      return hasScope;
+    } catch (error) {
+      console.warn('googleAuthService.hasDriveScope failed', error);
+      return false;
+    }
+  }
+
+  async ensureDriveAccess(options: { forcePrompt?: boolean } = {}): Promise<boolean> {
+    try {
+      await this.initialize();
+    } catch (error) {
+      console.error('Failed to initialize Google API before requesting Drive access', error);
+      return false;
+    }
+
+    const authInstance = this.gapi?.auth2?.getAuthInstance?.();
+    if (!authInstance) {
+      console.warn('Google auth instance not available to request Drive access');
+      return false;
+    }
+
+    try {
+      let user = authInstance.currentUser.get();
+      const alreadyGranted = user && typeof user.hasGrantedScopes === 'function'
+        ? user.hasGrantedScopes(this.driveScope)
+        : false;
+
+      if (alreadyGranted && !options.forcePrompt) {
+        this.currentUser = this.mapGoogleUser(user);
+        this.persistCurrentUser();
+        return true;
+      }
+
+      user = await authInstance.signIn({
+        scope: this.scopes,
+        prompt: options.forcePrompt ? 'consent select_account' : 'consent'
+      });
+
+      const granted = user && typeof user.hasGrantedScopes === 'function'
+        ? user.hasGrantedScopes(this.driveScope)
+        : false;
+
+      if (granted) {
+        this.currentUser = this.mapGoogleUser(user);
+        this.persistCurrentUser();
+      }
+
+      return granted;
+    } catch (error) {
+      console.warn('User declined or failed Google Drive consent', error);
+      return false;
     }
   }
 
@@ -263,7 +365,10 @@ class GoogleAuthService {
       const authInstance = this.gapi.auth2.getAuthInstance();
       await authInstance.signOut();
       this.currentUser = null;
-      localStorage.removeItem('google_user');
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('google_user');
+        window.localStorage.removeItem('google_auth_user');
+      }
     } catch (error) {
       console.error('Error signing out:', error);
       throw new Error('Failed to sign out');
@@ -276,13 +381,43 @@ class GoogleAuthService {
     }
 
     // Try to restore from localStorage
-    const stored = localStorage.getItem('google_user');
-    if (stored) {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    const storedAuth = window.localStorage.getItem('google_auth_user');
+    if (storedAuth) {
       try {
-        this.currentUser = JSON.parse(stored);
+        this.currentUser = JSON.parse(storedAuth) as GoogleUser;
         return this.currentUser;
       } catch (error) {
-        localStorage.removeItem('google_user');
+        window.localStorage.removeItem('google_auth_user');
+      }
+    }
+
+    const stored = window.localStorage.getItem('google_user');
+    if (stored) {
+      try {
+        const legacy = JSON.parse(stored) as {
+          id: string;
+          email: string;
+          name: string;
+          picture: string;
+          given_name?: string;
+          family_name?: string;
+        };
+        this.currentUser = {
+          id: legacy.id,
+          email: legacy.email,
+          name: legacy.name,
+          picture: legacy.picture,
+          givenName: legacy.given_name,
+          familyName: legacy.family_name,
+          accessToken: '',
+        };
+        return this.currentUser;
+      } catch (error) {
+        window.localStorage.removeItem('google_user');
       }
     }
 
@@ -302,6 +437,8 @@ class GoogleAuthService {
       email: profile.getEmail(),
       name: profile.getName(),
       picture: profile.getImageUrl(),
+      givenName: typeof profile.getGivenName === 'function' ? profile.getGivenName() : undefined,
+      familyName: typeof profile.getFamilyName === 'function' ? profile.getFamilyName() : undefined,
       accessToken: authResponse.access_token,
       refreshToken: authResponse.refresh_token
     };
@@ -321,7 +458,7 @@ class GoogleAuthService {
       this.currentUser!.accessToken = authResponse.access_token;
       
       // Update stored user
-      localStorage.setItem('google_user', JSON.stringify(this.currentUser));
+      this.persistCurrentUser();
       
       return authResponse.access_token;
     } catch (error) {
@@ -336,7 +473,9 @@ class GoogleAuthService {
     }
 
     // Check if token is expired (basic check)
-    const tokenExpiry = localStorage.getItem('google_token_expiry');
+    const tokenExpiry = typeof window !== 'undefined'
+      ? window.localStorage.getItem('google_token_expiry')
+      : null;
     if (tokenExpiry && Date.now() > parseInt(tokenExpiry)) {
       return await this.refreshAccessToken();
     }
