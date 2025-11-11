@@ -1,11 +1,14 @@
 import React, { useCallback } from 'react'
 import { Upload, FileText, Sparkles } from 'lucide-react'
+import { useAppStore } from '../store/appStore'
 
 interface EmptyStateProps {
   onUploadClick?: () => void
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
+  const openCustomReadingWizard = useAppStore((state) => state.openCustomReadingWizard)
+
   const handleUpload = useCallback(() => {
     if (onUploadClick) {
       onUploadClick()
@@ -13,6 +16,10 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
       window.dispatchEvent(new CustomEvent('app:open-upload'))
     }
   }, [onUploadClick])
+
+  const handleOpenCustomReading = useCallback(() => {
+    openCustomReadingWizard('empty-state')
+  }, [openCustomReadingWizard])
 
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4">
@@ -99,7 +106,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
             boxShadow: 'var(--shadow-sm)',
             borderRadius: 'var(--border-radius-lg)',
           }}
-          onClick={handleUpload}
+          onClick={handleOpenCustomReading}
           type="button"
         >
           <div 
