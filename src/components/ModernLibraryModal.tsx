@@ -188,6 +188,478 @@ const CollectionDetailsDialog: React.FC<CollectionDetailsDialogProps> = ({
     </div>
   );
 };
+
+interface CreateCollectionFormValues {
+  name: string;
+  description?: string;
+  color: string;
+  icon: string;
+}
+
+interface CreateCollectionModalProps {
+  isOpen: boolean;
+  parentCollection: Collection | null;
+  defaultColor: string;
+  defaultIcon: string;
+  submitting: boolean;
+  onClose: () => void;
+  onSubmit: (values: CreateCollectionFormValues) => Promise<void>;
+}
+
+const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
+  isOpen,
+  parentCollection,
+  defaultColor,
+  defaultIcon,
+  submitting,
+  onClose,
+  onSubmit
+}) => {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [color, setColor] = useState(defaultColor);
+  const [icon, setIcon] = useState(defaultIcon);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setName('');
+      setDescription('');
+      setColor(defaultColor);
+      setIcon(defaultIcon);
+      setError(null);
+    }
+  }, [isOpen, defaultColor, defaultIcon]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  const IconPreview = COLLECTION_ICON_OPTIONS.find(option => option.value === icon)?.Icon ?? Folder;
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError('Collection name is required.');
+      return;
+    }
+    setError(null);
+    await onSubmit({
+      name: trimmed,
+      description: description.trim() ? description.trim() : undefined,
+      color,
+      icon
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div
+        className="w-full max-w-lg rounded-xl border shadow-xl"
+        style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+            <div>
+              <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                Create {parentCollection ? 'Subcollection' : 'Collection'}
+              </h2>
+              {parentCollection && (
+                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+                  Parent: {parentCollection.name}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1 rounded transition-colors"
+              style={{ color: 'var(--color-text-tertiary)' }}
+              disabled={submitting}
+              onMouseEnter={(e) => !submitting && (e.currentTarget.style.color = 'var(--color-text-secondary)')}
+              onMouseLeave={(e) => !submitting && (e.currentTarget.style.color = 'var(--color-text-tertiary)')}
+              aria-label="Close create collection modal"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="p-4 space-y-5">
+            <div className="space-y-2">
+              <label className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                Name
+              </label>
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{
+                  borderColor: error ? 'rgba(239, 68, 68, 0.6)' : 'var(--color-border)',
+                  backgroundColor: 'var(--color-surface)'
+                }}
+                placeholder="Collection name"
+                disabled={submitting}
+                autoFocus
+              />
+              {error && (
+                <p className="text-xs" style={{ color: 'rgba(239, 68, 68, 0.9)' }}>
+                  {error}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                Description <span style={{ color: 'var(--color-text-tertiary)' }}>(optional)</span>
+              </label>
+              <textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}
+                rows={3}
+                placeholder="Add a helpful description"
+                disabled={submitting}
+              />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                Color
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {COLLECTION_COLOR_OPTIONS.map(option => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setColor(option)}
+                    className={`h-12 rounded-lg border transition-transform ${
+                      color === option ? 'ring-2 ring-offset-2 ring-blue-500 scale-105' : ''
+                    }`}
+                    style={{ backgroundColor: option, borderColor: 'rgba(255,255,255,0.18)' }}
+                    aria-label={`Select color ${option}`}
+                    disabled={submitting}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                Icon
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {COLLECTION_ICON_OPTIONS.map(option => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setIcon(option.value)}
+                    className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg border transition-colors ${
+                      icon === option.value ? 'border-blue-500 text-blue-600 bg-blue-50 dark:bg-slate-800' : 'border-transparent'
+                    }`}
+                    style={{ color: icon === option.value ? '#2563EB' : 'var(--color-text-secondary)' }}
+                    disabled={submitting}
+                  >
+                    <option.Icon className="w-5 h-5" />
+                    <span className="text-xs">{option.label}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-3 px-3 py-2 rounded-md border" style={{ borderColor: 'var(--color-border)' }}>
+                <IconPreview className="w-5 h-5" style={{ color }} />
+                <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                  Preview
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 p-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm rounded-md border"
+              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+              disabled={submitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+              disabled={submitting}
+            >
+              {submitting ? 'Creating…' : 'Create'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+interface CreateTagFormValues {
+  name: string;
+  color: string;
+  category: string;
+}
+
+interface CreateTagModalProps {
+  isOpen: boolean;
+  submitting: boolean;
+  onClose: () => void;
+  onSubmit: (values: CreateTagFormValues) => Promise<void>;
+}
+
+const TAG_COLOR_OPTIONS = [
+  '#F87171',
+  '#FB923C',
+  '#FBBF24',
+  '#34D399',
+  '#60A5FA',
+  '#A78BFA',
+  '#F472B6',
+  '#94A3B8'
+];
+
+const CreateTagModal: React.FC<CreateTagModalProps> = ({
+  isOpen,
+  submitting,
+  onClose,
+  onSubmit
+}) => {
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('general');
+  const [color, setColor] = useState(TAG_COLOR_OPTIONS[0]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setName('');
+      setCategory('general');
+      setColor(TAG_COLOR_OPTIONS[0]);
+      setError(null);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError('Tag name is required.');
+      return;
+    }
+    setError(null);
+    await onSubmit({
+      name: trimmed,
+      category: category.trim() || 'general',
+      color
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div
+        className="w-full max-w-md rounded-xl border shadow-xl"
+        style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+              Create Tag
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1 rounded transition-colors"
+              style={{ color: 'var(--color-text-tertiary)' }}
+              disabled={submitting}
+              onMouseEnter={(e) => !submitting && (e.currentTarget.style.color = 'var(--color-text-secondary)')}
+              onMouseLeave={(e) => !submitting && (e.currentTarget.style.color = 'var(--color-text-tertiary)')}
+              aria-label="Close create tag modal"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="p-4 space-y-5">
+            <div className="space-y-2">
+              <label className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                Name
+              </label>
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{
+                  borderColor: error ? 'rgba(239, 68, 68, 0.6)' : 'var(--color-border)',
+                  backgroundColor: 'var(--color-surface)'
+                }}
+                placeholder="Tag name"
+                disabled={submitting}
+                autoFocus
+              />
+              {error && (
+                <p className="text-xs" style={{ color: 'rgba(239, 68, 68, 0.9)' }}>
+                  {error}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                Category <span style={{ color: 'var(--color-text-tertiary)' }}>(optional)</span>
+              </label>
+              <input
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+                className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}
+                placeholder="e.g. research, work, personal"
+                disabled={submitting}
+              />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                Color
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {TAG_COLOR_OPTIONS.map(option => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setColor(option)}
+                    className={`h-12 rounded-lg border transition-transform ${
+                      color === option ? 'ring-2 ring-offset-2 ring-blue-500 scale-105' : ''
+                    }`}
+                    style={{ backgroundColor: option, borderColor: 'rgba(255,255,255,0.18)' }}
+                    aria-label={`Select color ${option}`}
+                    disabled={submitting}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 p-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm rounded-md border"
+              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+              disabled={submitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+              disabled={submitting}
+            >
+              {submitting ? 'Creating…' : 'Create'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+interface ConfirmDialogProps {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  confirmTone?: 'danger' | 'primary';
+  loading?: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
+  open,
+  title,
+  description,
+  confirmLabel,
+  confirmTone = 'primary',
+  loading = false,
+  onCancel,
+  onConfirm
+}) => {
+  if (!open) {
+    return null;
+  }
+
+  const confirmStyle =
+    confirmTone === 'danger'
+      ? {
+          backgroundColor: '#ef4444',
+          color: '#ffffff',
+          hover: '#dc2626'
+        }
+      : {
+          backgroundColor: '#2563eb',
+          color: '#ffffff',
+          hover: '#1d4ed8'
+        };
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/45 backdrop-blur-sm px-4">
+      <div
+        className="w-full max-w-md rounded-xl border shadow-xl bg-white dark:bg-slate-900"
+        style={{ borderColor: 'var(--color-border)' }}
+      >
+        <div className="p-5 border-b" style={{ borderColor: 'var(--color-border)' }}>
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            {title}
+          </h2>
+        </div>
+        <div className="p-5">
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+            {description}
+          </p>
+        </div>
+        <div className="flex justify-end gap-2 p-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 text-sm rounded-md border"
+            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+            disabled={loading}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="px-4 py-2 text-sm rounded-md transition-colors disabled:opacity-60"
+            style={{
+              backgroundColor: confirmStyle.backgroundColor,
+              color: confirmStyle.color
+            }}
+            disabled={loading}
+            onMouseEnter={(event) => {
+              if (!loading) {
+                event.currentTarget.style.backgroundColor = confirmStyle.hover;
+              }
+            }}
+            onMouseLeave={(event) => {
+              event.currentTarget.style.backgroundColor = confirmStyle.backgroundColor;
+            }}
+          >
+            {loading ? 'Please wait…' : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 interface ModernLibraryModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -211,9 +683,12 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
   const [bulkMode, setBulkMode] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showCollectionPicker, setShowCollectionPicker] = useState(false);
+  const [createCollectionParentId, setCreateCollectionParentId] = useState<string | null>(null);
   const [collectionPickerSelection, setCollectionPickerSelection] = useState<string[]>([]);
   const [editingCollectionDetails, setEditingCollectionDetails] = useState<Collection | null>(null);
   const [isSavingCollection, setIsSavingCollection] = useState(false);
+  const [isCreatingCollection, setIsCreatingCollection] = useState(false);
+  const [isCreatingTag, setIsCreatingTag] = useState(false);
   const [tagManagerMode, setTagManagerMode] = useState<'assign' | 'remove' | null>(null);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [isApplyingTags, setIsApplyingTags] = useState(false);
@@ -222,6 +697,12 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
   const [moveCollectionParentId, setMoveCollectionParentId] = useState<string | null>(null);
   const [isMovingCollection, setIsMovingCollection] = useState(false);
   const [notifications, setNotifications] = useState<LibraryNotification[]>([]);
+  type ConfirmDialogState =
+    | { type: 'bulk-delete' }
+    | { type: 'delete-collection'; collection: Collection }
+    | { type: 'empty-trash' };
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const generateNotificationId = () =>
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -490,86 +971,106 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
   const handleBookDelete = useCallback(async (bookId: string) => {
     try {
       await supabaseStorageService.deleteBook(bookId);
-      // Refresh the books list after deletion
       await searchBooks();
       clearSelection();
+      pushNotification('success', 'Document moved to Trash.');
     } catch (error) {
       console.error('Failed to delete book:', error);
-      alert('Failed to delete book');
+      pushNotification('error', 'Failed to delete document. Please try again.');
     }
-  }, [searchBooks, clearSelection]);
+  }, [searchBooks, clearSelection, pushNotification]);
 
-  const handleBulkAction = useCallback(async (action: string) => {
-    if (libraryView.selectedBooks.length === 0) return;
-    
-    switch (action) {
-      case 'delete':
-        if (confirm(`Delete ${libraryView.selectedBooks.length} books?`)) {
-          try {
-            await Promise.all(libraryView.selectedBooks.map(id => supabaseStorageService.deleteBook(id)));
-            // Refresh the books list after deletion
-            await searchBooks();
-            clearSelection();
-          } catch (error) {
-            console.error('Failed to delete books:', error);
-            alert('Failed to delete some books');
-          }
-        }
-        break;
-      case 'favorite':
-        try {
-          await Promise.all(libraryView.selectedBooks.map(id => 
-            supabaseStorageService.updateBookMetadata(id, { is_favorite: true })
-          ));
-          // Refresh books to show updated favorites
-          searchBooks();
-          clearSelection();
-        } catch (error) {
-          console.error('Failed to favorite books:', error);
-          alert('Failed to favorite some books');
-        }
-        break;
-    }
-  }, [libraryView.selectedBooks, books, clearSelection, searchBooks]);
 
-  const handleCreateCollection = useCallback(async (name: string, parentId?: string) => {
-    try {
-      const collection = await libraryOrganizationService.createCollection({
-        name,
-        parent_id: parentId,
-        color: '#3B82F6',
-        icon: 'folder',
-        is_favorite: false,
-        display_order: 0
-      });
-      
-      setCollections([...collections, collection]);
-      setShowCreateCollection(false);
-      pushNotification('success', 'Collection created successfully.');
-    } catch (error) {
-      console.error('Failed to create collection:', error);
-      pushNotification('error', 'Failed to create collection. Please try again.');
-      await refreshCollections();
-    }
-  }, [collections, pushNotification, refreshCollections]);
+  const handleOpenCreateCollection = useCallback((parentId?: string) => {
+    setCreateCollectionParentId(parentId ?? null);
+    setShowCreateCollection(true);
+  }, []);
 
-  const handleCreateTag = useCallback(async (name: string, color: string) => {
-    try {
-      const tag = await libraryOrganizationService.createTag({
-        name,
-        color,
-        category: 'general'
-      });
-      
-      setTags([...tags, tag]);
-      setShowCreateTag(false);
-      pushNotification('success', 'Tag created successfully.');
-    } catch (error) {
-      console.error('Failed to create tag:', error);
-      pushNotification('error', 'Failed to create tag. Please try again.');
-      await refreshTags();
+  const handleCloseCreateCollection = useCallback(() => {
+    if (isCreatingCollection) {
+      return;
     }
-  }, [tags, pushNotification, refreshTags]);
+    setShowCreateCollection(false);
+    setCreateCollectionParentId(null);
+  }, [isCreatingCollection]);
+
+  const handleSubmitCreateCollection = useCallback(
+    async ({ name, description, color, icon }: CreateCollectionFormValues) => {
+      setIsCreatingCollection(true);
+      try {
+        const siblings = collections.filter(
+          collection => (collection.parent_id ?? null) === (createCollectionParentId ?? null)
+        );
+        const newCollection = await libraryOrganizationService.createCollection({
+          name,
+          description,
+          parent_id: createCollectionParentId ?? null,
+          color,
+          icon,
+          is_favorite: false,
+          display_order: siblings.length
+        });
+
+        pushNotification('success', `Collection “${name}” created.`);
+        await refreshCollections();
+        setActiveCollection(newCollection.id);
+        setShowCreateCollection(false);
+        setCreateCollectionParentId(null);
+      } catch (error) {
+        console.error('Failed to create collection:', error);
+        pushNotification('error', 'Failed to create collection. Please try again.');
+        await refreshCollections();
+      } finally {
+        setIsCreatingCollection(false);
+      }
+    },
+    [collections, createCollectionParentId, pushNotification, refreshCollections, setActiveCollection]
+  );
+
+  const handleOpenCreateTag = useCallback(() => {
+    setShowCreateTag(true);
+  }, []);
+
+  const handleCloseCreateTag = useCallback(() => {
+    if (isCreatingTag) {
+      return;
+    }
+    setShowCreateTag(false);
+  }, [isCreatingTag]);
+
+  const handleSubmitCreateTag = useCallback(
+    async ({ name, color, category }: CreateTagFormValues) => {
+      setIsCreatingTag(true);
+      try {
+        const tag = await libraryOrganizationService.createTag({
+          name,
+          color,
+          category
+        });
+
+        setTags(prev => [...prev, tag]);
+        pushNotification('success', `Tag “${name}” created.`);
+        setShowCreateTag(false);
+      } catch (error) {
+        console.error('Failed to create tag:', error);
+        pushNotification('error', 'Failed to create tag. Please try again.');
+        await refreshTags();
+      } finally {
+        setIsCreatingTag(false);
+      }
+    },
+    [pushNotification, refreshTags, setTags]
+  );
+
+  const parentCollectionForModal = useMemo(() => {
+    if (!createCollectionParentId) {
+      return null;
+    }
+    return collections.find(collection => collection.id === createCollectionParentId) ?? null;
+  }, [collections, createCollectionParentId]);
+
+  const defaultCollectionColor = parentCollectionForModal?.color ?? COLLECTION_COLOR_OPTIONS[0];
+  const defaultCollectionIcon = parentCollectionForModal?.icon ?? COLLECTION_ICON_OPTIONS[0].value;
 
   const handleSmartCollectionSelect = useCallback((collectionId: string) => {
     handleCollectionSelect(collectionId);
@@ -727,24 +1228,35 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
     setEditingCollectionDetails(collection);
   }, []);
 
-  const handleDeleteCollection = useCallback(async (collectionId: string) => {
-    const confirmed = window.confirm('Delete this collection? Books inside will remain in your library.');
-    if (!confirmed) return;
-
-    try {
-      await libraryOrganizationService.deleteCollection(collectionId);
-      setCollections(prev => prev.filter(collection => collection.id !== collectionId));
-      if (libraryView.selectedCollectionId === collectionId) {
-        setActiveCollection(null);
-        setLibraryFilters({ collections: [] });
+  const performDeleteCollection = useCallback(
+    async (target: Collection) => {
+      try {
+        await libraryOrganizationService.deleteCollection(target.id);
+        setCollections(prev => prev.filter(collection => collection.id !== target.id));
+        if (libraryView.selectedCollectionId === target.id) {
+          setActiveCollection(null);
+          setLibraryFilters({ collections: [] });
+        }
+        pushNotification('success', `Collection “${target.name}” deleted.`);
+      } catch (error) {
+        console.error('Failed to delete collection:', error);
+        pushNotification('error', 'Failed to delete collection. Please try again.');
+        await refreshCollections();
       }
-      pushNotification('success', 'Collection deleted.');
-    } catch (error) {
-      console.error('Failed to delete collection:', error);
-      pushNotification('error', 'Failed to delete collection. Please try again.');
-      await refreshCollections();
-    }
-  }, [libraryView.selectedCollectionId, setActiveCollection, setLibraryFilters, pushNotification, refreshCollections]);
+    },
+    [libraryView.selectedCollectionId, setActiveCollection, setLibraryFilters, pushNotification, refreshCollections]
+  );
+
+  const handleDeleteCollection = useCallback(
+    (collectionId: string) => {
+      const target = collections.find(collection => collection.id === collectionId);
+      if (!target) {
+        return;
+      }
+      setConfirmDialog({ type: 'delete-collection', collection: target });
+    },
+    [collections]
+  );
 
   const handleToggleCollectionFavorite = useCallback(async (collectionId: string, isFavorite: boolean) => {
     try {
@@ -811,31 +1323,36 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
       return;
     }
 
+    const selectionCount = libraryView.selectedBooks.length;
+    const collectionCount = collectionPickerSelection.length;
+
     try {
       await Promise.all(
-        collectionPickerSelection.flatMap(collectionId =>
-          libraryView.selectedBooks.map(bookId =>
-            libraryOrganizationService
-              .addBookToCollection(bookId, collectionId)
-              .catch(error => {
-                const message = (error as Error)?.message ?? '';
-                if (message.includes('duplicate')) {
-                  return;
-                }
-                throw error;
-              })
-          )
+        collectionPickerSelection.map(collectionId =>
+          libraryOrganizationService.bulkAddToCollection(libraryView.selectedBooks, collectionId)
         )
       );
       await searchBooks();
       clearSelection();
       setShowCollectionPicker(false);
       setCollectionPickerSelection([]);
+      pushNotification(
+        'success',
+        `Added ${selectionCount} document${selectionCount === 1 ? '' : 's'} to ${collectionCount} collection${collectionCount === 1 ? '' : 's'}.`
+      );
     } catch (error) {
       console.error('Failed to assign collection:', error);
-      alert('Failed to assign collection');
+      pushNotification('error', 'Failed to assign documents to collections. Please try again.');
+      await refreshCollections();
     }
-  }, [collectionPickerSelection, libraryView.selectedBooks, searchBooks, clearSelection]);
+  }, [
+    collectionPickerSelection,
+    libraryView.selectedBooks,
+    searchBooks,
+    clearSelection,
+    pushNotification,
+    refreshCollections
+  ]);
 
   const toggleCollectionSelection = useCallback((collectionId: string) => {
     setCollectionPickerSelection(prev =>
@@ -868,11 +1385,21 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
     }
 
     setIsApplyingTags(true);
+    const documentCount = libraryView.selectedBooks.length;
+    const tagCount = selectedTagIds.length;
     try {
       if (tagManagerMode === 'assign') {
         await libraryOrganizationService.batchAddTags(libraryView.selectedBooks, selectedTagIds);
+        pushNotification(
+          'success',
+          `Added ${tagCount} tag${tagCount === 1 ? '' : 's'} to ${documentCount} document${documentCount === 1 ? '' : 's'}.`
+        );
       } else {
         await libraryOrganizationService.batchRemoveTags(libraryView.selectedBooks, selectedTagIds);
+        pushNotification(
+          'success',
+          `Removed ${tagCount} tag${tagCount === 1 ? '' : 's'} from ${documentCount} document${documentCount === 1 ? '' : 's'}.`
+        );
       }
       await searchBooks();
       clearSelection();
@@ -881,35 +1408,98 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
       setSelectedTagIds([]);
     } catch (error) {
       console.error('Failed to update tags:', error);
-      alert('Failed to update tags');
+      pushNotification('error', 'Failed to update tags. Please try again.');
     } finally {
       setIsApplyingTags(false);
     }
-  }, [tagManagerMode, selectedTagIds, libraryView.selectedBooks, searchBooks, clearSelection, setTagManagerOpen]);
+  }, [
+    tagManagerMode,
+    selectedTagIds,
+    libraryView.selectedBooks,
+    searchBooks,
+    clearSelection,
+    setTagManagerOpen,
+    pushNotification
+  ]);
 
   const handleBulkToggleFavorite = useCallback(async (isFavorite: boolean) => {
+    if (libraryView.selectedBooks.length === 0) {
+      pushNotification('info', 'Select at least one document first.');
+      return;
+    }
+
+    const selectionCount = libraryView.selectedBooks.length;
+
     try {
       await libraryOrganizationService.batchToggleFavorite(libraryView.selectedBooks, isFavorite);
-      searchBooks();
+      await searchBooks();
       clearSelection();
+      pushNotification(
+        'success',
+        `${isFavorite ? 'Marked' : 'Removed favorite from'} ${selectionCount} document${selectionCount === 1 ? '' : 's'}.`
+      );
     } catch (error) {
       console.error('Failed to bulk toggle favorite:', error);
-      alert('Failed to update favorites');
+      pushNotification('error', 'Failed to update favorites. Please try again.');
     }
-  }, [libraryView.selectedBooks, searchBooks, clearSelection]);
+  }, [libraryView.selectedBooks, searchBooks, clearSelection, pushNotification]);
 
   const handleBulkArchive = useCallback(async () => {
+    if (libraryView.selectedBooks.length === 0) {
+      pushNotification('info', 'Select at least one document first.');
+      return;
+    }
+
+    const selectionCount = libraryView.selectedBooks.length;
+
     try {
       await libraryOrganizationService.batchArchive(libraryView.selectedBooks);
-      searchBooks();
+      await searchBooks();
       clearSelection();
+      pushNotification(
+        'success',
+        `Archived ${selectionCount} document${selectionCount === 1 ? '' : 's'}.`
+      );
     } catch (error) {
       console.error('Failed to bulk archive:', error);
-      alert('Failed to archive books');
+      pushNotification('error', 'Failed to archive documents. Please try again.');
     }
-  }, [libraryView.selectedBooks, searchBooks, clearSelection]);
+  }, [libraryView.selectedBooks, searchBooks, clearSelection, pushNotification]);
+
+  const requestBulkDelete = useCallback(() => {
+    if (libraryView.selectedBooks.length === 0) {
+      pushNotification('info', 'Select at least one document first.');
+      return;
+    }
+    setConfirmDialog({ type: 'bulk-delete' });
+  }, [libraryView.selectedBooks.length, pushNotification]);
+
+  const handleBulkAction = useCallback(async (action: string) => {
+    if (libraryView.selectedBooks.length === 0) {
+      pushNotification('info', 'Select at least one document first.');
+      return;
+    }
+
+    switch (action) {
+      case 'delete':
+        requestBulkDelete();
+        break;
+      case 'favorite':
+        await handleBulkToggleFavorite(true);
+        break;
+      default:
+        break;
+    }
+  }, [libraryView.selectedBooks.length, handleBulkToggleFavorite, pushNotification, requestBulkDelete]);
 
   const handleBulkDelete = useCallback(async () => {
+    if (libraryView.selectedBooks.length === 0) {
+      pushNotification('info', 'Select at least one document first.');
+      return;
+    }
+
+    const selectionCount = libraryView.selectedBooks.length;
+
     console.log('ModernLibraryModal: handleBulkDelete called with books:', libraryView.selectedBooks);
     try {
       // Get current user ID
@@ -971,6 +1561,10 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
       await searchBooks();
       clearSelection();
       console.log('ModernLibraryModal: Library refreshed after deletion');
+      pushNotification(
+        'success',
+        `Moved ${selectionCount} document${selectionCount === 1 ? '' : 's'} to Trash.`
+      );
     } catch (error) {
       console.error('ModernLibraryModal: Failed to bulk delete:', error);
       console.error('ModernLibraryModal: Error details:', {
@@ -978,34 +1572,104 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
         stack: error?.stack,
         name: error?.name
       });
-      alert(`Failed to delete books: ${error?.message || 'Unknown error'}`);
+      pushNotification('error', `Failed to delete documents: ${error?.message || 'Unknown error'}.`);
     }
-  }, [libraryView.selectedBooks, searchBooks, clearSelection]);
+  }, [libraryView.selectedBooks, searchBooks, clearSelection, pushNotification]);
 
-  const handleEmptyTrash = useCallback(async () => {
-    const confirmed = window.confirm(
-      'Are you sure you want to permanently delete all books in Trash? This action cannot be undone.'
-    );
-    
-    if (!confirmed) return;
-    
+  const performEmptyTrash = useCallback(async () => {
     try {
       console.log('ModernLibraryModal: Emptying Trash');
       const result = await supabaseStorageService.emptyTrash();
       console.log('ModernLibraryModal: Trash emptied, deleted count:', result.deletedCount);
-      
-      // Refresh the books list
       await searchBooks();
       clearSelection();
-      
-      alert(`Successfully deleted ${result.deletedCount} book(s) from Trash.`);
+      pushNotification(
+        'success',
+        `Permanently deleted ${result.deletedCount} document${result.deletedCount === 1 ? '' : 's'} from Trash.`
+      );
     } catch (error) {
       console.error('ModernLibraryModal: Failed to empty Trash:', error);
-      alert(`Failed to empty Trash: ${error?.message || 'Unknown error'}`);
+      pushNotification('error', `Failed to empty Trash: ${error?.message || 'Unknown error'}.`);
     }
-  }, [searchBooks, clearSelection]);
+  }, [searchBooks, clearSelection, pushNotification]);
+
+  const requestEmptyTrash = useCallback(() => {
+    setConfirmDialog({ type: 'empty-trash' });
+  }, []);
+
+  const confirmDialogContent = useMemo(() => {
+    if (!confirmDialog) {
+      return null;
+    }
+
+    switch (confirmDialog.type) {
+      case 'bulk-delete': {
+        const count = libraryView.selectedBooks.length;
+        return {
+          title:
+            count === 1
+              ? 'Move selected document to Trash?'
+              : `Move ${count} documents to Trash?`,
+          description: 'You can restore documents later from the Trash.',
+          confirmLabel: 'Move to Trash',
+          confirmTone: 'danger' as const
+        };
+      }
+      case 'delete-collection':
+        return {
+          title: `Delete collection “${confirmDialog.collection.name}”?`,
+          description: 'Documents inside will remain in your library.',
+          confirmLabel: 'Delete Collection',
+          confirmTone: 'danger' as const
+        };
+      case 'empty-trash':
+        return {
+          title: 'Empty Trash?',
+          description: 'This will permanently delete all documents in Trash. This action cannot be undone.',
+          confirmLabel: 'Empty Trash',
+          confirmTone: 'danger' as const
+        };
+      default:
+        return null;
+    }
+  }, [confirmDialog, libraryView.selectedBooks.length]);
+
+  const handleConfirmDialogCancel = useCallback(() => {
+    if (!confirmBusy) {
+      setConfirmDialog(null);
+    }
+  }, [confirmBusy]);
+
+  const handleConfirmDialogConfirm = useCallback(async () => {
+    if (!confirmDialog) {
+      return;
+    }
+
+    setConfirmBusy(true);
+    try {
+      switch (confirmDialog.type) {
+        case 'bulk-delete':
+          await handleBulkDelete();
+          break;
+        case 'delete-collection':
+          await performDeleteCollection(confirmDialog.collection);
+          break;
+        case 'empty-trash':
+          await performEmptyTrash();
+          break;
+      }
+      setConfirmDialog(null);
+    } finally {
+      setConfirmBusy(false);
+    }
+  }, [confirmDialog, handleBulkDelete, performDeleteCollection, performEmptyTrash]);
 
   const handleBulkExport = useCallback(async () => {
+    if (libraryView.selectedBooks.length === 0) {
+      pushNotification('info', 'Select at least one document first.');
+      return;
+    }
+
     try {
       const data = await libraryOrganizationService.batchExport(libraryView.selectedBooks);
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1015,30 +1679,31 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
       a.download = `books_export_${new Date().toISOString()}.json`;
       a.click();
       URL.revokeObjectURL(url);
+      pushNotification('success', 'Export generated successfully.');
     } catch (error) {
       console.error('Failed to bulk export:', error);
-      alert('Failed to export books');
+      pushNotification('error', 'Failed to export documents. Please try again.');
     }
-  }, [libraryView.selectedBooks]);
+  }, [libraryView.selectedBooks, pushNotification]);
 
   const handleBulkDetectDuplicates = useCallback(async () => {
     if (libraryView.selectedBooks.length !== 1) {
-      alert('Please select exactly one book to detect duplicates');
+      pushNotification('info', 'Select exactly one document to detect duplicates.');
       return;
     }
     try {
       const duplicates = await libraryOrganizationService.detectDuplicates(libraryView.selectedBooks[0]);
       if (duplicates.length > 0) {
-        alert(`Found ${duplicates.length} potential duplicates`);
+        pushNotification('info', `Found ${duplicates.length} potential duplicate${duplicates.length === 1 ? '' : 's'}.`);
         console.log('Duplicates:', duplicates);
       } else {
-        alert('No duplicates found');
+        pushNotification('info', 'No duplicates detected.');
       }
     } catch (error) {
       console.error('Failed to detect duplicates:', error);
-      alert('Failed to detect duplicates');
+      pushNotification('error', 'Failed to detect duplicates. Please try again.');
     }
-  }, [libraryView.selectedBooks]);
+  }, [libraryView.selectedBooks, pushNotification]);
 
   if (!isOpen) return null;
 
@@ -1211,7 +1876,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
             {/* Empty Trash button - shown when Trash collection is selected */}
             {collections.find(c => c.id === libraryView.selectedCollectionId && c.name === 'Trash') && (
               <button
-                onClick={handleEmptyTrash}
+                onClick={requestEmptyTrash}
                 className="px-4 py-2 text-sm rounded transition-colors flex items-center gap-2 whitespace-nowrap"
                 style={{
                   backgroundColor: 'var(--color-error-light, rgba(239, 68, 68, 0.1))',
@@ -1316,7 +1981,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
                   📁 Collections
                 </h3>
                 <button
-                  onClick={() => setShowCreateCollection(true)}
+                  onClick={() => handleOpenCreateCollection()}
                   className="p-1 transition-colors"
                   style={{ color: 'var(--color-text-tertiary)' }}
                   onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
@@ -1329,7 +1994,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
                 collections={collections.filter(c => !c.is_smart)}
                 selectedCollectionId={libraryView.selectedCollectionId}
                 onSelectCollection={handleCollectionSelect}
-                onCreateCollection={handleCreateCollection}
+                onCreateCollection={handleOpenCreateCollection}
                 onRenameCollection={handleRenameCollection}
                 onOpenCollectionDetails={handleOpenCollectionDetails}
                 onDeleteCollection={handleDeleteCollection}
@@ -1349,7 +2014,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
                   🏷️ Tags
                 </h3>
                 <button
-                  onClick={() => setShowCreateTag(true)}
+                  onClick={handleOpenCreateTag}
                   className="p-1 transition-colors"
                   style={{ color: 'var(--color-text-tertiary)' }}
                   onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
@@ -1563,7 +2228,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
             onRemoveTags={handleBulkRemoveTags}
             onToggleFavorite={handleBulkToggleFavorite}
             onArchive={handleBulkArchive}
-            onDelete={handleBulkDelete}
+            onDelete={requestBulkDelete}
             onExport={handleBulkExport}
             onDetectDuplicates={handleBulkDetectDuplicates}
             onClearSelection={clearSelection}
@@ -1825,7 +2490,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
               <div className="flex items-center justify-between p-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
                 <button
                   onClick={() => {
-                    setShowCreateTag(true);
+                    handleOpenCreateTag();
                     setTagManagerOpen(false);
                   }}
                   className="px-3 py-2 text-sm rounded-md border"
@@ -1869,6 +2534,36 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
             saving={isSavingCollection}
             onClose={() => setEditingCollectionDetails(null)}
             onSave={handleSaveCollectionDetails}
+          />
+        )}
+
+        <CreateCollectionModal
+          isOpen={showCreateCollection}
+          parentCollection={parentCollectionForModal}
+          defaultColor={defaultCollectionColor}
+          defaultIcon={defaultCollectionIcon}
+          submitting={isCreatingCollection}
+          onClose={handleCloseCreateCollection}
+          onSubmit={handleSubmitCreateCollection}
+        />
+
+        <CreateTagModal
+          isOpen={showCreateTag}
+          submitting={isCreatingTag}
+          onClose={handleCloseCreateTag}
+          onSubmit={handleSubmitCreateTag}
+        />
+
+        {confirmDialogContent && (
+          <ConfirmDialog
+            open={!!confirmDialog}
+            title={confirmDialogContent.title}
+            description={confirmDialogContent.description}
+            confirmLabel={confirmDialogContent.confirmLabel}
+            confirmTone={confirmDialogContent.confirmTone}
+            loading={confirmBusy}
+            onCancel={handleConfirmDialogCancel}
+            onConfirm={handleConfirmDialogConfirm}
           />
         )}
       </div>

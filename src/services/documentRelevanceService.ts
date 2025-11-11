@@ -324,38 +324,45 @@ Return ONLY this JSON (no other text):
     relatedContent: string = ''
   ): Promise<string> {
     try {
-      const prompt = `You are an expert at analyzing relationships between academic documents. Both documents' content is provided below - analyze them directly.
+      const prompt = `You are a specialized AI assistant with expert/PhD-level proficiency in state-of-the-art scientific and academic literature analysis. Your task is to perform a deep, multi-faceted comparison of two provided documents (Document A and Document B) and generate a concise analysis explaining their relationship.
 
-=== SOURCE DOCUMENT ===
-Summary: ${source.summary}
-Topics: ${source.topics.join(', ')}
-Keywords: ${source.keywords.slice(0, 10).join(', ')}
+Document A (Source)
+- Summary: ${source.summary}
+- Topics: ${source.topics.join(', ') || 'N/A'}
+- Keywords: ${source.keywords.slice(0, 10).join(', ') || 'N/A'}
+- Content sample (1500 chars):
+${sourceContent.substring(0, 1500) || '[No additional content available]'}
 
-Content (1500 chars):
-${sourceContent.substring(0, 1500)}
-=== END SOURCE ===
+Document B (Related)
+- Summary: ${related.summary}
+- Topics: ${related.topics.join(', ') || 'N/A'}
+- Keywords: ${related.keywords.slice(0, 10).join(', ') || 'N/A'}
+- Content sample (1500 chars):
+${relatedContent.substring(0, 1500) || '[No additional content available]'}
 
-=== RELATED DOCUMENT ===
-Summary: ${related.summary}
-Topics: ${related.topics.join(', ')}
-Keywords: ${related.keywords.slice(0, 10).join(', ')}
+Heuristic similarity estimate (0-100): ${similarity}
 
-Content (1500 chars):
-${relatedContent.substring(0, 1500)}
-=== END RELATED ===
+Follow these steps explicitly:
+1. Semantic Core Analysis – compare hypotheses, claims, conclusions.
+2. Structural & Modality Analysis – compare organisation, discourse flow, multimodal elements (figures, tables, equations, etc.) even if deductions must be inferred from text clues.
+3. Scholarly Context Analysis – compare cited works, overlapping references, and scholarly positioning (use any cues present; otherwise infer cautiously).
+4. Relationship Synthesis – classify the relationship using exactly ONE category from:
+   Identical, Revision / Version, Extension / Follow-up, Refutation / Counter-Argument, Methodological Application, Shared Topic, Related (Tangential), Unrelated.
 
-Computed Similarity: ${similarity}%
-
-TASK: Provide a detailed relationship analysis in JSON format. Return ONLY valid JSON (no other text):
-
+OUTPUT REQUIREMENTS:
+Return a single valid JSON object with this schema (no markdown, no commentary):
 {
-  "overview": "2-3 sentences on how these documents relate (complementary/sequential/comparative/applied/foundational/contradictory). Be specific - mention actual topics/concepts they share. If similarity is low (<30%), note they cover different areas but may still provide useful context.",
-  "sharedTopics": ["List 3-5 specific topics", "concepts or subject areas", "both documents cover"],
-  "keyConnections": ["2-3 specific ways", "the documents complement or relate to each other"],
-  "readingRecommendation": "1 sentence on how to use these documents together for best learning/insight"
+  "relationship_score_percent": <float 0.0-100.0>,
+  "relationship_type": "<one category from the list above>",
+  "key_semantic_overlap": ["item1", "item2", "item3"],
+  "key_structural_differences": ["item1", "item2", "item3"],
+  "explanation": "<one concise paragraph summarising steps 1-4 and justifying the score and category>"
 }
 
-Important: Return ONLY the JSON object above, nothing else.`;
+Important rules:
+- Provide strictly valid JSON (double-quoted keys/strings, no trailing commas).
+- Do not add commentary before or after the JSON.
+- If evidence is missing for a step, infer cautiously and note the limitation in the explanation.`;
 
       console.log('DocumentRelevanceService: Sending prompt (preview):', prompt.substring(0, 500));
       const response = await sendMessageToAI(prompt);
@@ -379,28 +386,41 @@ Important: Return ONLY the JSON object above, nothing else.`;
 
       if (hasFallback) {
         console.warn('DocumentRelevanceService: AI returned fallback message');
-        // Provide better default based on similarity
+        // Provide structured fallback based on heuristic similarity
+        const relationshipType = (() => {
+          if (similarity >= 90) return 'Identical';
+          if (similarity >= 80) return 'Revision / Version';
+          if (similarity >= 60) return 'Shared Topic';
+          if (similarity >= 40) return 'Related (Tangential)';
+          return 'Unrelated';
+        })();
+
+        const commonTopics = this.findCommonTopics(source.topics, related.topics);
+        const commonKeywords = this.findCommonKeywords(source.keywords, related.keywords);
+        const semanticOverlap = (commonTopics.length ? commonTopics : commonKeywords).slice(0, 5);
+        const overlapSummary = semanticOverlap.length ? semanticOverlap.join(', ') : 'no significant overlap detected';
+
+        const structuralDifferences: string[] = [
+          'Detailed structural comparison unavailable from heuristic data; review section headings manually.',
+          'Multimodal artifacts (figures/tables/equations) were not parsed; cross-check originals.',
+          'Bibliographic overlap could not be inferred; inspect reference lists for confirmation.'
+        ];
+
+        const explanation = `Heuristic content analysis estimates a ${similarity}% relationship score, suggesting the documents are classified as "${relationshipType}". Shared surface-level topics (${overlapSummary}) imply some thematic overlap, but a manual review of structure, multimodal evidence, and citation networks is recommended to confirm this assessment.`;
+
         const fallbackAnalysis = {
-          overview: similarity >= 70 
-            ? `These documents are highly related (${similarity}% similarity), covering similar topics in ${source.topics[0] || 'this field'}. Reading both provides comprehensive coverage.`
-            : similarity >= 40
-            ? `These documents share moderate overlap (${similarity}% similarity) in topics like ${source.topics[0] || 'the subject area'}. They complement each other's perspectives.`
-            : `These documents cover different but potentially complementary areas (${similarity}% similarity). They may provide useful context for each other.`,
-          sharedTopics: this.findCommonTopics(source.topics, related.topics),
-          keyConnections: [
-            `${source.topics[0] || 'The topics'} are explored from different perspectives in these documents`,
-            similarity >= 50 ? 'These documents build upon complementary ideas' : 'These documents may provide valuable context for each other'
-          ],
-          readingRecommendation: similarity >= 70 
-            ? 'Read together to gain comprehensive understanding of shared topics'
-            : 'Consider reading in sequence to explore different aspects of related themes',
+          relationship_score_percent: similarity,
+          relationship_type: relationshipType,
+          key_semantic_overlap: semanticOverlap.length ? semanticOverlap : ['No significant overlap detected'],
+          key_structural_differences: structuralDifferences,
+          explanation,
           rawAnalysis: {
             sourceKeywords: source.keywords,
             relatedKeywords: related.keywords,
-            commonKeywords: this.findCommonKeywords(source.keywords, related.keywords),
+            commonKeywords,
             sourceTopics: source.topics,
             relatedTopics: related.topics,
-            commonTopics: this.findCommonTopics(source.topics, related.topics)
+            commonTopics
           }
         };
         return JSON.stringify(fallbackAnalysis);
@@ -437,7 +457,29 @@ Important: Return ONLY the JSON object above, nothing else.`;
       }
     } catch (error) {
       console.error('DocumentRelevanceService: Error generating AI description:', error);
-      return `Documents share ${similarity}% similarity based on content analysis. Both documents cover related topics and themes.`;
+      const relationshipType = similarity >= 50 ? 'Shared Topic' : similarity >= 30 ? 'Related (Tangential)' : 'Unrelated';
+      const commonTopics = this.findCommonTopics(source.topics, related.topics);
+      const commonKeywords = this.findCommonKeywords(source.keywords, related.keywords);
+      const semanticOverlap = (commonTopics.length ? commonTopics : commonKeywords).slice(0, 5);
+      const fallback = {
+        relationship_score_percent: similarity,
+        relationship_type: relationshipType,
+        key_semantic_overlap: semanticOverlap.length ? semanticOverlap : ['No significant overlap detected'],
+        key_structural_differences: [
+          'Automated comparison unavailable; verify structural differences manually.',
+          'Multimodal evidence (tables/figures/equations) not evaluated due to parsing limits.'
+        ],
+        explanation: `Automated analysis encountered an error; heuristic similarity is ${similarity}%, suggesting the documents are "${relationshipType}". Manual review of content, structure, and citations is recommended.`,
+        rawAnalysis: {
+          sourceKeywords: source.keywords,
+          relatedKeywords: related.keywords,
+          commonKeywords,
+          sourceTopics: source.topics,
+          relatedTopics: related.topics,
+          commonTopics
+        }
+      };
+      return JSON.stringify(fallback);
     }
   }
 

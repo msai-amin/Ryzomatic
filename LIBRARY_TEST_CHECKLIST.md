@@ -165,32 +165,34 @@ Check console for:
 - [ ] See log: `[INFO] Collections retrieved`
 
 ### Sidebar Smoke Checklist:
-- [ ] Click the **+** button next to Collections and create `QA Temp Collection`
-  - Toast appears: "Collection created successfully."
-  - New collection shows in tree.
+- [ ] Click the **+** button next to Collections → modal appears
+  - Enter `QA Temp Collection`, pick a color & icon, optionally add a description
+  - Submit → toast: “Collection “QA Temp Collection” created.”
+  - New collection inherits selected color/icon in the tree
 - [ ] Right-click the new collection → **Rename** → change to `QA Temp Collection (Renamed)`
-  - Toast appears confirming the rename.
-  - Name updates immediately in tree.
+  - Toast confirms rename
+  - Name updates immediately in the tree
 - [ ] Drag the renamed collection above/below another root collection
-  - Order updates without page refresh.
-  - No duplicate/ghost entries appear.
-- [ ] Right-click the collection → **Move to...** → choose another collection as parent (or root)
-  - Toast appears: "Collection moved."
-  - Tree refreshes to show new nesting.
+  - Order updates without page refresh or ghost entries
+- [ ] Right-click the collection → **Move to…** → choose another collection as parent (or root)
+  - Toast: “Collection moved.”
+  - Tree refreshes with new nesting
 - [ ] Toggle the star icon to favorite/unfavorite
-  - Star icon fills/unfills.
-  - Close and reopen Library → state persists.
+  - Star fills/unfills and persists after closing/reopening the library
 - [ ] Right-click → **Delete** the temp collection
-  - Confirm prompt appears.
-  - Toast appears: "Collection deleted."
-  - Collection disappears from tree.
+  - In-app confirm dialog appears (“Delete collection…”)
+  - Confirm → toast: “Collection deleted.”
+  - Collection disappears from the tree
 
 ### Tag Smoke Checklist:
-- [ ] Click the **+** button next to Tags and create `QA Temp Tag`
-  - Toast appears: "Tag created successfully."
-  - Tag chip appears under Tags list.
-- [ ] (Optional) Assign the tag via bulk toolbar and verify chip count increments.
-- [ ] Close/reopen Library → tag persists.
+- [ ] Click the **+** button next to Tags → modal appears
+  - Enter `QA Temp Tag`, pick a color (category optional)
+  - Submit → toast: “Tag ‘QA Temp Tag’ created.”
+  - Tag chip appears under Tags list with chosen color
+- [ ] (Optional) Use the bulk toolbar to **Add Tags** → select the new tag
+  - Success toast indicates tags were added
+  - Tag chips update counts accordingly
+- [ ] Close/reopen Library → tag persists
 
 ### Error Handling (Optional):
 - [ ] Toggle offline mode (DevTools → Network → Offline), attempt to rename a collection
@@ -283,7 +285,7 @@ These are expected and will be enhanced later:
 
 1. **Collections Management**: Cross-parent drag via DnD not yet supported (use “Move to…” action)
 2. **Tag Management**: Reordering and archival are not yet implemented
-3. **Bulk Operations**: Some toolbar actions still pending backend wiring
+3. **Bulk Operations**: Delete/favorite/archive/tag assignment wired with confirmations & toasts (duplicate detection still basic)
 4. **Virtual Scrolling**: Not yet implemented (loads all books at once)
 5. **Advanced Filters**: UI exists but some filters not connected yet
 
