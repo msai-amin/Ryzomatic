@@ -49,6 +49,20 @@ Smart Reader uses GitHub Actions for continuous integration and continuous deplo
 - Performance budgets
 - Core Web Vitals
 
+### 5. Pre-Production Verification
+
+**Trigger:** Manual (`workflow_dispatch`) or pushes to `main` / `release/**`  
+**File:** `.github/workflows/preproduction.yml`
+
+**Stages (strict order):**
+1. **Lint & Type Check** – ESLint and TypeScript (fails on warning/error)
+2. **Unit & Integration Tests** – `npm run test:ci` with coverage artifact upload
+3. **Build Bundle** – `npm run build` and publish the compiled `dist/` artifact
+4. **Playwright E2E** – `npm run test:e2e:ci`, uploads Playwright report
+5. **Security & Compliance** – `npm audit` + Snyk scan (artifacts archived)
+
+Use this workflow before promoting UI/library changes to ensure full parity with production gating.
+
 ## Required Secrets
 
 Configure these in GitHub repository settings:

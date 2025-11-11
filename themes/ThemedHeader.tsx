@@ -1,14 +1,28 @@
-import React, { useRef, useEffect } from 'react'
-import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut, Menu, Bot, Sparkles, Timer, Home, Sidebar as SidebarIcon, HelpCircle, Volume2, X } from 'lucide-react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import {
+  Upload,
+  Settings,
+  Library,
+  User,
+  LogOut,
+  Bot,
+  Timer,
+  HelpCircle,
+  ChevronLeft,
+  ChevronDown,
+  Sidebar as SidebarIcon,
+  Search,
+  X,
+  FileText,
+  Volume2
+} from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { TypographySettings } from '../src/components/TypographySettings'
 import { GeneralSettings } from '../src/components/GeneralSettings'
 import { ModernLibraryModal } from '../src/components/ModernLibraryModal'
 import { AuthModal } from '../src/components/AuthModal'
-import { PomodoroTimer } from '../src/components/PomodoroTimer'
 import { Tooltip } from '../src/components/Tooltip'
-import { useTheme } from './ThemeProvider'
 import { timerService, TimerState } from '../src/services/timerService'
 
 interface ThemedHeaderProps {
@@ -17,13 +31,20 @@ interface ThemedHeaderProps {
   onSidebarToggle: () => void
 }
 
-export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSidebarOpen, onSidebarToggle }) => {
-  const [timerState, setTimerState] = React.useState<TimerState>(timerService.getState())
-  const { 
-    toggleChat, 
-    currentDocument, 
-    isAuthenticated, 
-    user, 
+export const ThemedHeader: React.FC<ThemedHeaderProps> = ({
+  onUploadClick,
+  isSidebarOpen,
+  onSidebarToggle
+}) => {
+  const headerRef = useRef<HTMLDivElement>(null)
+  const userMenuRef = useRef<HTMLDivElement>(null)
+  const userButtonRef = useRef<HTMLButtonElement>(null)
+  const [timerState, setTimerState] = useState<TimerState>(timerService.getState())
+  const {
+    toggleChat,
+    currentDocument,
+    isAuthenticated,
+    user,
     logout,
     libraryRefreshTrigger,
     pdfViewer,
@@ -34,707 +55,704 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     hasSeenPomodoroTour,
     setCurrentDocument
   } = useAppStore()
-  const [showSettings, setShowSettings] = React.useState(false)
-  const [showGeneralSettings, setShowGeneralSettings] = React.useState(false)
-  const [showHelp, setShowHelp] = React.useState(false)
-  const [showLibrary, setShowLibrary] = React.useState(false)
-  const [showAuth, setShowAuth] = React.useState(false)
-  const [showMenu, setShowMenu] = React.useState(false)
-  const [menuPosition, setMenuPosition] = React.useState({ top: 0, left: 0 })
-  const menuRef = useRef<HTMLDivElement>(null)
 
-  const { currentTheme } = useTheme()
+  const [showSettings, setShowSettings] = useState(false)
+  const [showGeneralSettings, setShowGeneralSettings] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
+  const [showLibrary, setShowLibrary] = useState(false)
+  const [showAuth, setShowAuth] = useState(false)
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
 
   const handleLogout = async () => {
     await logout()
+    setIsUserMenuOpen(false)
   }
-  
-  // Update menu position when it opens or when scrolling/resizing
+
   useEffect(() => {
-    const updateMenuPosition = () => {
-      if (menuRef.current) {
-        const rect = menuRef.current.getBoundingClientRect()
-        setMenuPosition({
-          top: rect.bottom + 8,
-          left: rect.left
-        })
-      }
-    }
-
-    if (showMenu) {
-      updateMenuPosition()
-      window.addEventListener('scroll', updateMenuPosition, true)
-      window.addEventListener('resize', updateMenuPosition)
-    }
-
-    return () => {
-      window.removeEventListener('scroll', updateMenuPosition, true)
-      window.removeEventListener('resize', updateMenuPosition)
-    }
-  }, [showMenu])
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      const isClickInsideMenu = menuRef.current?.contains(target)
-      const isClickOnMenuDropdown = target.closest('[data-menu-dropdown]')
-      
-      if (!isClickInsideMenu && !isClickOnMenuDropdown) {
-        setShowMenu(false)
-      }
-    }
-
-    if (showMenu) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showMenu])
-
-  // Subscribe to timer service
-  React.useEffect(() => {
     const unsubscribe = timerService.subscribe(setTimerState)
     return unsubscribe
   }, [])
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return
+    }
+
+    const updateHeaderHeight = () => {
+      const height = headerRef.current?.getBoundingClientRect().height ?? 80
+      document.documentElement.style.setProperty('--header-height', `${Math.ceil(height)}px`)
+    }
+
+    updateHeaderHeight()
+
+    const resizeHandler = () => updateHeaderHeight()
+    window.addEventListener('resize', resizeHandler)
+
+    let observer: ResizeObserver | undefined
+    if (headerRef.current && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => updateHeaderHeight())
+      observer.observe(headerRef.current)
+    }
+
+    return () => {
+      window.removeEventListener('resize', resizeHandler)
+      observer?.disconnect()
+    }
+  }, [currentDocument, isUserMenuOpen, isSidebarOpen, isAuthenticated, user])
+
+  useEffect(() => {
+    if (!isUserMenuOpen || typeof window === 'undefined' || typeof document === 'undefined') {
+      return
+    }
+
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (userMenuRef.current?.contains(target) || userButtonRef.current?.contains(target)) {
+        return
+      }
+      setIsUserMenuOpen(false)
+    }
+
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsUserMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [isUserMenuOpen])
+
+  const openLibrary = () => {
+    if (user) {
+      setShowLibrary(true)
+    } else {
+      setShowAuth(true)
+    }
+  }
+
+  const handleLogoClick = () => {
+    if (currentDocument) {
+      setCurrentDocument(null)
+    }
+    openLibrary()
+  }
+
+  const handleBackToLibrary = () => {
+    setCurrentDocument(null)
+    openLibrary()
+  }
+
+  const tierLabel = useMemo(() => user?.tier?.toUpperCase() ?? 'STANDARD', [user?.tier])
 
   return (
-    <header 
+    <header
+      ref={headerRef}
       className="sticky top-0 z-50"
       style={{
         background: 'linear-gradient(180deg, var(--color-surface) 0%, rgba(17, 24, 39, 0.95) 100%)',
         borderBottom: '1px solid var(--color-border)',
-        height: 'var(--header-height)',
         padding: 'var(--spacing-md) var(--spacing-lg)',
-        backdropFilter: 'blur(8px)',
+        backdropFilter: 'blur(10px)'
       }}
     >
-      <div className="flex items-center justify-between h-full">
-        {/* Logo and Title */}
-        <div className="flex items-center space-x-4">
-          <div className="relative" ref={menuRef}>
-            <button 
-              onClick={() => {
-                // If sidebar is open, close it first
-                if (isSidebarOpen) {
-                  onSidebarToggle()
-                }
-                // Toggle menu
-                setShowMenu(!showMenu)
-              }}
-              className="p-2 rounded-lg transition-colors"
-              style={{
-                color: 'var(--color-text-primary)',
-                backgroundColor: showMenu ? 'var(--color-surface-hover)' : 'transparent',
-              }}
-              onMouseEnter={(e) => {
-                if (!showMenu) {
-                  e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!showMenu) {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                }
-              }}
-              title="Menu"
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleLogoClick}
+              className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors"
+              style={{ color: 'var(--color-text-primary)' }}
+              aria-label="Go to library"
             >
-              <Menu className="w-5 h-5" />
-            </button>
-            
-            {showMenu && createPortal(
-              <div 
-                data-menu-dropdown
-                className="fixed w-56 rounded-lg shadow-lg border menu-dropdown"
-                style={{
-                  backgroundColor: 'var(--color-surface)',
-                  borderColor: 'var(--color-border)',
-                  top: `${menuPosition.top}px`,
-                  left: `${menuPosition.left}px`,
-                }}
+              <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-6 w-6" />
+              <span
+                className="text-sm font-bold uppercase tracking-[0.18em]"
+                style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}
               >
-                <div className="py-1">
-                  <button
-                    onClick={() => {
-                      setCurrentDocument(null)
-                      setShowMenu(false)
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm transition-colors flex items-center space-x-2"
-                    style={{ 
-                      color: 'var(--color-text-primary)'
-                    }}
-                  >
-                    <Home className="w-4 h-4" />
-                    <span>Close Document</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      onSidebarToggle()
-                      setShowMenu(false)
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm transition-colors flex items-center space-x-2"
-                    style={{ 
-                      color: 'var(--color-text-primary)'
-                    }}
-                  >
-                    <SidebarIcon className="w-4 h-4" />
-                    <span>{isSidebarOpen ? 'Close Sidebar' : 'Open Sidebar'}</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowGeneralSettings(true)
-                      setShowMenu(false)
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm transition-colors flex items-center space-x-2"
-                    style={{ 
-                      color: 'var(--color-text-primary)'
-                    }}
-                  >
-                    <Settings className="w-4 h-4" />
-                    <span>Settings</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowHelp(true)
-                      setShowMenu(false)
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm transition-colors flex items-center space-x-2"
-                    style={{ 
-                      color: 'var(--color-text-primary)'
-                    }}
-                  >
-                    <HelpCircle className="w-4 h-4" />
-                    <span>Help</span>
-                  </button>
-                  {user && (
-                    <>
-                      <div className="border-t my-1" style={{ borderColor: 'var(--color-border)' }}>
-                        <div className="px-4 py-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                          <div className="flex items-center space-x-2 mb-2">
-                            <User className="w-4 h-4" />
-                            <span className="font-medium" style={{ color: 'var(--color-text-primary)' }}>Account</span>
-                          </div>
-                          <div className="text-xs mt-2" style={{ color: 'var(--color-text-secondary)' }}>
-                            {user.full_name || user.email}
-                          </div>
-                          {user.tier && (
-                            <div className="text-xs mt-1" style={{ color: 'var(--color-primary)' }}>
-                              {user.tier.toUpperCase()} Plan
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          handleLogout()
-                          setShowMenu(false)
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent'
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm transition-colors flex items-center space-x-2"
-                        style={{ 
-                          color: '#ef4444'
-                        }}
-                      >
-                        <LogOut className="w-4 h-4" />
-                        <span>Sign Out</span>
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>,
-              document.body
-            )}
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-6 w-6" />
-            <div 
-              className="px-3 py-1 font-bold text-sm rounded-lg"
-              style={{
-                backgroundColor: 'var(--color-primary)',
-                color: 'var(--color-text-inverse)',
-                fontFamily: "'Space Grotesk', sans-serif",
-                letterSpacing: '0.05em',
-                fontWeight: '600',
-              }}
-            >
-              ryzomatic
-            </div>
-          </div>
-        </div>
-
-        {/* Document Info */}
-        {currentDocument && (
-          <div 
-            className="flex items-center space-x-2 text-sm"
-            style={{ color: 'var(--color-text-secondary)' }}
-          >
-            <FileText className="w-4 h-4" />
-            <span className="truncate max-w-xs">{currentDocument.name}</span>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex items-center space-x-2">
-          {/* Search Button */}
-          <Tooltip content="Search Documents" position="bottom">
-            <button 
-              className="p-2 rounded-lg transition-colors"
-              style={{
-                color: 'var(--color-text-primary)',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              aria-label="Search Documents"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+                ryzomatic
+              </span>
             </button>
-          </Tooltip>
 
-          {/* Visual Separator */}
-          <div 
-            className="w-px h-6"
-            style={{ backgroundColor: 'var(--color-border)' }}
-            aria-hidden="true"
-          />
+            <Tooltip content="Browse your library" position="bottom">
+              <button
+                onClick={openLibrary}
+                className="text-sm font-medium transition-colors"
+                style={{ color: 'var(--color-text-secondary)' }}
+              >
+                Library
+              </button>
+            </Tooltip>
+          </div>
 
-          {/* Show Library and Upload only when user is signed in */}
-          {user && (
-            <>
-              <div id="pomodoro-collapsed-anchor" className="flex items-center mr-2 min-w-0" />
-              <Tooltip content="View Library" position="bottom">
+          <div className="flex items-center gap-2">
+            <Tooltip content="Search your documents" position="bottom">
+              <button
+                className="rounded-lg p-2 transition-colors"
+                style={{ color: 'var(--color-text-primary)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                aria-label="Search"
+              >
+                <Search className="h-5 w-5" />
+              </button>
+            </Tooltip>
+
+            {user && currentDocument && !timerState.isRunning && (
+              <Tooltip
+                content={
+                  pomodoroIsRunning
+                    ? `Timer running: ${Math.floor((pomodoroTimeLeft || 0) / 60)}:${String((pomodoroTimeLeft || 0) % 60).padStart(2, '0')}`
+                    : 'Start Pomodoro timer'
+                }
+                position="bottom"
+              >
                 <button
-                  data-tour="library-button"
-                  onClick={() => setShowLibrary(true)}
-                  className="btn-secondary flex items-center space-x-2"
-                  style={{
-                    backgroundColor: 'var(--color-surface)',
-                    color: 'var(--color-text-primary)',
-                    border: '1px solid var(--color-border)',
-                    padding: 'var(--spacing-sm) var(--spacing-md)',
-                    borderRadius: 'var(--border-radius-lg)',
-                  }}
-                  aria-label="View Library"
+                  data-tour="pomodoro-button"
+                  onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
+                  className={`rounded-lg p-2 transition-all duration-300 ${
+                    !hasSeenPomodoroTour ? 'animate-pulse ring-2 ring-blue-500/60' : ''
+                  }`}
+                  style={{ backgroundColor: 'transparent', border: 'none', fontSize: '1.35rem' }}
+                  aria-label="Toggle Pomodoro timer"
                 >
-                  <Library className="w-4 h-4" />
-                  <span>Library</span>
+                  🍅
                 </button>
               </Tooltip>
+            )}
 
-              <Tooltip 
+            <Tooltip content="Ask the AI Assistant" position="bottom">
+              <button
+                data-tour="ai-assistant-button"
+                onClick={() => toggleChat()}
+                className={`rounded-lg p-2 transition-all ${
+                  isChatOpen ? 'bg-[var(--color-primary-light)] ring-2 ring-blue-500/60' : ''
+                }`}
+                style={{
+                  color: 'var(--color-text-primary)',
+                  border: '1px solid var(--color-border)'
+                }}
+                aria-label="Toggle AI assistant"
+              >
+                <Bot className="h-5 w-5" />
+              </button>
+            </Tooltip>
+
+            {user && (
+              <Tooltip
                 content={
-                  libraryView.selectedBooks.length > 0 
-                    ? "Please deselect books to upload" 
-                    : "Upload New Document"
-                } 
+                  libraryView.selectedBooks.length > 0
+                    ? 'Please deselect books to upload'
+                    : 'Upload new material'
+                }
                 position="bottom"
               >
                 <button
                   data-tour="upload-button"
                   onClick={onUploadClick}
                   disabled={libraryView.selectedBooks.length > 0}
-                  className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   style={{
                     backgroundColor: 'var(--color-primary)',
                     color: 'var(--color-text-inverse)',
-                    border: 'none',
-                    padding: 'var(--spacing-sm) var(--spacing-md)',
-                    borderRadius: 'var(--border-radius-lg)',
-                    opacity: libraryView.selectedBooks.length > 0 ? 0.5 : 1,
-                    cursor: libraryView.selectedBooks.length > 0 ? 'not-allowed' : 'pointer',
+                    border: 'none'
                   }}
-                  aria-label="Upload New Document"
                 >
-                  <Upload className="w-4 h-4" />
+                  <Upload className="h-4 w-4" />
                   <span>New Material</span>
                 </button>
               </Tooltip>
+            )}
 
-              {/* Visual Separator */}
-              <div 
-                className="w-px h-6"
-                style={{ backgroundColor: 'var(--color-border)' }}
-                aria-hidden="true"
-              />
-            </>
-          )}
-          
-          {/* Settings Button - Only show in Reading Mode */}
-          {pdfViewer.readingMode && (
-            <Tooltip content="Settings" position="bottom">
-              <button
-                data-tour="settings-button"
-                onClick={() => setShowSettings(true)}
-                className="p-2 rounded-lg transition-colors"
-                style={{ color: 'var(--color-text-primary)' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                aria-label="Settings"
-              >
-                <Settings className="w-5 h-5" />
-              </button>
-            </Tooltip>
-          )}
-
-          {/* Pomodoro Timer Button - Only show when user is authenticated, has a document, and Pomodoro is NOT running */}
-          {user && currentDocument && !timerState.isRunning && (
-            <Tooltip content={pomodoroIsRunning ? `Timer Running: ${Math.floor((pomodoroTimeLeft || 0) / 60)}:${String((pomodoroTimeLeft || 0) % 60).padStart(2, '0')}` : "Pomodoro Timer - Stay Focused"} position="bottom">
-              <button
-                data-tour="pomodoro-button"
-                onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
-                className={`p-2 rounded-lg transition-all duration-300 text-2xl leading-none relative ${
-                  !hasSeenPomodoroTour ? 'animate-pulse ring-2 ring-blue-500 ring-opacity-50' : ''
-                }`}
-                style={{
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                }}
-                aria-label={pomodoroIsRunning ? `Pomodoro Timer Running: ${Math.floor((pomodoroTimeLeft || 0) / 60)}:${String((pomodoroTimeLeft || 0) % 60).padStart(2, '0')}` : "Open Pomodoro Timer"}
-              >
-                🍅
-              </button>
-            </Tooltip>
-          )}
-
-          {/* AI Assistant Button */}
-          <Tooltip content="AI Assistant - Ask questions about your documents" position="bottom">
-            <button
-              data-tour="ai-assistant-button"
-              onClick={() => toggleChat()}
-              className={`btn-primary flex items-center space-x-2 transition-all duration-200 ${
-                isChatOpen ? 'ring-2 ring-blue-500 ring-opacity-50' : ''
-              }`}
-              style={{
-                backgroundColor: isChatOpen ? 'var(--color-primary-light)' : 'var(--color-primary)',
-                color: 'var(--color-text-inverse)',
-                border: 'none',
-                padding: 'var(--spacing-sm) var(--spacing-md)',
-                borderRadius: 'var(--border-radius-lg)',
-              }}
-              aria-label="Open AI Assistant"
-            >
-              <Bot className="w-4 h-4" />
-              <span>AI Assistant</span>
-              {isChatOpen && (
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              )}
-            </button>
-          </Tooltip>
-
-          {/* Visual Separator */}
-          <div 
-            className="w-px h-6"
-            style={{ backgroundColor: 'var(--color-border)' }}
-            aria-hidden="true"
-          />
-
-          {/* Auth Button */}
-          {isAuthenticated && user ? (
-            <div className="flex items-center space-x-4">
-              <Tooltip content={`Signed in as ${user.full_name || user.email}`} position="bottom">
-                <div 
-                  className="flex items-center space-x-2"
-                  style={{ color: 'var(--color-text-secondary)' }}
+            {isAuthenticated && user ? (
+              <div className="relative">
+                <button
+                  ref={userButtonRef}
+                  onClick={() => setIsUserMenuOpen((prev) => !prev)}
+                  className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors"
+                  style={{
+                    borderColor: 'var(--color-border)',
+                    color: 'var(--color-text-primary)'
+                  }}
+                  aria-haspopup="menu"
+                  aria-expanded={isUserMenuOpen}
                 >
-                  <User className="w-4 h-4" />
-                  <span className="text-sm font-medium">
-                    {user.full_name || user.email}
-                  </span>
-                  <span 
-                    className="text-xs px-2 py-1 rounded-full"
+                  <User className="h-4 w-4" />
+                  <span className="max-w-[140px] truncate">{user.full_name || user.email}</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isUserMenuOpen && (
+                  <div
+                    ref={userMenuRef}
+                    className="absolute right-0 mt-2 w-64 rounded-lg border shadow-lg"
                     style={{
-                      backgroundColor: 'var(--color-primary-light)',
-                      color: 'var(--color-primary-dark)',
+                      backgroundColor: 'var(--color-surface)',
+                      borderColor: 'var(--color-border)'
+                    }}
+                    role="menu"
+                  >
+                    <div className="border-b px-4 py-3" style={{ borderColor: 'var(--color-border)' }}>
+                      <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                        {user.full_name || user.email}
+                      </p>
+                      <span
+                        className="mt-1 inline-flex items-center gap-2 rounded-full px-2 py-0.5 text-xs"
+                        style={{
+                          backgroundColor: 'var(--color-primary-light)',
+                          color: 'var(--color-primary-dark)'
+                        }}
+                      >
+                        {tierLabel} Plan
+                      </span>
+                    </div>
+                    <div className="py-1">
+                      <button
+                        onClick={() => {
+                          setShowGeneralSettings(true)
+                          setIsUserMenuOpen(false)
+                        }}
+                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm transition-colors"
+                        style={{ color: 'var(--color-text-primary)' }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      >
+                        <User className="h-4 w-4" />
+                        <span>Account</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowSettings(true)
+                          setIsUserMenuOpen(false)
+                        }}
+                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm transition-colors"
+                        style={{ color: 'var(--color-text-primary)' }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      >
+                        <Settings className="h-4 w-4" />
+                        <span>Settings</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowHelp(true)
+                          setIsUserMenuOpen(false)
+                        }}
+                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm transition-colors"
+                        style={{ color: 'var(--color-text-primary)' }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                        <span>Help</span>
+                      </button>
+                    </div>
+                    <div className="border-t px-4 py-2" style={{ borderColor: 'var(--color-border)' }}>
+                      <button
+                        onClick={handleLogout}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-colors"
+                        style={{ color: '#ef4444' }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Tooltip content="Sign in to access all features" position="bottom">
+                <button
+                  onClick={() => setShowAuth(true)}
+                  className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors"
+                  style={{
+                    borderColor: 'var(--color-border)',
+                    color: 'var(--color-text-primary)'
+                  }}
+                  aria-label="Sign in"
+                >
+                  <User className="h-4 w-4" />
+                  <span>Sign In</span>
+                </button>
+              </Tooltip>
+            )}
+          </div>
+        </div>
+
+        {currentDocument && (
+          <div
+            className="flex flex-wrap items-center justify-between gap-3 border-t pt-3"
+            style={{ borderColor: 'var(--color-border)' }}
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              <button
+                onClick={handleBackToLibrary}
+                className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm transition-colors"
+                style={{ color: 'var(--color-text-secondary)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span>Library</span>
+              </button>
+              <span
+                className="truncate text-sm font-medium"
+                style={{ color: 'var(--color-text-primary)' }}
+              >
+                {currentDocument.name}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {pdfViewer.readingMode && (
+                <Tooltip content="Reader settings" position="bottom">
+                  <button
+                    onClick={() => setShowSettings(true)}
+                    className="flex items-center gap-2 rounded-lg border px-3 py-1 text-sm transition-colors"
+                    style={{
+                      color: 'var(--color-text-primary)',
+                      borderColor: 'var(--color-border)'
                     }}
                   >
-                    {user.tier?.toUpperCase()}
-                  </span>
-                </div>
-              </Tooltip>
-              <Tooltip content="Sign Out" position="bottom">
+                    <Settings className="h-4 w-4" />
+                    <span>Typography</span>
+                  </button>
+                </Tooltip>
+              )}
+
+              <Tooltip
+                content={isSidebarOpen ? 'Hide notes & insights' : 'Show notes & insights'}
+                position="bottom"
+              >
                 <button
-                  onClick={handleLogout}
-                  className="flex items-center space-x-2 px-3 py-1 rounded-lg transition-colors"
+                  onClick={onSidebarToggle}
+                  className="flex items-center gap-2 rounded-lg border px-3 py-1 text-sm transition-colors"
                   style={{
-                    backgroundColor: 'var(--color-surface)',
-                    color: 'var(--color-error)',
-                    border: '1px solid var(--color-error)',
+                    color: 'var(--color-text-primary)',
+                    borderColor: 'var(--color-border)'
                   }}
-                  aria-label="Sign Out"
                 >
-                  <LogOut className="w-4 h-4" />
-                  <span>Logout</span>
+                  <SidebarIcon className="h-4 w-4" />
+                  <span>{isSidebarOpen ? 'Hide Sidebar' : 'Show Sidebar'}</span>
                 </button>
               </Tooltip>
             </div>
-          ) : (
-            <Tooltip content="Sign in to access all features" position="bottom">
-              <button
-                onClick={() => setShowAuth(true)}
-                className="flex items-center space-x-2 px-3 py-1 rounded-lg transition-colors"
-                style={{
-                  backgroundColor: 'var(--color-surface)',
-                  color: 'var(--color-text-primary)',
-                  border: '1px solid var(--color-border)',
-                }}
-                aria-label="Sign In"
-              >
-                <User className="w-4 h-4" />
-                <span>Sign In</span>
-              </button>
-            </Tooltip>
-          )}
-
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Modals */}
       {showAuth && (
-        <AuthModal 
-          isOpen={showAuth} 
-          onClose={() => setShowAuth(false)} 
+        <AuthModal
+          isOpen={showAuth}
+          onClose={() => setShowAuth(false)}
           onAuthSuccess={() => setShowAuth(false)}
         />
       )}
 
       {showLibrary && (
-        <ModernLibraryModal 
-          isOpen={showLibrary} 
-          onClose={() => setShowLibrary(false)} 
+        <ModernLibraryModal
+          isOpen={showLibrary}
+          onClose={() => setShowLibrary(false)}
           refreshTrigger={libraryRefreshTrigger}
         />
       )}
 
-      {showSettings && (
-        <TypographySettings onClose={() => setShowSettings(false)} />
-      )}
+      {showSettings && <TypographySettings onClose={() => setShowSettings(false)} />}
 
       {showGeneralSettings && (
-        <GeneralSettings isOpen={showGeneralSettings} onClose={() => setShowGeneralSettings(false)} />
+        <GeneralSettings
+          isOpen={showGeneralSettings}
+          onClose={() => setShowGeneralSettings(false)}
+        />
       )}
 
-      {showHelp && createPortal(
-        <div 
-          className="fixed inset-0 z-[9999] flex items-center justify-center px-4 overflow-y-auto" 
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
-        >
-          <div 
-            className="rounded-xl shadow-xl max-w-4xl w-full mx-4 animate-scale-in my-auto" 
-            style={{ 
-              backgroundColor: 'var(--color-surface)', 
-              border: '1px solid var(--color-border)' 
-            }}
+      {showHelp &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto px-4"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--color-border)' }}>
-              <h2 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                Help & Features Guide
-              </h2>
-              <button
-                onClick={() => setShowHelp(false)}
-                className="transition-colors"
-                style={{ color: 'var(--color-text-secondary)' }}
-                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-primary)'}
-                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
+            <div
+              className="my-auto w-full max-w-4xl animate-scale-in rounded-xl shadow-xl"
+              style={{
+                backgroundColor: 'var(--color-surface)',
+                border: '1px solid var(--color-border)'
+              }}
+            >
+              <div
+                className="flex items-center justify-between border-b p-6"
+                style={{ borderColor: 'var(--color-border)' }}
               >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
+                <h2
+                  className="text-xl font-semibold"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  Help & Features Guide
+                </h2>
+                <button
+                  onClick={() => setShowHelp(false)}
+                  className="transition-colors"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-primary)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-secondary)')}
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
 
-            {/* Content */}
-            <div className="p-6 max-h-[70vh] overflow-y-auto">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* AI Assistant */}
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <Bot className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-                    <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                      AI Assistant
-                    </h3>
-                  </div>
-                  <div className="space-y-3 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                    <p>Ask questions about your documents and get intelligent answers powered by AI.</p>
-                    <div className="space-y-2">
-                      <h4 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>How to use:</h4>
-                      <ul className="list-disc list-inside space-y-1 ml-2">
-                        <li>Click the "AI Assistant" button in the header</li>
-                        <li>Type your question about the current document</li>
-                        <li>Get instant answers with relevant context</li>
-                        <li>Ask follow-up questions for deeper understanding</li>
-                      </ul>
+              <div className="max-h-[70vh] overflow-y-auto p-6">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <Bot className="h-6 w-6" style={{ color: 'var(--color-primary)' }} />
+                      <h3
+                        className="text-lg font-semibold"
+                        style={{ color: 'var(--color-text-primary)' }}
+                      >
+                        AI Assistant
+                      </h3>
                     </div>
-                    <div className="space-y-2">
-                      <h4 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>Example questions:</h4>
-                      <ul className="list-disc list-inside space-y-1 ml-2">
-                        <li>"What are the main points of this chapter?"</li>
-                        <li>"Explain this concept in simpler terms"</li>
-                        <li>"What does this paragraph mean?"</li>
-                      </ul>
+                    <div
+                      className="space-y-3 text-sm"
+                      style={{ color: 'var(--color-text-secondary)' }}
+                    >
+                      <p>
+                        Ask questions about your documents and get intelligent answers powered by AI.
+                      </p>
+                      <div className="space-y-2">
+                        <h4
+                          className="font-medium"
+                          style={{ color: 'var(--color-text-primary)' }}
+                        >
+                          How to use:
+                        </h4>
+                        <ul className="ml-2 list-disc space-y-1">
+                          <li>Click the "AI Assistant" button in the header</li>
+                          <li>Type your question about the current document</li>
+                          <li>Get instant answers with relevant context</li>
+                          <li>Ask follow-up questions for deeper understanding</li>
+                        </ul>
+                      </div>
+                      <div className="space-y-2">
+                        <h4
+                          className="font-medium"
+                          style={{ color: 'var(--color-text-primary)' }}
+                        >
+                          Example questions:
+                        </h4>
+                        <ul className="ml-2 list-disc space-y-1">
+                          <li>"What are the main points of this chapter?"</li>
+                          <li>"Explain this concept in simpler terms"</li>
+                          <li>"What does this paragraph mean?"</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <Timer className="h-6 w-6" style={{ color: 'var(--color-primary)' }} />
+                      <h3
+                        className="text-lg font-semibold"
+                        style={{ color: 'var(--color-text-primary)' }}
+                      >
+                        Pomodoro Timer
+                      </h3>
+                    </div>
+                    <div
+                      className="space-y-3 text-sm"
+                      style={{ color: 'var(--color-text-secondary)' }}
+                    >
+                      <p>Stay focused and productive with timed work sessions and breaks.</p>
+                      <div className="space-y-2">
+                        <h4
+                          className="font-medium"
+                          style={{ color: 'var(--color-text-primary)' }}
+                        >
+                          How to use:
+                        </h4>
+                        <ul className="ml-2 list-disc space-y-1">
+                          <li>Click the 🍅 tomato icon in the header</li>
+                          <li>Start a 25-minute work session</li>
+                          <li>Take 5-minute breaks between sessions</li>
+                          <li>After 4 sessions, take a 15-minute long break</li>
+                        </ul>
+                      </div>
+                      <div className="space-y-2">
+                        <h4
+                          className="font-medium"
+                          style={{ color: 'var(--color-text-primary)' }}
+                        >
+                          Features:
+                        </h4>
+                        <ul className="ml-2 list-disc space-y-1">
+                          <li>Customizable work and break durations</li>
+                          <li>Auto-start options for breaks and sessions</li>
+                          <li>Progress tracking and achievements</li>
+                          <li>Notifications when sessions end</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <Volume2 className="h-6 w-6" style={{ color: 'var(--color-primary)' }} />
+                      <h3
+                        className="text-lg font-semibold"
+                        style={{ color: 'var(--color-text-primary)' }}
+                      >
+                        Text-to-Speech (TTS)
+                      </h3>
+                    </div>
+                    <div
+                      className="space-y-3 text-sm"
+                      style={{ color: 'var(--color-text-secondary)' }}
+                    >
+                      <p>Listen to your documents with natural-sounding voices for better comprehension.</p>
+                      <div className="space-y-2">
+                        <h4
+                          className="font-medium"
+                          style={{ color: 'var(--color-text-primary)' }}
+                        >
+                          How to use:
+                        </h4>
+                        <ul className="ml-2 list-disc space-y-1">
+                          <li>Open a document and click the speaker icon</li>
+                          <li>Choose your preferred voice and settings</li>
+                          <li>Click play to start reading</li>
+                          <li>Adjust speed, pitch, and volume as needed</li>
+                        </ul>
+                      </div>
+                      <div className="space-y-2">
+                        <h4
+                          className="font-medium"
+                          style={{ color: 'var(--color-text-primary)' }}
+                        >
+                          Features:
+                        </h4>
+                        <ul className="ml-2 list-disc space-y-1">
+                          <li>Multiple voice options (Native & Google Cloud)</li>
+                          <li>Word highlighting as it reads</li>
+                          <li>Auto-advance through paragraphs</li>
+                          <li>Customizable reading speed and voice settings</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <FileText className="h-6 w-6" style={{ color: 'var(--color-primary)' }} />
+                      <h3
+                        className="text-lg font-semibold"
+                        style={{ color: 'var(--color-text-primary)' }}
+                      >
+                        Note Taking
+                      </h3>
+                    </div>
+                    <div
+                      className="space-y-3 text-sm"
+                      style={{ color: 'var(--color-text-secondary)' }}
+                    >
+                      <p>Take structured notes with multiple templates designed for different learning styles.</p>
+                      <div className="space-y-2">
+                        <h4
+                          className="font-medium"
+                          style={{ color: 'var(--color-text-primary)' }}
+                        >
+                          How to use:
+                        </h4>
+                        <ul className="ml-2 list-disc space-y-1">
+                          <li>Click the "+" button next to Notes in the right sidebar</li>
+                          <li>Choose from 6 different note templates</li>
+                          <li>Set a default template in Settings</li>
+                          <li>Export notes in multiple formats</li>
+                        </ul>
+                      </div>
+                      <div className="space-y-2">
+                        <h4
+                          className="font-medium"
+                          style={{ color: 'var(--color-text-primary)' }}
+                        >
+                          Note Templates:
+                        </h4>
+                        <ul className="ml-2 list-disc space-y-1">
+                          <li><strong>Freeform:</strong> Simple text notes</li>
+                          <li><strong>Cornell:</strong> Cue column + Notes + Summary</li>
+                          <li><strong>Outline:</strong> Hierarchical structure</li>
+                          <li><strong>Mind Map:</strong> Central topic with branches</li>
+                          <li><strong>Chart:</strong> Comparison tables</li>
+                          <li><strong>Boxing:</strong> Grouped concepts in boxes</li>
+                        </ul>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Pomodoro Timer */}
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <Timer className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-                    <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                      Pomodoro Timer
-                    </h3>
-                  </div>
-                  <div className="space-y-3 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                    <p>Stay focused and productive with timed work sessions and breaks.</p>
-                    <div className="space-y-2">
-                      <h4 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>How to use:</h4>
-                      <ul className="list-disc list-inside space-y-1 ml-2">
-                        <li>Click the 🍅 tomato icon in the header</li>
-                        <li>Start a 25-minute work session</li>
-                        <li>Take 5-minute breaks between sessions</li>
-                        <li>After 4 sessions, take a 15-minute long break</li>
+                <div
+                  className="mt-8 rounded-lg p-4"
+                  style={{ backgroundColor: 'var(--color-background)' }}
+                >
+                  <h3
+                    className="mb-3 text-lg font-semibold"
+                    style={{ color: 'var(--color-text-primary)' }}
+                  >
+                    💡 Quick Tips
+                  </h3>
+                  <div
+                    className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2"
+                    style={{ color: 'var(--color-text-secondary)' }}
+                  >
+                    <div>
+                      <h4
+                        className="mb-2 font-medium"
+                        style={{ color: 'var(--color-text-primary)' }}
+                      >
+                        Keyboard Shortcuts:
+                      </h4>
+                      <ul className="space-y-1">
+                        <li>
+                          • Press <kbd className="rounded bg-gray-200 px-1 py-0.5 text-xs dark:bg-gray-700">M</kbd> for
+                          Reading Mode
+                        </li>
+                        <li>
+                          • Press <kbd className="rounded bg-gray-200 px-1 py-0.5 text-xs dark:bg-gray-700">Space</kbd>{' '}
+                          to play/pause TTS
+                        </li>
+                        <li>
+                          • Press <kbd className="rounded bg-gray-200 px-1 py-0.5 text-xs dark:bg-gray-700">Esc</kbd>{' '}
+                          to close modals
+                        </li>
                       </ul>
                     </div>
-                    <div className="space-y-2">
-                      <h4 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>Features:</h4>
-                      <ul className="list-disc list-inside space-y-1 ml-2">
-                        <li>Customizable work and break durations</li>
-                        <li>Auto-start options for breaks and sessions</li>
-                        <li>Progress tracking and achievements</li>
-                        <li>Notifications when sessions end</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Text-to-Speech */}
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <Volume2 className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-                    <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                      Text-to-Speech (TTS)
-                    </h3>
-                  </div>
-                  <div className="space-y-3 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                    <p>Listen to your documents with natural-sounding voices for better comprehension.</p>
-                    <div className="space-y-2">
-                      <h4 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>How to use:</h4>
-                      <ul className="list-disc list-inside space-y-1 ml-2">
-                        <li>Open a document and click the speaker icon</li>
-                        <li>Choose your preferred voice and settings</li>
-                        <li>Click play to start reading</li>
-                        <li>Adjust speed, pitch, and volume as needed</li>
-                      </ul>
-                    </div>
-                    <div className="space-y-2">
-                      <h4 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>Features:</h4>
-                      <ul className="list-disc list-inside space-y-1 ml-2">
-                        <li>Multiple voice options (Native & Google Cloud)</li>
-                        <li>Word highlighting as it reads</li>
-                        <li>Auto-advance through paragraphs</li>
-                        <li>Customizable reading speed and voice settings</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Note Taking */}
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <FileText className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-                    <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                      Note Taking
-                    </h3>
-                  </div>
-                  <div className="space-y-3 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                    <p>Take structured notes with multiple templates designed for different learning styles.</p>
-                    <div className="space-y-2">
-                      <h4 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>How to use:</h4>
-                      <ul className="list-disc list-inside space-y-1 ml-2">
-                        <li>Click the "+" button next to Notes in the right sidebar</li>
-                        <li>Choose from 6 different note templates</li>
-                        <li>Set a default template in Settings</li>
-                        <li>Export notes in multiple formats</li>
-                      </ul>
-                    </div>
-                    <div className="space-y-2">
-                      <h4 className="font-medium" style={{ color: 'var(--color-text-primary)' }}>Note Templates:</h4>
-                      <ul className="list-disc list-inside space-y-1 ml-2">
-                        <li><strong>Freeform:</strong> Simple text notes</li>
-                        <li><strong>Cornell:</strong> Cue column + Notes + Summary</li>
-                        <li><strong>Outline:</strong> Hierarchical structure</li>
-                        <li><strong>Mind Map:</strong> Central topic with branches</li>
-                        <li><strong>Chart:</strong> Comparison tables</li>
-                        <li><strong>Boxing:</strong> Grouped concepts in boxes</li>
+                    <div>
+                      <h4
+                        className="mb-2 font-medium"
+                        style={{ color: 'var(--color-text-primary)' }}
+                      >
+                        Best Practices:
+                      </h4>
+                      <ul className="space-y-1">
+                        <li>• Use Pomodoro for focused reading sessions</li>
+                        <li>• Combine TTS with note-taking for better retention</li>
+                        <li>• Ask AI questions while reading for deeper understanding</li>
+                        <li>• Try different note templates for different content types</li>
                       </ul>
                     </div>
                   </div>
                 </div>
               </div>
-
-              {/* Quick Tips */}
-              <div className="mt-8 p-4 rounded-lg" style={{ backgroundColor: 'var(--color-background)' }}>
-                <h3 className="text-lg font-semibold mb-3" style={{ color: 'var(--color-text-primary)' }}>
-                  💡 Quick Tips
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                  <div>
-                    <h4 className="font-medium mb-2" style={{ color: 'var(--color-text-primary)' }}>Keyboard Shortcuts:</h4>
-                    <ul className="space-y-1">
-                      <li>• Press <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">M</kbd> for Reading Mode</li>
-                      <li>• Press <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">Space</kbd> to play/pause TTS</li>
-                      <li>• Press <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">Esc</kbd> to close modals</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-medium mb-2" style={{ color: 'var(--color-text-primary)' }}>Best Practices:</h4>
-                    <ul className="space-y-1">
-                      <li>• Use Pomodoro for focused reading sessions</li>
-                      <li>• Combine TTS with note-taking for better retention</li>
-                      <li>• Ask AI questions while reading for deeper understanding</li>
-                      <li>• Try different note templates for different content types</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
+          </div>,
+          document.body
+        )}
     </header>
   )
 }
