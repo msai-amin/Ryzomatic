@@ -5,11 +5,15 @@
 
 import { authService } from './supabaseAuthService';
 
-export interface HighlightPosition {
+export interface HighlightRect {
   x: number;
   y: number;
   width: number;
   height: number;
+}
+
+export interface HighlightPosition extends HighlightRect {
+  rects?: HighlightRect[];
 }
 
 export interface TextAnchors {
@@ -450,12 +454,16 @@ class HighlightService {
       }
       
       if (minX !== Infinity && maxX !== -Infinity && minY !== Infinity && maxY !== -Infinity) {
-        return {
+        const rect = {
           x: minX,
           y: minY,
           width: maxX - minX,
           height: maxY - minY
-        };
+        }
+        return {
+          ...rect,
+          rects: [rect]
+        }
       }
       
       return null;

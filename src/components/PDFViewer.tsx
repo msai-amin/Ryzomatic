@@ -110,6 +110,22 @@ interface TextSegment {
   tableData?: string[] // For table rows
 }
 
+type HighlightRenderRect = {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+interface HighlightRenderData {
+  highlight: HighlightType
+  scaledRects: HighlightRenderRect[]
+  buttonPosition: { x: number; y: number }
+  labelPosition: { x: number; y: number }
+  outlineStyle: string
+  outlineOffset: number
+}
+
 // Parse text to preserve paragraph structure - USED ONLY IN READING MODE
 // CACHE BUST v3 - Force Vercel to rebuild with new bundle hash
 function parseTextWithBreaks(text: string): TextSegment[] {
@@ -378,6 +394,83 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   const [selectedHighlightId, setSelectedHighlightId] = useState<string | null>(null)
   const [lastCreatedHighlightId, setLastCreatedHighlightId] = useState<string | null>(null)
   const [showUndoToast, setShowUndoToast] = useState(false)
+
+  const mapHighlightToRenderData = useCallback((highlight: HighlightType): HighlightRenderData | null => {
+    const safeScale = Math.max(scale, 0.1)
+    const rectsSource = highlight.position_data.rects && highlight.position_data.rects.length > 0
+      ? highlight.position_data.rects
+      : [{
+          x: highlight.position_data.x,
+          y: highlight.position_data.y,
+          width: highlight.position_data.width,
+          height: highlight.position_data.height
+        }]
+    const scaledRects = rectsSource
+      .map(rect => ({
+        x: rect.x * safeScale,
+        y: rect.y * safeScale,
+        width: rect.width * safeScale,
+        height: rect.height * safeScale
+      }))
+      .filter(rect =>
+        Number.isFinite(rect.x) &&
+        Number.isFinite(rect.y) &&
+        Number.isFinite(rect.width) &&
+        Number.isFinite(rect.height) &&
+        rect.width > 0 &&
+        rect.height > 0
+      )
+
+    if (scaledRects.length === 0) {
+      return null
+    }
+
+    const bounds = scaledRects.reduce(
+      (acc, rect) => ({
+        minX: Math.min(acc.minX, rect.x),
+        minY: Math.min(acc.minY, rect.y),
+        maxX: Math.max(acc.maxX, rect.x + rect.width),
+        maxY: Math.max(acc.maxY, rect.y + rect.height)
+      }),
+      {
+        minX: Number.POSITIVE_INFINITY,
+        minY: Number.POSITIVE_INFINITY,
+        maxX: Number.NEGATIVE_INFINITY,
+        maxY: Number.NEGATIVE_INFINITY
+      }
+    )
+
+    const fallbackBounding = {
+      minX: Number.isFinite(bounds.minX) ? bounds.minX : 0,
+      minY: Number.isFinite(bounds.minY) ? bounds.minY : 0,
+      maxX: Number.isFinite(bounds.maxX) ? bounds.maxX : 0,
+      maxY: Number.isFinite(bounds.maxY) ? bounds.maxY : 0
+    }
+
+    const buttonPosition = {
+      x: Math.max(fallbackBounding.minX, Math.min(fallbackBounding.maxX - 20, fallbackBounding.maxX - 8)),
+      y: Math.max(fallbackBounding.minY - 28, 0)
+    }
+
+    const outlineStyle = selectedHighlightId === highlight.id
+      ? '2px solid #3B82F6'
+      : (highlight.is_orphaned ? '2px dashed #999' : 'none')
+
+    const outlineOffset = selectedHighlightId === highlight.id ? -1 : 0
+    const labelPosition = {
+      x: fallbackBounding.minX,
+      y: Math.max(fallbackBounding.minY - 20, 0)
+    }
+
+    return {
+      highlight,
+      scaledRects,
+      buttonPosition,
+      labelPosition,
+      outlineStyle,
+      outlineOffset
+    }
+  }, [scale, selectedHighlightId])
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
@@ -2191,39 +2284,45 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const containerStyles = window.getComputedStyle(pageContainer)
       const transform = containerStyles.transform
       
-      // For multi-line selections, use getClientRects() to get all line fragments
-      // This provides better accuracy for selections spanning multiple lines
-      const rects = range.getClientRects()
-      let finalRect: DOMRect
-      
-      if (rects.length > 1) {
-        // Multi-line selection: combine all rects into one bounding box
-        const rectArray = Array.from(rects)
-        const combinedRect = {
-          left: Math.min(...rectArray.map(r => r.left)),
-          top: Math.min(...rectArray.map(r => r.top)),
-          right: Math.max(...rectArray.map(r => r.right)),
-          bottom: Math.max(...rectArray.map(r => r.bottom)),
+      const clientRectsArray = Array.from(range.getClientRects()).filter(rect => rect.width > 0 && rect.height > 0)
+      const rectsForComputation = clientRectsArray.length > 0 ? clientRectsArray : [selectionRect]
+
+      const combinedRect = rectsForComputation.reduce(
+        (acc, rect) => ({
+          left: Math.min(acc.left, rect.left),
+          top: Math.min(acc.top, rect.top),
+          right: Math.max(acc.right, rect.right),
+          bottom: Math.max(acc.bottom, rect.bottom)
+        }),
+        {
+          left: Number.POSITIVE_INFINITY,
+          top: Number.POSITIVE_INFINITY,
+          right: Number.NEGATIVE_INFINITY,
+          bottom: Number.NEGATIVE_INFINITY
         }
-        finalRect = {
-          ...selectionRect,
-          left: combinedRect.left,
-          top: combinedRect.top,
-          width: combinedRect.right - combinedRect.left,
-          height: combinedRect.bottom - combinedRect.top,
-        } as DOMRect
-      } else {
-        // Single-line selection: use the bounding rect directly
-        finalRect = selectionRect
+      )
+
+      const normalizedCombinedRect = {
+        left: Number.isFinite(combinedRect.left) ? combinedRect.left : selectionRect.left,
+        top: Number.isFinite(combinedRect.top) ? combinedRect.top : selectionRect.top,
+        right: Number.isFinite(combinedRect.right) ? combinedRect.right : selectionRect.right,
+        bottom: Number.isFinite(combinedRect.bottom) ? combinedRect.bottom : selectionRect.bottom
       }
-      
+
       // selectionRect gives us viewport coordinates, containerRect gives us the container's viewport position
       // Subtracting gives us the position within the container - same coordinate system as text spans
+      const rawRects = rectsForComputation.map(rect => ({
+        x: rect.left - containerRect.left,
+        y: rect.top - containerRect.top,
+        width: rect.width,
+        height: rect.height
+      }))
+
       let rawPosition = {
-        x: finalRect.left - containerRect.left,
-        y: finalRect.top - containerRect.top,
-        width: finalRect.width,
-        height: finalRect.height
+        x: normalizedCombinedRect.left - containerRect.left,
+        y: normalizedCombinedRect.top - containerRect.top,
+        width: normalizedCombinedRect.right - normalizedCombinedRect.left,
+        height: normalizedCombinedRect.bottom - normalizedCombinedRect.top
       }
       
       // CRITICAL: Account for container transforms that might affect coordinate system
@@ -2264,10 +2363,19 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const currentViewport = page.getViewport({ scale: safeScale, rotation })
       const baseViewport = page.getViewport({ scale: 1, rotation })
       const position = convertScreenRectToBaseViewportRect(rawPosition, currentViewport, baseViewport)
+      const normalizedRects = rawRects.map(rect =>
+        convertScreenRectToBaseViewportRect(rect, currentViewport, baseViewport)
+      )
+      const rectsForStorage = normalizedRects.length > 0 ? normalizedRects : [position]
+      const highlightPosition = {
+        ...position,
+        rects: rectsForStorage
+      }
 
       // ROBUST VALIDATION: Check for reasonable position values
-      if (position.x < 0 || position.y < 0 || position.width <= 0 || position.height <= 0) {
-        console.error('Invalid calculated position:', { rawPosition, position, scale })
+      const hasInvalidRect = rectsForStorage.some(rect => rect.width <= 0 || rect.height <= 0)
+      if (position.x < 0 || position.y < 0 || position.width <= 0 || position.height <= 0 || hasInvalidRect) {
+        console.error('Invalid calculated position:', { rawPosition, position, rectsForStorage, scale })
         alert('Cannot create highlight: Invalid position calculation. Please try selecting the text again.')
         setSelectedTextInfo(null)
         return
@@ -2300,7 +2408,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           scrollTop: scrollContainerRef.current?.scrollTop || 0
         },
         rawPosition,
+        rawRects,
         baseViewportPosition: position,
+        baseViewportRects: rectsForStorage,
         safeScale: safeScale,
         textElement: {
           fontSize: textElement?.style?.fontSize,
@@ -2411,7 +2521,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         highlightedText: activeSelection.text,
         colorId,
         colorHex,
-        positionData: position,
+        positionData: highlightPosition,
         textStartOffset: textOffset?.startOffset,
         textEndOffset: textOffset?.endOffset,
         textContextBefore: textOffset?.contextBefore,
@@ -3824,57 +3934,98 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                     }}
                   />
                   {/* Render highlights for this page */}
-                  {highlights
-                    .filter(h => h.page_number === pageNum)
-                    .map(highlight => {
-                      // ROBUST SCALING: Scale positions by current scale (positions are stored normalized at scale 1.0)
-                      // Add safeguards to prevent invalid scale values
-                      const safeScale = Math.max(scale, 0.1)
-                      const scaledPosition = {
-                        x: highlight.position_data.x * safeScale,
-                        y: highlight.position_data.y * safeScale,
-                        width: highlight.position_data.width * safeScale,
-                        height: highlight.position_data.height * safeScale
-                      }
-                      
-                      return (
+                  {(() => {
+                    const pageHighlightData = highlights
+                      .filter(h => h.page_number === pageNum)
+                      .map(mapHighlightToRenderData)
+                      .filter((data): data is HighlightRenderData => data !== null)
+
+                    if (pageHighlightData.length === 0) {
+                      return null
+                    }
+
+                    return (
+                      <>
                         <div
-                          key={highlight.id}
-                          className="absolute group"
-                                                style={{
-                        left: `${scaledPosition.x}px`,
-                        top: `${scaledPosition.y}px`,
-                        width: `${scaledPosition.width}px`,
-                        height: `${scaledPosition.height}px`,
-                        backgroundColor: highlight.color_hex,
-                        opacity: highlight.is_orphaned ? 0.2 : 0.4,
-                        pointerEvents: 'none', // Allow text selection underneath
-                        border: selectedHighlightId === highlight.id ? '2px solid #3B82F6' : (highlight.is_orphaned ? '2px dashed #999' : 'none'),
-                        zIndex: 3,
-                        transformOrigin: '0 0', // Match text layer transform origin
-                      }}
-                      title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
+                          className="absolute highlightLayer"
+                          style={{
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            pointerEvents: 'none',
+                            zIndex: 3
+                          }}
                         >
-                          {highlight.is_orphaned && (
-                            <div className="absolute -top-3 -left-1 bg-yellow-500 text-white text-xs px-1 rounded z-10">
-                              ⚠
-                            </div>
+                          {pageHighlightData.flatMap(data =>
+                            data.scaledRects.map((rect, idx) => (
+                              <div
+                                key={`${data.highlight.id}-rect-${idx}`}
+                                className="absolute"
+                                style={{
+                                  left: `${rect.x}px`,
+                                  top: `${rect.y}px`,
+                                  width: `${rect.width}px`,
+                                  height: `${rect.height}px`,
+                                  backgroundColor: data.highlight.color_hex,
+                                  opacity: data.highlight.is_orphaned ? 0.2 : 0.35,
+                                  pointerEvents: 'none',
+                                  transformOrigin: '0 0',
+                                  borderRadius: '2px',
+                                  mixBlendMode: 'multiply',
+                                  outline: data.outlineStyle,
+                                  outlineOffset: data.outlineOffset,
+                                  zIndex: 3
+                                }}
+                                title={data.highlight.is_orphaned ? `Orphaned: ${data.highlight.orphaned_reason}` : data.highlight.highlighted_text}
+                                data-highlight-id={data.highlight.id}
+                              />
+                            ))
                           )}
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              removeHighlight(highlight.id)
-                            }}
-                            className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-100 group-hover:opacity-100 transition-all shadow-lg z-10"
-                            style={{ pointerEvents: 'auto' }}
-                            title="Delete highlight"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
                         </div>
-                      )
-                    })}
+                        {pageHighlightData.map(data => (
+                          <React.Fragment key={`${data.highlight.id}-controls`}>
+                            {data.highlight.is_orphaned && (
+                              <div
+                                className="absolute text-xs px-1 rounded shadow-sm"
+                                style={{
+                                  left: `${data.labelPosition.x}px`,
+                                  top: `${data.labelPosition.y}px`,
+                                  backgroundColor: '#facc15',
+                                  color: '#111827',
+                                  zIndex: 4,
+                                  pointerEvents: 'none'
+                                }}
+                              >
+                                ⚠ Orphaned
+                              </div>
+                            )}
+                            <div
+                              className="absolute"
+                              style={{
+                                left: `${data.buttonPosition.x}px`,
+                                top: `${data.buttonPosition.y}px`,
+                                zIndex: 4
+                              }}
+                            >
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  removeHighlight(data.highlight.id)
+                                }}
+                                className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
+                                style={{ pointerEvents: 'auto' }}
+                                title="Delete highlight"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </React.Fragment>
+                        ))}
+                      </>
+                    )
+                  })()}
                   </div>
                 ))
             )}
@@ -3950,63 +4101,98 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               />
               
               {/* Render highlights */}
-              {highlights
-                .filter(h => h.page_number === pageNumber)
-                .map(highlight => {
-                  // ROBUST SCALING: Scale positions by current scale (positions are stored normalized at scale 1.0)
-                  // Add safeguards to prevent invalid scale values
-                  const safeScale = Math.max(scale, 0.1)
-                  const scaledPosition = {
-                    x: highlight.position_data.x * safeScale,
-                    y: highlight.position_data.y * safeScale,
-                    width: highlight.position_data.width * safeScale,
-                    height: highlight.position_data.height * safeScale
-                  }
-                  
-                  return (
+              {(() => {
+                const pageHighlightData = highlights
+                  .filter(h => h.page_number === pageNumber)
+                  .map(mapHighlightToRenderData)
+                  .filter((data): data is HighlightRenderData => data !== null)
+
+                if (pageHighlightData.length === 0) {
+                  return null
+                }
+
+                return (
+                  <>
                     <div
-                      key={highlight.id}
-                      className="absolute group"
+                      className="absolute highlightLayer"
                       style={{
-                        left: `${scaledPosition.x}px`,
-                        top: `${scaledPosition.y}px`,
-                        width: `${scaledPosition.width}px`,
-                        height: `${scaledPosition.height}px`,
-                        backgroundColor: highlight.color_hex,
-                        opacity: highlight.is_orphaned ? 0.2 : 0.4,
-                        pointerEvents: 'none', // Allow text selection underneath
-                        border: highlight.is_orphaned ? '2px dashed #999' : 'none',
-                        zIndex: 3,
-                        // Enable sub-pixel rendering for better alignment
-                        transform: 'translateZ(0)',
-                        transformOrigin: '0 0', // Match text layer transform origin
-                        willChange: 'transform',
-                        backfaceVisibility: 'hidden',
-                        // Ensure pixel-perfect positioning
-                        boxSizing: 'border-box',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        pointerEvents: 'none',
+                        zIndex: 3
                       }}
-                      title={highlight.is_orphaned ? `Orphaned: ${highlight.orphaned_reason}` : highlight.highlighted_text}
                     >
-                      {highlight.is_orphaned && (
-                        <div className="absolute -top-3 -left-1 bg-yellow-500 text-white text-xs px-1 rounded z-10">
-                          ⚠
-                        </div>
+                      {pageHighlightData.flatMap(data =>
+                        data.scaledRects.map((rect, idx) => (
+                          <div
+                            key={`${data.highlight.id}-rect-${idx}`}
+                            className="absolute"
+                            style={{
+                              left: `${rect.x}px`,
+                              top: `${rect.y}px`,
+                              width: `${rect.width}px`,
+                              height: `${rect.height}px`,
+                              backgroundColor: data.highlight.color_hex,
+                              opacity: data.highlight.is_orphaned ? 0.2 : 0.35,
+                              pointerEvents: 'none',
+                              transformOrigin: '0 0',
+                              borderRadius: '2px',
+                              mixBlendMode: 'multiply',
+                              outline: data.outlineStyle,
+                              outlineOffset: data.outlineOffset,
+                              zIndex: 3
+                            }}
+                            title={data.highlight.is_orphaned ? `Orphaned: ${data.highlight.orphaned_reason}` : data.highlight.highlighted_text}
+                            data-highlight-id={data.highlight.id}
+                          />
+                        ))
                       )}
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          removeHighlight(highlight.id)
-                        }}
-                        className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-100 group-hover:opacity-100 transition-all shadow-lg z-10"
-                        style={{ pointerEvents: 'auto' }}
-                        title="Delete highlight"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
                     </div>
-                  )
-                })}
+                    {pageHighlightData.map(data => (
+                      <React.Fragment key={`${data.highlight.id}-controls`}>
+                        {data.highlight.is_orphaned && (
+                          <div
+                            className="absolute text-xs px-1 rounded shadow-sm"
+                            style={{
+                              left: `${data.labelPosition.x}px`,
+                              top: `${data.labelPosition.y}px`,
+                              backgroundColor: '#facc15',
+                              color: '#111827',
+                              zIndex: 4,
+                              pointerEvents: 'none'
+                            }}
+                          >
+                            ⚠ Orphaned
+                          </div>
+                        )}
+                        <div
+                          className="absolute"
+                          style={{
+                            left: `${data.buttonPosition.x}px`,
+                            top: `${data.buttonPosition.y}px`,
+                            zIndex: 4
+                          }}
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              removeHighlight(data.highlight.id)
+                            }}
+                            className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
+                            style={{ pointerEvents: 'auto' }}
+                            title="Delete highlight"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </React.Fragment>
+                    ))}
+                  </>
+                )
+              })()}
                 </div>
         </div>
       )}

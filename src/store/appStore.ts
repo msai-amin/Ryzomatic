@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { authService, AuthUser } from '../services/supabaseAuthService'
 import { DocumentRelationshipWithDetails } from '../../lib/supabase'
+import { HighlightPosition as ServiceHighlightPosition } from '../services/highlightService'
 
 export interface TextAnchors {
   startIndex?: number
@@ -16,12 +17,7 @@ export interface Highlight {
   highlighted_text: string
   color_id: string
   color_hex: string
-  position_data: {
-    x: number
-    y: number
-    width: number
-    height: number
-  }
+  position_data: ServiceHighlightPosition
   text_start_offset?: number
   text_end_offset?: number
   text_context_before?: string
