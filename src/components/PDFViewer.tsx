@@ -204,6 +204,39 @@ const getSelectedTextLayerSpans = (range: Range, textLayerDiv: HTMLElement | nul
   })
 }
 
+const getTightBoundingRectForSpan = (span: HTMLElement): DOMRect | null => {
+  if (span.dataset?.isWhitespace === 'true') {
+    return null
+  }
+
+  const firstChild = span.firstChild
+  if (firstChild && firstChild.nodeType === Node.TEXT_NODE) {
+    const textContent = firstChild.textContent ?? ''
+    const leadingWhitespaceMatch = textContent.match(/^\s+/)
+    const trailingWhitespaceMatch = textContent.match(/\s+$/)
+    const leading = leadingWhitespaceMatch ? leadingWhitespaceMatch[0].length : 0
+    const trailing = trailingWhitespaceMatch ? trailingWhitespaceMatch[0].length : 0
+    const start = leading
+    const end = textContent.length - trailing
+
+    if (start < end) {
+      const range = document.createRange()
+      range.setStart(firstChild, start)
+      range.setEnd(firstChild, end)
+      const rect = range.getBoundingClientRect()
+      range.detach?.()
+      if (rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON) {
+        return rect
+      }
+    }
+  }
+
+  const fallbackRect = span.getBoundingClientRect()
+  return fallbackRect.width > RECT_SIZE_EPSILON && fallbackRect.height > RECT_SIZE_EPSILON
+    ? fallbackRect
+    : null
+}
+
 // Parse text to preserve paragraph structure - USED ONLY IN READING MODE
 // CACHE BUST v3 - Force Vercel to rebuild with new bundle hash
 function parseTextWithBreaks(text: string): TextSegment[] {
@@ -2391,8 +2424,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
       const containerMetrics = getContainerMetrics(pageContainer, textLayerDivForGeometry)
       const containerRect = containerMetrics.rect
-      const widthLimit = Math.max(containerMetrics.width, RECT_SIZE_EPSILON * 2)
-      const heightLimit = Math.max(containerMetrics.height, RECT_SIZE_EPSILON * 2)
+      const textLayerBounds = textLayerDivForGeometry?.getBoundingClientRect()
+      const widthLimit = Math.max(
+        Math.min(containerMetrics.width, textLayerBounds?.width ?? containerMetrics.width),
+        RECT_SIZE_EPSILON * 2
+      )
+      const heightLimit = Math.max(
+        Math.min(containerMetrics.height, textLayerBounds?.height ?? containerMetrics.height),
+        RECT_SIZE_EPSILON * 2
+      )
       
       // CRITICAL: Calculate position relative to the page container
       // The text spans use position: absolute within the page container
@@ -2404,8 +2444,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const baseViewport = page.getViewport({ scale: 1, rotation })
       const selectedSpanElements = getSelectedTextLayerSpans(range, textLayerDivForGeometry)
       const spanRects = selectedSpanElements
-        .map(span => span.getBoundingClientRect())
-        .filter(rect => rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON)
+        .map(span => getTightBoundingRectForSpan(span))
+        .filter((rect): rect is DOMRect => !!rect && rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON)
 
       if (selectedSpanElements.length === 0) {
         logger.warn('PDFViewer: selection detected but no textLayer spans intersected the range', {
