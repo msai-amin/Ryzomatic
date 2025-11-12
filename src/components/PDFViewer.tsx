@@ -128,6 +128,108 @@ interface HighlightRenderData {
 
 const LINE_MERGE_THRESHOLD_PX = 2
 const RECT_SIZE_EPSILON = 0.5
+const TRANSFORM_FLOAT_REGEX = /matrix\(([^)]+)\)/
+
+const clamp = (value: number, min: number, max: number): number => {
+  if (Number.isNaN(value)) return min
+  return Math.min(Math.max(value, min), max)
+}
+
+const normalizeRectWithinBounds = (rect: RectLike, widthLimit: number, heightLimit: number): RectLike | null => {
+  const safeWidthLimit = Math.max(widthLimit, RECT_SIZE_EPSILON)
+  const safeHeightLimit = Math.max(heightLimit, RECT_SIZE_EPSILON)
+
+  let x = rect.x
+  let y = rect.y
+  let width = rect.width
+  let height = rect.height
+
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) {
+    return null
+  }
+
+  if (width <= RECT_SIZE_EPSILON || height <= RECT_SIZE_EPSILON) {
+    return null
+  }
+
+  if (x < 0) {
+    width += x
+    x = 0
+  }
+  if (y < 0) {
+    height += y
+    y = 0
+  }
+
+  if (x + width > safeWidthLimit) {
+    width = safeWidthLimit - x
+  }
+  if (y + height > safeHeightLimit) {
+    height = safeHeightLimit - y
+  }
+
+  if (width <= RECT_SIZE_EPSILON || height <= RECT_SIZE_EPSILON) {
+    return null
+  }
+
+  return { x, y, width, height }
+}
+
+const extractTransformScales = (transform: string | null): { scaleX: number; scaleY: number } => {
+  if (!transform || transform === 'none') {
+    return { scaleX: 1, scaleY: 1 }
+  }
+  const match = TRANSFORM_FLOAT_REGEX.exec(transform)
+  if (!match) {
+    return { scaleX: 1, scaleY: 1 }
+  }
+  const values = match[1].split(',').map(v => parseFloat(v.trim()))
+  if (values.length < 4) {
+    return { scaleX: 1, scaleY: 1 }
+  }
+  const scaleX = Number.isFinite(values[0]) && values[0] !== 0 ? values[0] : 1
+  const scaleY = Number.isFinite(values[3]) && values[3] !== 0 ? values[3] : 1
+  return { scaleX, scaleY }
+}
+
+interface ContainerMetrics {
+  rect: DOMRect
+  width: number
+  height: number
+  scaleX: number
+  scaleY: number
+}
+
+const getContainerMetrics = (container: HTMLElement, textLayerDiv?: HTMLElement | null): ContainerMetrics => {
+  const rect = container.getBoundingClientRect()
+  const computedStyle = window.getComputedStyle(container)
+  const { scaleX, scaleY } = extractTransformScales(computedStyle.transform)
+
+  const textLayerRect = textLayerDiv?.getBoundingClientRect()
+
+  const widthCandidates = [
+    rect.width,
+    (textLayerRect?.width ?? 0) * scaleX,
+    container.offsetWidth * scaleX,
+    container.clientWidth * scaleX,
+    container.scrollWidth * scaleX,
+    (textLayerDiv?.scrollWidth ?? 0) * scaleX
+  ].filter(value => Number.isFinite(value) && value > RECT_SIZE_EPSILON)
+
+  const heightCandidates = [
+    rect.height,
+    (textLayerRect?.height ?? 0) * scaleY,
+    container.offsetHeight * scaleY,
+    container.clientHeight * scaleY,
+    container.scrollHeight * scaleY,
+    (textLayerDiv?.scrollHeight ?? 0) * scaleY
+  ].filter(value => Number.isFinite(value) && value > RECT_SIZE_EPSILON)
+
+  const width = widthCandidates.length > 0 ? Math.max(...widthCandidates) : Math.max(rect.width, RECT_SIZE_EPSILON)
+  const height = heightCandidates.length > 0 ? Math.max(...heightCandidates) : Math.max(rect.height, RECT_SIZE_EPSILON)
+
+  return { rect, width, height, scaleX, scaleY }
+}
 
 const getSelectedTextLayerSpans = (range: Range, textLayerDiv: HTMLElement | null): HTMLElement[] => {
   if (!textLayerDiv) return []
@@ -175,45 +277,32 @@ const mergeSpanRectsByLine = (rects: DOMRect[]): LineRect[] => {
   return groups
 }
 
-const convertLineRectToScreenRect = (lineRect: LineRect, containerRect: DOMRect): RectLike | null => {
-  let x = lineRect.left - containerRect.left
-  let y = lineRect.top - containerRect.top
-  let width = lineRect.right - lineRect.left
-  let height = lineRect.bottom - lineRect.top
-
-  if (width <= RECT_SIZE_EPSILON || height <= RECT_SIZE_EPSILON) {
-    return null
+const convertLineRectToScreenRect = (
+  lineRect: LineRect,
+  containerRect: DOMRect,
+  widthLimit?: number,
+  heightLimit?: number
+): RectLike | null => {
+  const rawRect: RectLike = {
+    x: lineRect.left - containerRect.left,
+    y: lineRect.top - containerRect.top,
+    width: lineRect.right - lineRect.left,
+    height: lineRect.bottom - lineRect.top
   }
 
-  if (x < 0) {
-    width += x
-    x = 0
-  }
-  if (y < 0) {
-    height += y
-    y = 0
-  }
-  const maxWidth = containerRect.width
-  const maxHeight = containerRect.height
-  if (x + width > maxWidth) {
-    width = maxWidth - x
-  }
-  if (y + height > maxHeight) {
-    height = maxHeight - y
-  }
+  const effectiveWidthLimit = widthLimit ?? containerRect.width
+  const effectiveHeightLimit = heightLimit ?? containerRect.height
 
-  if (width <= RECT_SIZE_EPSILON || height <= RECT_SIZE_EPSILON) {
-    return null
-  }
-
-  return { x, y, width, height }
+  return normalizeRectWithinBounds(rawRect, effectiveWidthLimit, effectiveHeightLimit)
 }
 
 const computeGeometryFromSelectedSpans = (
   spans: HTMLElement[],
   containerRect: DOMRect,
   currentViewport: any,
-  baseViewport: any
+  baseViewport: any,
+  widthLimit: number,
+  heightLimit: number
 ) => {
   if (!spans.length) {
     return null
@@ -229,7 +318,7 @@ const computeGeometryFromSelectedSpans = (
 
   const mergedLineRects = mergeSpanRectsByLine(rects)
   const screenRects = mergedLineRects
-    .map(lineRect => convertLineRectToScreenRect(lineRect, containerRect))
+    .map(lineRect => convertLineRectToScreenRect(lineRect, containerRect, widthLimit, heightLimit))
     .filter((rect): rect is RectLike => !!rect)
 
   if (!screenRects.length) {
@@ -2456,30 +2545,31 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         return
       }
 
-      // Get the container's bounding rectangle in viewport coordinates
-      const containerRect = pageContainer.getBoundingClientRect()
+      const textLayerDivForGeometry = pdfViewer.scrollMode === 'continuous'
+        ? pageTextLayerRefs.current.get(activeSelection.pageNumber)
+        : textLayerRef.current
+
+      const containerMetrics = getContainerMetrics(pageContainer, textLayerDivForGeometry)
+      const containerRect = containerMetrics.rect
+      const widthLimit = Math.max(containerMetrics.width, RECT_SIZE_EPSILON * 2)
+      const heightLimit = Math.max(containerMetrics.height, RECT_SIZE_EPSILON * 2)
       
       // CRITICAL: Calculate position relative to the page container
       // The text spans use position: absolute within the page container
       // We need to match their coordinate system exactly
       
-      // Account for any CSS transforms on the container
-      const containerStyles = window.getComputedStyle(pageContainer)
-      const transform = containerStyles.transform
-      
       const safeScale = Math.max(scale, 0.1) // Prevent division by zero
       const page = await pdfDocRef.current.getPage(activeSelection.pageNumber)
       const currentViewport = page.getViewport({ scale: safeScale, rotation })
       const baseViewport = page.getViewport({ scale: 1, rotation })
-      const textLayerDivForGeometry = pdfViewer.scrollMode === 'continuous'
-        ? pageTextLayerRefs.current.get(activeSelection.pageNumber)
-        : textLayerRef.current
       const selectedSpanElements = getSelectedTextLayerSpans(range, textLayerDivForGeometry)
       const geometry = computeGeometryFromSelectedSpans(
         selectedSpanElements,
         containerRect,
         currentViewport,
-        baseViewport
+        baseViewport,
+        widthLimit,
+        heightLimit
       )
 
       let highlightPosition: RectLike & { rects?: RectLike[] }
@@ -2494,14 +2584,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         }
         rawPosition = geometry.boundingScreenRect
       } else {
-        const fallbackScreenRect: RectLike = {
+        const fallbackScreenRectRaw: RectLike = {
           x: selectionRect.left - containerRect.left,
           y: selectionRect.top - containerRect.top,
           width: selectionRect.width,
           height: selectionRect.height
         }
+        const normalizedFallback =
+          normalizeRectWithinBounds(fallbackScreenRectRaw, widthLimit, heightLimit) ?? {
+            x: clamp(fallbackScreenRectRaw.x, 0, widthLimit - RECT_SIZE_EPSILON),
+            y: clamp(fallbackScreenRectRaw.y, 0, heightLimit - RECT_SIZE_EPSILON),
+            width: Math.max(RECT_SIZE_EPSILON, Math.min(widthLimit, Math.abs(fallbackScreenRectRaw.width))),
+            height: Math.max(RECT_SIZE_EPSILON, Math.min(heightLimit, Math.abs(fallbackScreenRectRaw.height)))
+          }
         const position = convertScreenRectToBaseViewportRect(
-          fallbackScreenRect,
+          normalizedFallback,
           currentViewport,
           baseViewport
         )
@@ -2510,7 +2607,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           ...position,
           rects: rectsForStorage
         }
-        rawPosition = fallbackScreenRect
+        rawPosition = normalizedFallback
       }
 
       const hasInvalidRect = rectsForStorage.some(rect => rect.width <= 0 || rect.height <= 0)
@@ -2556,6 +2653,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           scrollTop: scrollContainerRef.current?.scrollTop || 0
         },
         rawPosition,
+        containerWidth: widthLimit,
+        containerHeight: heightLimit,
         selectedSpanCount: selectedSpanElements.length,
         geometryDerived: !!geometry,
         baseViewportPosition: highlightPosition,
@@ -2583,9 +2682,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         const textContent = await page.getTextContent()
         
         // Find text layer spans that correspond to the selected range
-        const textLayerDiv = pdfViewer.scrollMode === 'continuous'
-          ? pageTextLayerRefs.current.get(activeSelection.pageNumber)
-          : textLayerRef.current
+        const textLayerDiv = textLayerDivForGeometry
         
         if (textLayerDiv) {
           const spansForAnchors = selectedSpanElements.length > 0
