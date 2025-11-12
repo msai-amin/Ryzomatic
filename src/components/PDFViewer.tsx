@@ -2078,84 +2078,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     setContextMenu(null)
   }, [contextMenu])
 
-  const handleTextSelection = useCallback((event: MouseEvent) => {
-    const selection = window.getSelection()
-    if (!selection || selection.isCollapsed || !selection.rangeCount) {
-      setSelectedTextInfo(null)
-      return
-    }
-
-    const selectedText = selection.toString().trim()
-    if (selectedText.length < 2) {
-      setSelectedTextInfo(null)
-      return
-    }
-
-    // Get the range and position
-    const range = selection.getRangeAt(0)
-    const rect = range.getBoundingClientRect()
-
-    // Determine which page the selection is on
-    let currentPage = pageNumber
-    // In reading mode or continuous scroll mode, detect page from DOM
-    if (pdfViewer.readingMode || pdfViewer.scrollMode === 'continuous') {
-      // Find the page containing the selection
-      const targetElement = range.commonAncestorContainer
-      const pageElement = (targetElement as Element).closest?.('[data-page-number]') ||
-                         (targetElement.nodeType === Node.TEXT_NODE 
-                           ? (targetElement.parentElement as Element)?.closest?.('[data-page-number]')
-                           : null)
-      if (pageElement) {
-        const pageAttr = pageElement.getAttribute('data-page-number')
-        if (pageAttr) {
-          currentPage = parseInt(pageAttr, 10)
-        }
-      }
-    }
-
-    console.log('📝 Text selection detected:', {
-      selectedText: selectedText.substring(0, 50),
-      scrollMode: pdfViewer.scrollMode,
-      pageNumber: currentPage,
-      selectionRect: { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
-      rangeInfo: {
-        startContainer: range.startContainer.nodeName,
-        endContainer: range.endContainer.nodeName,
-        startOffset: range.startOffset,
-        endOffset: range.endOffset
-      }
-    })
-
-    // ALWAYS store selection info (used by notes, AI, context menu, etc.)
-    const selectionDetails = {
-      text: selectedText,
-      pageNumber: currentPage,
-      range
-    }
-    setSelectedTextInfo(selectionDetails)
-
-    if (isHighlightMode) {
-      handleCreateHighlight(currentHighlightColorId, currentHighlightColor, selectionDetails)
-    }
-  }, [pdfViewer.scrollMode, pdfViewer.readingMode, pageNumber, isHighlightMode, handleCreateHighlight, currentHighlightColorId, currentHighlightColor])
-  
-  // Handle right-click context menu for AI features
-  const handleContextMenuClick = useCallback((event: React.MouseEvent) => {
-    if (hasTextSelection()) {
-      event.preventDefault()
-      const selection = window.getSelection()
-      if (selection) {
-        setSelectedTextInfo(null)
-        
-        setContextMenu({
-          x: event.clientX,
-          y: event.clientY,
-          text: selection.toString().trim()
-        })
-      }
-    }
-  }, [])
-
   // Create highlight after color selection
   const handleCreateHighlight = useCallback(async (colorId: string, colorHex: string, selectionOverride?: { text: string; pageNumber: number; range: Range | null }) => {
     const activeSelection = selectionOverride ?? selectedTextInfo
@@ -2544,6 +2466,84 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       setSelectedTextInfo(null)
     }
   }, [selectedTextInfo, document.id, document.pageTexts])
+
+  const handleTextSelection = useCallback((event: MouseEvent) => {
+    const selection = window.getSelection()
+    if (!selection || selection.isCollapsed || !selection.rangeCount) {
+      setSelectedTextInfo(null)
+      return
+    }
+
+    const selectedText = selection.toString().trim()
+    if (selectedText.length < 2) {
+      setSelectedTextInfo(null)
+      return
+    }
+
+    // Get the range and position
+    const range = selection.getRangeAt(0)
+    const rect = range.getBoundingClientRect()
+
+    // Determine which page the selection is on
+    let currentPage = pageNumber
+    // In reading mode or continuous scroll mode, detect page from DOM
+    if (pdfViewer.readingMode || pdfViewer.scrollMode === 'continuous') {
+      // Find the page containing the selection
+      const targetElement = range.commonAncestorContainer
+      const pageElement = (targetElement as Element).closest?.('[data-page-number]') ||
+                         (targetElement.nodeType === Node.TEXT_NODE 
+                           ? (targetElement.parentElement as Element)?.closest?.('[data-page-number]')
+                           : null)
+      if (pageElement) {
+        const pageAttr = pageElement.getAttribute('data-page-number')
+        if (pageAttr) {
+          currentPage = parseInt(pageAttr, 10)
+        }
+      }
+    }
+
+    console.log('📝 Text selection detected:', {
+      selectedText: selectedText.substring(0, 50),
+      scrollMode: pdfViewer.scrollMode,
+      pageNumber: currentPage,
+      selectionRect: { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
+      rangeInfo: {
+        startContainer: range.startContainer.nodeName,
+        endContainer: range.endContainer.nodeName,
+        startOffset: range.startOffset,
+        endOffset: range.endOffset
+      }
+    })
+
+    // ALWAYS store selection info (used by notes, AI, context menu, etc.)
+    const selectionDetails = {
+      text: selectedText,
+      pageNumber: currentPage,
+      range
+    }
+    setSelectedTextInfo(selectionDetails)
+
+    if (isHighlightMode) {
+      handleCreateHighlight(currentHighlightColorId, currentHighlightColor, selectionDetails)
+    }
+  }, [pdfViewer.scrollMode, pdfViewer.readingMode, pageNumber, isHighlightMode, handleCreateHighlight, currentHighlightColorId, currentHighlightColor])
+  
+  // Handle right-click context menu for AI features
+  const handleContextMenuClick = useCallback((event: React.MouseEvent) => {
+    if (hasTextSelection()) {
+      event.preventDefault()
+      const selection = window.getSelection()
+      if (selection) {
+        setSelectedTextInfo(null)
+        
+        setContextMenu({
+          x: event.clientX,
+          y: event.clientY,
+          text: selection.toString().trim()
+        })
+      }
+    }
+  }, [])
 
   // Mark highlights as orphaned when page text is edited
   const markPageHighlightsOrphaned = useCallback(async (pageNum: number) => {
