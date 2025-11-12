@@ -51,7 +51,7 @@ import { HighlightColorPopover } from './HighlightColorPopover'
 import { notesService } from '../services/notesService'
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
-import { convertScreenRectToBaseViewportRect } from '../utils/highlightCoordinates'
+import { convertScreenRectToBaseViewportRect, RectLike } from '../utils/highlightCoordinates'
 import { supabase } from '../../lib/supabase'
 import { configurePDFWorker } from '../utils/pdfjsConfig'
 import { useTheme } from '../../themes/ThemeProvider'
@@ -124,6 +124,163 @@ interface HighlightRenderData {
   labelPosition: { x: number; y: number }
   outlineStyle: string
   outlineOffset: number
+}
+
+const LINE_MERGE_THRESHOLD_PX = 2
+const RECT_SIZE_EPSILON = 0.5
+
+const getSelectedTextLayerSpans = (range: Range, textLayerDiv: HTMLElement | null): HTMLElement[] => {
+  if (!textLayerDiv) return []
+  const spans = Array.from(textLayerDiv.querySelectorAll('span')) as HTMLElement[]
+  return spans.filter(span => {
+    if (!span.textContent || span.textContent.trim().length === 0) return false
+    try {
+      return range.intersectsNode(span)
+    } catch {
+      return false
+    }
+  })
+}
+
+type LineRect = { left: number; right: number; top: number; bottom: number }
+
+const mergeSpanRectsByLine = (rects: DOMRect[]): LineRect[] => {
+  const sorted = [...rects].sort((a, b) => a.top - b.top)
+  const groups: LineRect[] = []
+
+  sorted.forEach(rect => {
+    if (rect.width <= RECT_SIZE_EPSILON || rect.height <= RECT_SIZE_EPSILON) {
+      return
+    }
+    const match = groups.find(group =>
+      Math.abs(group.top - rect.top) <= LINE_MERGE_THRESHOLD_PX ||
+      Math.abs(group.bottom - rect.bottom) <= LINE_MERGE_THRESHOLD_PX
+    )
+
+    if (match) {
+      match.left = Math.min(match.left, rect.left)
+      match.right = Math.max(match.right, rect.right)
+      match.top = Math.min(match.top, rect.top)
+      match.bottom = Math.max(match.bottom, rect.bottom)
+    } else {
+      groups.push({
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom
+      })
+    }
+  })
+
+  return groups
+}
+
+const convertLineRectToScreenRect = (lineRect: LineRect, containerRect: DOMRect): RectLike | null => {
+  let x = lineRect.left - containerRect.left
+  let y = lineRect.top - containerRect.top
+  let width = lineRect.right - lineRect.left
+  let height = lineRect.bottom - lineRect.top
+
+  if (width <= RECT_SIZE_EPSILON || height <= RECT_SIZE_EPSILON) {
+    return null
+  }
+
+  if (x < 0) {
+    width += x
+    x = 0
+  }
+  if (y < 0) {
+    height += y
+    y = 0
+  }
+  const maxWidth = containerRect.width
+  const maxHeight = containerRect.height
+  if (x + width > maxWidth) {
+    width = maxWidth - x
+  }
+  if (y + height > maxHeight) {
+    height = maxHeight - y
+  }
+
+  if (width <= RECT_SIZE_EPSILON || height <= RECT_SIZE_EPSILON) {
+    return null
+  }
+
+  return { x, y, width, height }
+}
+
+const computeGeometryFromSelectedSpans = (
+  spans: HTMLElement[],
+  containerRect: DOMRect,
+  currentViewport: any,
+  baseViewport: any
+) => {
+  if (!spans.length) {
+    return null
+  }
+
+  const rects = spans
+    .map(span => span.getBoundingClientRect())
+    .filter(rect => rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON)
+
+  if (!rects.length) {
+    return null
+  }
+
+  const mergedLineRects = mergeSpanRectsByLine(rects)
+  const screenRects = mergedLineRects
+    .map(lineRect => convertLineRectToScreenRect(lineRect, containerRect))
+    .filter((rect): rect is RectLike => !!rect)
+
+  if (!screenRects.length) {
+    return null
+  }
+
+  const bounding = screenRects.reduce(
+    (acc, rect) => ({
+      minX: Math.min(acc.minX, rect.x),
+      minY: Math.min(acc.minY, rect.y),
+      maxX: Math.max(acc.maxX, rect.x + rect.width),
+      maxY: Math.max(acc.maxY, rect.y + rect.height)
+    }),
+    {
+      minX: Number.POSITIVE_INFINITY,
+      minY: Number.POSITIVE_INFINITY,
+      maxX: Number.NEGATIVE_INFINITY,
+      maxY: Number.NEGATIVE_INFINITY
+    }
+  )
+
+  if (!Number.isFinite(bounding.minX) || !Number.isFinite(bounding.minY) || !Number.isFinite(bounding.maxX) || !Number.isFinite(bounding.maxY)) {
+    return null
+  }
+
+  const boundingScreenRect: RectLike = {
+    x: bounding.minX,
+    y: bounding.minY,
+    width: bounding.maxX - bounding.minX,
+    height: bounding.maxY - bounding.minY
+  }
+
+  if (boundingScreenRect.width <= RECT_SIZE_EPSILON || boundingScreenRect.height <= RECT_SIZE_EPSILON) {
+    return null
+  }
+
+  const viewportRects = screenRects.map(rect =>
+    convertScreenRectToBaseViewportRect(rect, currentViewport, baseViewport)
+  )
+  const boundingViewportRect = convertScreenRectToBaseViewportRect(
+    boundingScreenRect,
+    currentViewport,
+    baseViewport
+  )
+
+  return {
+    screenRects,
+    viewportRects,
+    boundingScreenRect,
+    boundingViewportRect
+  }
 }
 
 // Parse text to preserve paragraph structure - USED ONLY IN READING MODE
@@ -405,7 +562,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           width: highlight.position_data.width,
           height: highlight.position_data.height
         }]
-    const scaledRects = rectsSource
+    const scaledRectsRaw = rectsSource
       .map(rect => ({
         x: rect.x * safeScale,
         y: rect.y * safeScale,
@@ -421,11 +578,37 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         rect.height > 0
       )
 
-    if (scaledRects.length === 0) {
+    if (scaledRectsRaw.length === 0) {
       return null
     }
 
-    const bounds = scaledRects.reduce(
+    const mergedScaledRects = scaledRectsRaw.reduce<HighlightRenderRect[]>((acc, rect) => {
+      const match = acc.find(existing =>
+        Math.abs(existing.y - rect.y) <= 1 &&
+        Math.abs((existing.y + existing.height) - (rect.y + rect.height)) <= 1
+      )
+
+      if (match) {
+        const newLeft = Math.min(match.x, rect.x)
+        const newRight = Math.max(match.x + match.width, rect.x + rect.width)
+        const newTop = Math.min(match.y, rect.y)
+        const newBottom = Math.max(match.y + match.height, rect.y + rect.height)
+        match.x = newLeft
+        match.y = newTop
+        match.width = newRight - newLeft
+        match.height = newBottom - newTop
+      } else {
+        acc.push({ ...rect })
+      }
+
+      return acc
+    }, [])
+
+    if (mergedScaledRects.length === 0) {
+      return null
+    }
+
+    const bounds = mergedScaledRects.reduce(
       (acc, rect) => ({
         minX: Math.min(acc.minX, rect.x),
         minY: Math.min(acc.minY, rect.y),
@@ -464,7 +647,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
     return {
       highlight,
-      scaledRects,
+      scaledRects: mergedScaledRects,
       buttonPosition,
       labelPosition,
       outlineStyle,
@@ -2284,102 +2467,67 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const containerStyles = window.getComputedStyle(pageContainer)
       const transform = containerStyles.transform
       
-      const clientRectsArray = Array.from(range.getClientRects()).filter(rect => rect.width > 0 && rect.height > 0)
-      const rectsForComputation = clientRectsArray.length > 0 ? clientRectsArray : [selectionRect]
-
-      const combinedRect = rectsForComputation.reduce(
-        (acc, rect) => ({
-          left: Math.min(acc.left, rect.left),
-          top: Math.min(acc.top, rect.top),
-          right: Math.max(acc.right, rect.right),
-          bottom: Math.max(acc.bottom, rect.bottom)
-        }),
-        {
-          left: Number.POSITIVE_INFINITY,
-          top: Number.POSITIVE_INFINITY,
-          right: Number.NEGATIVE_INFINITY,
-          bottom: Number.NEGATIVE_INFINITY
-        }
-      )
-
-      const normalizedCombinedRect = {
-        left: Number.isFinite(combinedRect.left) ? combinedRect.left : selectionRect.left,
-        top: Number.isFinite(combinedRect.top) ? combinedRect.top : selectionRect.top,
-        right: Number.isFinite(combinedRect.right) ? combinedRect.right : selectionRect.right,
-        bottom: Number.isFinite(combinedRect.bottom) ? combinedRect.bottom : selectionRect.bottom
-      }
-
-      // selectionRect gives us viewport coordinates, containerRect gives us the container's viewport position
-      // Subtracting gives us the position within the container - same coordinate system as text spans
-      const rawRects = rectsForComputation.map(rect => ({
-        x: rect.left - containerRect.left,
-        y: rect.top - containerRect.top,
-        width: rect.width,
-        height: rect.height
-      }))
-
-      let rawPosition = {
-        x: normalizedCombinedRect.left - containerRect.left,
-        y: normalizedCombinedRect.top - containerRect.top,
-        width: normalizedCombinedRect.right - normalizedCombinedRect.left,
-        height: normalizedCombinedRect.bottom - normalizedCombinedRect.top
-      }
-      
-      // CRITICAL: Account for container transforms that might affect coordinate system
-      // If container has a transform (e.g., scale), we need to adjust coordinates
-      if (transform && transform !== 'none') {
-        // Parse transform matrix if present
-        const matrixMatch = transform.match(/matrix\(([^)]+)\)/)
-        if (matrixMatch) {
-          const values = matrixMatch[1].split(',').map(v => parseFloat(v.trim()))
-          if (values.length >= 4) {
-            // Transform scaling is typically in values[0] (scaleX) and values[3] (scaleY)
-            // Translation is in values[4] (translateX) and values[5] (translateY)
-            const scaleX = values[0] || 1
-            const scaleY = values[3] || 1
-            
-            // If transform is applied, coordinates need to be adjusted
-            // getBoundingClientRect already accounts for transforms, but we need
-            // to ensure we're using the right coordinate space
-            // For most cases, getBoundingClientRect handles this correctly
-            // But if there's scaling, we may need to adjust
-            if (scaleX !== 1 || scaleY !== 1) {
-              // The coordinates from getBoundingClientRect are already transformed
-              // But we need to work in the container's local coordinate space
-              // This is already handled by subtracting containerRect, so we're good
-            }
-          }
-        }
-      }
-
-      // TEXT ALIGNMENT: Use browser's getBoundingClientRect() without adjustments
-      // Previous adjustments were causing position misalignment - browser rect is already accurate
-      
-      // Get text element for debugging
-      const textElement = range.startContainer.parentElement
-
       const safeScale = Math.max(scale, 0.1) // Prevent division by zero
       const page = await pdfDocRef.current.getPage(activeSelection.pageNumber)
       const currentViewport = page.getViewport({ scale: safeScale, rotation })
       const baseViewport = page.getViewport({ scale: 1, rotation })
-      const position = convertScreenRectToBaseViewportRect(rawPosition, currentViewport, baseViewport)
-      const normalizedRects = rawRects.map(rect =>
-        convertScreenRectToBaseViewportRect(rect, currentViewport, baseViewport)
+      const textLayerDivForGeometry = pdfViewer.scrollMode === 'continuous'
+        ? pageTextLayerRefs.current.get(activeSelection.pageNumber)
+        : textLayerRef.current
+      const selectedSpanElements = getSelectedTextLayerSpans(range, textLayerDivForGeometry)
+      const geometry = computeGeometryFromSelectedSpans(
+        selectedSpanElements,
+        containerRect,
+        currentViewport,
+        baseViewport
       )
-      const rectsForStorage = normalizedRects.length > 0 ? normalizedRects : [position]
-      const highlightPosition = {
-        ...position,
-        rects: rectsForStorage
+
+      let highlightPosition: RectLike & { rects?: RectLike[] }
+      let rectsForStorage: RectLike[]
+      let rawPosition: RectLike
+
+      if (geometry) {
+        rectsForStorage = geometry.viewportRects
+        highlightPosition = {
+          ...geometry.boundingViewportRect,
+          rects: rectsForStorage
+        }
+        rawPosition = geometry.boundingScreenRect
+      } else {
+        const fallbackScreenRect: RectLike = {
+          x: selectionRect.left - containerRect.left,
+          y: selectionRect.top - containerRect.top,
+          width: selectionRect.width,
+          height: selectionRect.height
+        }
+        const position = convertScreenRectToBaseViewportRect(
+          fallbackScreenRect,
+          currentViewport,
+          baseViewport
+        )
+        rectsForStorage = [position]
+        highlightPosition = {
+          ...position,
+          rects: rectsForStorage
+        }
+        rawPosition = fallbackScreenRect
       }
 
-      // ROBUST VALIDATION: Check for reasonable position values
       const hasInvalidRect = rectsForStorage.some(rect => rect.width <= 0 || rect.height <= 0)
-      if (position.x < 0 || position.y < 0 || position.width <= 0 || position.height <= 0 || hasInvalidRect) {
-        console.error('Invalid calculated position:', { rawPosition, position, rectsForStorage, scale })
+      if (
+        highlightPosition.x < 0 ||
+        highlightPosition.y < 0 ||
+        highlightPosition.width <= 0 ||
+        highlightPosition.height <= 0 ||
+        hasInvalidRect
+      ) {
+        console.error('Invalid calculated position:', { rawPosition, highlightPosition, rectsForStorage, scale })
         alert('Cannot create highlight: Invalid position calculation. Please try selecting the text again.')
         setSelectedTextInfo(null)
         return
       }
+
+      const textElement = selectedSpanElements[0] ?? range.startContainer.parentElement
 
       console.log('Highlight position debug:', {
         pageNumber: activeSelection.pageNumber,
@@ -2408,8 +2556,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           scrollTop: scrollContainerRef.current?.scrollTop || 0
         },
         rawPosition,
-        rawRects,
-        baseViewportPosition: position,
+        selectedSpanCount: selectedSpanElements.length,
+        geometryDerived: !!geometry,
+        baseViewportPosition: highlightPosition,
         baseViewportRects: rectsForStorage,
         safeScale: safeScale,
         textElement: {
@@ -2434,70 +2583,60 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         const textContent = await page.getTextContent()
         
         // Find text layer spans that correspond to the selected range
-        const selectedText = activeSelection.text.trim()
         const textLayerDiv = pdfViewer.scrollMode === 'continuous'
           ? pageTextLayerRefs.current.get(activeSelection.pageNumber)
           : textLayerRef.current
         
         if (textLayerDiv) {
-          // Find all spans within the selection range
-          const selection = window.getSelection()
-          if (selection && selection.rangeCount > 0) {
-            const selectionRange = selection.getRangeAt(0)
-            const spans = textLayerDiv.querySelectorAll('span')
-            
-            const itemIds: number[] = []
-            let startIndex: number | undefined
-            let endIndex: number | undefined
-            
-            // Find spans that intersect with the selection
-            spans.forEach((span, spanIndex) => {
-              const spanRect = span.getBoundingClientRect()
-              const rangeRect = selectionRange.getBoundingClientRect()
-              
-              // Check if span intersects with selection
-              const intersects = !(
-                spanRect.right < rangeRect.left ||
-                spanRect.left > rangeRect.right ||
-                spanRect.bottom < rangeRect.top ||
-                spanRect.top > rangeRect.bottom
-              )
-              
-              if (intersects) {
-                // Use data-text-index attribute if available (from manual rendering)
-                const textIndexAttr = span.getAttribute('data-text-index')
-                if (textIndexAttr !== null) {
-                  const index = parseInt(textIndexAttr, 10)
-                  if (!isNaN(index) && !itemIds.includes(index)) {
-                    itemIds.push(index)
-                    if (startIndex === undefined || index < startIndex) startIndex = index
-                    if (endIndex === undefined || index > endIndex) endIndex = index
-                  }
-                } else {
-                  // Fallback: try to match by text content
-                  const spanText = span.textContent || ''
-                  for (let i = 0; i < textContent.items.length; i++) {
-                    const item = textContent.items[i] as any
-                    if (item.str === spanText && !itemIds.includes(i)) {
-                      itemIds.push(i)
-                      if (startIndex === undefined) startIndex = i
-                      endIndex = i
-                      break
-                    }
-                  }
+          const spansForAnchors = selectedSpanElements.length > 0
+            ? selectedSpanElements
+            : Array.from(textLayerDiv.querySelectorAll('span')) as HTMLElement[]
+
+          const itemIds: number[] = []
+          let startIndex: number | undefined
+          let endIndex: number | undefined
+
+          spansForAnchors.forEach(span => {
+            if (selectedSpanElements.length === 0) {
+              try {
+                if (!range.intersectsNode(span)) {
+                  return
+                }
+              } catch {
+                // ignore errors from intersectsNode
+              }
+            }
+
+            const textIndexAttr = span.getAttribute('data-text-index')
+            if (textIndexAttr !== null) {
+              const index = parseInt(textIndexAttr, 10)
+              if (!isNaN(index) && !itemIds.includes(index)) {
+                itemIds.push(index)
+                if (startIndex === undefined || index < startIndex) startIndex = index
+                if (endIndex === undefined || index > endIndex) endIndex = index
+              }
+            } else {
+              const spanText = span.textContent || ''
+              for (let i = 0; i < textContent.items.length; i++) {
+                const item = textContent.items[i] as any
+                if (item.str === spanText && !itemIds.includes(i)) {
+                  itemIds.push(i)
+                  if (startIndex === undefined) startIndex = i
+                  endIndex = i
+                  break
                 }
               }
-            })
-            
-            // If we found items, create text anchors
-            if (itemIds.length > 0) {
-              textAnchors = {
-                startIndex: startIndex,
-                endIndex: endIndex,
-                itemIds: itemIds.sort((a, b) => a - b) // Sort ascending
-              }
-              console.log('📌 Captured text anchors:', textAnchors)
             }
+          })
+
+          if (itemIds.length > 0) {
+            itemIds.sort((a, b) => a - b)
+            textAnchors = {
+              startIndex,
+              endIndex,
+              itemIds
+            }
+            console.log('📌 Captured text anchors:', textAnchors)
           }
         }
       } catch (error) {
