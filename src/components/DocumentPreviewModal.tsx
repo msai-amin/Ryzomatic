@@ -20,6 +20,18 @@ interface DocumentPreviewModalProps {
   onDeleteRelationship: (relationshipId: string) => void;
 }
 
+const getPrettyJson = (description?: string | null): string | null => {
+  if (!description) return null;
+  try {
+    const jsonMatch = description.trim().match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    const parsed = JSON.parse(jsonMatch[0]);
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    return null;
+  }
+};
+
 export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   isOpen,
   onClose,
@@ -349,19 +361,37 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                         </div>
                       );
                     } else {
-                      // Plain text fallback
+                      // Plain text / JSON fallback
+                      const userDescription = relationship.relationship_description;
+                      const aiDescription = relationship.ai_generated_description;
+                      const prettyJson = getPrettyJson(aiDescription);
+
                       return (
                         <div className="space-y-3 text-sm">
-                          {relationship.relationship_description && (
+                          {userDescription && (
                             <div>
                               <p className="font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>Your Description:</p>
-                              <p style={{ color: 'var(--color-text-primary)' }}>{relationship.relationship_description}</p>
+                              <p style={{ color: 'var(--color-text-primary)' }}>{userDescription}</p>
                             </div>
                           )}
-                          {relationship.ai_generated_description && (
+                          {prettyJson ? (
+                            <div>
+                              <p className="font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>AI Analysis (JSON):</p>
+                              <pre
+                                className="p-3 rounded-md overflow-x-auto text-[13px]"
+                                style={{
+                                  backgroundColor: 'var(--color-surface-hover)',
+                                  color: 'var(--color-text-primary)',
+                                  border: `1px solid var(--color-border)`
+                                }}
+                              >
+                                {prettyJson}
+                              </pre>
+                            </div>
+                          ) : aiDescription && (
                             <div>
                               <p className="font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>AI Analysis:</p>
-                              <p style={{ color: 'var(--color-text-primary)' }}>{relationship.ai_generated_description}</p>
+                              <p style={{ color: 'var(--color-text-primary)' }}>{aiDescription}</p>
                             </div>
                           )}
                         </div>
