@@ -237,6 +237,17 @@ const getTightBoundingRectForSpan = (span: HTMLElement): DOMRect | null => {
     : null
 }
 
+const getClientRectsForRange = (range: Range): DOMRect[] => {
+  try {
+    const rectList = range.getClientRects()
+    return Array.from(rectList)
+      .map(rect => new DOMRect(rect.x, rect.y, rect.width, rect.height))
+      .filter(rect => rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON)
+  } catch {
+    return []
+  }
+}
+
 // Parse text to preserve paragraph structure - USED ONLY IN READING MODE
 // CACHE BUST v3 - Force Vercel to rebuild with new bundle hash
 function parseTextWithBreaks(text: string): TextSegment[] {
@@ -2443,9 +2454,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const currentViewport = page.getViewport({ scale: safeScale, rotation })
       const baseViewport = page.getViewport({ scale: 1, rotation })
       const selectedSpanElements = getSelectedTextLayerSpans(range, textLayerDivForGeometry)
-      const spanRects = selectedSpanElements
+      const selectionClientRects = getClientRectsForRange(range)
+      const spanRects = (selectionClientRects.length > 0 ? selectionClientRects : selectedSpanElements
         .map(span => getTightBoundingRectForSpan(span))
-        .filter((rect): rect is DOMRect => !!rect && rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON)
+        .filter((rect): rect is DOMRect => !!rect && rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON))
 
       if (selectedSpanElements.length === 0) {
         logger.warn('PDFViewer: selection detected but no textLayer spans intersected the range', {
@@ -2559,6 +2571,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         containerWidth: widthLimit,
         containerHeight: heightLimit,
         selectedSpanCount: selectedSpanElements.length,
+        selectionClientRectCount: selectionClientRects.length,
         geometryDerived: !!screenGeometry,
         baseViewportPosition: highlightPosition,
         baseViewportRects: rectsForStorage,
