@@ -568,67 +568,103 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
     );
   };
 
-  const handleOpenBook = (book: EnhancedSavedBook) => {
+  const handleOpenBook = async (book: EnhancedSavedBook) => {
     try {
+      let workingBook: EnhancedSavedBook = { ...book };
+
       console.log('Opening book from Library:', {
-        id: book.id,
-        title: book.title,
-        type: book.type,
-        hasFileData: !!book.fileData,
-        hasPdfDataBase64: !!book.pdfDataBase64,
-        fileDataType: typeof book.fileData,
-        fileDataConstructor: book.fileData?.constructor?.name,
-        fileDataLength: book.fileData ? (book.fileData as any).byteLength || (book.fileData as any).length : 0
+        id: workingBook.id,
+        title: workingBook.title,
+        type: workingBook.type,
+        hasFileData: !!workingBook.fileData,
+        hasPdfDataBase64: !!workingBook.pdfDataBase64,
+        fileDataType: typeof workingBook.fileData,
+        fileDataConstructor: workingBook.fileData?.constructor?.name,
+        fileDataLength: workingBook.fileData ? (workingBook.fileData as any).byteLength || (workingBook.fileData as any).length : 0
       });
 
+      // If the book was loaded from Supabase metadata and the binary data isn't loaded yet, fetch it now.
+      if (
+        isSupabaseData &&
+        (workingBook.type === 'pdf' || workingBook.type === 'epub') &&
+        !workingBook.fileData
+      ) {
+        try {
+          console.log('Fetching full book data from Supabase for', workingBook.id);
+          const fullBook = await supabaseStorageService.getBook(workingBook.id);
+          if (fullBook?.fileData) {
+            workingBook = {
+              ...workingBook,
+              fileData: fullBook.fileData,
+              pageTexts: fullBook.pageTexts?.length ? fullBook.pageTexts : workingBook.pageTexts,
+              cleanedPageTexts: fullBook.cleanedPageTexts ?? workingBook.cleanedPageTexts,
+              totalPages: fullBook.totalPages ?? workingBook.totalPages,
+              pdfDataBase64: fullBook.pdfDataBase64 ?? workingBook.pdfDataBase64,
+              text_content: fullBook.text_content ?? workingBook.text_content,
+            };
+            console.log('Supabase book data loaded:', {
+              byteLength: fullBook.fileData.byteLength,
+              totalPages: fullBook.totalPages,
+              hasPageTexts: !!fullBook.pageTexts?.length
+            });
+          } else {
+            console.warn('Supabase book data missing binary payload', { bookId: workingBook.id });
+          }
+        } catch (fetchError) {
+          console.error('Failed to load book data from Supabase', fetchError);
+          alert('Failed to load book file from storage. Please try again.');
+          return;
+        }
+      }
+
     // Ensure binary data is properly loaded for PDF/EPUB books
-    if (book.type === 'pdf' || book.type === 'epub') {
-      const isPdf = book.type === 'pdf';
+    if (workingBook.type === 'pdf' || workingBook.type === 'epub') {
+      const isPdf = workingBook.type === 'pdf';
       const formatLabel = isPdf ? 'PDF' : 'EPUB';
 
-      if (!book.fileData && book.pdfDataBase64) {
+      if (!workingBook.fileData && workingBook.pdfDataBase64) {
         console.log('Converting base64 to ArrayBuffer...');
         try {
           // Convert base64 to ArrayBuffer if needed
-          const binary = atob(book.pdfDataBase64);
+          const binary = atob(workingBook.pdfDataBase64);
           const bytes = new Uint8Array(binary.length);
           for (let i = 0; i < binary.length; i++) {
             bytes[i] = binary.charCodeAt(i);
           }
-          book.fileData = bytes.buffer as ArrayBuffer;
+          workingBook.fileData = bytes.buffer as ArrayBuffer;
           console.log('Converted to ArrayBuffer:', {
-            byteLength: book.fileData.byteLength,
-            constructor: book.fileData.constructor.name
+            byteLength: workingBook.fileData.byteLength,
+            constructor: workingBook.fileData.constructor.name
           });
         } catch (error) {
           console.error('Error converting base64 to ArrayBuffer:', error);
           throw new Error(`Failed to load ${formatLabel} data from library`);
         }
-      } else if (!book.fileData && !book.pdfDataBase64) {
+      } else if (!workingBook.fileData && !workingBook.pdfDataBase64) {
         console.error(`${formatLabel} book has no data:`, {
-          id: book.id,
-          title: book.title,
-          hasFileData: !!book.fileData,
-          hasPdfDataBase64: !!book.pdfDataBase64
+          id: workingBook.id,
+          title: workingBook.title,
+          hasFileData: !!workingBook.fileData,
+          hasPdfDataBase64: !!workingBook.pdfDataBase64
         });
         throw new Error(`${formatLabel} data is missing from library. Please re-upload the file.`);
-      } else if (book.fileData && !(book.fileData instanceof ArrayBuffer)) {
+      } else if (workingBook.fileData && !(workingBook.fileData instanceof ArrayBuffer)) {
         console.log('FileData is not ArrayBuffer, attempting conversion...');
         try {
           // If it's a Uint8Array or similar, convert to ArrayBuffer
-          if (book.fileData instanceof Uint8Array) {
-            book.fileData = book.fileData.buffer as ArrayBuffer;
-          } else if (Array.isArray(book.fileData)) {
+          if (workingBook.fileData instanceof Uint8Array) {
+            workingBook.fileData = workingBook.fileData.buffer as ArrayBuffer;
+          } else if (Array.isArray(workingBook.fileData)) {
             // If it's an array of numbers, convert to ArrayBuffer
-            const bytes = new Uint8Array(book.fileData);
-            book.fileData = bytes.buffer as ArrayBuffer;
-          } else if (typeof book.fileData === 'object' && book.fileData !== null) {
+            const bytes = new Uint8Array(workingBook.fileData);
+            workingBook.fileData = bytes.buffer as ArrayBuffer;
+          } else if (typeof workingBook.fileData === 'object' && workingBook.fileData !== null) {
             // Handle legacy data format - this is likely corrupted data from before base64 conversion
             console.warn(`Legacy ${formatLabel} data detected, this book may need to be re-uploaded:`, {
-              fileDataType: typeof book.fileData,
-              fileDataConstructor: book.fileData.constructor?.name,
-              fileDataKeys: Object.keys(book.fileData),
-              hasPdfDataBase64: !!book.pdfDataBase64
+              fileDataType: typeof workingBook.fileData,
+              fileDataConstructor: workingBook.fileData.constructor?.name,
+              fileDataKeys: Object.keys(workingBook.fileData),
+              hasPdfDataBase64: !!workingBook.pdfDataBase64
             });
             throw new Error(`This ${formatLabel} was saved in an old format and cannot be loaded. Please re-upload the file.`);
           } else {
@@ -636,8 +672,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
             throw new Error(`Invalid ${formatLabel} data format in library`);
           }
           console.log('Conversion successful:', {
-            byteLength: book.fileData.byteLength,
-            constructor: book.fileData.constructor.name
+            byteLength: workingBook.fileData.byteLength,
+            constructor: workingBook.fileData.constructor.name
           });
         } catch (error) {
           console.error('Error converting fileData to ArrayBuffer:', error);
@@ -646,18 +682,18 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       }
       
       // Final validation
-      if (!book.fileData || !(book.fileData instanceof ArrayBuffer)) {
+      if (!workingBook.fileData || !(workingBook.fileData instanceof ArrayBuffer)) {
         console.error(`${formatLabel} data validation failed:`, {
-          hasFileData: !!book.fileData,
-          fileDataType: typeof book.fileData,
-          fileDataConstructor: book.fileData?.constructor?.name,
-          hasPdfDataBase64: !!book.pdfDataBase64,
-          pdfDataBase64Length: book.pdfDataBase64?.length || 0,
-          pdfDataBase64Preview: book.pdfDataBase64?.substring(0, 50) + '...' || 'N/A'
+          hasFileData: !!workingBook.fileData,
+          fileDataType: typeof workingBook.fileData,
+          fileDataConstructor: workingBook.fileData?.constructor?.name,
+          hasPdfDataBase64: !!workingBook.pdfDataBase64,
+          pdfDataBase64Length: workingBook.pdfDataBase64?.length || 0,
+          pdfDataBase64Preview: workingBook.pdfDataBase64?.substring(0, 50) + '...' || 'N/A'
         });
         
         // Try to provide a more helpful error message
-        if (book.pdfDataBase64) {
+        if (workingBook.pdfDataBase64) {
           throw new Error(`${formatLabel} data conversion failed. The file may be corrupted. Please try re-uploading.`);
         } else {
           throw new Error(`${formatLabel} data is missing. Please try re-uploading the file.`);
@@ -665,28 +701,45 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       }
     }
 
-    const cleanedPageTexts = sanitizePageTexts(book.pageTexts);
-    const legacyTextContent = (book as { text_content?: string }).text_content;
+    // Persist hydrated data back into state so future openings don't need another fetch
+    setBooks(prev =>
+      prev.map(existing =>
+        existing.id === workingBook.id
+          ? {
+              ...existing,
+              fileData: workingBook.fileData,
+              pageTexts: workingBook.pageTexts,
+              cleanedPageTexts: workingBook.cleanedPageTexts,
+              totalPages: workingBook.totalPages,
+              pdfDataBase64: workingBook.pdfDataBase64,
+              text_content: workingBook.text_content,
+            }
+          : existing
+      )
+    );
+
+    const cleanedPageTexts = sanitizePageTexts(workingBook.pageTexts);
+    const legacyTextContent = (workingBook as { text_content?: string }).text_content;
     const combinedContent =
       cleanedPageTexts.length > 0
         ? cleanedPageTexts.join('\n\n')
-        : typeof book.fileData === 'string'
-          ? book.fileData
+        : typeof workingBook.fileData === 'string'
+          ? workingBook.fileData
           : legacyTextContent || '';
 
     const doc = {
-      id: book.id,
-      name: book.title,
+      id: workingBook.id,
+      name: workingBook.title,
       content: combinedContent,
-      type: book.type,
-      uploadedAt: book.savedAt,
-      pdfData: book.type === 'pdf' ? book.fileData as ArrayBuffer : undefined,
+      type: workingBook.type,
+      uploadedAt: workingBook.savedAt,
+      pdfData: workingBook.type === 'pdf' ? workingBook.fileData as ArrayBuffer : undefined,
       epubData:
-        book.type === 'epub' && book.fileData instanceof ArrayBuffer
-          ? new Blob([book.fileData], { type: 'application/epub+zip' })
+        workingBook.type === 'epub' && workingBook.fileData instanceof ArrayBuffer
+          ? new Blob([workingBook.fileData], { type: 'application/epub+zip' })
           : undefined,
-      totalPages: book.totalPages,
-      lastReadPage: book.lastReadPage,
+      totalPages: workingBook.totalPages,
+      lastReadPage: workingBook.lastReadPage,
       pageTexts: cleanedPageTexts,
       cleanedPageTexts
     };
