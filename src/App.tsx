@@ -16,6 +16,7 @@ import { libraryOrganizationService } from './services/libraryOrganizationServic
 import { librarySearchService } from './services/librarySearchService'
 import { ThemeProvider } from '../themes/ThemeProvider'
 import { useAuth } from './contexts/AuthContext'
+import { ensurePdfViewerStyles, arePdfViewerStylesApplied } from './styles/ensurePdfViewerStyles'
 
 function App() {
   // Use AuthContext as the single source of truth for auth state
@@ -33,6 +34,16 @@ function App() {
   const [isInitialized, setIsInitialized] = useState(false)
   const [showNeoReader, setShowNeoReader] = useState(false)
   const [showLandingPage, setShowLandingPage] = useState(false)
+
+  useEffect(() => {
+    ensurePdfViewerStyles()
+    if (!arePdfViewerStylesApplied()) {
+      logger.warn('Critical PDF viewer styles were injected but probe detected pointer-events not applied', {
+        component: 'App',
+        action: 'ensurePdfViewerStyles'
+      })
+    }
+  }, [])
 
   // Sync AuthContext session changes with Zustand store and initialize services
   useEffect(() => {

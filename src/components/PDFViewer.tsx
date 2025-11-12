@@ -52,6 +52,13 @@ import { notesService } from '../services/notesService'
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { convertScreenRectToBaseViewportRect, RectLike } from '../utils/highlightCoordinates'
+import { logger } from '../services/logger'
+import {
+  buildScreenGeometry,
+  clamp,
+  normalizeRectWithinBounds,
+  RECT_SIZE_EPSILON
+} from '../utils/pdfHighlightGeometry'
 import { supabase } from '../../lib/supabase'
 import { configurePDFWorker } from '../utils/pdfjsConfig'
 import { useTheme } from '../../themes/ThemeProvider'
@@ -126,54 +133,7 @@ interface HighlightRenderData {
   outlineOffset: number
 }
 
-const LINE_MERGE_THRESHOLD_PX = 2
-const RECT_SIZE_EPSILON = 0.5
 const TRANSFORM_FLOAT_REGEX = /matrix\(([^)]+)\)/
-
-const clamp = (value: number, min: number, max: number): number => {
-  if (Number.isNaN(value)) return min
-  return Math.min(Math.max(value, min), max)
-}
-
-const normalizeRectWithinBounds = (rect: RectLike, widthLimit: number, heightLimit: number): RectLike | null => {
-  const safeWidthLimit = Math.max(widthLimit, RECT_SIZE_EPSILON)
-  const safeHeightLimit = Math.max(heightLimit, RECT_SIZE_EPSILON)
-
-  let x = rect.x
-  let y = rect.y
-  let width = rect.width
-  let height = rect.height
-
-  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) {
-    return null
-  }
-
-  if (width <= RECT_SIZE_EPSILON || height <= RECT_SIZE_EPSILON) {
-    return null
-  }
-
-  if (x < 0) {
-    width += x
-    x = 0
-  }
-  if (y < 0) {
-    height += y
-    y = 0
-  }
-
-  if (x + width > safeWidthLimit) {
-    width = safeWidthLimit - x
-  }
-  if (y + height > safeHeightLimit) {
-    height = safeHeightLimit - y
-  }
-
-  if (width <= RECT_SIZE_EPSILON || height <= RECT_SIZE_EPSILON) {
-    return null
-  }
-
-  return { x, y, width, height }
-}
 
 const extractTransformScales = (transform: string | null): { scaleX: number; scaleY: number } => {
   if (!transform || transform === 'none') {
@@ -242,134 +202,6 @@ const getSelectedTextLayerSpans = (range: Range, textLayerDiv: HTMLElement | nul
       return false
     }
   })
-}
-
-type LineRect = { left: number; right: number; top: number; bottom: number }
-
-const mergeSpanRectsByLine = (rects: DOMRect[]): LineRect[] => {
-  const sorted = [...rects].sort((a, b) => a.top - b.top)
-  const groups: LineRect[] = []
-
-  sorted.forEach(rect => {
-    if (rect.width <= RECT_SIZE_EPSILON || rect.height <= RECT_SIZE_EPSILON) {
-      return
-    }
-    const match = groups.find(group =>
-      Math.abs(group.top - rect.top) <= LINE_MERGE_THRESHOLD_PX ||
-      Math.abs(group.bottom - rect.bottom) <= LINE_MERGE_THRESHOLD_PX
-    )
-
-    if (match) {
-      match.left = Math.min(match.left, rect.left)
-      match.right = Math.max(match.right, rect.right)
-      match.top = Math.min(match.top, rect.top)
-      match.bottom = Math.max(match.bottom, rect.bottom)
-    } else {
-      groups.push({
-        left: rect.left,
-        right: rect.right,
-        top: rect.top,
-        bottom: rect.bottom
-      })
-    }
-  })
-
-  return groups
-}
-
-const convertLineRectToScreenRect = (
-  lineRect: LineRect,
-  containerRect: DOMRect,
-  widthLimit?: number,
-  heightLimit?: number
-): RectLike | null => {
-  const rawRect: RectLike = {
-    x: lineRect.left - containerRect.left,
-    y: lineRect.top - containerRect.top,
-    width: lineRect.right - lineRect.left,
-    height: lineRect.bottom - lineRect.top
-  }
-
-  const effectiveWidthLimit = widthLimit ?? containerRect.width
-  const effectiveHeightLimit = heightLimit ?? containerRect.height
-
-  return normalizeRectWithinBounds(rawRect, effectiveWidthLimit, effectiveHeightLimit)
-}
-
-const computeGeometryFromSelectedSpans = (
-  spans: HTMLElement[],
-  containerRect: DOMRect,
-  currentViewport: any,
-  baseViewport: any,
-  widthLimit: number,
-  heightLimit: number
-) => {
-  if (!spans.length) {
-    return null
-  }
-
-  const rects = spans
-    .map(span => span.getBoundingClientRect())
-    .filter(rect => rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON)
-
-  if (!rects.length) {
-    return null
-  }
-
-  const mergedLineRects = mergeSpanRectsByLine(rects)
-  const normalizedScreenRects = mergedLineRects
-    .map(lineRect => convertLineRectToScreenRect(lineRect, containerRect, widthLimit, heightLimit))
-    .filter((rect): rect is RectLike => !!rect)
-
-  if (!normalizedScreenRects.length) {
-    return null
-  }
-
-  const bounding = normalizedScreenRects.reduce(
-    (acc, rect) => ({
-      minX: Math.min(acc.minX, rect.x),
-      minY: Math.min(acc.minY, rect.y),
-      maxX: Math.max(acc.maxX, rect.x + rect.width),
-      maxY: Math.max(acc.maxY, rect.y + rect.height)
-    }),
-    {
-      minX: Number.POSITIVE_INFINITY,
-      minY: Number.POSITIVE_INFINITY,
-      maxX: Number.NEGATIVE_INFINITY,
-      maxY: Number.NEGATIVE_INFINITY
-    }
-  )
-
-  if (!Number.isFinite(bounding.minX) || !Number.isFinite(bounding.minY) || !Number.isFinite(bounding.maxX) || !Number.isFinite(bounding.maxY)) {
-    return null
-  }
-
-  const boundingScreenRect: RectLike = {
-    x: bounding.minX,
-    y: bounding.minY,
-    width: bounding.maxX - bounding.minX,
-    height: bounding.maxY - bounding.minY
-  }
-
-  if (boundingScreenRect.width <= RECT_SIZE_EPSILON || boundingScreenRect.height <= RECT_SIZE_EPSILON) {
-    return null
-  }
-
-  const viewportRects = normalizedScreenRects.map(rect =>
-    convertScreenRectToBaseViewportRect(rect, currentViewport, baseViewport)
-  )
-  const boundingViewportRect = convertScreenRectToBaseViewportRect(
-    boundingScreenRect,
-    currentViewport,
-    baseViewport
-  )
-
-  return {
-    screenRects: normalizedScreenRects,
-    viewportRects,
-    boundingScreenRect,
-    boundingViewportRect
-  }
 }
 
 // Parse text to preserve paragraph structure - USED ONLY IN READING MODE
@@ -2571,26 +2403,46 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const currentViewport = page.getViewport({ scale: safeScale, rotation })
       const baseViewport = page.getViewport({ scale: 1, rotation })
       const selectedSpanElements = getSelectedTextLayerSpans(range, textLayerDivForGeometry)
-      const geometry = computeGeometryFromSelectedSpans(
-        selectedSpanElements,
-        containerRect,
-        currentViewport,
-        baseViewport,
-        widthLimit,
-        heightLimit
-      )
+      const spanRects = selectedSpanElements
+        .map(span => span.getBoundingClientRect())
+        .filter(rect => rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON)
+
+      if (selectedSpanElements.length === 0) {
+        logger.warn('PDFViewer: selection detected but no textLayer spans intersected the range', {
+          component: 'PDFViewer',
+          action: 'computeHighlightGeometry',
+          selectionRect: {
+            left: selectionRect.left,
+            top: selectionRect.top,
+            width: selectionRect.width,
+            height: selectionRect.height
+          },
+          hasTextLayer: !!textLayerDivForGeometry
+        })
+      }
 
       let highlightPosition: RectLike & { rects?: RectLike[] }
       let rectsForStorage: RectLike[]
       let rawPosition: RectLike
 
-      if (geometry) {
-        rectsForStorage = geometry.viewportRects
+      const screenGeometry = spanRects.length
+        ? buildScreenGeometry(spanRects, containerRect, widthLimit, heightLimit)
+        : null
+
+      if (screenGeometry) {
+        rawPosition = screenGeometry.boundingScreenRect
+        rectsForStorage = screenGeometry.screenRects.map(rect =>
+          convertScreenRectToBaseViewportRect(rect, currentViewport, baseViewport)
+        )
+        const boundingViewportRect = convertScreenRectToBaseViewportRect(
+          rawPosition,
+          currentViewport,
+          baseViewport
+        )
         highlightPosition = {
-          ...geometry.boundingViewportRect,
+          ...boundingViewportRect,
           rects: rectsForStorage
         }
-        rawPosition = geometry.boundingScreenRect
       } else {
         const fallbackScreenRectRaw: RectLike = {
           x: selectionRect.left - containerRect.left,
