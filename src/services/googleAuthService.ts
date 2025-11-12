@@ -28,6 +28,8 @@ export interface GoogleDriveFile {
 class GoogleAuthService {
   private clientId: string;
   private apiKey: string;
+  private isConfigured: boolean;
+  private hasLoggedMissingConfig = false;
   private discoveryDocs: string[] = [
     'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'
   ];
@@ -40,9 +42,30 @@ class GoogleAuthService {
   constructor() {
     this.clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
     this.apiKey = import.meta.env.VITE_GOOGLE_API_KEY || '';
+    this.isConfigured = Boolean(this.clientId && this.apiKey);
+  }
+
+  private configurationAvailable(): boolean {
+    if (this.isConfigured) {
+      return true;
+    }
+
+    if (!this.hasLoggedMissingConfig) {
+      console.warn(
+        'Google Drive integration disabled: VITE_GOOGLE_CLIENT_ID and/or VITE_GOOGLE_API_KEY are not configured.'
+      );
+      this.hasLoggedMissingConfig = true;
+    }
+
+    return false;
   }
 
   async initialize(): Promise<void> {
+    if (!this.configurationAvailable()) {
+      this.isInitialized = false;
+      return Promise.resolve();
+    }
+
     if (this.isInitialized) return;
 
     return new Promise((resolve, reject) => {
@@ -219,6 +242,10 @@ class GoogleAuthService {
   }
 
   async signIn(): Promise<GoogleUser> {
+    if (!this.configurationAvailable()) {
+      throw new Error('Google integration is not configured');
+    }
+
     if (!this.isInitialized) {
       await this.initialize();
     }
@@ -282,6 +309,10 @@ class GoogleAuthService {
   }
 
   async hasDriveScope(): Promise<boolean> {
+    if (!this.configurationAvailable()) {
+      return false;
+    }
+
     try {
       if (!this.isInitialized) {
         await this.initialize();
@@ -310,6 +341,10 @@ class GoogleAuthService {
   }
 
   async ensureDriveAccess(options: { forcePrompt?: boolean } = {}): Promise<boolean> {
+    if (!this.configurationAvailable()) {
+      return false;
+    }
+
     try {
       await this.initialize();
     } catch (error) {
@@ -357,6 +392,10 @@ class GoogleAuthService {
   }
 
   async signOut(): Promise<void> {
+    if (!this.configurationAvailable()) {
+      return;
+    }
+
     if (!this.isInitialized) {
       await this.initialize();
     }
@@ -445,6 +484,10 @@ class GoogleAuthService {
   }
 
   async refreshAccessToken(): Promise<string> {
+    if (!this.configurationAvailable()) {
+      throw new Error('Google integration is not configured');
+    }
+
     if (!this.isInitialized) {
       await this.initialize();
     }
@@ -468,6 +511,10 @@ class GoogleAuthService {
   }
 
   async getAccessToken(): Promise<string> {
+    if (!this.configurationAvailable()) {
+      throw new Error('Google integration is not configured');
+    }
+
     if (!this.currentUser) {
       throw new Error('User not signed in');
     }
