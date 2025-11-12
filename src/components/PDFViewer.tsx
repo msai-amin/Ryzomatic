@@ -2428,6 +2428,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const screenGeometry = spanRects.length
         ? buildScreenGeometry(spanRects, containerRect, widthLimit, heightLimit)
         : null
+      const geometry = screenGeometry // Back-compat alias for legacy instrumentation
 
       if (screenGeometry) {
         rawPosition = screenGeometry.boundingScreenRect
