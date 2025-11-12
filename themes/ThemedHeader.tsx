@@ -43,8 +43,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     libraryRefreshTrigger,
     pdfViewer,
     isChatOpen,
-    pomodoroIsRunning,
-    pomodoroTimeLeft,
     hasSeenPomodoroTour,
     setCurrentDocument,
     isRightSidebarOpen,
@@ -132,6 +130,12 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     }
   }, [])
 
+  const workDurationSeconds = timerState.settings.workDuration * 60
+  const isTimerPristine =
+    !timerState.isRunning &&
+    timerState.mode === 'work' &&
+    timerState.timeLeft === workDurationSeconds
+
   const openLibrary = () => {
     if (user) {
       setShowLibrary(true)
@@ -197,15 +201,8 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
-            {user && currentDocument && !timerState.isRunning && (
-              <Tooltip
-                content={
-                  pomodoroIsRunning
-                    ? `Timer running: ${Math.floor((pomodoroTimeLeft || 0) / 60)}:${String((pomodoroTimeLeft || 0) % 60).padStart(2, '0')}`
-                    : 'Start Pomodoro timer'
-                }
-                position="bottom"
-              >
+            {user && currentDocument && isTimerPristine && (
+              <Tooltip content="Start Pomodoro timer" position="bottom">
                 <button
                   data-tour="pomodoro-button"
                   onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}

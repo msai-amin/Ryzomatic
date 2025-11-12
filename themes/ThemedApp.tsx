@@ -65,6 +65,13 @@ const ThemedAppContent: React.FC = () => {
   }, [])
 
 
+  const workDurationSeconds = timerState.settings.workDuration * 60
+  const isTimerPristine =
+    !timerState.isRunning &&
+    timerState.mode === 'work' &&
+    timerState.timeLeft === workDurationSeconds
+  const hasActiveTimer = !isTimerPristine
+
   return (
     <OnboardingProvider>
       <div 
@@ -103,8 +110,8 @@ const ThemedAppContent: React.FC = () => {
         <DocumentUpload onClose={() => setShowUploadModal(false)} />
       )}
 
-      {/* Pomodoro Bottom Bar - Visible when user is authenticated, has uploaded a file, and Pomodoro IS running */}
-      {user && currentDocument && timerState.isRunning && (
+      {/* Pomodoro Bottom Bar - Visible when there is an active or paused session */}
+      {user && currentDocument && hasActiveTimer && (
         <PomodoroBottomBar 
           onExpand={() => {
             // Open the full Pomodoro timer in the header
