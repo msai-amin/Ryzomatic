@@ -2518,7 +2518,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         containerWidth: widthLimit,
         containerHeight: heightLimit,
         selectedSpanCount: selectedSpanElements.length,
-        geometryDerived: !!geometry,
+        geometryDerived: !!screenGeometry,
         baseViewportPosition: highlightPosition,
         baseViewportRects: rectsForStorage,
         safeScale: safeScale,
