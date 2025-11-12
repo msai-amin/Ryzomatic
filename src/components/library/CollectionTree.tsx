@@ -144,7 +144,7 @@ const CollectionNode: React.FC<CollectionNodeProps> = ({
       console.error('Failed to rename collection:', error);
       setEditName(collection.name);
     } finally {
-      setIsEditing(false);
+    setIsEditing(false);
     }
   };
 
@@ -451,7 +451,7 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({
       treeData: roots,
       parentMap: parent,
       siblingsMap: siblings
-    };
+  };
   }, [collections]);
 
   const toggleExpanded = (collectionId: string) => {
@@ -495,19 +495,19 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({
 
           return (
             <div key={node.id}>
-              <CollectionNode
+        <CollectionNode
                 collection={node}
-                level={level}
-                isExpanded={isExpanded}
-                onToggle={toggleExpanded}
-                onSelect={handleSelectCollection}
-                onCreateChild={onCreateCollection}
+          level={level}
+          isExpanded={isExpanded}
+          onToggle={toggleExpanded}
+          onSelect={handleSelectCollection}
+          onCreateChild={onCreateCollection}
                 onRename={onRenameCollection}
                 onOpenDetails={onOpenCollectionDetails}
-                onDelete={onDeleteCollection}
-                onToggleFavorite={onToggleFavorite}
+          onDelete={onDeleteCollection}
+          onToggleFavorite={onToggleFavorite}
                 onMove={onMoveCollection}
-                isSelected={isSelected}
+          isSelected={isSelected}
                 isDragOver={isDragOver}
               />
               {isExpanded &&
@@ -515,9 +515,9 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({
                   node.children as (Collection & { children: Collection[] })[],
                   level + 1,
                   node.id
-                )}
-            </div>
-          );
+        )}
+      </div>
+    );
         })}
       </SortableContext>
     );

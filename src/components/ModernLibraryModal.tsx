@@ -1002,27 +1002,27 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
           collection => (collection.parent_id ?? null) === (createCollectionParentId ?? null)
         );
         const newCollection = await libraryOrganizationService.createCollection({
-          name,
+        name,
           description,
           parent_id: createCollectionParentId ?? null,
           color,
           icon,
-          is_favorite: false,
+        is_favorite: false,
           display_order: siblings.length
-        });
-
+      });
+      
         pushNotification('success', `Collection “${name}” created.`);
         await refreshCollections();
         setActiveCollection(newCollection.id);
-        setShowCreateCollection(false);
+      setShowCreateCollection(false);
         setCreateCollectionParentId(null);
-      } catch (error) {
-        console.error('Failed to create collection:', error);
+    } catch (error) {
+      console.error('Failed to create collection:', error);
         pushNotification('error', 'Failed to create collection. Please try again.');
         await refreshCollections();
       } finally {
         setIsCreatingCollection(false);
-      }
+    }
     },
     [collections, createCollectionParentId, pushNotification, refreshCollections, setActiveCollection]
   );
@@ -1041,23 +1041,23 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
   const handleSubmitCreateTag = useCallback(
     async ({ name, color, category }: CreateTagFormValues) => {
       setIsCreatingTag(true);
-      try {
-        const tag = await libraryOrganizationService.createTag({
-          name,
-          color,
+    try {
+      const tag = await libraryOrganizationService.createTag({
+        name,
+        color,
           category
-        });
-
+      });
+      
         setTags(prev => [...prev, tag]);
         pushNotification('success', `Tag “${name}” created.`);
-        setShowCreateTag(false);
-      } catch (error) {
-        console.error('Failed to create tag:', error);
+      setShowCreateTag(false);
+    } catch (error) {
+      console.error('Failed to create tag:', error);
         pushNotification('error', 'Failed to create tag. Please try again.');
         await refreshTags();
       } finally {
         setIsCreatingTag(false);
-      }
+    }
     },
     [pushNotification, refreshTags, setTags]
   );

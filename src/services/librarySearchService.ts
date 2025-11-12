@@ -67,7 +67,7 @@ class LibrarySearchService {
   setCurrentUser(userId: string | null) {
     this.currentUserId = userId;
     if (userId) {
-      logger.info('LibrarySearchService initialized', { userId });
+    logger.info('LibrarySearchService initialized', { userId });
     } else {
       logger.info('LibrarySearchService cleared user context', { userId: null });
     }

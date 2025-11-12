@@ -183,7 +183,7 @@
   position: absolute !important;
   text-align: initial !important;
   inset: 0px !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   opacity: 1 !important;
   line-height: 1 !important;
   -webkit-text-size-adjust: none !important;

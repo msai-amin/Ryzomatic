@@ -59,7 +59,7 @@ class SupabaseStorageService {
   setCurrentUser(userId: string | null) {
     this.currentUserId = userId;
     if (userId) {
-      logger.info('SupabaseStorageService initialized', { userId });
+    logger.info('SupabaseStorageService initialized', { userId });
     } else {
       logger.info('SupabaseStorageService cleared user context', { userId: null });
     }

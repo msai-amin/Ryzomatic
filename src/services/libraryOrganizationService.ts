@@ -71,7 +71,7 @@ class LibraryOrganizationService {
   setCurrentUser(userId: string | null) {
     this.currentUserId = userId;
     if (userId) {
-      logger.info('LibraryOrganizationService initialized', { userId });
+    logger.info('LibraryOrganizationService initialized', { userId });
     } else {
       logger.info('LibraryOrganizationService cleared user context', { userId: null });
     }

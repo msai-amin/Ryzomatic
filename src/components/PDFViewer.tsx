@@ -52,6 +52,7 @@ import { HighlightColorPopover } from './HighlightColorPopover'
 import { notesService } from '../services/notesService'
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
+import { convertScreenRectToBaseViewportRect } from '../utils/highlightCoordinates'
 import { supabase } from '../../lib/supabase'
 import { configurePDFWorker } from '../utils/pdfjsConfig'
 import {
@@ -297,6 +298,8 @@ function parseTextWithBreaks(text: string): TextSegment[] {
   
   return segments
 }
+
+const TEXT_LAYER_OVERSCAN_PX = 4
 
 // Remove the old local Highlight interface - we'll use the one from highlightService
 
@@ -704,13 +707,16 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               
               // Match canvas container's positioning and transform exactly
               const canvasContainer = canvasRef.current?.parentElement
+              const adjustedWidth = Math.ceil(viewport.width)
+              const adjustedHeight = Math.ceil(viewport.height + TEXT_LAYER_OVERSCAN_PX)
+
               if (canvasContainer) {
                 const containerStyles = window.getComputedStyle(canvasContainer)
                 const transform = containerStyles.transform
                 const transformOrigin = containerStyles.transformOrigin || '0 0'
                 
-                textLayerRef.current.style.width = viewport.width + 'px'
-                textLayerRef.current.style.height = viewport.height + 'px'
+                textLayerRef.current.style.width = `${adjustedWidth}px`
+                textLayerRef.current.style.height = `${adjustedHeight}px`
                 textLayerRef.current.style.position = 'absolute'
                 textLayerRef.current.style.top = '0'
                 textLayerRef.current.style.left = '0'
@@ -722,8 +728,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   textLayerRef.current.style.transform = 'none'
                 }
               } else {
-                textLayerRef.current.style.width = viewport.width + 'px'
-                textLayerRef.current.style.height = viewport.height + 'px'
+                textLayerRef.current.style.width = `${adjustedWidth}px`
+                textLayerRef.current.style.height = `${adjustedHeight}px`
                 textLayerRef.current.style.position = 'absolute'
                 textLayerRef.current.style.top = '0'
                 textLayerRef.current.style.left = '0'
@@ -1005,6 +1011,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               // CRITICAL: Match canvas container's positioning and transform exactly
               // Get the page container (parent of canvas and textLayer)
               const pageContainer = canvas.parentElement
+              const adjustedWidth = Math.ceil(viewport.width)
+              const adjustedHeight = Math.ceil(viewport.height + TEXT_LAYER_OVERSCAN_PX)
               if (pageContainer) {
                 const containerStyles = window.getComputedStyle(pageContainer)
                 
@@ -1013,8 +1021,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 const transformOrigin = containerStyles.transformOrigin || '0 0'
                 
                 // Set text layer container size to match canvas exactly
-                textLayerDiv.style.width = viewport.width + 'px'
-                textLayerDiv.style.height = viewport.height + 'px'
+                textLayerDiv.style.width = `${adjustedWidth}px`
+                textLayerDiv.style.height = `${adjustedHeight}px`
                 textLayerDiv.style.position = 'absolute'
                 textLayerDiv.style.top = '0'
                 textLayerDiv.style.left = '0'
@@ -1028,8 +1036,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 }
               } else {
                 // Fallback: basic positioning if container not found
-                textLayerDiv.style.width = viewport.width + 'px'
-                textLayerDiv.style.height = viewport.height + 'px'
+                textLayerDiv.style.width = `${adjustedWidth}px`
+                textLayerDiv.style.height = `${adjustedHeight}px`
                 textLayerDiv.style.position = 'absolute'
                 textLayerDiv.style.top = '0'
                 textLayerDiv.style.left = '0'
@@ -2326,61 +2334,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       // Get text element for debugging
       const textElement = range.startContainer.parentElement
 
-      // CRITICAL FIX: Convert screen coordinates to PDF viewport coordinates
-      // The text layer uses PDF.js viewport coordinates, so we must match that coordinate system
-      // Get the actual viewport used for rendering this page
-      let viewportPosition = rawPosition
-      
-      try {
-        const page = await pdfDocRef.current.getPage(selectedTextInfo.pageNumber)
-        const currentViewport = page.getViewport({ scale, rotation })
-        
-        // Find the canvas for this page
-        const pageCanvas = pdfViewer.scrollMode === 'continuous' 
-          ? pageCanvasRefs.current.get(selectedTextInfo.pageNumber)
-          : canvasRef.current
-        
-        if (pageCanvas) {
-          // Get the actual rendered size of the canvas (from browser)
-          const canvasRect = pageCanvas.getBoundingClientRect()
-          
-          // Calculate conversion factor: viewport dimensions vs actual rendered size
-          // This accounts for any CSS transforms or scaling that might affect the canvas
-          const viewportToScreenX = canvasRect.width / currentViewport.width
-          const viewportToScreenY = canvasRect.height / currentViewport.height
-          
-          // Convert screen coordinates (from getBoundingClientRect) to viewport coordinates
-          // The text layer spans use viewport coordinates directly
-          viewportPosition = {
-            x: rawPosition.x / viewportToScreenX,
-            y: rawPosition.y / viewportToScreenY,
-            width: rawPosition.width / viewportToScreenX,
-            height: rawPosition.height / viewportToScreenY
-          }
-          
-          console.log('Viewport coordinate conversion:', {
-            viewport: { width: currentViewport.width, height: currentViewport.height },
-            canvasRect: { width: canvasRect.width, height: canvasRect.height },
-            conversionFactors: { x: viewportToScreenX, y: viewportToScreenY },
-            rawPosition,
-            viewportPosition
-          })
-        }
-      } catch (error) {
-        console.warn('Could not get viewport for coordinate conversion, using raw position:', error)
-        // Fall back to using raw position (existing behavior)
-      }
-
-      // ROBUST SCALING: Normalize by current scale so positions are stored at scale 1.0
-      // This ensures highlights scale correctly when zoom changes
-      // Add safeguards to prevent division by zero or invalid scale values
       const safeScale = Math.max(scale, 0.1) // Prevent division by zero
-      const position = {
-        x: viewportPosition.x / safeScale,
-        y: viewportPosition.y / safeScale,
-        width: viewportPosition.width / safeScale,
-        height: viewportPosition.height / safeScale
-      }
+      const page = await pdfDocRef.current.getPage(selectedTextInfo.pageNumber)
+      const currentViewport = page.getViewport({ scale: safeScale, rotation })
+      const baseViewport = page.getViewport({ scale: 1, rotation })
+      const position = convertScreenRectToBaseViewportRect(rawPosition, currentViewport, baseViewport)
 
       // ROBUST VALIDATION: Check for reasonable position values
       if (position.x < 0 || position.y < 0 || position.width <= 0 || position.height <= 0) {
@@ -2396,6 +2354,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         scrollMode: pdfViewer.scrollMode,
         currentScale: scale,
         currentZoom: pdfViewer.zoom,
+        rotation,
         selectionRect: { 
           left: selectionRect.left, 
           top: selectionRect.top, 
@@ -2416,8 +2375,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           offsetLeft: pageContainer.offsetLeft,
           scrollTop: scrollContainerRef.current?.scrollTop || 0
         },
-        rawPositionBeforeNormalization: rawPosition,
-        normalizedPosition: position,
+        rawPosition,
+        baseViewportPosition: position,
         safeScale: safeScale,
         textElement: {
           fontSize: textElement?.style?.fontSize,
@@ -2438,7 +2397,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       // Capture text anchors from PDF.js text content
       let textAnchors: { startIndex?: number; endIndex?: number; itemIds?: number[] } | undefined
       try {
-        const page = await pdfDocRef.current.getPage(selectedTextInfo.pageNumber)
         const textContent = await page.getTextContent()
         
         // Find text layer spans that correspond to the selected range

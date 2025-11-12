@@ -900,8 +900,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         }}
       >
         <div className="relative">
-          <button
-            onClick={onClose}
+            <button 
+              onClick={onClose} 
             className="absolute top-6 right-6 p-2 rounded-xl transition-colors"
             style={{
               color: 'var(--color-text-tertiary)',
@@ -917,9 +917,9 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
               e.currentTarget.style.color = 'var(--color-text-tertiary)';
             }}
             aria-label="Close library"
-          >
+            >
             <X className="w-5 h-5" />
-          </button>
+            </button>
 
           {/* Header */}
           <div className="px-8 pt-8 pb-6 border-b" style={{ borderColor: 'rgba(148,163,184,0.12)' }}>
@@ -1009,11 +1009,11 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
               ].map(({ key, label, count, icon: Icon }) => {
                 const active = activeTab === key;
                 return (
-                  <button
+            <button
                     key={key}
                     onClick={() => setActiveTab(key as typeof activeTab)}
                     className="flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all"
-                    style={{
+              style={{
                       background: active
                         ? 'linear-gradient(135deg, rgba(99,102,241,0.9), rgba(139,92,246,0.9))'
                         : 'transparent',
@@ -1030,7 +1030,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                         style={{
                           backgroundColor: active ? 'rgba(255,255,255,0.18)' : 'rgba(148,163,184,0.18)',
                           color: active ? '#ffffff' : 'var(--color-text-secondary)'
-                        }}
+              }}
                       >
                         {count}
                       </span>
@@ -1071,7 +1071,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                         <Plus className="w-3.5 h-3.5" />
                         New
                       </button>
-                    </div>
+              </div>
                     {collectionError && (
                       <p className="text-xs mb-3" style={{ color: '#fda4af' }}>
                         {collectionError}
@@ -1134,7 +1134,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                           >
                             <Icon className="w-3.5 h-3.5" />
                             {label}
-                          </button>
+            </button>
                         );
                       })}
                     </div>
@@ -1218,7 +1218,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                               </div>
                               <div className="flex items-center gap-2">
                                 {renderFavoriteButton(book)}
-                                <button
+            <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     e.preventDefault();
@@ -1226,43 +1226,43 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                                   }}
                                   disabled={isRenaming}
                                   className="rounded-xl p-2 transition-all duration-300"
-                                  style={{
+              style={{
                                     color: isRenaming ? 'var(--color-text-tertiary)' : '#a855f7',
                                     backgroundColor: 'rgba(168,85,247,0.12)',
                                     opacity: isRenaming ? 0.5 : 1
-                                  }}
-                                  onMouseEnter={(e) => {
+              }}
+              onMouseEnter={(e) => {
                                     if (!isRenaming) {
                                       e.currentTarget.style.backgroundColor = 'rgba(168,85,247,0.2)';
-                                    }
-                                  }}
-                                  onMouseLeave={(e) => {
+                }
+              }}
+              onMouseLeave={(e) => {
                                     e.currentTarget.style.backgroundColor = 'rgba(168,85,247,0.12)';
-                                  }}
-                                >
+              }}
+            >
                                   <Edit3 className="w-4 h-4" />
-                                </button>
-                                <button
+            </button>
+            <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     e.preventDefault();
                                     handleDeleteBook(book.id);
                                   }}
                                   className="rounded-xl p-2 transition-all duration-300"
-                                  style={{
+              style={{
                                     color: '#f87171',
                                     backgroundColor: 'rgba(248,113,113,0.12)'
-                                  }}
-                                  onMouseEnter={(e) => {
+              }}
+              onMouseEnter={(e) => {
                                     e.currentTarget.style.backgroundColor = 'rgba(248,113,113,0.22)';
-                                  }}
-                                  onMouseLeave={(e) => {
+              }}
+              onMouseLeave={(e) => {
                                     e.currentTarget.style.backgroundColor = 'rgba(248,113,113,0.12)';
-                                  }}
-                                >
+              }}
+            >
                                   <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
+            </button>
+          </div>
                             </div>
                             {renderProgressBar(progress)}
                           </div>
@@ -1275,11 +1275,11 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                     {displayedBooks.map(book => {
                       const progress = getDocumentProgress(book);
                       const isRenaming = renameBusyIds.includes(book.id);
-                      return (
-                        <div
-                          key={book.id}
+                    return (
+                      <div
+                        key={book.id}
                           className="group relative overflow-hidden rounded-2xl border transition-all duration-300 hover:-translate-y-[3px] hover:shadow-[0_18px_40px_rgba(15,23,42,0.45)]"
-                          style={{
+                        style={{
                             borderColor: 'rgba(148,163,184,0.14)',
                             background: 'linear-gradient(145deg, rgba(30,41,59,0.92), rgba(17,24,39,0.92))'
                           }}
@@ -1323,13 +1323,13 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                                 color: isRenaming ? 'var(--color-text-tertiary)' : '#a855f7',
                                 backgroundColor: 'rgba(168,85,247,0.12)',
                                 opacity: isRenaming ? 0.5 : 1
-                              }}
-                              onMouseEnter={(e) => {
+                        }}
+                        onMouseEnter={(e) => {
                                 if (!isRenaming) {
                                   e.currentTarget.style.backgroundColor = 'rgba(168,85,247,0.22)';
                                 }
-                              }}
-                              onMouseLeave={(e) => {
+                        }}
+                        onMouseLeave={(e) => {
                                 e.currentTarget.style.backgroundColor = 'rgba(168,85,247,0.12)';
                               }}
                             >
@@ -1347,8 +1347,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                               }}
                               onMouseLeave={(e) => {
                                 e.currentTarget.style.backgroundColor = 'rgba(248,113,113,0.12)';
-                              }}
-                            >
+                        }}
+                      >
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
@@ -1391,16 +1391,16 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                                   {book.title}
                                 </h3>
                                 <p className="mt-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                                  {book.type.toUpperCase()} • {book.totalPages ? `${book.totalPages} pages` : 'Text file'}
-                                </p>
+                          {book.type.toUpperCase()} • {book.totalPages ? `${book.totalPages} pages` : 'Text file'}
+                        </p>
                                 <p className="mt-2 text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-tertiary)' }}>
-                                  Saved {new Date(book.savedAt).toLocaleDateString()}
+                          Saved {new Date(book.savedAt).toLocaleDateString()}
                                   {book.lastReadPage && ` • Last read page ${book.lastReadPage}`}
-                                </p>
-                              </div>
+                        </p>
+                      </div>
                               <div className="flex items-center gap-2">
                                 {renderFavoriteButton(book)}
-                                <button
+                      <button
                                   onClick={() => handleRenameDocument(book)}
                                   disabled={isRenaming}
                                   className="rounded-xl px-3 py-2 text-xs font-medium transition-all"
@@ -1413,8 +1413,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                                   onMouseEnter={(e) => {
                                     if (!isRenaming) {
                                       e.currentTarget.style.backgroundColor = 'rgba(168,85,247,0.22)';
-                                    }
-                                  }}
+                          }
+                        }}
                                   onMouseLeave={(e) => {
                                     e.currentTarget.style.backgroundColor = 'rgba(168,85,247,0.12)';
                                   }}
@@ -1424,20 +1424,20 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                                 <button
                                   onClick={() => handleDeleteBook(book.id)}
                                   className="rounded-xl px-3 py-2 text-xs font-medium transition-all"
-                                  style={{
+                        style={{ 
                                     color: '#f87171',
                                     backgroundColor: 'rgba(248,113,113,0.12)',
                                     border: '1px solid rgba(248,113,113,0.24)'
-                                  }}
-                                  onMouseEnter={(e) => {
+                        }}
+                        onMouseEnter={(e) => {
                                     e.currentTarget.style.backgroundColor = 'rgba(248,113,113,0.22)';
-                                  }}
-                                  onMouseLeave={(e) => {
+                        }}
+                        onMouseLeave={(e) => {
                                     e.currentTarget.style.backgroundColor = 'rgba(248,113,113,0.12)';
-                                  }}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                               </div>
                             </div>
 
@@ -1481,8 +1481,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                               </div>
                             </div>
                           </div>
-                        </div>
-                      );
+                    </div>
+                  );
                     })}
                   </div>
                 )}
@@ -1679,23 +1679,23 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
           >
             <div className="grid gap-4 md:grid-cols-[2fr_3fr] md:items-center">
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-sm">
                   <HardDrive className="w-4 h-4" style={{ color: 'rgba(148,163,184,0.9)' }} />
                   <span className="font-medium" style={{ color: 'var(--color-text-secondary)' }}>
                     Storage usage {storageInfo.percentage.toFixed(0)}%
-                  </span>
-                </div>
+                </span>
+              </div>
                 <div className="h-2 overflow-hidden rounded-full" style={{ backgroundColor: 'rgba(148,163,184,0.18)' }}>
-                  <div
+              <div
                     className="h-2 rounded-full transition-all duration-500"
-                    style={{
-                      width: `${Math.min(storageInfo.percentage, 100)}%`,
+                style={{ 
+                  width: `${Math.min(storageInfo.percentage, 100)}%`,
                       background: 'linear-gradient(90deg, #60a5fa 0%, #a855f7 50%, #ec4899 100%)',
                       boxShadow: '0 0 14px rgba(129,140,248,0.35)'
-                    }}
+                }}
                   />
-                </div>
-              </div>
+            </div>
+                  </div>
 
               <div className="flex flex-wrap items-center justify-end gap-3">
                 {isGoogleDriveEnabled ? (
@@ -1709,30 +1709,30 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                   >
                     <Cloud className="w-3.5 h-3.5" />
                     <span className="font-medium">Drive sync enabled</span>
-                    {syncStatus.lastSync && (
+                  {syncStatus.lastSync && (
                       <span style={{ color: 'rgba(16,185,129,0.8)' }}>
                         · Last sync {syncStatus.lastSync.toLocaleDateString()}
-                      </span>
-                    )}
+                    </span>
+                  )}
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleSyncToGoogleDrive}
-                        disabled={isSyncing}
+                  <button
+                    onClick={handleSyncToGoogleDrive}
+                    disabled={isSyncing}
                         className="flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 transition-all disabled:opacity-60"
-                      >
-                        <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
                         Upload
-                      </button>
-                      <button
-                        onClick={handleSyncFromGoogleDrive}
-                        disabled={isSyncing}
+                  </button>
+                  <button
+                    onClick={handleSyncFromGoogleDrive}
+                    disabled={isSyncing}
                         className="flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 transition-all disabled:opacity-60"
-                      >
-                        <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
                         Download
-                      </button>
-                    </div>
-                  </div>
+                  </button>
+                </div>
+              </div>
                 ) : (
                   <div
                     className="flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs"
@@ -1751,55 +1751,55 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                     >
                       {isConnectingDrive ? 'Connecting…' : 'Enable'}
                     </button>
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleExportData}
-                    className="flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition-all"
-                    style={{
-                      borderColor: 'rgba(148,163,184,0.16)',
-                      color: 'var(--color-text-primary)',
-                      backgroundColor: 'rgba(148,163,184,0.08)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(148,163,184,0.18)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(148,163,184,0.08)';
-                    }}
-                  >
-                    <Download className="w-4 h-4" />
-                    Export
-                  </button>
-                  <label
-                    className="flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-2 text-sm transition-all"
-                    style={{
-                      borderColor: 'rgba(148,163,184,0.16)',
-                      color: 'var(--color-text-primary)',
-                      backgroundColor: 'rgba(148,163,184,0.08)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(148,163,184,0.18)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(148,163,184,0.08)';
-                    }}
-                  >
-                    <Upload className="w-4 h-4" />
-                    Import
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleImportData}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
               </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleExportData}
+                    className="flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition-all"
+                style={{
+                      borderColor: 'rgba(148,163,184,0.16)',
+                  color: 'var(--color-text-primary)',
+                      backgroundColor: 'rgba(148,163,184,0.08)'
+                }}
+                onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(148,163,184,0.18)';
+                }}
+                onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(148,163,184,0.08)';
+                }}
+              >
+                <Download className="w-4 h-4" />
+                    Export
+              </button>
+              <label 
+                    className="flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-2 text-sm transition-all"
+                style={{
+                      borderColor: 'rgba(148,163,184,0.16)',
+                  color: 'var(--color-text-primary)',
+                      backgroundColor: 'rgba(148,163,184,0.08)'
+                }}
+                onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(148,163,184,0.18)';
+                }}
+                onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(148,163,184,0.08)';
+                }}
+              >
+                <Upload className="w-4 h-4" />
+                    Import
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleImportData}
+                  className="hidden"
+                />
+              </label>
             </div>
           </div>
+      </div>
+    </div>
         </div>
       </div>
     </div>,

@@ -18,7 +18,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
   }, [onUploadClick])
 
   const handleOpenCustomReading = useCallback(() => {
-    openCustomReadingWizard('empty-state')
+      openCustomReadingWizard('empty-state')
   }, [openCustomReadingWizard])
 
   return (
