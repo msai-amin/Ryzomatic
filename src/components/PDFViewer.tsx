@@ -207,26 +207,26 @@ const getContainerMetrics = (container: HTMLElement, textLayerDiv?: HTMLElement 
 
   const textLayerRect = textLayerDiv?.getBoundingClientRect()
 
-  const widthCandidates = [
+  const rawWidthCandidates = [
+    textLayerRect?.width ?? 0,
     rect.width,
-    (textLayerRect?.width ?? 0) * scaleX,
-    container.offsetWidth * scaleX,
-    container.clientWidth * scaleX,
-    container.scrollWidth * scaleX,
-    (textLayerDiv?.scrollWidth ?? 0) * scaleX
+    container.clientWidth,
+    container.offsetWidth,
+    container.scrollWidth,
+    textLayerDiv?.scrollWidth ?? 0
   ].filter(value => Number.isFinite(value) && value > RECT_SIZE_EPSILON)
 
-  const heightCandidates = [
+  const rawHeightCandidates = [
+    textLayerRect?.height ?? 0,
     rect.height,
-    (textLayerRect?.height ?? 0) * scaleY,
-    container.offsetHeight * scaleY,
-    container.clientHeight * scaleY,
-    container.scrollHeight * scaleY,
-    (textLayerDiv?.scrollHeight ?? 0) * scaleY
+    container.clientHeight,
+    container.offsetHeight,
+    container.scrollHeight,
+    textLayerDiv?.scrollHeight ?? 0
   ].filter(value => Number.isFinite(value) && value > RECT_SIZE_EPSILON)
 
-  const width = widthCandidates.length > 0 ? Math.max(...widthCandidates) : Math.max(rect.width, RECT_SIZE_EPSILON)
-  const height = heightCandidates.length > 0 ? Math.max(...heightCandidates) : Math.max(rect.height, RECT_SIZE_EPSILON)
+  const width = rawWidthCandidates.length > 0 ? Math.min(...rawWidthCandidates) : Math.max(rect.width, RECT_SIZE_EPSILON)
+  const height = rawHeightCandidates.length > 0 ? Math.min(...rawHeightCandidates) : Math.max(rect.height, RECT_SIZE_EPSILON)
 
   return { rect, width, height, scaleX, scaleY }
 }
@@ -317,15 +317,15 @@ const computeGeometryFromSelectedSpans = (
   }
 
   const mergedLineRects = mergeSpanRectsByLine(rects)
-  const screenRects = mergedLineRects
+  const normalizedScreenRects = mergedLineRects
     .map(lineRect => convertLineRectToScreenRect(lineRect, containerRect, widthLimit, heightLimit))
     .filter((rect): rect is RectLike => !!rect)
 
-  if (!screenRects.length) {
+  if (!normalizedScreenRects.length) {
     return null
   }
 
-  const bounding = screenRects.reduce(
+  const bounding = normalizedScreenRects.reduce(
     (acc, rect) => ({
       minX: Math.min(acc.minX, rect.x),
       minY: Math.min(acc.minY, rect.y),
@@ -355,7 +355,7 @@ const computeGeometryFromSelectedSpans = (
     return null
   }
 
-  const viewportRects = screenRects.map(rect =>
+  const viewportRects = normalizedScreenRects.map(rect =>
     convertScreenRectToBaseViewportRect(rect, currentViewport, baseViewport)
   )
   const boundingViewportRect = convertScreenRectToBaseViewportRect(
@@ -365,7 +365,7 @@ const computeGeometryFromSelectedSpans = (
   )
 
   return {
-    screenRects,
+    screenRects: normalizedScreenRects,
     viewportRects,
     boundingScreenRect,
     boundingViewportRect
@@ -640,6 +640,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   const [selectedHighlightId, setSelectedHighlightId] = useState<string | null>(null)
   const [lastCreatedHighlightId, setLastCreatedHighlightId] = useState<string | null>(null)
   const [showUndoToast, setShowUndoToast] = useState(false)
+
+  useEffect(() => {
+    setHighlights([])
+    setSelectedHighlightId(null)
+    setLastCreatedHighlightId(null)
+    setShowUndoToast(false)
+    setSelectedTextInfo(null)
+  }, [document.id])
 
   const mapHighlightToRenderData = useCallback((highlight: HighlightType): HighlightRenderData | null => {
     const safeScale = Math.max(scale, 0.1)
@@ -2650,7 +2658,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           className: pageContainer.className,
           offsetTop: pageContainer.offsetTop,
           offsetLeft: pageContainer.offsetLeft,
-          scrollTop: scrollContainerRef.current?.scrollTop || 0
+          scrollTop: scrollContainerRef.current?.scrollTop || 0,
+          scaleX: containerMetrics.scaleX,
+          scaleY: containerMetrics.scaleY
         },
         rawPosition,
         containerWidth: widthLimit,
