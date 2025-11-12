@@ -46,7 +46,6 @@ import { FormulaRenderer, FormulaPlaceholder } from './FormulaRenderer'
 import { extractMarkedFormulas } from '../utils/pdfTextExtractor'
 import { convertMultipleFormulas } from '../services/formulaService'
 import { highlightService, Highlight as HighlightType } from '../services/highlightService'
-import { HighlightColorPicker } from './HighlightColorPicker'
 import { HighlightManagementPanel } from './HighlightManagementPanel'
 import { HighlightColorPopover } from './HighlightColorPopover'
 import { notesService } from '../services/notesService'
@@ -55,6 +54,7 @@ import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelec
 import { convertScreenRectToBaseViewportRect } from '../utils/highlightCoordinates'
 import { supabase } from '../../lib/supabase'
 import { configurePDFWorker } from '../utils/pdfjsConfig'
+import { useTheme } from '../../themes/ThemeProvider'
 import {
   cleanupDocumentText,
   CleanupPreferences
@@ -327,6 +327,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     setRightSidebarTab
   } = useAppStore()
 
+  const { annotationColors } = useTheme()
+
   const userId = user?.id ?? null
   
   // Get document from store (which is sanitized)
@@ -362,7 +364,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     setScale(pdfViewer.zoom)
   }, [pdfViewer.zoom])
   const [searchQuery, setSearchQuery] = useState('')
-  const [highlightPickerPosition, setHighlightPickerPosition] = useState<{ x: number; y: number } | null>(null)
   const [selectedTextInfo, setSelectedTextInfo] = useState<{
     text: string
     pageNumber: number
@@ -370,7 +371,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   } | null>(null)
   const [highlights, setHighlights] = useState<HighlightType[]>([])
   const [showHighlightColorPopover, setShowHighlightColorPopover] = useState(false)
-  const [currentHighlightColor, setCurrentHighlightColor] = useState('#FFD700')
+  const defaultAnnotationColor = annotationColors[0] ?? { id: 'default-yellow', color: '#FFD700' }
+  const [currentHighlightColorId, setCurrentHighlightColorId] = useState(defaultAnnotationColor.id)
+  const [currentHighlightColor, setCurrentHighlightColor] = useState(defaultAnnotationColor.color)
   const [isHighlightMode, setIsHighlightMode] = useState(true) // Auto-enable highlight mode when document loads
   const [selectedHighlightId, setSelectedHighlightId] = useState<string | null>(null)
   const [lastCreatedHighlightId, setLastCreatedHighlightId] = useState<string | null>(null)
@@ -404,6 +407,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   const [formulaConversionProgress, setFormulaConversionProgress] = useState({ current: 0, total: 0 })
   const [lastRenderedDocId, setLastRenderedDocId] = useState<string | null>(null)
   
+  useEffect(() => {
+    if (annotationColors.length === 0) {
+      return
+    }
+    const matchedColor = annotationColors.find(color => color.id === currentHighlightColorId)
+    if (matchedColor) {
+      if (matchedColor.color !== currentHighlightColor) {
+        setCurrentHighlightColor(matchedColor.color)
+      }
+    } else {
+      setCurrentHighlightColorId(annotationColors[0].id)
+      setCurrentHighlightColor(annotationColors[0].color)
+    }
+  }, [annotationColors, currentHighlightColorId, currentHighlightColor])
+
   // Text cleanup state
   const [showCleanupModal, setShowCleanupModal] = useState(false)
   const [isCleaning, setIsCleaning] = useState(false)
@@ -2063,14 +2081,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   const handleTextSelection = useCallback((event: MouseEvent) => {
     const selection = window.getSelection()
     if (!selection || selection.isCollapsed || !selection.rangeCount) {
-      setHighlightPickerPosition(null)
       setSelectedTextInfo(null)
       return
     }
 
     const selectedText = selection.toString().trim()
     if (selectedText.length < 2) {
-      setHighlightPickerPosition(null)
       setSelectedTextInfo(null)
       return
     }
@@ -2111,23 +2127,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     })
 
     // ALWAYS store selection info (used by notes, AI, context menu, etc.)
-    setSelectedTextInfo({
+    const selectionDetails = {
       text: selectedText,
       pageNumber: currentPage,
       range
-    })
-
-    // ONLY show highlight picker UI when highlight mode is active
-    if (isHighlightMode) {
-      setHighlightPickerPosition({
-        x: rect.right + 10,
-        y: rect.top - 10
-      })
-    } else {
-      // Clear picker UI when not in highlight mode, but keep selection info
-      setHighlightPickerPosition(null)
     }
-  }, [pdfViewer.scrollMode, pdfViewer.readingMode, pageNumber, isHighlightMode])
+    setSelectedTextInfo(selectionDetails)
+
+    if (isHighlightMode) {
+      handleCreateHighlight(currentHighlightColorId, currentHighlightColor, selectionDetails)
+    }
+  }, [pdfViewer.scrollMode, pdfViewer.readingMode, pageNumber, isHighlightMode, handleCreateHighlight, currentHighlightColorId, currentHighlightColor])
   
   // Handle right-click context menu for AI features
   const handleContextMenuClick = useCallback((event: React.MouseEvent) => {
@@ -2135,8 +2145,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       event.preventDefault()
       const selection = window.getSelection()
       if (selection) {
-        // Close highlight picker when context menu opens to avoid z-index conflicts
-        setHighlightPickerPosition(null)
         setSelectedTextInfo(null)
         
         setContextMenu({
@@ -2149,11 +2157,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   }, [])
 
   // Create highlight after color selection
-  const handleCreateHighlight = useCallback(async (colorId: string, colorHex: string) => {
-    if (!selectedTextInfo || !selectedTextInfo.range) {
+  const handleCreateHighlight = useCallback(async (colorId: string, colorHex: string, selectionOverride?: { text: string; pageNumber: number; range: Range | null }) => {
+    const activeSelection = selectionOverride ?? selectedTextInfo
+    if (!activeSelection || !activeSelection.range) {
       console.error('Cannot create highlight: missing selectedTextInfo or range')
       alert('Cannot create highlight: No text selected. Please select text first.')
-      setHighlightPickerPosition(null)
       return
     }
 
@@ -2166,13 +2174,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     if (isVeryRecentlyUploaded) {
       const secondsRemaining = Math.ceil((10000 - (now - uploadTime)) / 1000)
       alert(`⏳ Document is still being saved to database...\n\nPlease wait ${secondsRemaining} more second${secondsRemaining > 1 ? 's' : ''} and try again.`)
-      setHighlightPickerPosition(null)
       setSelectedTextInfo(null)
       return
     }
 
     try {
-      const range = selectedTextInfo.range
+      const range = activeSelection.range
       
       // Check if range is still valid (DOM might have changed)
       try {
@@ -2183,7 +2190,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       } catch (rangeError) {
         console.error('Range is invalid:', rangeError)
         alert('The selected text is no longer valid. Please select the text again.')
-        setHighlightPickerPosition(null)
         setSelectedTextInfo(null)
         return
       }
@@ -2196,7 +2202,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       if (!selectionRect || selectionRect.width === 0 || selectionRect.height === 0) {
         console.error('Invalid bounding rectangle for selection:', selectionRect)
         alert('Cannot create highlight: Invalid text selection. Please try selecting the text again.')
-        setHighlightPickerPosition(null)
         setSelectedTextInfo(null)
         return
       }
@@ -2205,7 +2210,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       if (selectionRect.width < 1 || selectionRect.height < 1) {
         console.error('Selection too small to create highlight:', selectionRect)
         alert('Cannot create highlight: Selection is too small. Please select more text.')
-        setHighlightPickerPosition(null)
         setSelectedTextInfo(null)
         return
       }
@@ -2250,7 +2254,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       if (!pageContainer) {
         console.error('Could not find page container for highlight')
         alert('Cannot create highlight: Unable to locate page container. Please try again.')
-        setHighlightPickerPosition(null)
         setSelectedTextInfo(null)
         return
       }
@@ -2335,7 +2338,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const textElement = range.startContainer.parentElement
 
       const safeScale = Math.max(scale, 0.1) // Prevent division by zero
-      const page = await pdfDocRef.current.getPage(selectedTextInfo.pageNumber)
+      const page = await pdfDocRef.current.getPage(activeSelection.pageNumber)
       const currentViewport = page.getViewport({ scale: safeScale, rotation })
       const baseViewport = page.getViewport({ scale: 1, rotation })
       const position = convertScreenRectToBaseViewportRect(rawPosition, currentViewport, baseViewport)
@@ -2344,13 +2347,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       if (position.x < 0 || position.y < 0 || position.width <= 0 || position.height <= 0) {
         console.error('Invalid calculated position:', { rawPosition, position, scale })
         alert('Cannot create highlight: Invalid position calculation. Please try selecting the text again.')
-        setHighlightPickerPosition(null)
         setSelectedTextInfo(null)
         return
       }
 
       console.log('Highlight position debug:', {
-        pageNumber: selectedTextInfo.pageNumber,
+        pageNumber: activeSelection.pageNumber,
         scrollMode: pdfViewer.scrollMode,
         currentScale: scale,
         currentZoom: pdfViewer.zoom,
@@ -2386,11 +2388,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       })
 
       // Calculate text offset for reading mode sync
-      const rawPageText = document.pageTexts?.[selectedTextInfo.pageNumber - 1]
+      const rawPageText = document.pageTexts?.[activeSelection.pageNumber - 1]
       const pageText = typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
       const textOffset = highlightService.calculateTextOffset(
         pageText,
-        selectedTextInfo.text,
+        activeSelection.text,
         0
       )
 
@@ -2400,9 +2402,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         const textContent = await page.getTextContent()
         
         // Find text layer spans that correspond to the selected range
-        const selectedText = selectedTextInfo.text.trim()
+        const selectedText = activeSelection.text.trim()
         const textLayerDiv = pdfViewer.scrollMode === 'continuous'
-          ? pageTextLayerRefs.current.get(selectedTextInfo.pageNumber)
+          ? pageTextLayerRefs.current.get(activeSelection.pageNumber)
           : textLayerRef.current
         
         if (textLayerDiv) {
@@ -2475,7 +2477,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         bookId: document.id,
         documentId: document.id,
         documentName: document.name,
-        pageNumber: selectedTextInfo.pageNumber,
+        pageNumber: activeSelection.pageNumber,
         hasDocument: !!document,
         documentType: document?.type,
         hasTextAnchors: !!textAnchors
@@ -2483,8 +2485,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       
       const highlight = await highlightService.createHighlight({
         bookId: document.id,
-        pageNumber: selectedTextInfo.pageNumber,
-        highlightedText: selectedTextInfo.text,
+        pageNumber: activeSelection.pageNumber,
+        highlightedText: activeSelection.text,
         colorId,
         colorHex,
         positionData: position,
@@ -2510,7 +2512,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
       // Clear selection
       window.getSelection()?.removeAllRanges()
-      setHighlightPickerPosition(null)
       setSelectedTextInfo(null)
     } catch (error: any) {
       console.error('Error creating highlight:', error)
@@ -2518,10 +2519,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         message: error?.message,
         stack: error?.stack,
         name: error?.name,
-        selectedTextInfo: selectedTextInfo ? {
-          text: selectedTextInfo.text.substring(0, 50),
-          pageNumber: selectedTextInfo.pageNumber,
-          hasRange: !!selectedTextInfo.range
+        selectedTextInfo: activeSelection ? {
+          text: activeSelection.text.substring(0, 50),
+          pageNumber: activeSelection.pageNumber,
+          hasRange: !!activeSelection.range
         } : null
       })
       
@@ -2540,7 +2541,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       }
       
       // Clear UI state on error
-      setHighlightPickerPosition(null)
       setSelectedTextInfo(null)
     }
   }, [selectedTextInfo, document.id, document.pageTexts])
@@ -3042,7 +3042,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                       setIsHighlightMode(!isHighlightMode)
                       // Clear any existing selection and popover when toggling mode
                       if (isHighlightMode) {
-                        setHighlightPickerPosition(null)
                         setSelectedTextInfo(null)
                         setShowHighlightColorPopover(false)
                       }
@@ -3658,7 +3657,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 setIsHighlightMode(!isHighlightMode)
                 // Clear any existing selection and popover when toggling mode
                 if (isHighlightMode) {
-                  setHighlightPickerPosition(null)
                   setSelectedTextInfo(null)
                   setShowHighlightColorPopover(false)
                 }
@@ -4028,17 +4026,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         />
       )}
 
-      {/* Highlight Color Picker */}
-      <HighlightColorPicker
-        isOpen={highlightPickerPosition !== null}
-        position={highlightPickerPosition || { x: 0, y: 0 }}
-        onColorSelect={handleCreateHighlight}
-        onCancel={() => {
-          setHighlightPickerPosition(null)
-          setSelectedTextInfo(null)
-        }}
-      />
-
       {/* Undo Toast for Last Created Highlight */}
       {showUndoToast && lastCreatedHighlightId && (
         <div
@@ -4123,7 +4110,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         isOpen={showHighlightColorPopover}
         onClose={() => setShowHighlightColorPopover(false)}
         selectedColor={currentHighlightColor}
-        onColorSelect={setCurrentHighlightColor}
+        onColorSelect={(colorHex) => {
+          setCurrentHighlightColor(colorHex)
+          const matchedColor = annotationColors.find(color => color.color === colorHex)
+          if (matchedColor) {
+            setCurrentHighlightColorId(matchedColor.id)
+          }
+        }}
         triggerRef={highlightColorButtonRef}
       />
 
