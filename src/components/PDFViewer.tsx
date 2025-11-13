@@ -2391,54 +2391,92 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         ? pageTextLayerRefs.current.get(activeSelection.pageNumber)
         : textLayerRef.current
 
-      // Fallback: If ref is null (e.g., page just switched), find text layer from DOM
+      // Fallback: If ref is null (e.g., page just switched or ref not populated), find text layer from DOM
       if (!textLayerDivForGeometry) {
-        // Try to find text layer by traversing from the selection
-        let currentElement = range.startContainer.parentElement
+        // Strategy 1: Find text layer by traversing up from the selection
+        let currentElement: Element | null = range.startContainer.parentElement
         while (currentElement) {
-          // Look for element with class 'textLayer'
+          // Check if current element is a textLayer
           if (currentElement.classList?.contains('textLayer')) {
             textLayerDivForGeometry = currentElement as HTMLElement
             break
           }
-          // Also check if it's a textLayer by checking for spans with data-text-index
-          if (currentElement.querySelector?.('span[data-text-index]')) {
+          // Check if current element contains textLayer spans
+          if (currentElement.querySelector?.('span[data-text-index]') && 
+              currentElement.classList?.contains('textLayer')) {
             textLayerDivForGeometry = currentElement as HTMLElement
             break
           }
           currentElement = currentElement.parentElement
         }
-      }
 
-      // Final fallback: Find text layer in page container
-      if (!textLayerDivForGeometry) {
-        // Find page container first
-        let pageContainer: HTMLElement | null = null
-        let currentElement = range.startContainer.parentElement
-        while (currentElement && !pageContainer) {
-          if (currentElement.hasAttribute('data-page-number') || 
-              (currentElement.querySelector?.('canvas') && currentElement.querySelector?.('.textLayer'))) {
-            pageContainer = currentElement as HTMLElement
-            break
+        // Strategy 2: Find page container first, then find text layer inside it
+        if (!textLayerDivForGeometry) {
+          let pageContainer: HTMLElement | null = null
+          currentElement = range.startContainer.parentElement
+          
+          // Find page container by data-page-number attribute
+          while (currentElement && !pageContainer) {
+            if (currentElement.hasAttribute('data-page-number')) {
+              pageContainer = currentElement as HTMLElement
+              break
+            }
+            // Also check for container with both canvas and textLayer
+            if (currentElement.querySelector?.('canvas') && currentElement.querySelector?.('.textLayer')) {
+              pageContainer = currentElement as HTMLElement
+              break
+            }
+            currentElement = currentElement.parentElement
           }
-          currentElement = currentElement.parentElement
+          
+          // Look for text layer in the container
+          if (pageContainer) {
+            textLayerDivForGeometry = pageContainer.querySelector('.textLayer') as HTMLElement
+          }
         }
-        
-        // Look for text layer in the container
-        if (pageContainer) {
-          textLayerDivForGeometry = pageContainer.querySelector('.textLayer') as HTMLElement
+
+        // Strategy 3: In continuous mode, try to find text layer by page number from DOM
+        if (!textLayerDivForGeometry && pdfViewer.scrollMode === 'continuous') {
+          // Find page container with matching page number
+          const pageContainers = document.querySelectorAll('[data-page-number]')
+          for (const container of pageContainers) {
+            const pageAttr = container.getAttribute('data-page-number')
+            if (pageAttr && parseInt(pageAttr, 10) === activeSelection.pageNumber) {
+              const textLayer = container.querySelector('.textLayer') as HTMLElement
+              if (textLayer) {
+                textLayerDivForGeometry = textLayer
+                break
+              }
+            }
+          }
         }
       }
 
       if (!textLayerDivForGeometry) {
-        console.error('Could not find text layer div for highlight', {
+        // Enhanced debugging
+        const debugInfo = {
           scrollMode: pdfViewer.scrollMode,
           pageNumber: activeSelection.pageNumber,
           hasTextLayerRef: !!textLayerRef.current,
           hasPageTextLayerRef: pdfViewer.scrollMode === 'continuous' 
             ? pageTextLayerRefs.current.has(activeSelection.pageNumber)
-            : false
-        })
+            : false,
+          pageTextLayerRefsKeys: pdfViewer.scrollMode === 'continuous'
+            ? Array.from(pageTextLayerRefs.current.keys())
+            : [],
+          selectionRangeInfo: {
+            startContainer: range.startContainer.nodeName,
+            startOffset: range.startOffset,
+            endContainer: range.endContainer.nodeName,
+            endOffset: range.endOffset
+          },
+          domCheck: {
+            hasTextLayerInDOM: !!document.querySelector('.textLayer'),
+            textLayerCount: document.querySelectorAll('.textLayer').length,
+            hasPageContainers: document.querySelectorAll('[data-page-number]').length
+          }
+        }
+        console.error('Could not find text layer div for highlight', debugInfo)
         alert('Cannot create highlight: Unable to locate text layer. Please try again.')
         setSelectedTextInfo(null)
         return
