@@ -21,6 +21,7 @@ type EnhancedSavedBook = SavedBook & {
   text_content?: string;
   fileSize?: number;
   file_size?: number;
+  cleanedPageTexts?: string[];
 };
 
 export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalProps) {
@@ -60,6 +61,38 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       ...book,
       isFavorite: Boolean(normalizedFavorite),
     };
+  };
+
+  const getFileDataByteLength = (fileData: unknown): number | null => {
+    if (!fileData) {
+      return null;
+    }
+
+    if (fileData instanceof ArrayBuffer) {
+      return fileData.byteLength;
+    }
+
+    if (fileData instanceof Uint8Array) {
+      return fileData.byteLength;
+    }
+
+    if (fileData instanceof Blob) {
+      return fileData.size;
+    }
+
+    if (typeof fileData === 'string') {
+      return new TextEncoder().encode(fileData).length;
+    }
+
+    if (Array.isArray(fileData)) {
+      return fileData.length;
+    }
+
+    if (typeof fileData === 'object' && 'byteLength' in fileData && typeof (fileData as { byteLength?: unknown }).byteLength === 'number') {
+      return (fileData as { byteLength: number }).byteLength;
+    }
+
+    return null;
   };
 
   const formatBookSize = (book: EnhancedSavedBook): string => {
@@ -579,8 +612,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         hasFileData: !!workingBook.fileData,
         hasPdfDataBase64: !!workingBook.pdfDataBase64,
         fileDataType: typeof workingBook.fileData,
-        fileDataConstructor: workingBook.fileData?.constructor?.name,
-        fileDataLength: workingBook.fileData ? (workingBook.fileData as any).byteLength || (workingBook.fileData as any).length : 0
+        fileDataConstructor: (workingBook.fileData as any)?.constructor?.name,
+        fileDataLength: getFileDataByteLength(workingBook.fileData) ?? 0
       });
 
       // If the book was loaded from Supabase metadata and the binary data isn't loaded yet, fetch it now.
@@ -603,7 +636,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
               text_content: fullBook.text_content ?? workingBook.text_content,
             };
             console.log('Supabase book data loaded:', {
-              byteLength: fullBook.fileData.byteLength,
+              byteLength: getFileDataByteLength(fullBook.fileData),
               totalPages: fullBook.totalPages,
               hasPageTexts: !!fullBook.pageTexts?.length
             });
@@ -632,10 +665,12 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
             bytes[i] = binary.charCodeAt(i);
           }
           workingBook.fileData = bytes.buffer as ArrayBuffer;
-          console.log('Converted to ArrayBuffer:', {
-            byteLength: workingBook.fileData.byteLength,
-            constructor: workingBook.fileData.constructor.name
-          });
+          if (workingBook.fileData instanceof ArrayBuffer) {
+            console.log('Converted to ArrayBuffer:', {
+              byteLength: workingBook.fileData.byteLength,
+              constructor: workingBook.fileData.constructor.name
+            });
+          }
         } catch (error) {
           console.error('Error converting base64 to ArrayBuffer:', error);
           throw new Error(`Failed to load ${formatLabel} data from library`);
@@ -658,40 +693,48 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
             // If it's an array of numbers, convert to ArrayBuffer
             const bytes = new Uint8Array(workingBook.fileData);
             workingBook.fileData = bytes.buffer as ArrayBuffer;
+          } else if (workingBook.fileData instanceof Blob) {
+            const arrayBuffer = await workingBook.fileData.arrayBuffer();
+            workingBook.fileData = arrayBuffer as ArrayBuffer;
           } else if (typeof workingBook.fileData === 'object' && workingBook.fileData !== null) {
             // Handle legacy data format - this is likely corrupted data from before base64 conversion
             console.warn(`Legacy ${formatLabel} data detected, this book may need to be re-uploaded:`, {
               fileDataType: typeof workingBook.fileData,
-              fileDataConstructor: workingBook.fileData.constructor?.name,
-              fileDataKeys: Object.keys(workingBook.fileData),
+              fileDataConstructor: (workingBook.fileData as any).constructor?.name,
+              fileDataKeys: Object.keys(workingBook.fileData as Record<string, unknown>),
               hasPdfDataBase64: !!workingBook.pdfDataBase64
             });
             throw new Error(`This ${formatLabel} was saved in an old format and cannot be loaded. Please re-upload the file.`);
+          } else if (typeof workingBook.fileData === 'string') {
+            const textBytes = new TextEncoder().encode(workingBook.fileData);
+            workingBook.fileData = textBytes.buffer as ArrayBuffer;
           } else {
-            console.error('Unknown fileData type:', typeof book.fileData, book.fileData?.constructor?.name);
+            console.error('Unknown fileData type:', typeof book.fileData, (book.fileData as any)?.constructor?.name);
             throw new Error(`Invalid ${formatLabel} data format in library`);
           }
-          console.log('Conversion successful:', {
-            byteLength: workingBook.fileData.byteLength,
-            constructor: workingBook.fileData.constructor.name
-          });
+          if (workingBook.fileData instanceof ArrayBuffer) {
+            console.log('Conversion successful:', {
+              byteLength: workingBook.fileData.byteLength,
+              constructor: workingBook.fileData.constructor.name
+            });
+          }
         } catch (error) {
           console.error('Error converting fileData to ArrayBuffer:', error);
           throw new Error(`Failed to convert ${formatLabel} data to proper format`);
         }
       }
-      
+
       // Final validation
       if (!workingBook.fileData || !(workingBook.fileData instanceof ArrayBuffer)) {
         console.error(`${formatLabel} data validation failed:`, {
           hasFileData: !!workingBook.fileData,
           fileDataType: typeof workingBook.fileData,
-          fileDataConstructor: workingBook.fileData?.constructor?.name,
+          fileDataConstructor: (workingBook.fileData as any)?.constructor?.name,
           hasPdfDataBase64: !!workingBook.pdfDataBase64,
           pdfDataBase64Length: workingBook.pdfDataBase64?.length || 0,
-          pdfDataBase64Preview: workingBook.pdfDataBase64?.substring(0, 50) + '...' || 'N/A'
+          pdfDataBase64Preview: workingBook.pdfDataBase64 ? `${workingBook.pdfDataBase64.substring(0, 50)}...` : 'N/A'
         });
-        
+
         // Try to provide a more helpful error message
         if (workingBook.pdfDataBase64) {
           throw new Error(`${formatLabel} data conversion failed. The file may be corrupted. Please try re-uploading.`);
@@ -733,37 +776,20 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       content: combinedContent,
       type: workingBook.type,
       uploadedAt: workingBook.savedAt,
-      pdfData: workingBook.type === 'pdf' ? workingBook.fileData as ArrayBuffer : undefined,
+      pdfData: workingBook.type === 'pdf' ? (workingBook.fileData as ArrayBuffer) : undefined,
       epubData:
         workingBook.type === 'epub' && workingBook.fileData instanceof ArrayBuffer
           ? new Blob([workingBook.fileData], { type: 'application/epub+zip' })
           : undefined,
       totalPages: workingBook.totalPages,
-      lastReadPage: workingBook.lastReadPage,
       pageTexts: cleanedPageTexts,
-      cleanedPageTexts
+      cleanedPageTexts: workingBook.cleanedPageTexts,
+      text_content: workingBook.text_content,
     };
 
-      console.log('Document created for app store:', {
-        id: doc.id,
-        type: doc.type,
-        hasPdfData: !!doc.pdfData,
-        pdfDataType: doc.pdfData ? doc.pdfData.constructor.name : 'undefined',
-        pdfDataLength: doc.pdfData ? doc.pdfData.byteLength : 0,
-        hasPageTexts: !!doc.pageTexts,
-        pageTextsLength: doc.pageTexts?.length || 0,
-        pageTextsPreview: doc.pageTexts?.slice(0, 2).map((text, i) => {
-          const safeText = typeof text === 'string' ? text : String(text || '')
-          return {
-            page: i + 1,
-            textLength: safeText.length,
-            textPreview: safeText.substring(0, 30) + (safeText.length > 30 ? '...' : '')
-          }
-        }) || []
-      });
+    addDocument(doc);
 
-      useAppStore.getState().setCurrentDocument(doc as any);
-      onClose();
+    onClose();
     } catch (error) {
       console.error('Failed to open book:', error);
       alert('Failed to open book. Please try again.');

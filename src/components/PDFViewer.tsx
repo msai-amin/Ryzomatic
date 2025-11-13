@@ -2409,9 +2409,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
       // CRITICAL: Find text layer div first, then get its parent (the page container)
       // This ensures we use the same coordinate system as the text spans
-      let textLayerDivForGeometry = pdfViewer.scrollMode === 'continuous'
-        ? pageTextLayerRefs.current.get(activeSelection.pageNumber)
-        : textLayerRef.current
+      let textLayerDivForGeometry: HTMLDivElement | null = pdfViewer.scrollMode === 'continuous'
+        ? pageTextLayerRefs.current.get(activeSelection.pageNumber) ?? null
+        : textLayerRef.current ?? null
 
       // Fallback: If ref is null (e.g., page just switched or ref not populated), find text layer from DOM
       if (!textLayerDivForGeometry) {
@@ -2419,14 +2419,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         let currentElement: Element | null = range.startContainer.parentElement
         while (currentElement) {
           // Check if current element is a textLayer
-          if (currentElement.classList?.contains('textLayer')) {
-            textLayerDivForGeometry = currentElement as HTMLElement
+          if (currentElement instanceof HTMLDivElement && currentElement.classList.contains('textLayer')) {
+            textLayerDivForGeometry = currentElement
             break
           }
           // Check if current element contains textLayer spans
-          if (currentElement.querySelector?.('span[data-text-index]') && 
-              currentElement.classList?.contains('textLayer')) {
-            textLayerDivForGeometry = currentElement as HTMLElement
+          if (currentElement instanceof HTMLDivElement && currentElement.querySelector?.('span[data-text-index]') && 
+              currentElement.classList.contains('textLayer')) {
+            textLayerDivForGeometry = currentElement
             break
           }
           currentElement = currentElement.parentElement
@@ -2439,13 +2439,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           
           // Find page container by data-page-number attribute
           while (currentElement && !pageContainer) {
-            if (currentElement.hasAttribute('data-page-number')) {
-              pageContainer = currentElement as HTMLElement
+            if (currentElement instanceof HTMLElement && currentElement.hasAttribute('data-page-number')) {
+              pageContainer = currentElement
               break
             }
             // Also check for container with both canvas and textLayer
-            if (currentElement.querySelector?.('canvas') && currentElement.querySelector?.('.textLayer')) {
-              pageContainer = currentElement as HTMLElement
+            if (currentElement instanceof HTMLElement && currentElement.querySelector?.('canvas') && currentElement.querySelector?.('.textLayer')) {
+              pageContainer = currentElement
               break
             }
             currentElement = currentElement.parentElement
@@ -2453,18 +2453,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           
           // Look for text layer in the container
           if (pageContainer) {
-            textLayerDivForGeometry = pageContainer.querySelector('.textLayer') as HTMLElement
+            const candidateTextLayer = pageContainer.querySelector<HTMLDivElement>('.textLayer')
+            if (candidateTextLayer) {
+              textLayerDivForGeometry = candidateTextLayer
+            }
           }
         }
 
         // Strategy 3: In continuous mode, try to find text layer by page number from DOM
         if (!textLayerDivForGeometry && pdfViewer.scrollMode === 'continuous') {
           // Find page container with matching page number
-          const pageContainers = document.querySelectorAll('[data-page-number]')
+          const pageContainers = Array.from(globalThis.document.querySelectorAll<HTMLElement>('[data-page-number]'))
           for (const container of pageContainers) {
             const pageAttr = container.getAttribute('data-page-number')
             if (pageAttr && parseInt(pageAttr, 10) === activeSelection.pageNumber) {
-              const textLayer = container.querySelector('.textLayer') as HTMLElement
+              const textLayer = container.querySelector<HTMLDivElement>('.textLayer')
               if (textLayer) {
                 textLayerDivForGeometry = textLayer
                 break
@@ -2476,6 +2479,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
       if (!textLayerDivForGeometry) {
         // Enhanced debugging
+        const domDocument = globalThis.document
         const debugInfo = {
           scrollMode: pdfViewer.scrollMode,
           pageNumber: activeSelection.pageNumber,
@@ -2493,9 +2497,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             endOffset: range.endOffset
           },
           domCheck: {
-            hasTextLayerInDOM: !!document.querySelector('.textLayer'),
-            textLayerCount: document.querySelectorAll('.textLayer').length,
-            hasPageContainers: document.querySelectorAll('[data-page-number]').length
+            hasTextLayerInDOM: !!domDocument.querySelector('.textLayer'),
+            textLayerCount: domDocument.querySelectorAll('.textLayer').length,
+            hasPageContainers: domDocument.querySelectorAll('[data-page-number]').length
           }
         }
         console.error('Could not find text layer div for highlight', debugInfo)
