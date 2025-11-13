@@ -555,11 +555,33 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       return null
     }
 
+    // Detect multi-column layouts by measuring typical rect width
+    const averageRectWidth = scaledRectsRaw.reduce((sum, rect) => sum + rect.width, 0) / scaledRectsRaw.length
+    const columnGapThreshold = Math.max(averageRectWidth * 3, 50) // Require at least 50px gap to treat as new column
+
     const mergedScaledRects = scaledRectsRaw.reduce<HighlightRenderRect[]>((acc, rect) => {
-      const match = acc.find(existing =>
-        Math.abs(existing.y - rect.y) <= 1 &&
-        Math.abs((existing.y + existing.height) - (rect.y + rect.height)) <= 1
-      )
+      const match = acc.find(existing => {
+        const sameLine = Math.abs(existing.y - rect.y) <= 1 &&
+                          Math.abs((existing.y + existing.height) - (rect.y + rect.height)) <= 1
+
+        if (!sameLine) {
+          return false
+        }
+
+        // Calculate horizontal separation between the rects. If it exceeds the threshold,
+        // they belong to different columns and must not be merged.
+        const horizontalGap = rect.x > (existing.x + existing.width)
+          ? rect.x - (existing.x + existing.width) // rect sits to the right of existing
+          : existing.x > (rect.x + rect.width)
+            ? existing.x - (rect.x + rect.width)   // existing sits to the right of rect
+            : 0                                     // overlap or touch
+
+        if (horizontalGap > columnGapThreshold) {
+          return false
+        }
+
+        return true
+      })
 
       if (match) {
         const newLeft = Math.min(match.x, rect.x)
