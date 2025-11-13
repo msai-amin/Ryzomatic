@@ -2387,12 +2387,58 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
       // CRITICAL: Find text layer div first, then get its parent (the page container)
       // This ensures we use the same coordinate system as the text spans
-      const textLayerDivForGeometry = pdfViewer.scrollMode === 'continuous'
+      let textLayerDivForGeometry = pdfViewer.scrollMode === 'continuous'
         ? pageTextLayerRefs.current.get(activeSelection.pageNumber)
         : textLayerRef.current
 
+      // Fallback: If ref is null (e.g., page just switched), find text layer from DOM
       if (!textLayerDivForGeometry) {
-        console.error('Could not find text layer div for highlight')
+        // Try to find text layer by traversing from the selection
+        let currentElement = range.startContainer.parentElement
+        while (currentElement) {
+          // Look for element with class 'textLayer'
+          if (currentElement.classList?.contains('textLayer')) {
+            textLayerDivForGeometry = currentElement as HTMLElement
+            break
+          }
+          // Also check if it's a textLayer by checking for spans with data-text-index
+          if (currentElement.querySelector?.('span[data-text-index]')) {
+            textLayerDivForGeometry = currentElement as HTMLElement
+            break
+          }
+          currentElement = currentElement.parentElement
+        }
+      }
+
+      // Final fallback: Find text layer in page container
+      if (!textLayerDivForGeometry) {
+        // Find page container first
+        let pageContainer: HTMLElement | null = null
+        let currentElement = range.startContainer.parentElement
+        while (currentElement && !pageContainer) {
+          if (currentElement.hasAttribute('data-page-number') || 
+              (currentElement.querySelector?.('canvas') && currentElement.querySelector?.('.textLayer'))) {
+            pageContainer = currentElement as HTMLElement
+            break
+          }
+          currentElement = currentElement.parentElement
+        }
+        
+        // Look for text layer in the container
+        if (pageContainer) {
+          textLayerDivForGeometry = pageContainer.querySelector('.textLayer') as HTMLElement
+        }
+      }
+
+      if (!textLayerDivForGeometry) {
+        console.error('Could not find text layer div for highlight', {
+          scrollMode: pdfViewer.scrollMode,
+          pageNumber: activeSelection.pageNumber,
+          hasTextLayerRef: !!textLayerRef.current,
+          hasPageTextLayerRef: pdfViewer.scrollMode === 'continuous' 
+            ? pageTextLayerRefs.current.has(activeSelection.pageNumber)
+            : false
+        })
         alert('Cannot create highlight: Unable to locate text layer. Please try again.')
         setSelectedTextInfo(null)
         return
