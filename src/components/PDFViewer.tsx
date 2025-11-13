@@ -525,8 +525,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     setSelectedTextInfo(null)
   }, [document.id])
 
-  const mapHighlightToRenderData = useCallback((highlight: HighlightType): HighlightRenderData | null => {
-    const safeScale = Math.max(scale, 0.1)
+  const mapHighlightToRenderData = useCallback((highlight: HighlightType, overrides?: { scaleX?: number; scaleY?: number }): HighlightRenderData | null => {
+    const fallbackScale = Math.max(scale, 0.1)
+    const effectiveScaleX = Math.abs(overrides?.scaleX ?? highlight.position_data.scaleX ?? fallbackScale)
+    const effectiveScaleY = Math.abs(overrides?.scaleY ?? highlight.position_data.scaleY ?? fallbackScale)
     const rectsSource = highlight.position_data.rects && highlight.position_data.rects.length > 0
       ? highlight.position_data.rects
       : [{
@@ -537,10 +539,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         }]
     const scaledRectsRaw = rectsSource
       .map(rect => ({
-        x: rect.x * safeScale,
-        y: rect.y * safeScale,
-        width: rect.width * safeScale,
-        height: rect.height * safeScale
+        x: rect.x * effectiveScaleX,
+        y: rect.y * effectiveScaleY,
+        width: rect.width * effectiveScaleX,
+        height: rect.height * effectiveScaleY
       }))
       .filter(rect =>
         Number.isFinite(rect.x) &&
@@ -2581,6 +2583,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const scaleY = containerMetrics.scaleY || 1
       const containerWidth = containerMetrics.width
       const containerHeight = containerMetrics.height
+      const textLayerStyle = window.getComputedStyle(textLayerDivForGeometry)
+      const { scaleX: textLayerScaleXRaw, scaleY: textLayerScaleYRaw } = extractTransformScales(textLayerStyle.transform)
+      const viewportScale = Math.max(scale, 0.1) // Prevent division by zero
+      const highlightScaleX = Math.abs(textLayerScaleXRaw) || Math.abs(containerMetrics.scaleX) || viewportScale
+      const highlightScaleY = Math.abs(textLayerScaleYRaw) || Math.abs(containerMetrics.scaleY) || viewportScale
       
       const selectionRect = new DOMRect(
         selectionViewportRect.left - pageRect.left,
@@ -2615,13 +2622,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           scaleX,
           scaleY,
           containerWidth,
-          containerHeight
+          containerHeight,
+          highlightScaleX,
+          highlightScaleY
         })
       }
 
-      const safeScale = Math.max(scale, 0.1) // Prevent division by zero
       const page = await pdfDocRef.current.getPage(activeSelection.pageNumber)
-      const currentViewport = page.getViewport({ scale: safeScale, rotation })
+      const currentViewport = page.getViewport({ scale: viewportScale, rotation })
       const baseViewport = page.getViewport({ scale: 1, rotation })
       const selectedSpanElements = getSelectedTextLayerSpans(range, textLayerDivForGeometry)
       
@@ -2716,7 +2724,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         )
         highlightPosition = {
           ...boundingViewportRect,
-          rects: rectsForStorage
+          rects: rectsForStorage,
+          scaleX: highlightScaleX,
+          scaleY: highlightScaleY
         }
       } else {
         const clampedFallback = new DOMRect(
@@ -2741,7 +2751,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         rectsForStorage = [position]
         highlightPosition = {
           ...position,
-          rects: rectsForStorage
+          rects: rectsForStorage,
+          scaleX: highlightScaleX,
+          scaleY: highlightScaleY
         }
         rawPosition = safeFallback
       }
@@ -2810,7 +2822,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         geometryDerived: !!screenGeometry,
         baseViewportPosition: highlightPosition,
         baseViewportRects: rectsForStorage,
-        safeScale: safeScale,
+        safeScale: viewportScale,
         textElement: {
           fontSize: textElement?.style?.fontSize,
           lineHeight: textElement?.style?.lineHeight,
@@ -4331,9 +4343,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   {/* Render highlights for this page */}
                   {/* CRITICAL: Highlight layer must use identical positioning as text layer */}
                   {(() => {
+                    const textLayerElement = pageTextLayerRefs.current.get(pageNum) ?? null
+                    let scaleOverrides: { scaleX?: number; scaleY?: number } | undefined
+                    if (textLayerElement) {
+                      const textLayerComputedStyle = window.getComputedStyle(textLayerElement)
+                      const { scaleX: layerScaleX, scaleY: layerScaleY } = extractTransformScales(textLayerComputedStyle.transform)
+                      const overrideScaleX = Math.abs(layerScaleX) > 0 ? Math.abs(layerScaleX) : undefined
+                      const overrideScaleY = Math.abs(layerScaleY) > 0 ? Math.abs(layerScaleY) : undefined
+                      if (overrideScaleX !== undefined || overrideScaleY !== undefined) {
+                        scaleOverrides = { scaleX: overrideScaleX, scaleY: overrideScaleY }
+                      }
+                    }
+
                     const pageHighlightData = highlights
                       .filter(h => h.page_number === pageNum)
-                      .map(mapHighlightToRenderData)
+                      .map(highlight => mapHighlightToRenderData(highlight, scaleOverrides))
                       .filter((data): data is HighlightRenderData => data !== null)
 
                     if (pageHighlightData.length === 0) {
@@ -4501,9 +4525,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               {/* Render highlights */}
               {/* CRITICAL: Highlight layer must use identical positioning as text layer */}
               {(() => {
+                const textLayerElement = textLayerRef.current ?? null
+                let scaleOverrides: { scaleX?: number; scaleY?: number } | undefined
+                if (textLayerElement) {
+                  const textLayerComputedStyle = window.getComputedStyle(textLayerElement)
+                  const { scaleX: layerScaleX, scaleY: layerScaleY } = extractTransformScales(textLayerComputedStyle.transform)
+                  const overrideScaleX = Math.abs(layerScaleX) > 0 ? Math.abs(layerScaleX) : undefined
+                  const overrideScaleY = Math.abs(layerScaleY) > 0 ? Math.abs(layerScaleY) : undefined
+                  if (overrideScaleX !== undefined || overrideScaleY !== undefined) {
+                    scaleOverrides = { scaleX: overrideScaleX, scaleY: overrideScaleY }
+                  }
+                }
+
                 const pageHighlightData = highlights
                   .filter(h => h.page_number === pageNumber)
-                  .map(mapHighlightToRenderData)
+                  .map(highlight => mapHighlightToRenderData(highlight, scaleOverrides))
                   .filter((data): data is HighlightRenderData => data !== null)
 
                 if (pageHighlightData.length === 0) {

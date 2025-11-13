@@ -14,6 +14,8 @@ export interface HighlightRect {
 
 export interface HighlightPosition extends HighlightRect {
   rects?: HighlightRect[];
+  scaleX?: number;
+  scaleY?: number;
 }
 
 export interface TextAnchors {
