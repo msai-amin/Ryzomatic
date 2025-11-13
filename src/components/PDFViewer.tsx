@@ -2584,17 +2584,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const textLayerRect = textLayerDivForGeometry.getBoundingClientRect()
       const containerMetrics = getContainerMetrics(pageContainer, textLayerDivForGeometry)
       const containerRect = containerMetrics.rect
+      const scaleX = containerMetrics.scaleX || 1
+      const scaleY = containerMetrics.scaleY || 1
+      const containerWidth = containerMetrics.width / scaleX
+      const containerHeight = containerMetrics.height / scaleY
       
       // Allow selections that extend beyond container
       // Include selection dimensions to prevent clamping wide selections
       const widthLimit = Math.max(
-        selectionRect.width,  // Include selection width
-        textLayerRect.width || containerMetrics.width,
+        selectionRect.width,
+        containerWidth,
         RECT_SIZE_EPSILON * 2
       )
       const heightLimit = Math.max(
-        selectionRect.height, // Include selection height
-        textLayerRect.height || containerMetrics.height,
+        selectionRect.height,
+        containerHeight,
         RECT_SIZE_EPSILON * 2
       )
       
@@ -2616,6 +2620,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         )
       })
       
+      if (import.meta.env.DEV) {
+        console.debug('Highlight debug: selectionClientRects', selectionClientRects.map(rect => ({
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height
+        })))
+      }
+      
       // CRITICAL: Calculate span rects relative to page container
       // This ensures pixel-perfect alignment since highlights are rendered within the page container
       // Prefer selectedSpanElements over selectionClientRects because span rects have tighter bounds
@@ -2635,22 +2648,32 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         : selectionClientRects
 
       if (selectedSpanElements.length === 0) {
-        logger.warn('PDFViewer: selection detected but no textLayer spans intersected the range', {
-          component: 'PDFViewer',
-          action: 'computeHighlightGeometry',
-          selectionRect: {
-            left: selectionRect.left,
-            top: selectionRect.top,
-            width: selectionRect.width,
-            height: selectionRect.height
-          },
-          hasTextLayer: !!textLayerDivForGeometry,
-          textLayerRect: {
-            left: textLayerRect.left,
-            top: textLayerRect.top,
-            width: textLayerRect.width,
-            height: textLayerRect.height
-          }
+        console.debug('Highlight debug: no span intersections; using selectionClientRects', selectionClientRects.map(rect => ({
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height
+        })))
+      }
+
+      const skipNormalization = selectedSpanElements.length > 0
+      // Convert pageRect to DOMRect format for buildScreenGeometry
+      const pageContainerRect = new DOMRect(pageRect.left, pageRect.top, pageRect.width, pageRect.height)
+      let screenGeometry = spanRects.length
+        ? buildScreenGeometry(spanRects, pageContainerRect, widthLimit, heightLimit, true, skipNormalization)
+        : null
+      const geometry = screenGeometry // Back-compat alias for legacy instrumentation
+
+      if (!screenGeometry && selectedSpanElements.length === 0) {
+        console.warn('Highlight debug: geometry failed with no span intersections', {
+          validRectsCount: validRects.length,
+          selectionClientRectsCount: selectionClientRects.length,
+          textLayerContainsStart: textLayerDivForGeometry.contains(range.startContainer),
+          textLayerContainsEnd: textLayerDivForGeometry.contains(range.endContainer),
+          textLayerSpanSample: Array.from(textLayerDivForGeometry.querySelectorAll('span[data-text-index]')).slice(0, 5).map(span => ({
+            text: span.textContent,
+            hasDataAttr: !!span.getAttribute('data-text-index')
+          }))
         })
       }
 
@@ -2712,27 +2735,26 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         }
       } else {
         // Fallback: calculate relative to page container
-        // Use selectionRect dimensions directly, don't clamp to container
-        const fallbackScreenRectRaw: RectLike = {
-          x: selectionRect.left - pageRect.left,
-          y: selectionRect.top - pageRect.top,
-          width: selectionRect.width,  // Use actual selection width
-          height: selectionRect.height // Use actual selection height
-        }
-        
-        // Don't clamp to widthLimit/heightLimit - preserve actual dimensions
-        // Only ensure values are finite and positive
+        // Clamp selection rect within page container bounds to avoid oversized highlights
+        const clampedFallback = new DOMRect(
+          Math.max(0, selectionRect.left - pageRect.left),
+          Math.max(0, selectionRect.top - pageRect.top),
+          Math.min(selectionRect.width, pageRect.width),
+          Math.min(selectionRect.height, pageRect.height)
+        )
+
+        // Ensure we still have positive dimensions after clamping
         const safeFallback: RectLike = {
-          x: Number.isFinite(fallbackScreenRectRaw.x) ? fallbackScreenRectRaw.x : 0,
-          y: Number.isFinite(fallbackScreenRectRaw.y) ? fallbackScreenRectRaw.y : 0,
-          width: Number.isFinite(fallbackScreenRectRaw.width) && fallbackScreenRectRaw.width > 0 
-            ? fallbackScreenRectRaw.width 
+          x: Number.isFinite(clampedFallback.x) ? clampedFallback.x : 0,
+          y: Number.isFinite(clampedFallback.y) ? clampedFallback.y : 0,
+          width: Number.isFinite(clampedFallback.width) && clampedFallback.width > 0
+            ? clampedFallback.width
             : RECT_SIZE_EPSILON,
-          height: Number.isFinite(fallbackScreenRectRaw.height) && fallbackScreenRectRaw.height > 0
-            ? fallbackScreenRectRaw.height
+          height: Number.isFinite(clampedFallback.height) && clampedFallback.height > 0
+            ? clampedFallback.height
             : RECT_SIZE_EPSILON
         }
-        
+
         const position = convertScreenRectToBaseViewportRect(
           safeFallback,
           currentViewport,
