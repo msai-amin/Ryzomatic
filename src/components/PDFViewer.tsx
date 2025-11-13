@@ -2672,14 +2672,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         ? selectedSpanElements
             .map(span => getTightBoundingRectForSpan(span))
             .filter((rect): rect is DOMRect => !!rect && rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON)
-            .map(rect => {
-              return new DOMRect(
-                (rect.left - pageRect.left) / scaleX,
-                (rect.top - pageRect.top) / scaleY,
-                rect.width / scaleX,
-                rect.height / scaleY
-              )
-            })
+            .map(rect => new DOMRect(
+              (rect.left - pageRect.left) / scaleX,
+              (rect.top - pageRect.top) / scaleY,
+              rect.width / scaleX,
+              rect.height / scaleY
+            ))
         : selectionClientRects
 
       if (selectedSpanElements.length === 0) {
@@ -2692,10 +2690,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       }
 
       const skipNormalization = selectedSpanElements.length > 0
-      // Convert pageRect to DOMRect format for buildScreenGeometry
-      const pageContainerRect = new DOMRect(pageRect.left, pageRect.top, pageRect.width, pageRect.height)
+      const containerRectNormalized = new DOMRect(0, 0, containerWidth, containerHeight)
       let screenGeometry = spanRects.length
-        ? buildScreenGeometry(spanRects, pageContainerRect, widthLimit, heightLimit, true, skipNormalization)
+        ? buildScreenGeometry(spanRects, containerRectNormalized, widthLimit, heightLimit, true, skipNormalization)
         : null
       const geometry = screenGeometry // Back-compat alias for legacy instrumentation
 
@@ -2716,44 +2713,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       let rectsForStorage: RectLike[]
       let rawPosition: RectLike
 
-      // Use page container rect as the reference for coordinate conversion
-      // Pass isRelativeToContainer=true since spanRects are already relative to page container
-      // Skip normalization when we have span-based rects (they have tighter bounds)
-      // Only normalize when using selectionClientRects (which may need some adjustment)
-      const skipNormalization = selectedSpanElements.length > 0
-      // Convert pageRect to DOMRect format for buildScreenGeometry
-      const pageContainerRect = new DOMRect(pageRect.left, pageRect.top, pageRect.width, pageRect.height)
-      let screenGeometry = spanRects.length
-        ? buildScreenGeometry(spanRects, pageContainerRect, widthLimit, heightLimit, true, skipNormalization)
-        : null
-      const geometry = screenGeometry // Back-compat alias for legacy instrumentation
-
-      // Validate geometry matches selection dimensions
-      // If geometry is significantly different (>20%), use direct calculation instead
-      if (screenGeometry) {
-        const geometryWidth = screenGeometry.boundingScreenRect.width
-        const geometryHeight = screenGeometry.boundingScreenRect.height
-        const selectionWidth = selectionRect.width
-        const selectionHeight = selectionRect.height
-        
-        // Calculate percentage difference
-        const widthDiff = selectionWidth > 0 ? Math.abs(geometryWidth - selectionWidth) / selectionWidth : 0
-        const heightDiff = selectionHeight > 0 ? Math.abs(geometryHeight - selectionHeight) / selectionHeight : 0
-        
-        // If geometry is significantly different (>20%), use direct calculation
-        if (widthDiff > 0.2 || heightDiff > 0.2) {
-          console.warn('Geometry validation failed: using direct calculation', {
-            geometryWidth,
-            selectionWidth,
-            geometryHeight,
-            selectionHeight,
-            widthDiff,
-            heightDiff
-          })
-          screenGeometry = null
-        }
-      }
-
       if (screenGeometry) {
         rawPosition = screenGeometry.boundingScreenRect
         rectsForStorage = screenGeometry.screenRects.map(rect =>
@@ -2769,25 +2728,18 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           rects: rectsForStorage
         }
       } else {
-        // Fallback: calculate relative to page container
-        // Clamp selection rect within page container bounds to avoid oversized highlights
         const clampedFallback = new DOMRect(
-          Math.max(0, selectionRect.left - pageRect.left),
-          Math.max(0, selectionRect.top - pageRect.top),
-          Math.min(selectionRect.width, pageRect.width),
-          Math.min(selectionRect.height, pageRect.height)
+          Math.max(0, selectionRect.left),
+          Math.max(0, selectionRect.top),
+          Math.max(RECT_SIZE_EPSILON, Math.min(containerWidth, selectionRect.width)),
+          Math.max(RECT_SIZE_EPSILON, Math.min(containerHeight, selectionRect.height))
         )
 
-        // Ensure we still have positive dimensions after clamping
         const safeFallback: RectLike = {
-          x: Number.isFinite(clampedFallback.x) ? clampedFallback.x : 0,
-          y: Number.isFinite(clampedFallback.y) ? clampedFallback.y : 0,
-          width: Number.isFinite(clampedFallback.width) && clampedFallback.width > 0
-            ? clampedFallback.width
-            : RECT_SIZE_EPSILON,
-          height: Number.isFinite(clampedFallback.height) && clampedFallback.height > 0
-            ? clampedFallback.height
-            : RECT_SIZE_EPSILON
+          x: clampedFallback.x,
+          y: clampedFallback.y,
+          width: clampedFallback.width,
+          height: clampedFallback.height
         }
 
         const position = convertScreenRectToBaseViewportRect(
