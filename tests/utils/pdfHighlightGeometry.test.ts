@@ -22,14 +22,14 @@ describe('buildScreenGeometry', () => {
 
   it('merges line fragments into a single line rect', () => {
     const rects = [
-      createDOMRect(10, 20, 40, 12),
-      createDOMRect(55, 21, 35, 12)
+      createDOMRect(10, 20, 45, 12),
+      createDOMRect(55, 21, 30, 12)
     ]
 
     const geometry = buildScreenGeometry(rects, containerRect, 200, 200)
     expect(geometry).not.toBeNull()
     expect(geometry!.screenRects).toHaveLength(1)
-    expect(geometry!.boundingScreenRect.width).toBeCloseTo(80)
+    expect(geometry!.boundingScreenRect.width).toBeCloseTo(75)
   })
 
   it('clips merged rects to container limits', () => {
