@@ -69,6 +69,11 @@ export const mergeSpanRectsByLine = (rects: DOMRect[]): LineRect[] => {
   })
   const groups: LineRect[] = []
 
+  // Calculate average rect width to detect column gaps
+  const avgWidth = rects.reduce((sum, r) => sum + r.width, 0) / rects.length
+  // Column gap threshold: if horizontal gap is > 3x average width, treat as different column
+  const COLUMN_GAP_THRESHOLD = Math.max(avgWidth * 3, 50) // At least 50px gap
+
   sorted.forEach(rect => {
     if (rect.width <= RECT_SIZE_EPSILON || rect.height <= RECT_SIZE_EPSILON) {
       return
@@ -80,6 +85,20 @@ export const mergeSpanRectsByLine = (rects: DOMRect[]): LineRect[] => {
                        Math.abs(group.bottom - rect.bottom) <= LINE_MERGE_THRESHOLD_PX
       
       if (!sameLine) return false
+      
+      // CRITICAL: Check for column boundaries FIRST - if horizontal gap is too large, don't merge
+      // This prevents merging rects from different columns in multi-column layouts
+      // Calculate the horizontal distance between rects (handles both overlapping and non-overlapping cases)
+      const horizontalGap = rect.left > group.right 
+        ? rect.left - group.right  // rect is to the right of group
+        : group.left > rect.right
+        ? group.left - rect.right   // group is to the right of rect
+        : 0                          // they overlap horizontally
+      
+      // If there's a significant horizontal gap (likely a column boundary), don't merge
+      if (horizontalGap > COLUMN_GAP_THRESHOLD) {
+        return false
+      }
       
       // Check if rect overlaps or is adjacent to the group
       // Adjacent means rect starts within threshold of group end, or group starts within threshold of rect end
