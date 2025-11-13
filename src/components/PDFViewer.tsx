@@ -2708,7 +2708,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         })
       }
 
-      let highlightPosition: RectLike & { rects?: RectLike[] }
+      let highlightPosition: (RectLike & { rects?: RectLike[] }) & { scaleX?: number; scaleY?: number }
       let rectsForStorage: RectLike[]
       let rawPosition: RectLike
 
@@ -2722,12 +2722,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           currentViewport,
           baseViewport
         )
-        highlightPosition = {
-          ...boundingViewportRect,
-          rects: rectsForStorage,
-          scaleX: highlightScaleX,
-          scaleY: highlightScaleY
-        }
+        highlightPosition = Object.assign(
+          { ...boundingViewportRect, rects: rectsForStorage },
+          { scaleX: highlightScaleX, scaleY: highlightScaleY }
+        )
       } else {
         const clampedFallback = new DOMRect(
           Math.max(0, selectionRect.x),
@@ -2749,12 +2747,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           baseViewport
         )
         rectsForStorage = [position]
-        highlightPosition = {
-          ...position,
-          rects: rectsForStorage,
-          scaleX: highlightScaleX,
-          scaleY: highlightScaleY
-        }
+        highlightPosition = Object.assign(
+          { ...position, rects: rectsForStorage },
+          { scaleX: highlightScaleX, scaleY: highlightScaleY }
+        )
         rawPosition = safeFallback
       }
 
