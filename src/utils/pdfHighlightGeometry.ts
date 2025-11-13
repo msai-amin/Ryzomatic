@@ -95,14 +95,23 @@ export const convertLineRectToScreenRect = (
   lineRect: LineRect,
   containerRect: DOMRect,
   widthLimit?: number,
-  heightLimit?: number
+  heightLimit?: number,
+  isRelativeToContainer: boolean = false
 ): RectLike | null => {
-  const rawRect: RectLike = {
-    x: lineRect.left - containerRect.left,
-    y: lineRect.top - containerRect.top,
-    width: lineRect.right - lineRect.left,
-    height: lineRect.bottom - lineRect.top
-  }
+  // If rects are already relative to container (e.g., text layer), don't subtract container position
+  const rawRect: RectLike = isRelativeToContainer
+    ? {
+        x: lineRect.left,
+        y: lineRect.top,
+        width: lineRect.right - lineRect.left,
+        height: lineRect.bottom - lineRect.top
+      }
+    : {
+        x: lineRect.left - containerRect.left,
+        y: lineRect.top - containerRect.top,
+        width: lineRect.right - lineRect.left,
+        height: lineRect.bottom - lineRect.top
+      }
 
   const effectiveWidthLimit = widthLimit ?? containerRect.width
   const effectiveHeightLimit = heightLimit ?? containerRect.height
@@ -114,7 +123,8 @@ export const buildScreenGeometry = (
   rects: DOMRect[],
   containerRect: DOMRect,
   widthLimit: number,
-  heightLimit: number
+  heightLimit: number,
+  isRelativeToContainer: boolean = false
 ): ScreenGeometryResult | null => {
   if (!rects.length) {
     return null
@@ -122,7 +132,7 @@ export const buildScreenGeometry = (
 
   const mergedLineRects = mergeSpanRectsByLine(rects)
   const normalizedScreenRects = mergedLineRects
-    .map(lineRect => convertLineRectToScreenRect(lineRect, containerRect, widthLimit, heightLimit))
+    .map(lineRect => convertLineRectToScreenRect(lineRect, containerRect, widthLimit, heightLimit, isRelativeToContainer))
     .filter((rect): rect is RectLike => !!rect)
 
   if (!normalizedScreenRects.length) {

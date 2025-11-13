@@ -2385,40 +2385,56 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         return
       }
 
-      // Find the page container - look for the element with data-page-number or the canvas parent
-      // CRITICAL: We need the exact container that holds both canvas and textLayer
-      let pageContainer: HTMLElement | null = null
-      
-      // Try to find the page container by traversing up the DOM
-      let currentElement = range.startContainer.parentElement
-      while (currentElement && !pageContainer) {
-        // Look for container that has both canvas and textLayer as children
-        const hasCanvas = currentElement.querySelector('canvas')
-        const hasTextLayer = currentElement.querySelector('.textLayer')
-        const position = window.getComputedStyle(currentElement).position
-        
-        // Preferred: container with both canvas and textLayer, positioned relative
-        if (hasCanvas && hasTextLayer && position === 'relative') {
-          pageContainer = currentElement as HTMLElement
-          break
-        }
-        // Fallback: container with data-page-number attribute
-        if (currentElement.hasAttribute('data-page-number')) {
-          pageContainer = currentElement as HTMLElement
-          break
-        }
-        currentElement = currentElement.parentElement
+      // CRITICAL: Find text layer div first, then get its parent (the page container)
+      // This ensures we use the same coordinate system as the text spans
+      const textLayerDivForGeometry = pdfViewer.scrollMode === 'continuous'
+        ? pageTextLayerRefs.current.get(activeSelection.pageNumber)
+        : textLayerRef.current
+
+      if (!textLayerDivForGeometry) {
+        console.error('Could not find text layer div for highlight')
+        alert('Cannot create highlight: Unable to locate text layer. Please try again.')
+        setSelectedTextInfo(null)
+        return
       }
 
-      // Fallback: look for single page mode container (direct parent of canvas)
+      // Get the page container (parent of text layer)
+      let pageContainer: HTMLElement | null = textLayerDivForGeometry.parentElement
+      
+      // Verify container is valid (should have position: relative or absolute)
+      if (pageContainer) {
+        const position = window.getComputedStyle(pageContainer).position
+        if (position !== 'relative' && position !== 'absolute') {
+          // Try to find a better container by traversing up
+          let currentElement = pageContainer.parentElement
+          while (currentElement) {
+            const pos = window.getComputedStyle(currentElement).position
+            if (pos === 'relative' || pos === 'absolute' || currentElement.hasAttribute('data-page-number')) {
+              pageContainer = currentElement as HTMLElement
+              break
+            }
+            currentElement = currentElement.parentElement
+          }
+        }
+      }
+
+      // Fallback: try to find container by traversing up from selection
+      if (!pageContainer) {
+        let currentElement = range.startContainer.parentElement
+        while (currentElement) {
+          if (currentElement.hasAttribute('data-page-number')) {
+            pageContainer = currentElement as HTMLElement
+            break
+          }
+          currentElement = currentElement.parentElement
+        }
+      }
+
+      // Final fallback: look for single page mode container
       if (!pageContainer) {
         const singlePageCanvas = canvasRef.current?.parentElement
         if (singlePageCanvas) {
-          // Verify it's the right container (should have position: relative)
-          const position = window.getComputedStyle(singlePageCanvas).position
-          if (position === 'relative') {
-            pageContainer = singlePageCanvas as HTMLElement
-          }
+          pageContainer = singlePageCanvas as HTMLElement
         }
       }
 
@@ -2429,25 +2445,22 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         return
       }
 
-      const textLayerDivForGeometry = pdfViewer.scrollMode === 'continuous'
-        ? pageTextLayerRefs.current.get(activeSelection.pageNumber)
-        : textLayerRef.current
-
+      // CRITICAL: Calculate positions relative to the text layer div, not the page container
+      // The text spans use position: absolute within the text layer div
+      // We need to match their coordinate system exactly
+      const textLayerRect = textLayerDivForGeometry.getBoundingClientRect()
       const containerMetrics = getContainerMetrics(pageContainer, textLayerDivForGeometry)
       const containerRect = containerMetrics.rect
-      const textLayerBounds = textLayerDivForGeometry?.getBoundingClientRect()
+      
+      // Use text layer dimensions for limits (more accurate than container)
       const widthLimit = Math.max(
-        Math.min(containerMetrics.width, textLayerBounds?.width ?? containerMetrics.width),
+        textLayerRect.width || containerMetrics.width,
         RECT_SIZE_EPSILON * 2
       )
       const heightLimit = Math.max(
-        Math.min(containerMetrics.height, textLayerBounds?.height ?? containerMetrics.height),
+        textLayerRect.height || containerMetrics.height,
         RECT_SIZE_EPSILON * 2
       )
-      
-      // CRITICAL: Calculate position relative to the page container
-      // The text spans use position: absolute within the page container
-      // We need to match their coordinate system exactly
       
       const safeScale = Math.max(scale, 0.1) // Prevent division by zero
       const page = await pdfDocRef.current.getPage(activeSelection.pageNumber)
@@ -2455,9 +2468,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const baseViewport = page.getViewport({ scale: 1, rotation })
       const selectedSpanElements = getSelectedTextLayerSpans(range, textLayerDivForGeometry)
       const selectionClientRects = getClientRectsForRange(range)
+      
+      // CRITICAL: Calculate span rects relative to text layer div, not page container
+      // This ensures pixel-perfect alignment since highlights will use the same coordinate system
       const spanRects = (selectionClientRects.length > 0 ? selectionClientRects : selectedSpanElements
         .map(span => getTightBoundingRectForSpan(span))
         .filter((rect): rect is DOMRect => !!rect && rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON))
+        .map(rect => {
+          // Convert rect from viewport coordinates to text layer coordinates
+          return new DOMRect(
+            rect.left - textLayerRect.left,
+            rect.top - textLayerRect.top,
+            rect.width,
+            rect.height
+          )
+        })
 
       if (selectedSpanElements.length === 0) {
         logger.warn('PDFViewer: selection detected but no textLayer spans intersected the range', {
@@ -2469,7 +2494,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             width: selectionRect.width,
             height: selectionRect.height
           },
-          hasTextLayer: !!textLayerDivForGeometry
+          hasTextLayer: !!textLayerDivForGeometry,
+          textLayerRect: {
+            left: textLayerRect.left,
+            top: textLayerRect.top,
+            width: textLayerRect.width,
+            height: textLayerRect.height
+          }
         })
       }
 
@@ -2477,8 +2508,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       let rectsForStorage: RectLike[]
       let rawPosition: RectLike
 
+      // Use text layer rect as the reference for coordinate conversion
+      // Pass isRelativeToContainer=true since spanRects are already relative to text layer
       const screenGeometry = spanRects.length
-        ? buildScreenGeometry(spanRects, containerRect, widthLimit, heightLimit)
+        ? buildScreenGeometry(spanRects, textLayerRect, widthLimit, heightLimit, true)
         : null
       const geometry = screenGeometry // Back-compat alias for legacy instrumentation
 
@@ -2497,9 +2530,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           rects: rectsForStorage
         }
       } else {
+        // Fallback: calculate relative to text layer div
         const fallbackScreenRectRaw: RectLike = {
-          x: selectionRect.left - containerRect.left,
-          y: selectionRect.top - containerRect.top,
+          x: selectionRect.left - textLayerRect.left,
+          y: selectionRect.top - textLayerRect.top,
           width: selectionRect.width,
           height: selectionRect.height
         }
@@ -2566,6 +2600,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           scrollTop: scrollContainerRef.current?.scrollTop || 0,
           scaleX: containerMetrics.scaleX,
           scaleY: containerMetrics.scaleY
+        },
+        textLayerRect: {
+          left: textLayerRect.left,
+          top: textLayerRect.top,
+          width: textLayerRect.width,
+          height: textLayerRect.height
         },
         rawPosition,
         containerWidth: widthLimit,
@@ -4071,7 +4111,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                       if (el) pageTextLayerRefs.current.set(pageNum, el)
                     }}
                     className="textLayer"
-                    style={{ opacity: 1, pointerEvents: 'auto', userSelect: 'text' }}
+                    style={{ 
+                      opacity: 1, 
+                      pointerEvents: 'auto', 
+                      userSelect: 'text',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      zIndex: 2
+                    }}
                   />
                   <div
                     ref={(el) => {
@@ -4086,6 +4134,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                     }}
                   />
                   {/* Render highlights for this page */}
+                  {/* CRITICAL: Highlight layer must use identical positioning as text layer */}
                   {(() => {
                     const pageHighlightData = highlights
                       .filter(h => h.page_number === pageNum)
@@ -4101,12 +4150,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                         <div
                           className="absolute highlightLayer"
                           style={{
+                            position: 'absolute',
                             top: 0,
                             left: 0,
                             right: 0,
                             bottom: 0,
                             pointerEvents: 'none',
-                            zIndex: 3
+                            zIndex: 3,
+                            transformOrigin: '0 0'
                           }}
                         >
                           {pageHighlightData.flatMap(data =>
@@ -4253,6 +4304,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               />
               
               {/* Render highlights */}
+              {/* CRITICAL: Highlight layer must use identical positioning as text layer */}
               {(() => {
                 const pageHighlightData = highlights
                   .filter(h => h.page_number === pageNumber)
@@ -4268,12 +4320,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                     <div
                       className="absolute highlightLayer"
                       style={{
+                        position: 'absolute',
                         top: 0,
                         left: 0,
                         right: 0,
                         bottom: 0,
                         pointerEvents: 'none',
-                        zIndex: 3
+                        zIndex: 3,
+                        transformOrigin: '0 0'
                       }}
                     >
                       {pageHighlightData.flatMap(data =>
