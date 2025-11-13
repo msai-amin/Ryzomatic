@@ -2579,14 +2579,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const containerRect = containerMetrics.rect
       const scaleX = containerMetrics.scaleX || 1
       const scaleY = containerMetrics.scaleY || 1
-      const containerWidth = containerMetrics.width / scaleX
-      const containerHeight = containerMetrics.height / scaleY
+      const containerWidth = containerMetrics.width
+      const containerHeight = containerMetrics.height
       
       const selectionRect = new DOMRect(
-        (selectionViewportRect.left - pageRect.left) / scaleX,
-        (selectionViewportRect.top - pageRect.top) / scaleY,
-        Math.max(RECT_SIZE_EPSILON, (selectionViewportRect.right - selectionViewportRect.left) / scaleX),
-        Math.max(RECT_SIZE_EPSILON, (selectionViewportRect.bottom - selectionViewportRect.top) / scaleY)
+        selectionViewportRect.left - pageRect.left,
+        selectionViewportRect.top - pageRect.top,
+        Math.max(RECT_SIZE_EPSILON, selectionViewportRect.right - selectionViewportRect.left),
+        Math.max(RECT_SIZE_EPSILON, selectionViewportRect.bottom - selectionViewportRect.top)
       )
 
       if (selectionRect.width <= RECT_SIZE_EPSILON || selectionRect.height <= RECT_SIZE_EPSILON) {
@@ -2601,6 +2601,24 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         return
       }
 
+      if (import.meta.env.DEV) {
+        console.debug('Highlight debug: viewport vs container metrics', {
+          pageNumber: activeSelection.pageNumber,
+          selectionViewportRect,
+          selectionRect,
+          pageRect: {
+            left: pageRect.left,
+            top: pageRect.top,
+            width: pageRect.width,
+            height: pageRect.height
+          },
+          scaleX,
+          scaleY,
+          containerWidth,
+          containerHeight
+        })
+      }
+
       const safeScale = Math.max(scale, 0.1) // Prevent division by zero
       const page = await pdfDocRef.current.getPage(activeSelection.pageNumber)
       const currentViewport = page.getViewport({ scale: safeScale, rotation })
@@ -2611,10 +2629,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       // Process all client rects individually, translating each relative to page container
       const selectionClientRects = validRects.map(rect => {
         return new DOMRect(
-          (rect.left - pageRect.left) / scaleX,
-          (rect.top - pageRect.top) / scaleY,
-          rect.width / scaleX,
-          rect.height / scaleY
+          rect.left - pageRect.left,
+          rect.top - pageRect.top,
+          rect.width,
+          rect.height
         )
       })
       
@@ -2646,10 +2664,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             .map(span => getTightBoundingRectForSpan(span))
             .filter((rect): rect is DOMRect => !!rect && rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON)
             .map(rect => new DOMRect(
-              (rect.left - pageRect.left) / scaleX,
-              (rect.top - pageRect.top) / scaleY,
-              rect.width / scaleX,
-              rect.height / scaleY
+              rect.left - pageRect.left,
+              rect.top - pageRect.top,
+              rect.width,
+              rect.height
             ))
         : selectionClientRects
 

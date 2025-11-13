@@ -22,7 +22,37 @@ interface AudioWidgetProps {
 }
 
 export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
-  const { tts, updateTTS, currentDocument, pdfViewer, user, saveTTSPosition, loadTTSPosition, isRightSidebarOpen } = useAppStore()
+  const {
+    tts,
+    updateTTS,
+    currentDocument,
+    pdfViewer,
+    user,
+    saveTTSPosition,
+    loadTTSPosition,
+    isRightSidebarOpen,
+    rightSidebarWidth,
+    audioWidgetPosition,
+    setAudioWidgetPosition
+  } = useAppStore()
+  const widgetRef = useRef<HTMLDivElement>(null)
+  const widgetSizeRef = useRef({ width: 280, height: 160 })
+  const dragOffsetRef = useRef({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+  const [position, setPosition] = useState<{ x: number; y: number }>(() => {
+    if (typeof window === 'undefined') {
+      return audioWidgetPosition
+    }
+    if (audioWidgetPosition.x !== 0 || audioWidgetPosition.y !== 0) {
+      return audioWidgetPosition
+    }
+    const viewportWidth = window.innerWidth || 1200
+    const viewportHeight = window.innerHeight || 800
+    return {
+      x: Math.max(16, viewportWidth - widgetSizeRef.current.width - 24),
+      y: Math.max(16, viewportHeight - widgetSizeRef.current.height - 24)
+    }
+  })
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
@@ -33,6 +63,252 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const lastClickTimeRef = useRef<number>(0)
   const previousDocumentIdRef = useRef<string | null>(null)
   const isSavingRef = useRef(false)
+
+  const clampPosition = useCallback(
+    (pos: { x: number; y: number }) => {
+      if (typeof window === 'undefined') {
+        return pos
+      }
+      const viewportWidth = window.innerWidth || 1200
+      const viewportHeight = window.innerHeight || 800
+      const measuredWidth = widgetRef.current?.offsetWidth ?? widgetSizeRef.current.width
+      const measuredHeight = widgetRef.current?.offsetHeight ?? widgetSizeRef.current.height
+      const sidebarGuard = isRightSidebarOpen ? (rightSidebarWidth || 280) + 24 : 24
+      const maxX = Math.max(16, viewportWidth - measuredWidth - sidebarGuard)
+      const maxY = Math.max(16, viewportHeight - measuredHeight - 24)
+      const clampedX = Math.min(Math.max(pos.x, 16), maxX)
+      const clampedY = Math.min(Math.max(pos.y, 16), maxY)
+      return { x: clampedX, y: clampedY }
+    },
+    [isRightSidebarOpen, rightSidebarWidth]
+  )
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const measure = () => {
+      if (!widgetRef.current) return
+      widgetSizeRef.current = {
+        width: widgetRef.current.offsetWidth || widgetSizeRef.current.width,
+        height: widgetRef.current.offsetHeight || widgetSizeRef.current.height
+      }
+    }
+    measure()
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (audioWidgetPosition.x === 0 && audioWidgetPosition.y === 0) {
+      const widgetWidth = widgetRef.current?.offsetWidth ?? widgetSizeRef.current.width
+      const widgetHeight = widgetRef.current?.offsetHeight ?? widgetSizeRef.current.height
+      const sidebarGuard = isRightSidebarOpen ? (rightSidebarWidth || 280) + 24 : 24
+      const defaultPos = {
+        x: (window.innerWidth || 1200) - widgetWidth - sidebarGuard,
+        y: (window.innerHeight || 800) - widgetHeight - 24
+      }
+      const clamped = clampPosition(defaultPos)
+      setPosition(clamped)
+      setAudioWidgetPosition(clamped)
+    }
+  }, [audioWidgetPosition.x, audioWidgetPosition.y, clampPosition, isRightSidebarOpen, rightSidebarWidth, setAudioWidgetPosition])
+
+  useEffect(() => {
+    if (isDragging) return
+    if (audioWidgetPosition.x === 0 && audioWidgetPosition.y === 0) return
+    setPosition(prev => {
+      if (Math.abs(prev.x - audioWidgetPosition.x) < 0.5 && Math.abs(prev.y - audioWidgetPosition.y) < 0.5) {
+        return prev
+      }
+      return clampPosition(audioWidgetPosition)
+    })
+  }, [audioWidgetPosition.x, audioWidgetPosition.y, clampPosition, isDragging])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof ResizeObserver === 'undefined') return
+    if (!widgetRef.current) return
+
+    const observer = new ResizeObserver(entries => {
+      const entry = entries[0]
+      if (!entry) return
+      const { width, height } = entry.contentRect
+      widgetSizeRef.current = {
+        width: width || widgetSizeRef.current.width,
+        height: height || widgetSizeRef.current.height
+      }
+      setPosition(prev => {
+        const clamped = clampPosition(prev)
+        if (Math.abs(clamped.x - prev.x) < 0.5 && Math.abs(clamped.y - prev.y) < 0.5) {
+          return prev
+        }
+        return clamped
+      })
+    })
+
+    observer.observe(widgetRef.current)
+    return () => observer.disconnect()
+  }, [clampPosition])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleResize = () => {
+      setPosition(prev => {
+        const clamped = clampPosition(prev)
+        if (Math.abs(clamped.x - prev.x) < 0.5 && Math.abs(clamped.y - prev.y) < 0.5) {
+          return prev
+        }
+        setAudioWidgetPosition(clamped)
+        return clamped
+      })
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [clampPosition, setAudioWidgetPosition])
+
+  useEffect(() => {
+    if (!widgetRef.current) return
+    widgetSizeRef.current = {
+      width: widgetRef.current.offsetWidth || widgetSizeRef.current.width,
+      height: widgetRef.current.offsetHeight || widgetSizeRef.current.height
+    }
+    setPosition(prev => clampPosition(prev))
+  }, [isExpanded, clampPosition])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    if (!isDragging) return
+    const previousUserSelect = document.body.style.userSelect
+    const previousCursor = document.body.style.cursor
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'grabbing'
+    return () => {
+      document.body.style.userSelect = previousUserSelect
+      document.body.style.cursor = previousCursor
+    }
+  }, [isDragging])
+
+  useEffect(() => {
+    setPosition(prev => {
+      const clamped = clampPosition(prev)
+      if (Math.abs(clamped.x - prev.x) < 0.5 && Math.abs(clamped.y - prev.y) < 0.5) {
+        return prev
+      }
+      setAudioWidgetPosition(clamped)
+      return clamped
+    })
+  }, [isRightSidebarOpen, rightSidebarWidth, clampPosition, setAudioWidgetPosition])
+
+  const handlePointerMove = useCallback(
+    (event: MouseEvent) => {
+      if (!isDragging) return
+      const rawPosition = {
+        x: event.clientX - dragOffsetRef.current.x,
+        y: event.clientY - dragOffsetRef.current.y
+      }
+      setPosition(prev => {
+        const clamped = clampPosition(rawPosition)
+        if (Math.abs(clamped.x - prev.x) < 0.5 && Math.abs(clamped.y - prev.y) < 0.5) {
+          return prev
+        }
+        return clamped
+      })
+    },
+    [isDragging, clampPosition]
+  )
+
+  const handleTouchMove = useCallback(
+    (event: TouchEvent) => {
+      if (!isDragging) return
+      const touch = event.touches[0]
+      if (!touch) return
+      event.preventDefault()
+      const rawPosition = {
+        x: touch.clientX - dragOffsetRef.current.x,
+        y: touch.clientY - dragOffsetRef.current.y
+      }
+      setPosition(prev => {
+        const clamped = clampPosition(rawPosition)
+        if (Math.abs(clamped.x - prev.x) < 0.5 && Math.abs(clamped.y - prev.y) < 0.5) {
+          return prev
+        }
+        return clamped
+      })
+    },
+    [isDragging, clampPosition]
+  )
+
+  const handlePointerUp = useCallback(() => {
+    if (!isDragging) return
+    setIsDragging(false)
+    setPosition(prev => {
+      const clamped = clampPosition(prev)
+      setAudioWidgetPosition(clamped)
+      return clamped
+    })
+  }, [isDragging, clampPosition, setAudioWidgetPosition])
+
+  useEffect(() => {
+    if (!isDragging) return
+
+    const pointerMove = (event: MouseEvent) => handlePointerMove(event)
+    const pointerUp = () => handlePointerUp()
+
+    document.addEventListener('mousemove', pointerMove)
+    document.addEventListener('mouseup', pointerUp)
+    document.addEventListener('mouseleave', pointerUp)
+
+    return () => {
+      document.removeEventListener('mousemove', pointerMove)
+      document.removeEventListener('mouseup', pointerUp)
+      document.removeEventListener('mouseleave', pointerUp)
+    }
+  }, [isDragging, handlePointerMove, handlePointerUp])
+
+  useEffect(() => {
+    if (!isDragging) return
+    const touchMove = (event: TouchEvent) => handleTouchMove(event)
+    const touchEnd = () => handlePointerUp()
+
+    document.addEventListener('touchmove', touchMove, { passive: false })
+    document.addEventListener('touchend', touchEnd)
+    document.addEventListener('touchcancel', touchEnd)
+
+    return () => {
+      document.removeEventListener('touchmove', touchMove)
+      document.removeEventListener('touchend', touchEnd)
+      document.removeEventListener('touchcancel', touchEnd)
+    }
+  }, [isDragging, handleTouchMove, handlePointerUp])
+
+  const handleWidgetMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return
+    const target = event.target as HTMLElement
+    if (target.closest('button, input, textarea, select, [data-no-drag]')) {
+      return
+    }
+    event.preventDefault()
+    event.stopPropagation()
+    setIsDragging(true)
+    dragOffsetRef.current = {
+      x: event.clientX - position.x,
+      y: event.clientY - position.y
+    }
+  }
+
+  const handleWidgetTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement
+    if (target.closest('button, input, textarea, select, [data-no-drag]')) {
+      return
+    }
+    const touch = event.touches[0]
+    if (!touch) return
+    event.preventDefault()
+    setIsDragging(true)
+    dragOffsetRef.current = {
+      x: touch.clientX - position.x,
+      y: touch.clientY - position.y
+    }
+  }
 
   // Extract paragraphs from current document
   useEffect(() => {
@@ -656,19 +932,25 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   return (
     <>
       {/* Toggle Bar - Always Visible */}
-      <div 
-        className={`fixed bottom-4 z-60 transition-all duration-300 ${className}`}
+      <div
+        ref={widgetRef}
+        className={`fixed z-60 transition-shadow duration-300 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${className}`}
         style={{
-          right: isRightSidebarOpen ? '284px' : '1rem', // 280px sidebar + 4px gap when open, 16px default
+          left: `${position.x}px`,
+          top: `${position.y}px`,
           backgroundColor: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
           borderRadius: '12px',
-          boxShadow: 'var(--shadow-lg)',
+          boxShadow: isDragging ? '0 12px 32px rgba(0,0,0,0.25)' : 'var(--shadow-lg)',
           backdropFilter: 'blur(10px)',
-          // Ensure audio widget stays in its designated zone
           minWidth: '200px',
-          maxWidth: '300px'
+          maxWidth: '320px',
+          width: 'min(320px, calc(100vw - 32px))',
+          userSelect: 'none',
+          touchAction: isDragging ? 'none' : 'auto'
         }}
+        onMouseDown={handleWidgetMouseDown}
+        onTouchStart={handleWidgetTouchStart}
       >
         {/* Playback Mode Selector - Show when expanded or always visible */}
         <div className="flex items-center justify-center gap-1 px-3 pt-3 pb-2 border-b" style={{ borderColor: 'var(--color-border)' }}>

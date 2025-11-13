@@ -251,6 +251,9 @@ interface AppState {
   pomodoroWidgetPosition: { x: number; y: number }
   showPomodoroDashboard: boolean
   
+  // Audio widget state
+  audioWidgetPosition: { x: number; y: number }
+  
   // Related Documents state
   relatedDocuments: DocumentRelationshipWithDetails[]
   relatedDocumentsRefreshTrigger: number
@@ -319,6 +322,7 @@ interface AppState {
   // Pomodoro widget actions
   setPomodoroWidgetPosition: (position: { x: number; y: number }) => void
   setShowPomodoroDashboard: (show: boolean) => void
+  setAudioWidgetPosition: (position: { x: number; y: number }) => void
   
   // Text selection and AI mode actions
   setSelectedTextContext: (context: TextSelectionContext | null) => void
@@ -476,6 +480,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Pomodoro widget state
   pomodoroWidgetPosition: { x: 0, y: 0 },
   showPomodoroDashboard: false,
+  
+  // Audio widget state
+  audioWidgetPosition: {
+    x: readNumberPreference('audioWidgetX', 0),
+    y: readNumberPreference('audioWidgetY', 0)
+  },
   
   // Related Documents state
   relatedDocuments: [],
@@ -830,6 +840,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Pomodoro widget actions
   setPomodoroWidgetPosition: (position) => set({ pomodoroWidgetPosition: position }),
   setShowPomodoroDashboard: (show) => set({ showPomodoroDashboard: show }),
+  setAudioWidgetPosition: (position) => {
+    const safePosition = {
+      x: Number.isFinite(position.x) ? position.x : 0,
+      y: Number.isFinite(position.y) ? position.y : 0
+    }
+    set({ audioWidgetPosition: safePosition })
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('audioWidgetX', String(Math.round(safePosition.x)))
+      window.localStorage.setItem('audioWidgetY', String(Math.round(safePosition.y)))
+    }
+  },
   
   // Library view actions
   setLibraryView: (settings) => set((state) => ({
