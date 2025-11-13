@@ -2611,12 +2611,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       // Use the client rects we already got from getClientRects() for proper multi-line support
       // Process all client rects individually, translating each relative to page container
       const selectionClientRects = validRects.map(rect => {
-        // Translate viewport coordinates to page container coordinates
         return new DOMRect(
-          rect.left - pageRect.left,
-          rect.top - pageRect.top,
-          rect.width,
-          rect.height
+          (rect.left - pageRect.left) / scaleX,
+          (rect.top - pageRect.top) / scaleY,
+          rect.width / scaleX,
+          rect.height / scaleY
         )
       })
       
@@ -2629,6 +2628,43 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         })))
       }
       
+      const selectionBounding = selectionClientRects.reduce((acc, rect) => ({
+        left: Math.min(acc.left, rect.left),
+        top: Math.min(acc.top, rect.top),
+        right: Math.max(acc.right, rect.left + rect.width),
+        bottom: Math.max(acc.bottom, rect.top + rect.height)
+      }), {
+        left: Number.POSITIVE_INFINITY,
+        top: Number.POSITIVE_INFINITY,
+        right: Number.NEGATIVE_INFINITY,
+        bottom: Number.NEGATIVE_INFINITY
+      })
+
+      const selectionRect = {
+        left: selectionBounding.left,
+        top: selectionBounding.top,
+        width: Math.max(RECT_SIZE_EPSILON, selectionBounding.right - selectionBounding.left),
+        height: Math.max(RECT_SIZE_EPSILON, selectionBounding.bottom - selectionBounding.top)
+      }
+
+      if (selectionRect.width <= RECT_SIZE_EPSILON || selectionRect.height <= RECT_SIZE_EPSILON) {
+        console.error('Selection too small after scaling:', selectionBounding)
+        alert('Cannot create highlight: Selection is too small. Please select more text.')
+        setSelectedTextInfo(null)
+        return
+      }
+
+      const widthLimit = Math.max(
+        selectionRect.width,
+        containerWidth,
+        RECT_SIZE_EPSILON * 2
+      )
+      const heightLimit = Math.max(
+        selectionRect.height,
+        containerHeight,
+        RECT_SIZE_EPSILON * 2
+      )
+
       // CRITICAL: Calculate span rects relative to page container
       // This ensures pixel-perfect alignment since highlights are rendered within the page container
       // Prefer selectedSpanElements over selectionClientRects because span rects have tighter bounds
@@ -2637,12 +2673,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
             .map(span => getTightBoundingRectForSpan(span))
             .filter((rect): rect is DOMRect => !!rect && rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON)
             .map(rect => {
-              // Convert rect from viewport coordinates to page container coordinates
               return new DOMRect(
-                rect.left - pageRect.left,
-                rect.top - pageRect.top,
-                rect.width,
-                rect.height
+                (rect.left - pageRect.left) / scaleX,
+                (rect.top - pageRect.top) / scaleY,
+                rect.width / scaleX,
+                rect.height / scaleY
               )
             })
         : selectionClientRects
