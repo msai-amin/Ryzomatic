@@ -437,7 +437,7 @@ function parseTextWithBreaks(text: string): TextSegment[] {
   return segments
 }
 
-const TEXT_LAYER_OVERSCAN_PX = 4
+const TEXT_LAYER_OVERSCAN_PX = 50 // Increased to ensure text layer covers full page including footnotes
 
 // Remove the old local Highlight interface - we'll use the one from highlightService
 
@@ -2474,18 +2474,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       
       // CRITICAL: Calculate span rects relative to text layer div, not page container
       // This ensures pixel-perfect alignment since highlights will use the same coordinate system
-      // When selectionClientRects are available, use them directly to preserve actual selection dimensions
-      const spanRects = selectionClientRects.length > 0
-        ? selectionClientRects.map(rect => {
-            // Convert directly to text layer coordinates, preserving actual width and height
-            return new DOMRect(
-              rect.left - textLayerRect.left,
-              rect.top - textLayerRect.top,
-              rect.width,  // Preserve actual width
-              rect.height  // Preserve actual height
-            )
-          })
-        : selectedSpanElements
+      // Prefer selectedSpanElements over selectionClientRects because span rects have tighter bounds
+      // selectionClientRects from range.getClientRects() can expand to full line width
+      const spanRects = selectedSpanElements.length > 0
+        ? selectedSpanElements
             .map(span => getTightBoundingRectForSpan(span))
             .filter((rect): rect is DOMRect => !!rect && rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON)
             .map(rect => {
@@ -2497,6 +2489,16 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 rect.height
               )
             })
+        : selectionClientRects.map(rect => {
+            // Fallback: use selectionClientRects if no spans found
+            // Convert directly to text layer coordinates, preserving actual width and height
+            return new DOMRect(
+              rect.left - textLayerRect.left,
+              rect.top - textLayerRect.top,
+              rect.width,  // Preserve actual width
+              rect.height  // Preserve actual height
+            )
+          })
 
       if (selectedSpanElements.length === 0) {
         logger.warn('PDFViewer: selection detected but no textLayer spans intersected the range', {
@@ -2524,8 +2526,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
       // Use text layer rect as the reference for coordinate conversion
       // Pass isRelativeToContainer=true since spanRects are already relative to text layer
+      // Skip normalization when we have span-based rects (they have tighter bounds)
+      // Only normalize when using selectionClientRects (which may need some adjustment)
+      const skipNormalization = selectedSpanElements.length > 0
       let screenGeometry = spanRects.length
-        ? buildScreenGeometry(spanRects, textLayerRect, widthLimit, heightLimit, true)
+        ? buildScreenGeometry(spanRects, textLayerRect, widthLimit, heightLimit, true, skipNormalization)
         : null
       const geometry = screenGeometry // Back-compat alias for legacy instrumentation
 
