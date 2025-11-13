@@ -2436,17 +2436,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         return
       }
 
-      const widthLimit = Math.max(
-        selectionRect.width,
-        containerWidth,
-        RECT_SIZE_EPSILON * 2
-      )
-      const heightLimit = Math.max(
-        selectionRect.height,
-        containerHeight,
-        RECT_SIZE_EPSILON * 2
-      )
-
       // CRITICAL: Find text layer div first, then get its parent (the page container)
       // This ensures we use the same coordinate system as the text spans
       let textLayerDivForGeometry: HTMLDivElement | null = pdfViewer.scrollMode === 'continuous'
@@ -2606,19 +2595,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const containerWidth = containerMetrics.width / scaleX
       const containerHeight = containerMetrics.height / scaleY
       
-      // Allow selections that extend beyond container
-      // Include selection dimensions to prevent clamping wide selections
-      const widthLimit = Math.max(
-        selectionRect.width,
-        containerWidth,
-        RECT_SIZE_EPSILON * 2
-      )
-      const heightLimit = Math.max(
-        selectionRect.height,
-        containerHeight,
-        RECT_SIZE_EPSILON * 2
-      )
-      
       const safeScale = Math.max(scale, 0.1) // Prevent division by zero
       const page = await pdfDocRef.current.getPage(activeSelection.pageNumber)
       const currentViewport = page.getViewport({ scale: safeScale, rotation })
@@ -2645,32 +2621,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         })))
       }
       
-      const selectionBounding = selectionClientRects.reduce((acc, rect) => ({
-        left: Math.min(acc.left, rect.left),
-        top: Math.min(acc.top, rect.top),
-        right: Math.max(acc.right, rect.left + rect.width),
-        bottom: Math.max(acc.bottom, rect.top + rect.height)
-      }), {
-        left: Number.POSITIVE_INFINITY,
-        top: Number.POSITIVE_INFINITY,
-        right: Number.NEGATIVE_INFINITY,
-        bottom: Number.NEGATIVE_INFINITY
-      })
-
-      const selectionRect = {
-        left: selectionBounding.left,
-        top: selectionBounding.top,
-        width: Math.max(RECT_SIZE_EPSILON, selectionBounding.right - selectionBounding.left),
-        height: Math.max(RECT_SIZE_EPSILON, selectionBounding.bottom - selectionBounding.top)
-      }
-
-      if (selectionRect.width <= RECT_SIZE_EPSILON || selectionRect.height <= RECT_SIZE_EPSILON) {
-        console.error('Selection too small after scaling:', selectionBounding)
-        alert('Cannot create highlight: Selection is too small. Please select more text.')
-        setSelectedTextInfo(null)
-        return
-      }
-
       const widthLimit = Math.max(
         selectionRect.width,
         containerWidth,
