@@ -60,7 +60,13 @@ export const normalizeRectWithinBounds = (
 }
 
 export const mergeSpanRectsByLine = (rects: DOMRect[]): LineRect[] => {
-  const sorted = [...rects].sort((a, b) => a.top - b.top)
+  const sorted = [...rects].sort((a, b) => {
+    // Sort by top first, then by left
+    if (Math.abs(a.top - b.top) > LINE_MERGE_THRESHOLD_PX) {
+      return a.top - b.top
+    }
+    return a.left - b.left
+  })
   const groups: LineRect[] = []
 
   sorted.forEach(rect => {
@@ -68,17 +74,29 @@ export const mergeSpanRectsByLine = (rects: DOMRect[]): LineRect[] => {
       return
     }
 
-    const match = groups.find(group =>
-      Math.abs(group.top - rect.top) <= LINE_MERGE_THRESHOLD_PX ||
-      Math.abs(group.bottom - rect.bottom) <= LINE_MERGE_THRESHOLD_PX
-    )
+    // Find a group on the same line where this rect overlaps or is adjacent
+    const match = groups.find(group => {
+      const sameLine = Math.abs(group.top - rect.top) <= LINE_MERGE_THRESHOLD_PX ||
+                       Math.abs(group.bottom - rect.bottom) <= LINE_MERGE_THRESHOLD_PX
+      
+      if (!sameLine) return false
+      
+      // Check if rect overlaps or is adjacent to the group
+      // Adjacent means rect starts within threshold of group end, or group starts within threshold of rect end
+      const isOverlapping = !(rect.right < group.left - LINE_MERGE_THRESHOLD_PX || 
+                              rect.left > group.right + LINE_MERGE_THRESHOLD_PX)
+      
+      return isOverlapping
+    })
 
     if (match) {
+      // Only expand to actual bounds of selected rects, don't expand beyond
       match.left = Math.min(match.left, rect.left)
       match.right = Math.max(match.right, rect.right)
       match.top = Math.min(match.top, rect.top)
       match.bottom = Math.max(match.bottom, rect.bottom)
     } else {
+      // Create new group with actual rect bounds
       groups.push({
         left: rect.left,
         right: rect.right,

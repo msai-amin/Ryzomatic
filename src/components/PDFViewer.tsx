@@ -2452,12 +2452,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const containerMetrics = getContainerMetrics(pageContainer, textLayerDivForGeometry)
       const containerRect = containerMetrics.rect
       
-      // Use text layer dimensions for limits (more accurate than container)
+      // Allow selections that extend beyond container
+      // Include selection dimensions to prevent clamping wide selections
       const widthLimit = Math.max(
+        selectionRect.width,  // Include selection width
         textLayerRect.width || containerMetrics.width,
         RECT_SIZE_EPSILON * 2
       )
       const heightLimit = Math.max(
+        selectionRect.height, // Include selection height
         textLayerRect.height || containerMetrics.height,
         RECT_SIZE_EPSILON * 2
       )
@@ -2471,18 +2474,29 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       
       // CRITICAL: Calculate span rects relative to text layer div, not page container
       // This ensures pixel-perfect alignment since highlights will use the same coordinate system
-      const spanRects = (selectionClientRects.length > 0 ? selectionClientRects : selectedSpanElements
-        .map(span => getTightBoundingRectForSpan(span))
-        .filter((rect): rect is DOMRect => !!rect && rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON))
-        .map(rect => {
-          // Convert rect from viewport coordinates to text layer coordinates
-          return new DOMRect(
-            rect.left - textLayerRect.left,
-            rect.top - textLayerRect.top,
-            rect.width,
-            rect.height
-          )
-        })
+      // When selectionClientRects are available, use them directly to preserve actual selection dimensions
+      const spanRects = selectionClientRects.length > 0
+        ? selectionClientRects.map(rect => {
+            // Convert directly to text layer coordinates, preserving actual width and height
+            return new DOMRect(
+              rect.left - textLayerRect.left,
+              rect.top - textLayerRect.top,
+              rect.width,  // Preserve actual width
+              rect.height  // Preserve actual height
+            )
+          })
+        : selectedSpanElements
+            .map(span => getTightBoundingRectForSpan(span))
+            .filter((rect): rect is DOMRect => !!rect && rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON)
+            .map(rect => {
+              // Convert rect from viewport coordinates to text layer coordinates
+              return new DOMRect(
+                rect.left - textLayerRect.left,
+                rect.top - textLayerRect.top,
+                rect.width,
+                rect.height
+              )
+            })
 
       if (selectedSpanElements.length === 0) {
         logger.warn('PDFViewer: selection detected but no textLayer spans intersected the range', {
@@ -2510,10 +2524,36 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
       // Use text layer rect as the reference for coordinate conversion
       // Pass isRelativeToContainer=true since spanRects are already relative to text layer
-      const screenGeometry = spanRects.length
+      let screenGeometry = spanRects.length
         ? buildScreenGeometry(spanRects, textLayerRect, widthLimit, heightLimit, true)
         : null
       const geometry = screenGeometry // Back-compat alias for legacy instrumentation
+
+      // Validate geometry matches selection dimensions
+      // If geometry is significantly different (>20%), use direct calculation instead
+      if (screenGeometry) {
+        const geometryWidth = screenGeometry.boundingScreenRect.width
+        const geometryHeight = screenGeometry.boundingScreenRect.height
+        const selectionWidth = selectionRect.width
+        const selectionHeight = selectionRect.height
+        
+        // Calculate percentage difference
+        const widthDiff = selectionWidth > 0 ? Math.abs(geometryWidth - selectionWidth) / selectionWidth : 0
+        const heightDiff = selectionHeight > 0 ? Math.abs(geometryHeight - selectionHeight) / selectionHeight : 0
+        
+        // If geometry is significantly different (>20%), use direct calculation
+        if (widthDiff > 0.2 || heightDiff > 0.2) {
+          console.warn('Geometry validation failed: using direct calculation', {
+            geometryWidth,
+            selectionWidth,
+            geometryHeight,
+            selectionHeight,
+            widthDiff,
+            heightDiff
+          })
+          screenGeometry = null
+        }
+      }
 
       if (screenGeometry) {
         rawPosition = screenGeometry.boundingScreenRect
@@ -2531,21 +2571,29 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         }
       } else {
         // Fallback: calculate relative to text layer div
+        // Use selectionRect dimensions directly, don't clamp to container
         const fallbackScreenRectRaw: RectLike = {
           x: selectionRect.left - textLayerRect.left,
           y: selectionRect.top - textLayerRect.top,
-          width: selectionRect.width,
-          height: selectionRect.height
+          width: selectionRect.width,  // Use actual selection width
+          height: selectionRect.height // Use actual selection height
         }
-        const normalizedFallback =
-          normalizeRectWithinBounds(fallbackScreenRectRaw, widthLimit, heightLimit) ?? {
-            x: clamp(fallbackScreenRectRaw.x, 0, widthLimit - RECT_SIZE_EPSILON),
-            y: clamp(fallbackScreenRectRaw.y, 0, heightLimit - RECT_SIZE_EPSILON),
-            width: Math.max(RECT_SIZE_EPSILON, Math.min(widthLimit, Math.abs(fallbackScreenRectRaw.width))),
-            height: Math.max(RECT_SIZE_EPSILON, Math.min(heightLimit, Math.abs(fallbackScreenRectRaw.height)))
-          }
+        
+        // Don't clamp to widthLimit/heightLimit - preserve actual dimensions
+        // Only ensure values are finite and positive
+        const safeFallback: RectLike = {
+          x: Number.isFinite(fallbackScreenRectRaw.x) ? fallbackScreenRectRaw.x : 0,
+          y: Number.isFinite(fallbackScreenRectRaw.y) ? fallbackScreenRectRaw.y : 0,
+          width: Number.isFinite(fallbackScreenRectRaw.width) && fallbackScreenRectRaw.width > 0 
+            ? fallbackScreenRectRaw.width 
+            : RECT_SIZE_EPSILON,
+          height: Number.isFinite(fallbackScreenRectRaw.height) && fallbackScreenRectRaw.height > 0
+            ? fallbackScreenRectRaw.height
+            : RECT_SIZE_EPSILON
+        }
+        
         const position = convertScreenRectToBaseViewportRect(
-          normalizedFallback,
+          safeFallback,
           currentViewport,
           baseViewport
         )
@@ -2554,7 +2602,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           ...position,
           rects: rectsForStorage
         }
-        rawPosition = normalizedFallback
+        rawPosition = safeFallback
       }
 
       const hasInvalidRect = rectsForStorage.some(rect => rect.width <= 0 || rect.height <= 0)
