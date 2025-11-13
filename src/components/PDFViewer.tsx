@@ -2387,25 +2387,48 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         return
       }
       
-      // Use getBoundingClientRect() instead of getClientRects() for a single unified rect
-      // This gives us the bounding box that encompasses the entire selection
-      const selectionRect = range.getBoundingClientRect()
+      // Use getClientRects() to get individual line rectangles for multi-line selections
+      // This prevents full-width highlights and ensures proper alignment
+      const selectionClientRectsArray = Array.from(range.getClientRects())
       
-      // ROBUST VALIDATION: Check for valid selection rectangle
-      if (!selectionRect || selectionRect.width === 0 || selectionRect.height === 0) {
-        console.error('Invalid bounding rectangle for selection:', selectionRect)
+      // ROBUST VALIDATION: Check for valid selection rectangles
+      if (!selectionClientRectsArray || selectionClientRectsArray.length === 0) {
+        console.error('Invalid selection rectangles:', selectionClientRectsArray)
         alert('Cannot create highlight: Invalid text selection. Please try selecting the text again.')
         setSelectedTextInfo(null)
         return
       }
 
-      // Additional validation for reasonable dimensions
-      if (selectionRect.width < 1 || selectionRect.height < 1) {
-        console.error('Selection too small to create highlight:', selectionRect)
+      // Filter out invalid rects and validate dimensions
+      const validRects = selectionClientRectsArray.filter(rect => 
+        rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON
+      )
+
+      if (validRects.length === 0) {
+        console.error('Selection too small to create highlight:', selectionClientRectsArray)
         alert('Cannot create highlight: Selection is too small. Please select more text.')
         setSelectedTextInfo(null)
         return
       }
+
+      // Calculate bounding box from all valid rects for validation and limits
+      const selectionRect = validRects.reduce((acc, rect) => ({
+        left: Math.min(acc.left, rect.left),
+        top: Math.min(acc.top, rect.top),
+        right: Math.max(acc.right, rect.right),
+        bottom: Math.max(acc.bottom, rect.bottom),
+        width: 0, // Will calculate below
+        height: 0 // Will calculate below
+      }), {
+        left: Infinity,
+        top: Infinity,
+        right: -Infinity,
+        bottom: -Infinity,
+        width: 0,
+        height: 0
+      })
+      selectionRect.width = selectionRect.right - selectionRect.left
+      selectionRect.height = selectionRect.bottom - selectionRect.top
 
       // CRITICAL: Find text layer div first, then get its parent (the page container)
       // This ensures we use the same coordinate system as the text spans
@@ -2555,9 +2578,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         return
       }
 
-      // CRITICAL: Calculate positions relative to the text layer div, not the page container
-      // The text spans use position: absolute within the text layer div
-      // We need to match their coordinate system exactly
+      // CRITICAL: Get page container's bounding rect for coordinate translation
+      // Highlights are rendered within the page container, so we translate relative to it
+      const pageRect = pageContainer.getBoundingClientRect()
       const textLayerRect = textLayerDivForGeometry.getBoundingClientRect()
       const containerMetrics = getContainerMetrics(pageContainer, textLayerDivForGeometry)
       const containerRect = containerMetrics.rect
@@ -2580,35 +2603,36 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const currentViewport = page.getViewport({ scale: safeScale, rotation })
       const baseViewport = page.getViewport({ scale: 1, rotation })
       const selectedSpanElements = getSelectedTextLayerSpans(range, textLayerDivForGeometry)
-      const selectionClientRects = getClientRectsForRange(range)
       
-      // CRITICAL: Calculate span rects relative to text layer div, not page container
-      // This ensures pixel-perfect alignment since highlights will use the same coordinate system
+      // Use the client rects we already got from getClientRects() for proper multi-line support
+      // Process all client rects individually, translating each relative to page container
+      const selectionClientRects = validRects.map(rect => {
+        // Translate viewport coordinates to page container coordinates
+        return new DOMRect(
+          rect.left - pageRect.left,
+          rect.top - pageRect.top,
+          rect.width,
+          rect.height
+        )
+      })
+      
+      // CRITICAL: Calculate span rects relative to page container
+      // This ensures pixel-perfect alignment since highlights are rendered within the page container
       // Prefer selectedSpanElements over selectionClientRects because span rects have tighter bounds
-      // selectionClientRects from range.getClientRects() can expand to full line width
       const spanRects = selectedSpanElements.length > 0
         ? selectedSpanElements
             .map(span => getTightBoundingRectForSpan(span))
             .filter((rect): rect is DOMRect => !!rect && rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON)
             .map(rect => {
-              // Convert rect from viewport coordinates to text layer coordinates
+              // Convert rect from viewport coordinates to page container coordinates
               return new DOMRect(
-                rect.left - textLayerRect.left,
-                rect.top - textLayerRect.top,
+                rect.left - pageRect.left,
+                rect.top - pageRect.top,
                 rect.width,
                 rect.height
               )
             })
-        : selectionClientRects.map(rect => {
-            // Fallback: use selectionClientRects if no spans found
-            // Convert directly to text layer coordinates, preserving actual width and height
-            return new DOMRect(
-              rect.left - textLayerRect.left,
-              rect.top - textLayerRect.top,
-              rect.width,  // Preserve actual width
-              rect.height  // Preserve actual height
-            )
-          })
+        : selectionClientRects
 
       if (selectedSpanElements.length === 0) {
         logger.warn('PDFViewer: selection detected but no textLayer spans intersected the range', {
@@ -2634,13 +2658,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       let rectsForStorage: RectLike[]
       let rawPosition: RectLike
 
-      // Use text layer rect as the reference for coordinate conversion
-      // Pass isRelativeToContainer=true since spanRects are already relative to text layer
+      // Use page container rect as the reference for coordinate conversion
+      // Pass isRelativeToContainer=true since spanRects are already relative to page container
       // Skip normalization when we have span-based rects (they have tighter bounds)
       // Only normalize when using selectionClientRects (which may need some adjustment)
       const skipNormalization = selectedSpanElements.length > 0
+      // Convert pageRect to DOMRect format for buildScreenGeometry
+      const pageContainerRect = new DOMRect(pageRect.left, pageRect.top, pageRect.width, pageRect.height)
       let screenGeometry = spanRects.length
-        ? buildScreenGeometry(spanRects, textLayerRect, widthLimit, heightLimit, true, skipNormalization)
+        ? buildScreenGeometry(spanRects, pageContainerRect, widthLimit, heightLimit, true, skipNormalization)
         : null
       const geometry = screenGeometry // Back-compat alias for legacy instrumentation
 
@@ -2685,11 +2711,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           rects: rectsForStorage
         }
       } else {
-        // Fallback: calculate relative to text layer div
+        // Fallback: calculate relative to page container
         // Use selectionRect dimensions directly, don't clamp to container
         const fallbackScreenRectRaw: RectLike = {
-          x: selectionRect.left - textLayerRect.left,
-          y: selectionRect.top - textLayerRect.top,
+          x: selectionRect.left - pageRect.left,
+          y: selectionRect.top - pageRect.top,
           width: selectionRect.width,  // Use actual selection width
           height: selectionRect.height // Use actual selection height
         }
@@ -2763,6 +2789,12 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           scrollTop: scrollContainerRef.current?.scrollTop || 0,
           scaleX: containerMetrics.scaleX,
           scaleY: containerMetrics.scaleY
+        },
+        pageRect: {
+          left: pageRect.left,
+          top: pageRect.top,
+          width: pageRect.width,
+          height: pageRect.height
         },
         textLayerRect: {
           left: textLayerRect.left,
