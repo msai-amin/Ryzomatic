@@ -2422,19 +2422,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         right: Number.NEGATIVE_INFINITY,
         bottom: Number.NEGATIVE_INFINITY
       })
-      const selectionRect = new DOMRect(
-        (selectionViewportRect.left - pageRect.left) / scaleX,
-        (selectionViewportRect.top - pageRect.top) / scaleY,
-        Math.max(RECT_SIZE_EPSILON, (selectionViewportRect.right - selectionViewportRect.left) / scaleX),
-        Math.max(RECT_SIZE_EPSILON, (selectionViewportRect.bottom - selectionViewportRect.top) / scaleY)
-      )
-
-      if (selectionRect.width <= RECT_SIZE_EPSILON || selectionRect.height <= RECT_SIZE_EPSILON) {
-        console.error('Selection too small after scaling:', selectionViewportRect)
-        alert('Cannot create highlight: Selection is too small. Please select more text.')
-        setSelectedTextInfo(null)
-        return
-      }
 
       // CRITICAL: Find text layer div first, then get its parent (the page container)
       // This ensures we use the same coordinate system as the text spans
@@ -2595,6 +2582,25 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const containerWidth = containerMetrics.width / scaleX
       const containerHeight = containerMetrics.height / scaleY
       
+      const selectionRect = new DOMRect(
+        (selectionViewportRect.left - pageRect.left) / scaleX,
+        (selectionViewportRect.top - pageRect.top) / scaleY,
+        Math.max(RECT_SIZE_EPSILON, (selectionViewportRect.right - selectionViewportRect.left) / scaleX),
+        Math.max(RECT_SIZE_EPSILON, (selectionViewportRect.bottom - selectionViewportRect.top) / scaleY)
+      )
+
+      if (selectionRect.width <= RECT_SIZE_EPSILON || selectionRect.height <= RECT_SIZE_EPSILON) {
+        console.error('Selection too small after scaling:', {
+          selectionViewportRect,
+          selectionRect,
+          scaleX,
+          scaleY
+        })
+        alert('Cannot create highlight: Selection is too small. Please select more text.')
+        setSelectedTextInfo(null)
+        return
+      }
+
       const safeScale = Math.max(scale, 0.1) // Prevent division by zero
       const page = await pdfDocRef.current.getPage(activeSelection.pageNumber)
       const currentViewport = page.getViewport({ scale: safeScale, rotation })
