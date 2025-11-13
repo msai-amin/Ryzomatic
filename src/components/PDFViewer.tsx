@@ -2411,24 +2411,41 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         return
       }
 
-      // Calculate bounding box from all valid rects for validation and limits
-      const selectionRect = validRects.reduce((acc, rect) => ({
+      const selectionViewportRect = validRects.reduce((acc, rect) => ({
         left: Math.min(acc.left, rect.left),
         top: Math.min(acc.top, rect.top),
         right: Math.max(acc.right, rect.right),
-        bottom: Math.max(acc.bottom, rect.bottom),
-        width: 0, // Will calculate below
-        height: 0 // Will calculate below
+        bottom: Math.max(acc.bottom, rect.bottom)
       }), {
-        left: Infinity,
-        top: Infinity,
-        right: -Infinity,
-        bottom: -Infinity,
-        width: 0,
-        height: 0
+        left: Number.POSITIVE_INFINITY,
+        top: Number.POSITIVE_INFINITY,
+        right: Number.NEGATIVE_INFINITY,
+        bottom: Number.NEGATIVE_INFINITY
       })
-      selectionRect.width = selectionRect.right - selectionRect.left
-      selectionRect.height = selectionRect.bottom - selectionRect.top
+      const selectionRect = new DOMRect(
+        (selectionViewportRect.left - pageRect.left) / scaleX,
+        (selectionViewportRect.top - pageRect.top) / scaleY,
+        Math.max(RECT_SIZE_EPSILON, (selectionViewportRect.right - selectionViewportRect.left) / scaleX),
+        Math.max(RECT_SIZE_EPSILON, (selectionViewportRect.bottom - selectionViewportRect.top) / scaleY)
+      )
+
+      if (selectionRect.width <= RECT_SIZE_EPSILON || selectionRect.height <= RECT_SIZE_EPSILON) {
+        console.error('Selection too small after scaling:', selectionViewportRect)
+        alert('Cannot create highlight: Selection is too small. Please select more text.')
+        setSelectedTextInfo(null)
+        return
+      }
+
+      const widthLimit = Math.max(
+        selectionRect.width,
+        containerWidth,
+        RECT_SIZE_EPSILON * 2
+      )
+      const heightLimit = Math.max(
+        selectionRect.height,
+        containerHeight,
+        RECT_SIZE_EPSILON * 2
+      )
 
       // CRITICAL: Find text layer div first, then get its parent (the page container)
       // This ensures we use the same coordinate system as the text spans
@@ -2729,8 +2746,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         }
       } else {
         const clampedFallback = new DOMRect(
-          Math.max(0, selectionRect.left),
-          Math.max(0, selectionRect.top),
+          Math.max(0, selectionRect.x),
+          Math.max(0, selectionRect.y),
           Math.max(RECT_SIZE_EPSILON, Math.min(containerWidth, selectionRect.width)),
           Math.max(RECT_SIZE_EPSILON, Math.min(containerHeight, selectionRect.height))
         )
