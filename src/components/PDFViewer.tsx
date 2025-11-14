@@ -589,12 +589,22 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           ? viewportRects
           : (fallbackBounding ? [fallbackBounding] : [])
 
-        // Apply current scale directly (no separate scaleX/scaleY)
+        // Apply current scale to convert from base viewport (scale=1) to current render scale
+        // Get actual canvas dimensions to ensure correct scaling
+        const canvas = canvasRef.current
+        const actualCanvasWidth = canvas ? parseFloat(canvas.style.width) || baseViewport.width * currentScale : baseViewport.width * currentScale
+        const actualCanvasHeight = canvas ? parseFloat(canvas.style.height) || baseViewport.height * currentScale : baseViewport.height * currentScale
+        
+        // Calculate render scale: actual canvas CSS size vs base viewport size
+        const renderScaleX = actualCanvasWidth / baseViewport.width
+        const renderScaleY = actualCanvasHeight / baseViewport.height
+        
+        // Use the render scale to position highlights correctly
         scaledRectsRaw = viewportRectsToUse.map(rect => ({
-          x: rect.left * currentScale,
-          y: rect.top * currentScale,
-          width: rect.width * currentScale,
-          height: rect.height * currentScale
+          x: rect.left * renderScaleX,
+          y: rect.top * renderScaleY,
+          width: rect.width * renderScaleX,
+          height: rect.height * renderScaleY
         }))
 
         // PHASE 4: Diagnostic logging for rendering
@@ -2882,17 +2892,58 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       }
 
       // PHASE 2: Convert CSS pixels to scaled coordinates
-      // The canvas and text layer are aligned. Canvas width in CSS pixels equals
-      // currentViewport.width in viewport units. Use currentViewport to convert
-      // directly to scaled coordinates (library handles scale independence).
+      // The canvas CSS size matches viewport dimensions. In single page mode, use canvasRef;
+      // in continuous mode, find the canvas for this specific page.
+      let canvas: HTMLCanvasElement | null = null
+      if (pdfViewer.scrollMode === 'single') {
+        canvas = canvasRef.current
+      } else {
+        // Continuous mode: find canvas for this page
+        const pageContainer = textLayerDivForGeometry.parentElement
+        if (pageContainer) {
+          canvas = pageContainer.querySelector('canvas') as HTMLCanvasElement | null
+        }
+      }
+      
+      // Get actual canvas CSS dimensions (these should match currentViewport at current scale)
+      const actualCanvasWidth = canvas ? parseFloat(canvas.style.width) || currentViewport.width : currentViewport.width
+      const actualCanvasHeight = canvas ? parseFloat(canvas.style.height) || currentViewport.height : currentViewport.height
+      
+      // Calculate scale factors: CSS pixels to viewport units
+      // Canvas CSS size should match currentViewport, but account for any rounding differences
+      const scaleFactorX = Math.abs(actualCanvasWidth / currentViewport.width) || 1
+      const scaleFactorY = Math.abs(actualCanvasHeight / currentViewport.height) || 1
+      
+      if (import.meta.env.DEV) {
+        console.debug('Highlight coordinate conversion:', {
+          pageNumber: activeSelection.pageNumber,
+          actualCanvasWidth,
+          actualCanvasHeight,
+          currentViewportWidth: currentViewport.width,
+          currentViewportHeight: currentViewport.height,
+          scaleFactorX,
+          scaleFactorY,
+          spanRectsCount: spanRects.length,
+          firstSpanRect: spanRects[0] ? { x: spanRects[0].x, y: spanRects[0].y, width: spanRects[0].width, height: spanRects[0].height } : null
+        })
+      }
+      
+      // Convert CSS pixels (from span rects) to viewport coordinates
       const scaledRects: ScaledHighlightRect[] = spanRects.map(rect => {
+        // Convert CSS pixels to viewport coordinates
+        const viewportX = rect.x / scaleFactorX
+        const viewportY = rect.y / scaleFactorY
+        const viewportWidth = rect.width / scaleFactorX
+        const viewportHeight = rect.height / scaleFactorY
+        
+        // Now convert viewport coordinates to scaled coordinates using base viewport
         return viewportToScaled({
-          left: rect.x,
-          top: rect.y,
-          width: rect.width,
-          height: rect.height,
+          left: viewportX,
+          top: viewportY,
+          width: viewportWidth,
+          height: viewportHeight,
           pageNumber: activeSelection.pageNumber
-        }, currentViewport) as ScaledHighlightRect
+        }, baseViewport) as ScaledHighlightRect
       })
 
       // Convert scaled coordinates back to base viewport for storage
