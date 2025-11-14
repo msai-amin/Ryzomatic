@@ -2936,24 +2936,59 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         const viewportWidth = rect.width / scaleFactorX
         const viewportHeight = rect.height / scaleFactorY
         
+        // Clamp to page boundaries to prevent extending beyond container
+        const clampedX = Math.max(0, Math.min(viewportX, baseViewport.width))
+        const clampedY = Math.max(0, Math.min(viewportY, baseViewport.height))
+        const clampedWidth = Math.max(RECT_SIZE_EPSILON, Math.min(viewportWidth, baseViewport.width - clampedX))
+        const clampedHeight = Math.max(RECT_SIZE_EPSILON, Math.min(viewportHeight, baseViewport.height - clampedY))
+        
         // Now convert viewport coordinates to scaled coordinates using base viewport
-        return viewportToScaled({
-          left: viewportX,
-          top: viewportY,
-          width: viewportWidth,
-          height: viewportHeight,
+        const scaledRect = viewportToScaled({
+          left: clampedX,
+          top: clampedY,
+          width: clampedWidth,
+          height: clampedHeight,
           pageNumber: activeSelection.pageNumber
         }, baseViewport) as ScaledHighlightRect
+        
+        // CRITICAL: Fix width, height, x2, and y2 to match the actual clamped dimensions
+        // The library might set these incorrectly (e.g., to page dimensions), so we recalculate
+        const correctedWidth = clampedWidth
+        const correctedHeight = clampedHeight
+        const correctedX2 = scaledRect.x1 + correctedWidth
+        const correctedY2 = scaledRect.y1 + correctedHeight
+        
+        return {
+          ...scaledRect,
+          x1: scaledRect.x1,
+          y1: scaledRect.y1,
+          x2: correctedX2,
+          y2: correctedY2,
+          width: correctedWidth,
+          height: correctedHeight
+        }
       })
 
       // Convert scaled coordinates back to base viewport for storage
-      const viewportRects: RectLike[] = scaledRects.map(scaledRect => {
-        const viewportRect = scaledToViewport(scaledRect, baseViewport, false)
+      // Use the original viewportRects we calculated, not the converted ones, to preserve accuracy
+      const viewportRects: RectLike[] = spanRects.map((rect, idx) => {
+        // Use the clamped viewport coordinates we calculated earlier
+        const viewportX = rect.x / scaleFactorX
+        const viewportY = rect.y / scaleFactorY
+        const viewportWidth = rect.width / scaleFactorX
+        const viewportHeight = rect.height / scaleFactorY
+        
+        // Clamp to page boundaries
+        const clampedX = Math.max(0, Math.min(viewportX, baseViewport.width))
+        const clampedY = Math.max(0, Math.min(viewportY, baseViewport.height))
+        const clampedWidth = Math.max(RECT_SIZE_EPSILON, Math.min(viewportWidth, baseViewport.width - clampedX))
+        const clampedHeight = Math.max(RECT_SIZE_EPSILON, Math.min(viewportHeight, baseViewport.height - clampedY))
+        
         return {
-          x: viewportRect.left,
-          y: viewportRect.top,
-          width: viewportRect.width,
-          height: viewportRect.height
+          x: clampedX,
+          y: clampedY,
+          width: clampedWidth,
+          height: clampedHeight
         }
       })
 
@@ -2970,13 +3005,19 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         maxY: Number.NEGATIVE_INFINITY
       })
 
+      // Clamp bounding rect to page boundaries
+      const clampedMinX = Math.max(0, boundingScaledRect.minX)
+      const clampedMinY = Math.max(0, boundingScaledRect.minY)
+      const clampedMaxX = Math.min(baseViewport.width, boundingScaledRect.maxX)
+      const clampedMaxY = Math.min(baseViewport.height, boundingScaledRect.maxY)
+      
       const scaledBoundingRect: ScaledHighlightRect = {
-        x1: boundingScaledRect.minX,
-        y1: boundingScaledRect.minY,
-        x2: boundingScaledRect.maxX,
-        y2: boundingScaledRect.maxY,
-        width: boundingScaledRect.maxX - boundingScaledRect.minX,
-        height: boundingScaledRect.maxY - boundingScaledRect.minY,
+        x1: clampedMinX,
+        y1: clampedMinY,
+        x2: clampedMaxX,
+        y2: clampedMaxY,
+        width: clampedMaxX - clampedMinX,
+        height: clampedMaxY - clampedMinY,
         pageNumber: activeSelection.pageNumber
       }
 
