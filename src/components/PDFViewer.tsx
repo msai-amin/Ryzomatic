@@ -712,8 +712,20 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     }
 
     if (scaledRectsRaw.length === 0) {
+      console.warn('mapHighlightToRenderData: scaledRectsRaw is empty for highlight', highlight.id, {
+        hasScaledGeometry,
+        hasRects: !!highlight.position_data.rects,
+        scaledRectsCount: highlight.position_data.scaledRects?.length || 0,
+        rectsCount: highlight.position_data.rects?.length || 0
+      })
       return null
     }
+    
+    console.log('mapHighlightToRenderData: Returning data for highlight', highlight.id, {
+      scaledRectsCount: scaledRectsRaw.length,
+      firstRect: scaledRectsRaw[0],
+      pageNumber: highlight.page_number
+    })
 
     // Detect multi-column layouts by measuring typical rect width
     const averageRectWidth = scaledRectsRaw.reduce((sum, rect) => sum + rect.width, 0) / scaledRectsRaw.length
@@ -5071,8 +5083,24 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   pageHighlightData: pageHighlightData.map(d => ({
                     id: d.highlight.id,
                     rectsCount: d.scaledRects.length,
-                    firstRect: d.scaledRects[0]
+                    firstRect: d.scaledRects[0],
+                    allRects: d.scaledRects.map(r => ({ x: r.x, y: r.y, w: r.width, h: r.height }))
                   }))
+                })
+                
+                // Check if any rects have invalid coordinates
+                pageHighlightData.forEach(data => {
+                  data.scaledRects.forEach((rect, idx) => {
+                    if (!Number.isFinite(rect.x) || !Number.isFinite(rect.y) || 
+                        !Number.isFinite(rect.width) || !Number.isFinite(rect.height) ||
+                        rect.width <= 0 || rect.height <= 0) {
+                      console.error('Invalid render rect found:', {
+                        highlightId: data.highlight.id,
+                        rectIndex: idx,
+                        rect
+                      })
+                    }
+                  })
                 })
 
                 if (pageHighlightData.length === 0) {
@@ -5089,14 +5117,38 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                         // Convert scaled to viewport for diagnostic display
                         try {
                           const baseViewport = baseViewportsRef.current.get(data.highlight.page_number)
-                          if (!baseViewport) return null
-                          const viewportRect = scaledToViewport(scaledRect, baseViewport, false)
-                          const canvas = canvasRef.current
+                          if (!baseViewport) {
+                            console.warn('No baseViewport for diagnostic layer, page:', data.highlight.page_number)
+                            return null
+                          }
+                          const correctedRect = {
+                            ...scaledRect,
+                            x2: scaledRect.x1 + scaledRect.width,
+                            y2: scaledRect.y1 + scaledRect.height
+                          }
+                          const viewportRect = scaledToViewport(correctedRect, baseViewport, false)
+                          // In continuous mode, use page-specific canvas ref
+                          const canvas = pdfViewer.scrollMode === 'continuous' 
+                            ? pageCanvasRefs.current.get(data.highlight.page_number)
+                            : canvasRef.current
                           const currentScale = Math.max(scale, 0.1)
                           const actualCanvasWidth = canvas ? parseFloat(canvas.style.width) || baseViewport.width * currentScale : baseViewport.width * currentScale
                           const actualCanvasHeight = canvas ? parseFloat(canvas.style.height) || baseViewport.height * currentScale : baseViewport.height * currentScale
                           const renderScaleX = actualCanvasWidth / baseViewport.width
                           const renderScaleY = actualCanvasHeight / baseViewport.height
+                          
+                          console.log('Diagnostic layer 1 (Red) - Scaled to render:', {
+                            scaledRect: correctedRect,
+                            viewportRect,
+                            renderScaleX,
+                            renderScaleY,
+                            finalCoords: {
+                              x: viewportRect.left * renderScaleX,
+                              y: viewportRect.top * renderScaleY,
+                              w: viewportRect.width * renderScaleX,
+                              h: viewportRect.height * renderScaleY
+                            }
+                          })
                           
                           return (
                             <div
