@@ -2908,7 +2908,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const boundingViewportRect = scaledToViewport(scaledBoundingRect, baseViewport, false)
       
       // Store both viewport coordinates (for backward compatibility) and scaled coordinates
-      const rectsForStorage: RectLike[] = scaledRects.map(scaledRect => {
+      let rectsForStorage: RectLike[] = scaledRects.map(scaledRect => {
         const viewportRect = scaledToViewport(scaledRect, baseViewport, false)
         return {
           x: viewportRect.left,
