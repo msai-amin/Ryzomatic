@@ -5049,6 +5049,106 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
                 return (
                   <>
+                    {/* DIAGNOSTIC LAYER 1: Stored Scaled Coordinates (Red) */}
+                    {import.meta.env.DEV && pageHighlightData.flatMap(data => {
+                      if (!data.highlight.position_data.scaledRects) return []
+                      return data.highlight.position_data.scaledRects.map((scaledRect, idx) => {
+                        // Convert scaled to viewport for diagnostic display
+                        try {
+                          const baseViewport = baseViewportsRef.current.get(data.highlight.page_number)
+                          if (!baseViewport) return null
+                          const viewportRect = scaledToViewport(scaledRect, baseViewport, false)
+                          const canvas = canvasRef.current
+                          const currentScale = Math.max(scale, 0.1)
+                          const actualCanvasWidth = canvas ? parseFloat(canvas.style.width) || baseViewport.width * currentScale : baseViewport.width * currentScale
+                          const actualCanvasHeight = canvas ? parseFloat(canvas.style.height) || baseViewport.height * currentScale : baseViewport.height * currentScale
+                          const renderScaleX = actualCanvasWidth / baseViewport.width
+                          const renderScaleY = actualCanvasHeight / baseViewport.height
+                          
+                          return (
+                            <div
+                              key={`diagnostic-scaled-${data.highlight.id}-${idx}`}
+                              className="absolute"
+                              style={{
+                                left: `${viewportRect.left * renderScaleX}px`,
+                                top: `${viewportRect.top * renderScaleY}px`,
+                                width: `${viewportRect.width * renderScaleX}px`,
+                                height: `${viewportRect.height * renderScaleY}px`,
+                                border: '2px solid red',
+                                backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                                pointerEvents: 'none',
+                                zIndex: 10,
+                                boxSizing: 'border-box'
+                              }}
+                              title={`DIAG: Scaled coords - x1:${scaledRect.x1}, y1:${scaledRect.y1}, x2:${scaledRect.x2}, y2:${scaledRect.y2}, w:${scaledRect.width}, h:${scaledRect.height}`}
+                            />
+                          )
+                        } catch (e) {
+                          return null
+                        }
+                      })
+                    })}
+                    
+                    {/* DIAGNOSTIC LAYER 2: After scaledToViewport (Blue) */}
+                    {import.meta.env.DEV && pageHighlightData.flatMap(data => {
+                      if (!data.highlight.position_data.scaledRects) return []
+                      const baseViewport = baseViewportsRef.current.get(data.highlight.page_number)
+                      if (!baseViewport) return []
+                      return data.highlight.position_data.scaledRects.map((scaledRect, idx) => {
+                        try {
+                          const correctedRect = {
+                            ...scaledRect,
+                            x2: scaledRect.x1 + scaledRect.width,
+                            y2: scaledRect.y1 + scaledRect.height
+                          }
+                          const viewportRect = scaledToViewport(correctedRect, baseViewport, false)
+                          return (
+                            <div
+                              key={`diagnostic-viewport-${data.highlight.id}-${idx}`}
+                              className="absolute"
+                              style={{
+                                left: `${viewportRect.left}px`,
+                                top: `${viewportRect.top}px`,
+                                width: `${viewportRect.width}px`,
+                                height: `${viewportRect.height}px`,
+                                border: '2px solid blue',
+                                backgroundColor: 'rgba(0, 0, 255, 0.1)',
+                                pointerEvents: 'none',
+                                zIndex: 9,
+                                boxSizing: 'border-box'
+                              }}
+                              title={`DIAG: Viewport coords - left:${viewportRect.left}, top:${viewportRect.top}, w:${viewportRect.width}, h:${viewportRect.height}`}
+                            />
+                          )
+                        } catch (e) {
+                          return null
+                        }
+                      })
+                    })}
+                    
+                    {/* DIAGNOSTIC LAYER 3: After Render Scale (Green) */}
+                    {import.meta.env.DEV && pageHighlightData.flatMap(data =>
+                      data.scaledRects.map((rect, idx) => (
+                        <div
+                          key={`diagnostic-render-${data.highlight.id}-${idx}`}
+                          className="absolute"
+                          style={{
+                            left: `${rect.x}px`,
+                            top: `${rect.y}px`,
+                            width: `${rect.width}px`,
+                            height: `${rect.height}px`,
+                            border: '2px solid green',
+                            backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                            pointerEvents: 'none',
+                            zIndex: 8,
+                            boxSizing: 'border-box'
+                          }}
+                          title={`DIAG: Render coords - x:${rect.x}, y:${rect.y}, w:${rect.width}, h:${rect.height}`}
+                        />
+                      ))
+                    )}
+                    
+                    {/* ACTUAL HIGHLIGHTS (Yellow/Original Color) */}
                     <div
                       className="absolute highlightLayer"
                       style={{
