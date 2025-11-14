@@ -4858,12 +4858,23 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
                     const pageHighlightData = highlights
                       .filter(h => h.page_number === pageNum)
-                      .map(highlight => mapHighlightToRenderData(highlight, scaleOverrides))
+                      .map(highlight => {
+                        const result = mapHighlightToRenderData(highlight, scaleOverrides)
+                        if (!result) {
+                          console.warn('mapHighlightToRenderData returned null for highlight (continuous):', highlight.id)
+                        }
+                        return result
+                      })
                       .filter((data): data is HighlightRenderData => data !== null)
 
                     if (pageHighlightData.length === 0) {
                       return null
                     }
+                    
+                    console.log('Continuous mode: Page highlight data for page', pageNum, ':', {
+                      totalHighlights: highlights.filter(h => h.page_number === pageNum).length,
+                      renderedHighlights: pageHighlightData.length
+                    })
 
                     return (
                       <>
@@ -5040,17 +5051,39 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
                 const pageHighlightData = highlights
                   .filter(h => h.page_number === pageNumber)
-                  .map(highlight => mapHighlightToRenderData(highlight, scaleOverrides))
+                  .map(highlight => {
+                    const result = mapHighlightToRenderData(highlight, scaleOverrides)
+                    if (!result) {
+                      console.warn('mapHighlightToRenderData returned null for highlight:', highlight.id, {
+                        hasScaledRects: !!highlight.position_data.scaledRects,
+                        hasRects: !!highlight.position_data.rects,
+                        scaledRectsCount: highlight.position_data.scaledRects?.length || 0,
+                        rectsCount: highlight.position_data.rects?.length || 0
+                      })
+                    }
+                    return result
+                  })
                   .filter((data): data is HighlightRenderData => data !== null)
 
+                console.log('Page highlight data for page', pageNumber, ':', {
+                  totalHighlights: highlights.filter(h => h.page_number === pageNumber).length,
+                  renderedHighlights: pageHighlightData.length,
+                  pageHighlightData: pageHighlightData.map(d => ({
+                    id: d.highlight.id,
+                    rectsCount: d.scaledRects.length,
+                    firstRect: d.scaledRects[0]
+                  }))
+                })
+
                 if (pageHighlightData.length === 0) {
+                  console.warn('No highlights to render for page', pageNumber)
                   return null
                 }
 
                 return (
                   <>
-                    {/* DIAGNOSTIC LAYER 1: Stored Scaled Coordinates (Red) */}
-                    {import.meta.env.DEV && pageHighlightData.flatMap(data => {
+                    {/* DIAGNOSTIC LAYER 1: Stored Scaled Coordinates (Red) - ALWAYS VISIBLE FOR DEBUGGING */}
+                    {pageHighlightData.flatMap(data => {
                       if (!data.highlight.position_data.scaledRects) return []
                       return data.highlight.position_data.scaledRects.map((scaledRect, idx) => {
                         // Convert scaled to viewport for diagnostic display
@@ -5089,8 +5122,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                       })
                     })}
                     
-                    {/* DIAGNOSTIC LAYER 2: After scaledToViewport (Blue) */}
-                    {import.meta.env.DEV && pageHighlightData.flatMap(data => {
+                    {/* DIAGNOSTIC LAYER 2: After scaledToViewport (Blue) - ALWAYS VISIBLE FOR DEBUGGING */}
+                    {pageHighlightData.flatMap(data => {
                       if (!data.highlight.position_data.scaledRects) return []
                       const baseViewport = baseViewportsRef.current.get(data.highlight.page_number)
                       if (!baseViewport) return []
@@ -5126,8 +5159,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                       })
                     })}
                     
-                    {/* DIAGNOSTIC LAYER 3: After Render Scale (Green) */}
-                    {import.meta.env.DEV && pageHighlightData.flatMap(data =>
+                    {/* DIAGNOSTIC LAYER 3: After Render Scale (Green) - ALWAYS VISIBLE FOR DEBUGGING */}
+                    {pageHighlightData.flatMap(data =>
                       data.scaledRects.map((rect, idx) => (
                         <div
                           key={`diagnostic-render-${data.highlight.id}-${idx}`}
