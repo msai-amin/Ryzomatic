@@ -615,13 +615,32 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
         // Apply current scale to convert from base viewport (scale=1) to current render scale
         // Get actual canvas dimensions to ensure correct scaling
-        const canvas = canvasRef.current
+        // In continuous mode, use page-specific canvas; in single mode, use main canvas
+        const canvas = pdfViewer.scrollMode === 'continuous'
+          ? pageCanvasRefs.current.get(highlight.page_number)
+          : canvasRef.current
         const actualCanvasWidth = canvas ? parseFloat(canvas.style.width) || baseViewport.width * currentScale : baseViewport.width * currentScale
         const actualCanvasHeight = canvas ? parseFloat(canvas.style.height) || baseViewport.height * currentScale : baseViewport.height * currentScale
         
         // Calculate render scale: actual canvas CSS size vs base viewport size
         const renderScaleX = actualCanvasWidth / baseViewport.width
         const renderScaleY = actualCanvasHeight / baseViewport.height
+        
+        if (import.meta.env.DEV) {
+          console.log('mapHighlightToRenderData: Render scale calculation:', {
+            highlightId: highlight.id,
+            pageNumber: highlight.page_number,
+            scrollMode: pdfViewer.scrollMode,
+            hasCanvas: !!canvas,
+            actualCanvasWidth,
+            actualCanvasHeight,
+            baseViewportWidth: baseViewport.width,
+            baseViewportHeight: baseViewport.height,
+            renderScaleX,
+            renderScaleY,
+            firstViewportRect: viewportRectsToUse[0]
+          })
+        }
         
         // Use the render scale to position highlights correctly
         scaledRectsRaw = viewportRectsToUse
