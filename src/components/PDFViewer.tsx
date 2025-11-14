@@ -2851,6 +2851,32 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         highlightPosition.rects = rectsForStorage
       }
 
+      const clampRectWithinContainer = (rect: RectLike): RectLike => {
+        const maxWidth = Math.max(RECT_SIZE_EPSILON, containerWidth - rect.x)
+        const maxHeight = Math.max(RECT_SIZE_EPSILON, containerHeight - rect.y)
+        return {
+          ...rect,
+          width: Math.max(RECT_SIZE_EPSILON, Math.min(rect.width, maxWidth)),
+          height: Math.max(RECT_SIZE_EPSILON, Math.min(rect.height, maxHeight))
+        }
+      }
+
+      rectsForStorage = (highlightPosition.rects ?? rectsForStorage).map(clampRectWithinContainer)
+      highlightPosition.rects = rectsForStorage
+
+      rawPosition = clampRectWithinContainer(rawPosition)
+
+      const clampedHighlightWidth = Math.max(
+        RECT_SIZE_EPSILON,
+        Math.min(highlightPosition.width, containerWidth - highlightPosition.x)
+      )
+      const clampedHighlightHeight = Math.max(
+        RECT_SIZE_EPSILON,
+        Math.min(highlightPosition.height, containerHeight - highlightPosition.y)
+      )
+      highlightPosition.width = clampedHighlightWidth
+      highlightPosition.height = clampedHighlightHeight
+
       rectsForStorage = highlightPosition.rects ?? rectsForStorage
 
       const boundingLtwhForScaled = {
