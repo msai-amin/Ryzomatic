@@ -2843,24 +2843,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const currentViewport = page.getViewport({ scale: viewportScale, rotation })
       const selectedSpanElements = getSelectedTextLayerSpans(range, textLayerDivForGeometry)
       
-      // PHASE 2: Simplified coordinate conversion - direct span-to-scaled
-      // Get span rects in page container coordinates (screen space)
+      // PHASE 2: Get span rects in page container coordinates (CSS pixels)
+      // getTightBoundingRectForSpan already returns container-relative coordinates
       const spanRects: DOMRect[] = selectedSpanElements.length > 0
         ? selectedSpanElements
             .map(span => getTightBoundingRectForSpan(span, pageContainer))
             .filter((rect): rect is DOMRect => !!rect && rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON)
-            .map(rect => new DOMRect(
+        : validRects.map(rect => {
+            // validRects are in viewport coordinates, convert to container-relative
+            return new DOMRect(
               rect.left - pageRect.left,
               rect.top - pageRect.top,
               rect.width,
               rect.height
-            ))
-        : validRects.map(rect => new DOMRect(
-            rect.left - pageRect.left,
-            rect.top - pageRect.top,
-            rect.width,
-            rect.height
-          ))
+            )
+          })
 
       if (spanRects.length === 0) {
         console.error('No valid span rects found for highlight')
@@ -2869,25 +2866,29 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         return
       }
 
-      // PHASE 2: Convert screen coordinates → viewport coordinates → scaled coordinates
-      // Step 1: Convert screen/container coordinates to base viewport coordinates
-      const viewportRects: RectLike[] = spanRects.map(rect => {
-        return convertScreenRectToBaseViewportRect(
-          { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-          currentViewport,
-          baseViewport
-        )
-      })
-
-      // Step 2: Convert viewport coordinates to scaled coordinates (for scale independence)
-      const scaledRects: ScaledHighlightRect[] = viewportRects.map(rect => {
+      // PHASE 2: Convert CSS pixels to scaled coordinates
+      // The canvas and text layer are aligned. Canvas width in CSS pixels equals
+      // currentViewport.width in viewport units. Use currentViewport to convert
+      // directly to scaled coordinates (library handles scale independence).
+      const scaledRects: ScaledHighlightRect[] = spanRects.map(rect => {
         return viewportToScaled({
           left: rect.x,
           top: rect.y,
           width: rect.width,
           height: rect.height,
           pageNumber: activeSelection.pageNumber
-        }, baseViewport) as ScaledHighlightRect
+        }, currentViewport) as ScaledHighlightRect
+      })
+
+      // Convert scaled coordinates back to base viewport for storage
+      const viewportRects: RectLike[] = scaledRects.map(scaledRect => {
+        const viewportRect = scaledToViewport(scaledRect, baseViewport, false)
+        return {
+          x: viewportRect.left,
+          y: viewportRect.top,
+          width: viewportRect.width,
+          height: viewportRect.height
+        }
       })
 
       // Calculate bounding rect from scaled rects
