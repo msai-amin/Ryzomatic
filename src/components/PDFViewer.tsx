@@ -956,8 +956,22 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           });
         }
       } catch (error) {
-        console.error('Error loading PDF:', error)
+        console.error('❌ Error loading PDF:', error)
+        console.error('PDF loading error details:', {
+          documentId: document.id,
+          pdfDataType: typeof document.pdfData,
+          pdfDataIsBlob: document.pdfData instanceof Blob,
+          pdfDataIsArrayBuffer: document.pdfData instanceof ArrayBuffer,
+          pdfDataIsString: typeof document.pdfData === 'string',
+          pdfDataLength: document.pdfData instanceof Blob ? 'Blob' : 
+                        document.pdfData instanceof ArrayBuffer ? document.pdfData.byteLength :
+                        typeof document.pdfData === 'string' ? document.pdfData.length : 'unknown',
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined
+        })
         setIsLoading(false)
+        // Show user-friendly error
+        alert(`Failed to load PDF: ${error instanceof Error ? error.message : 'Unknown error'}. Please try re-opening the document.`)
       }
     }
 
