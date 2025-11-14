@@ -2869,16 +2869,25 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         return
       }
 
-      // Convert directly to scaled coordinates using CURRENT viewport
-      // The library handles scale independence, so we use current viewport here
-      const scaledRects: ScaledHighlightRect[] = spanRects.map(rect => {
+      // PHASE 2: Convert screen coordinates → viewport coordinates → scaled coordinates
+      // Step 1: Convert screen/container coordinates to base viewport coordinates
+      const viewportRects: RectLike[] = spanRects.map(rect => {
+        return convertScreenRectToBaseViewportRect(
+          { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+          currentViewport,
+          baseViewport
+        )
+      })
+
+      // Step 2: Convert viewport coordinates to scaled coordinates (for scale independence)
+      const scaledRects: ScaledHighlightRect[] = viewportRects.map(rect => {
         return viewportToScaled({
           left: rect.x,
           top: rect.y,
           width: rect.width,
           height: rect.height,
           pageNumber: activeSelection.pageNumber
-        }, currentViewport) as ScaledHighlightRect
+        }, baseViewport) as ScaledHighlightRect
       })
 
       // Calculate bounding rect from scaled rects
@@ -2904,19 +2913,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         pageNumber: activeSelection.pageNumber
       }
 
-      // Convert scaled bounding rect back to viewport for storage (base viewport, scale=1)
-      const boundingViewportRect = scaledToViewport(scaledBoundingRect, baseViewport, false)
-      
-      // Store both viewport coordinates (for backward compatibility) and scaled coordinates
-      let rectsForStorage: RectLike[] = scaledRects.map(scaledRect => {
-        const viewportRect = scaledToViewport(scaledRect, baseViewport, false)
-        return {
-          x: viewportRect.left,
-          y: viewportRect.top,
-          width: viewportRect.width,
-          height: viewportRect.height
-        }
+      // Calculate bounding rect from viewport rects (already in base viewport coordinates)
+      const boundingViewportRect = viewportRects.reduce((acc, rect) => ({
+        minX: Math.min(acc.minX, rect.x),
+        minY: Math.min(acc.minY, rect.y),
+        maxX: Math.max(acc.maxX, rect.x + rect.width),
+        maxY: Math.max(acc.maxY, rect.y + rect.height)
+      }), {
+        minX: Number.POSITIVE_INFINITY,
+        minY: Number.POSITIVE_INFINITY,
+        maxX: Number.NEGATIVE_INFINITY,
+        maxY: Number.NEGATIVE_INFINITY
       })
+      
+      // Store viewport coordinates (already in base viewport, scale=1) and scaled coordinates
+      let rectsForStorage: RectLike[] = viewportRects
 
       const highlightPosition: RectLike & {
         rects?: RectLike[];
@@ -2924,10 +2935,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         scaledRects?: ScaledHighlightRect[];
         usePdfCoordinates?: boolean;
       } = {
-        x: boundingViewportRect.left,
-        y: boundingViewportRect.top,
-        width: boundingViewportRect.width,
-        height: boundingViewportRect.height,
+        x: boundingViewportRect.minX,
+        y: boundingViewportRect.minY,
+        width: boundingViewportRect.maxX - boundingViewportRect.minX,
+        height: boundingViewportRect.maxY - boundingViewportRect.minY,
         rects: rectsForStorage,
         scaledBoundingRect,
         scaledRects,
