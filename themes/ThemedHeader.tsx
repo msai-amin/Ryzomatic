@@ -171,33 +171,28 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     >
       <div className="flex w-full flex-col gap-3">
         <div className="flex w-full flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-6">
-            <div
-              className="flex items-center gap-2 rounded-lg px-2 py-1"
+          {/* Left: Logo & Brand (Home Button) */}
+          <div className="flex min-w-0 items-center">
+            <button
+              onClick={handleLogoClick}
+              className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:opacity-80"
               style={{ color: 'var(--color-text-primary)' }}
+              aria-label="Home"
             >
               <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-6 w-6" />
               <span className="text-sm font-semibold tracking-[0.18em]" style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}>
-                ryzomatic
+                ryzomatics
               </span>
-            </div>
+            </button>
+          </div>
 
-            <nav
-              className="flex items-center gap-4 text-sm font-medium"
-              style={{ color: 'var(--color-text-secondary)' }}
-            >
-              <button
-                onClick={openLibrary}
-                className="transition-colors hover:text-[var(--color-text-primary)]"
-                style={{
-                  color: 'var(--color-text-primary)',
-                  letterSpacing: '0.04em'
-                }}
-              >
+          {/* Center: Page Title */}
+          <div className="flex flex-1 items-center justify-center">
+            {!currentDocument && (
+              <h1 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>
                 Library
-              </button>
-              {/* Future navigation links can be added here */}
-            </nav>
+              </h1>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
