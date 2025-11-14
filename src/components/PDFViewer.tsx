@@ -2685,6 +2685,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const currentViewport = page.getViewport({ scale: viewportScale, rotation })
       const baseViewport = page.getViewport({ scale: 1, rotation })
       baseViewportsRef.current.set(activeSelection.pageNumber, baseViewport)
+      const baseViewportForScaled = baseViewportsRef.current.get(activeSelection.pageNumber) ?? baseViewport
       const selectedSpanElements = getSelectedTextLayerSpans(range, textLayerDivForGeometry)
       
       // Use the client rects we already got from getClientRects() for proper multi-line support
@@ -2783,35 +2784,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           currentViewport,
           baseViewport
         )
-        const baseViewportForScaled = baseViewportsRef.current.get(activeSelection.pageNumber) ?? baseViewport
-        const boundingLtwh = {
-          left: boundingViewportRect.x,
-          top: boundingViewportRect.y,
-          width: boundingViewportRect.width,
-          height: boundingViewportRect.height,
-          pageNumber: activeSelection.pageNumber
-        }
-        const scaledBoundingRect = viewportToScaled(boundingLtwh, baseViewportForScaled) as ScaledHighlightRect
-        const scaledRects = rectsForStorage.map(rect =>
-          viewportToScaled(
-            {
-              left: rect.x,
-              top: rect.y,
-              width: rect.width,
-              height: rect.height,
-              pageNumber: activeSelection.pageNumber
-            },
-            baseViewportForScaled
-          ) as ScaledHighlightRect
-        )
         highlightPosition = Object.assign(
           { ...boundingViewportRect, rects: rectsForStorage },
           {
             scaleX: highlightScaleX,
-            scaleY: highlightScaleY,
-            scaledBoundingRect,
-            scaledRects,
-            usePdfCoordinates: false
+            scaleY: highlightScaleY
           }
         )
       } else {
@@ -2835,41 +2812,72 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           baseViewport
         )
         rectsForStorage = [position]
-        const baseViewportForScaled = baseViewportsRef.current.get(activeSelection.pageNumber) ?? baseViewport
-        const scaledBoundingRect = viewportToScaled(
-          {
-            left: position.x,
-            top: position.y,
-            width: position.width,
-            height: position.height,
-            pageNumber: activeSelection.pageNumber
-          },
-          baseViewportForScaled
-        ) as ScaledHighlightRect
-        const scaledRects = rectsForStorage.map(rect =>
-          viewportToScaled(
-            {
-              left: rect.x,
-              top: rect.y,
-              width: rect.width,
-              height: rect.height,
-              pageNumber: activeSelection.pageNumber
-            },
-            baseViewportForScaled
-          ) as ScaledHighlightRect
-        )
         highlightPosition = Object.assign(
           { ...position, rects: rectsForStorage },
           {
             scaleX: highlightScaleX,
-            scaleY: highlightScaleY,
-            scaledBoundingRect,
-            scaledRects,
-            usePdfCoordinates: false
+            scaleY: highlightScaleY
           }
         )
         rawPosition = safeFallback
       }
+
+      const rectCollections = [
+        highlightPosition,
+        rawPosition,
+        ...rectsForStorage
+      ]
+      const minX = rectCollections.reduce((acc, rect) => Math.min(acc, rect.x), Number.POSITIVE_INFINITY)
+      const minY = rectCollections.reduce((acc, rect) => Math.min(acc, rect.y), Number.POSITIVE_INFINITY)
+      if (minX < 0 || minY < 0) {
+        const shiftX = minX < 0 ? -minX : 0
+        const shiftY = minY < 0 ? -minY : 0
+
+        highlightPosition.x += shiftX
+        highlightPosition.y += shiftY
+        rawPosition = {
+          ...rawPosition,
+          x: rawPosition.x + shiftX,
+          y: rawPosition.y + shiftY
+        }
+        rectsForStorage = rectsForStorage.map(rect => ({
+          ...rect,
+          x: rect.x + shiftX,
+          y: rect.y + shiftY
+        }))
+        highlightPosition.rects = rectsForStorage
+      } else if (highlightPosition.rects !== rectsForStorage) {
+        // Ensure rect references stay synced when no adjustment occurs but new array is expected later
+        highlightPosition.rects = rectsForStorage
+      }
+
+      rectsForStorage = highlightPosition.rects ?? rectsForStorage
+
+      const boundingLtwhForScaled = {
+        left: highlightPosition.x,
+        top: highlightPosition.y,
+        width: highlightPosition.width,
+        height: highlightPosition.height,
+        pageNumber: activeSelection.pageNumber
+      }
+      const scaledBoundingRect = viewportToScaled(boundingLtwhForScaled, baseViewportForScaled) as ScaledHighlightRect
+      const scaledRects = rectsForStorage.map(rect =>
+        viewportToScaled(
+          {
+            left: rect.x,
+            top: rect.y,
+            width: rect.width,
+            height: rect.height,
+            pageNumber: activeSelection.pageNumber
+          },
+          baseViewportForScaled
+        ) as ScaledHighlightRect
+      )
+      Object.assign(highlightPosition, {
+        scaledBoundingRect,
+        scaledRects,
+        usePdfCoordinates: false
+      })
 
       const hasInvalidRect = rectsForStorage.some(rect => rect.width <= 0 || rect.height <= 0)
       if (
