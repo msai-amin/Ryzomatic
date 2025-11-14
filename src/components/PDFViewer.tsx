@@ -45,7 +45,7 @@ import { OCRBanner, OCRStatusBadge } from './OCRStatusBadge'
 import { FormulaRenderer, FormulaPlaceholder } from './FormulaRenderer'
 import { extractMarkedFormulas } from '../utils/pdfTextExtractor'
 import { convertMultipleFormulas } from '../services/formulaService'
-import { highlightService, Highlight as HighlightType } from '../services/highlightService'
+import { highlightService, Highlight as HighlightType, ScaledHighlightRect } from '../services/highlightService'
 import { HighlightManagementPanel } from './HighlightManagementPanel'
 import { HighlightColorPopover } from './HighlightColorPopover'
 import { notesService } from '../services/notesService'
@@ -66,6 +66,10 @@ import {
   cleanupDocumentText,
   CleanupPreferences
 } from '../services/textCleanupService'
+import {
+  viewportToScaled,
+  scaledToViewport
+} from 'react-pdf-highlighter-extended/dist/esm/lib/coordinates'
 // TextLayerBuilder will be imported dynamically after PDF.js is initialized
 
 // Helper function to ensure globalThis.pdfjsLib is set before importing pdf_viewer
@@ -529,29 +533,73 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     const fallbackScale = Math.max(scale, 0.1)
     const effectiveScaleX = Math.abs(overrides?.scaleX ?? highlight.position_data.scaleX ?? fallbackScale)
     const effectiveScaleY = Math.abs(overrides?.scaleY ?? highlight.position_data.scaleY ?? fallbackScale)
-    const rectsSource = highlight.position_data.rects && highlight.position_data.rects.length > 0
-      ? highlight.position_data.rects
-      : [{
-          x: highlight.position_data.x,
-          y: highlight.position_data.y,
-          width: highlight.position_data.width,
-          height: highlight.position_data.height
-        }]
-    const scaledRectsRaw = rectsSource
-      .map(rect => ({
-        x: rect.x * effectiveScaleX,
-        y: rect.y * effectiveScaleY,
-        width: rect.width * effectiveScaleX,
-        height: rect.height * effectiveScaleY
-      }))
-      .filter(rect =>
-        Number.isFinite(rect.x) &&
-        Number.isFinite(rect.y) &&
-        Number.isFinite(rect.width) &&
-        Number.isFinite(rect.height) &&
-        rect.width > 0 &&
-        rect.height > 0
-      )
+    let scaledRectsRaw: HighlightRenderRect[] = []
+
+    const baseViewport = baseViewportsRef.current.get(highlight.page_number)
+    const hasScaledGeometry = Boolean(
+      baseViewport &&
+      highlight.position_data.scaledRects &&
+      highlight.position_data.scaledRects.length > 0 &&
+      highlight.position_data.scaledBoundingRect
+    )
+
+    if (hasScaledGeometry && baseViewport) {
+      try {
+        const viewportRects = (highlight.position_data.scaledRects ?? []).map(rect =>
+          scaledToViewport(rect, baseViewport, highlight.position_data.usePdfCoordinates)
+        )
+        const fallbackBounding = highlight.position_data.scaledBoundingRect
+          ? scaledToViewport(
+              highlight.position_data.scaledBoundingRect,
+              baseViewport,
+              highlight.position_data.usePdfCoordinates
+            )
+          : null
+        const viewportRectsToUse = viewportRects.length > 0
+          ? viewportRects
+          : (fallbackBounding ? [fallbackBounding] : [])
+
+        scaledRectsRaw = viewportRectsToUse.map(rect => ({
+          x: rect.left * effectiveScaleX,
+          y: rect.top * effectiveScaleY,
+          width: rect.width * effectiveScaleX,
+          height: rect.height * effectiveScaleY
+        }))
+      } catch (error) {
+        console.warn('Failed to convert scaled highlight position to viewport coordinates', {
+          error,
+          highlightId: highlight.id,
+          pageNumber: highlight.page_number
+        })
+        scaledRectsRaw = []
+      }
+    }
+
+    if (scaledRectsRaw.length === 0) {
+      const rectsSource = highlight.position_data.rects && highlight.position_data.rects.length > 0
+        ? highlight.position_data.rects
+        : [{
+            x: highlight.position_data.x,
+            y: highlight.position_data.y,
+            width: highlight.position_data.width,
+            height: highlight.position_data.height
+          }]
+      scaledRectsRaw = rectsSource
+        .map(rect => ({
+          x: rect.x * effectiveScaleX,
+          y: rect.y * effectiveScaleY,
+          width: rect.width * effectiveScaleX,
+          height: rect.height * effectiveScaleY
+        }))
+        .filter(rect =>
+          Number.isFinite(rect.x) &&
+          Number.isFinite(rect.y) &&
+          Number.isFinite(rect.width) &&
+          Number.isFinite(rect.height) &&
+          rect.width > 0 &&
+          rect.height > 0
+        )
+    }
 
     if (scaledRectsRaw.length === 0) {
       return null
@@ -715,6 +763,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
   const pageAnnotationLayerRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const textLayerInstances = useRef<Map<number, any>>(new Map())
   const annotationLayerInstances = useRef<Map<number, any>>(new Map())
+  const baseViewportsRef = useRef<Map<number, any>>(new Map())
 
   // CRITICAL: Initialize globalThis.pdfjsLib as early as possible
   // This must happen before any pdf_viewer.mjs imports are evaluated
@@ -947,6 +996,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         }
 
         const viewport = page.getViewport({ scale, rotation })
+        const baseViewport = page.getViewport({ scale: 1, rotation })
+        baseViewportsRef.current.set(pageNumber, baseViewport)
         
         // High-DPI display support for crisp rendering
         const dpr = window.devicePixelRatio || 1
@@ -1262,6 +1313,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           if (!context) continue
 
           const viewport = page.getViewport({ scale, rotation })
+          const baseViewport = page.getViewport({ scale: 1, rotation })
+          baseViewportsRef.current.set(pageNum, baseViewport)
           
           // High-DPI display support for crisp rendering
           const dpr = window.devicePixelRatio || 1
@@ -2631,6 +2684,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       const page = await pdfDocRef.current.getPage(activeSelection.pageNumber)
       const currentViewport = page.getViewport({ scale: viewportScale, rotation })
       const baseViewport = page.getViewport({ scale: 1, rotation })
+      baseViewportsRef.current.set(activeSelection.pageNumber, baseViewport)
       const selectedSpanElements = getSelectedTextLayerSpans(range, textLayerDivForGeometry)
       
       // Use the client rects we already got from getClientRects() for proper multi-line support
@@ -2708,7 +2762,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         })
       }
 
-      let highlightPosition: (RectLike & { rects?: RectLike[] }) & { scaleX?: number; scaleY?: number }
+      let highlightPosition: (RectLike & {
+        rects?: RectLike[];
+        scaleX?: number;
+        scaleY?: number;
+        scaledBoundingRect?: ScaledHighlightRect;
+        scaledRects?: ScaledHighlightRect[];
+        usePdfCoordinates?: boolean;
+      })
       let rectsForStorage: RectLike[]
       let rawPosition: RectLike
 
@@ -2722,9 +2783,36 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           currentViewport,
           baseViewport
         )
+        const baseViewportForScaled = baseViewportsRef.current.get(activeSelection.pageNumber) ?? baseViewport
+        const boundingLtwh = {
+          left: boundingViewportRect.x,
+          top: boundingViewportRect.y,
+          width: boundingViewportRect.width,
+          height: boundingViewportRect.height,
+          pageNumber: activeSelection.pageNumber
+        }
+        const scaledBoundingRect = viewportToScaled(boundingLtwh, baseViewportForScaled) as ScaledHighlightRect
+        const scaledRects = rectsForStorage.map(rect =>
+          viewportToScaled(
+            {
+              left: rect.x,
+              top: rect.y,
+              width: rect.width,
+              height: rect.height,
+              pageNumber: activeSelection.pageNumber
+            },
+            baseViewportForScaled
+          ) as ScaledHighlightRect
+        )
         highlightPosition = Object.assign(
           { ...boundingViewportRect, rects: rectsForStorage },
-          { scaleX: highlightScaleX, scaleY: highlightScaleY }
+          {
+            scaleX: highlightScaleX,
+            scaleY: highlightScaleY,
+            scaledBoundingRect,
+            scaledRects,
+            usePdfCoordinates: false
+          }
         )
       } else {
         const clampedFallback = new DOMRect(
@@ -2747,9 +2835,38 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           baseViewport
         )
         rectsForStorage = [position]
+        const baseViewportForScaled = baseViewportsRef.current.get(activeSelection.pageNumber) ?? baseViewport
+        const scaledBoundingRect = viewportToScaled(
+          {
+            left: position.x,
+            top: position.y,
+            width: position.width,
+            height: position.height,
+            pageNumber: activeSelection.pageNumber
+          },
+          baseViewportForScaled
+        ) as ScaledHighlightRect
+        const scaledRects = rectsForStorage.map(rect =>
+          viewportToScaled(
+            {
+              left: rect.x,
+              top: rect.y,
+              width: rect.width,
+              height: rect.height,
+              pageNumber: activeSelection.pageNumber
+            },
+            baseViewportForScaled
+          ) as ScaledHighlightRect
+        )
         highlightPosition = Object.assign(
           { ...position, rects: rectsForStorage },
-          { scaleX: highlightScaleX, scaleY: highlightScaleY }
+          {
+            scaleX: highlightScaleX,
+            scaleY: highlightScaleY,
+            scaledBoundingRect,
+            scaledRects,
+            usePdfCoordinates: false
+          }
         )
         rawPosition = safeFallback
       }

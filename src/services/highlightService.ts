@@ -12,10 +12,24 @@ export interface HighlightRect {
   height: number;
 }
 
+export interface ScaledHighlightRect {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  width: number;
+  height: number;
+  pageNumber: number;
+  usePdfCoordinates?: boolean;
+}
+
 export interface HighlightPosition extends HighlightRect {
   rects?: HighlightRect[];
   scaleX?: number;
   scaleY?: number;
+  scaledBoundingRect?: ScaledHighlightRect;
+  scaledRects?: ScaledHighlightRect[];
+  usePdfCoordinates?: boolean;
 }
 
 export interface TextAnchors {
