@@ -2952,11 +2952,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         }, baseViewport) as ScaledHighlightRect
         
         // CRITICAL: Fix width, height, x2, and y2 to match the actual clamped dimensions
-        // The library might set these incorrectly (e.g., to page dimensions), so we recalculate
-        const correctedWidth = clampedWidth
-        const correctedHeight = clampedHeight
+        // viewportToScaled returns scaled coordinates, but might set width/height incorrectly
+        // Use x1/y1 from the library (they're in scaled coords), but recalculate width/height/x2/y2
+        // The clamped width/height are in viewport coords (base viewport, scale=1), which equals scaled coords
+        const correctedWidth = clampedWidth  // Base viewport coords = scaled coords (scale=1)
+        const correctedHeight = clampedHeight  // Base viewport coords = scaled coords (scale=1)
         const correctedX2 = scaledRect.x1 + correctedWidth
         const correctedY2 = scaledRect.y1 + correctedHeight
+        
+        if (import.meta.env.DEV) {
+          console.debug('Scaled rect correction:', {
+            original: { x1: scaledRect.x1, y1: scaledRect.y1, x2: scaledRect.x2, y2: scaledRect.y2, width: scaledRect.width, height: scaledRect.height },
+            clamped: { x: clampedX, y: clampedY, width: clampedWidth, height: clampedHeight },
+            corrected: { x1: scaledRect.x1, y1: scaledRect.y1, x2: correctedX2, y2: correctedY2, width: correctedWidth, height: correctedHeight }
+          })
+        }
         
         return {
           ...scaledRect,
@@ -3006,19 +3016,30 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       })
 
       // Clamp bounding rect to page boundaries
-      const clampedMinX = Math.max(0, boundingScaledRect.minX)
-      const clampedMinY = Math.max(0, boundingScaledRect.minY)
-      const clampedMaxX = Math.min(baseViewport.width, boundingScaledRect.maxX)
-      const clampedMaxY = Math.min(baseViewport.height, boundingScaledRect.maxY)
+      // Use the actual rect dimensions, not the potentially incorrect values from the library
+      const actualMinX = Math.max(0, Math.min(boundingScaledRect.minX, baseViewport.width))
+      const actualMinY = Math.max(0, Math.min(boundingScaledRect.minY, baseViewport.height))
+      const actualMaxX = Math.max(actualMinX, Math.min(boundingScaledRect.maxX, baseViewport.width))
+      const actualMaxY = Math.max(actualMinY, Math.min(boundingScaledRect.maxY, baseViewport.height))
+      const actualBoundingWidth = actualMaxX - actualMinX
+      const actualBoundingHeight = actualMaxY - actualMinY
       
       const scaledBoundingRect: ScaledHighlightRect = {
-        x1: clampedMinX,
-        y1: clampedMinY,
-        x2: clampedMaxX,
-        y2: clampedMaxY,
-        width: clampedMaxX - clampedMinX,
-        height: clampedMaxY - clampedMinY,
+        x1: actualMinX,
+        y1: actualMinY,
+        x2: actualMaxX,
+        y2: actualMaxY,
+        width: actualBoundingWidth,
+        height: actualBoundingHeight,
         pageNumber: activeSelection.pageNumber
+      }
+      
+      if (import.meta.env.DEV) {
+        console.debug('Bounding rect correction:', {
+          before: { minX: boundingScaledRect.minX, minY: boundingScaledRect.minY, maxX: boundingScaledRect.maxX, maxY: boundingScaledRect.maxY },
+          after: { x1: actualMinX, y1: actualMinY, x2: actualMaxX, y2: actualMaxY, width: actualBoundingWidth, height: actualBoundingHeight },
+          baseViewport: { width: baseViewport.width, height: baseViewport.height }
+        })
       }
 
       // Calculate bounding rect from viewport rects (already in base viewport coordinates)
@@ -3117,7 +3138,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
 
       // After clamping, we need to recalculate scaled coordinates from clamped viewport coords
       // This ensures scaled coordinates match the clamped positions
-      const clampedScaledBoundingRect = viewportToScaled({
+      const clampedScaledBoundingRectRaw = viewportToScaled({
         left: highlightPosition.x,
         top: highlightPosition.y,
         width: highlightPosition.width,
@@ -3125,15 +3146,37 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         pageNumber: activeSelection.pageNumber
       }, baseViewport) as ScaledHighlightRect
       
-      const clampedScaledRects = rectsForStorage.map(rect =>
-        viewportToScaled({
+      // Fix width/height/x2/y2 to match actual clamped dimensions
+      const clampedScaledBoundingRect: ScaledHighlightRect = {
+        ...clampedScaledBoundingRectRaw,
+        x1: clampedScaledBoundingRectRaw.x1,
+        y1: clampedScaledBoundingRectRaw.y1,
+        x2: clampedScaledBoundingRectRaw.x1 + highlightPosition.width,
+        y2: clampedScaledBoundingRectRaw.y1 + highlightPosition.height,
+        width: highlightPosition.width,
+        height: highlightPosition.height
+      }
+      
+      const clampedScaledRects = rectsForStorage.map(rect => {
+        const scaledRectRaw = viewportToScaled({
           left: rect.x,
           top: rect.y,
           width: rect.width,
           height: rect.height,
           pageNumber: activeSelection.pageNumber
         }, baseViewport) as ScaledHighlightRect
-      )
+        
+        // Fix width/height/x2/y2 to match actual rect dimensions
+        return {
+          ...scaledRectRaw,
+          x1: scaledRectRaw.x1,
+          y1: scaledRectRaw.y1,
+          x2: scaledRectRaw.x1 + rect.width,
+          y2: scaledRectRaw.y1 + rect.height,
+          width: rect.width,
+          height: rect.height
+        }
+      })
       
       // Update scaled coordinates after clamping
       highlightPosition.scaledBoundingRect = clampedScaledBoundingRect
