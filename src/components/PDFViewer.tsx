@@ -2934,7 +2934,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         usePdfCoordinates: false
       }
 
-      const rawPosition: RectLike = {
+      let rawPosition: RectLike = {
         x: spanRects.reduce((min, r) => Math.min(min, r.x), Number.POSITIVE_INFINITY),
         y: spanRects.reduce((min, r) => Math.min(min, r.y), Number.POSITIVE_INFINITY),
         width: scaledBoundingRect.width,
