@@ -980,9 +980,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     return () => {
       if (pdfDocRef.current) {
         pdfDocRef.current.destroy()
+        pdfDocRef.current = null
       }
     }
-  }, [document.pdfData])
+  }, [document.pdfData, document.id])
 
   // Re-render PDF when switching back from reading mode
   useEffect(() => {
