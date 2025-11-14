@@ -70,6 +70,8 @@ import {
   viewportToScaled,
   scaledToViewport
 } from 'react-pdf-highlighter-extended/dist/esm/lib/coordinates'
+import { verifyTextLayerAlignment, fixTextLayerAlignment } from '../utils/textLayerAlignment'
+import { logHighlightDiagnostics } from '../utils/highlightDiagnostics'
 // TextLayerBuilder will be imported dynamically after PDF.js is initialized
 
 // Helper function to ensure globalThis.pdfjsLib is set before importing pdf_viewer
@@ -208,12 +210,14 @@ const getSelectedTextLayerSpans = (range: Range, textLayerDiv: HTMLElement | nul
   })
 }
 
-const getTightBoundingRectForSpan = (span: HTMLElement): DOMRect | null => {
+const getTightBoundingRectForSpan = (span: HTMLElement, pageContainer: HTMLElement | null = null): DOMRect | null => {
   if (span.dataset?.isWhitespace === 'true') {
     return null
   }
 
   const firstChild = span.firstChild
+  let rect: DOMRect | null = null
+
   if (firstChild && firstChild.nodeType === Node.TEXT_NODE) {
     const textContent = firstChild.textContent ?? ''
     const leadingWhitespaceMatch = textContent.match(/^\s+/)
@@ -227,18 +231,32 @@ const getTightBoundingRectForSpan = (span: HTMLElement): DOMRect | null => {
       const range = document.createRange()
       range.setStart(firstChild, start)
       range.setEnd(firstChild, end)
-      const rect = range.getBoundingClientRect()
+      rect = range.getBoundingClientRect()
       range.detach?.()
-      if (rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON) {
-        return rect
-      }
     }
   }
 
-  const fallbackRect = span.getBoundingClientRect()
-  return fallbackRect.width > RECT_SIZE_EPSILON && fallbackRect.height > RECT_SIZE_EPSILON
-    ? fallbackRect
-    : null
+  if (!rect || rect.width <= RECT_SIZE_EPSILON || rect.height <= RECT_SIZE_EPSILON) {
+    rect = span.getBoundingClientRect()
+  }
+
+  if (!rect || rect.width <= RECT_SIZE_EPSILON || rect.height <= RECT_SIZE_EPSILON) {
+    return null
+  }
+
+  // PHASE 2.3: Account for page container offset if provided
+  // This ensures coordinates are relative to the container
+  if (pageContainer) {
+    const containerRect = pageContainer.getBoundingClientRect()
+    return new DOMRect(
+      rect.left - containerRect.left,
+      rect.top - containerRect.top,
+      rect.width,
+      rect.height
+    )
+  }
+
+  return rect
 }
 
 const getClientRectsForRange = (range: Range): DOMRect[] => {
@@ -529,42 +547,75 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     setSelectedTextInfo(null)
   }, [document.id])
 
-  const mapHighlightToRenderData = useCallback((highlight: HighlightType, overrides?: { scaleX?: number; scaleY?: number }): HighlightRenderData | null => {
-    const fallbackScale = Math.max(scale, 0.1)
-    const effectiveScaleX = Math.abs(overrides?.scaleX ?? highlight.position_data.scaleX ?? fallbackScale)
-    const effectiveScaleY = Math.abs(overrides?.scaleY ?? highlight.position_data.scaleY ?? fallbackScale)
+  const mapHighlightToRenderData = useCallback((highlight: HighlightType): HighlightRenderData | null => {
+    // PHASE 2.4: Simplified rendering conversion
+    // Get base viewport for this page
+    const baseViewport = baseViewportsRef.current.get(highlight.page_number)
+    if (!baseViewport) {
+      console.warn(`No base viewport for page ${highlight.page_number}, skipping highlight`)
+      return null
+    }
+
+    // PHASE 3: Validate base viewport
+    if (baseViewport.scale !== 1) {
+      console.warn(`Invalid base viewport scale (${baseViewport.scale}), expected 1. Recalculating...`)
+      // Recalculate if needed - this should not happen but handle gracefully
+    }
+
+    const currentScale = Math.max(scale, 0.1)
     let scaledRectsRaw: HighlightRenderRect[] = []
 
-    const baseViewport = baseViewportsRef.current.get(highlight.page_number)
+    // PHASE 2.4: Convert scaled → viewport → apply current scale
     const hasScaledGeometry = Boolean(
-      baseViewport &&
       highlight.position_data.scaledRects &&
       highlight.position_data.scaledRects.length > 0 &&
       highlight.position_data.scaledBoundingRect
     )
 
-    if (hasScaledGeometry && baseViewport) {
+    if (hasScaledGeometry) {
       try {
+        // Convert scaled coordinates to viewport coordinates (base viewport, scale=1)
         const viewportRects = (highlight.position_data.scaledRects ?? []).map(rect =>
-          scaledToViewport(rect, baseViewport, highlight.position_data.usePdfCoordinates)
+          scaledToViewport(rect, baseViewport, highlight.position_data.usePdfCoordinates ?? false)
         )
         const fallbackBounding = highlight.position_data.scaledBoundingRect
           ? scaledToViewport(
               highlight.position_data.scaledBoundingRect,
               baseViewport,
-              highlight.position_data.usePdfCoordinates
+              highlight.position_data.usePdfCoordinates ?? false
             )
           : null
         const viewportRectsToUse = viewportRects.length > 0
           ? viewportRects
           : (fallbackBounding ? [fallbackBounding] : [])
 
+        // Apply current scale directly (no separate scaleX/scaleY)
         scaledRectsRaw = viewportRectsToUse.map(rect => ({
-          x: rect.left * effectiveScaleX,
-          y: rect.top * effectiveScaleY,
-          width: rect.width * effectiveScaleX,
-          height: rect.height * effectiveScaleY
+          x: rect.left * currentScale,
+          y: rect.top * currentScale,
+          width: rect.width * currentScale,
+          height: rect.height * currentScale
         }))
+
+        // PHASE 4: Diagnostic logging for rendering
+        if (import.meta.env.DEV) {
+          logHighlightDiagnostics('rendering', highlight.page_number, {
+            scaledRects: highlight.position_data.scaledRects,
+            viewportRects: viewportRectsToUse.map(r => ({
+              left: r.left,
+              top: r.top,
+              width: r.width,
+              height: r.height
+            })),
+            renderRects: scaledRectsRaw,
+            scale: currentScale,
+            baseViewport: {
+              width: baseViewport.width,
+              height: baseViewport.height,
+              scale: baseViewport.scale
+            }
+          })
+        }
       } catch (error) {
         console.warn('Failed to convert scaled highlight position to viewport coordinates', {
           error,
@@ -575,6 +626,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       }
     }
 
+    // Fallback to legacy viewport coordinates if scaled coordinates not available
     if (scaledRectsRaw.length === 0) {
       const rectsSource = highlight.position_data.rects && highlight.position_data.rects.length > 0
         ? highlight.position_data.rects
@@ -586,10 +638,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           }]
       scaledRectsRaw = rectsSource
         .map(rect => ({
-          x: rect.x * effectiveScaleX,
-          y: rect.y * effectiveScaleY,
-          width: rect.width * effectiveScaleX,
-          height: rect.height * effectiveScaleY
+          x: rect.x * currentScale,
+          y: rect.y * currentScale,
+          width: rect.width * currentScale,
+          height: rect.height * currentScale
         }))
         .filter(rect =>
           Number.isFinite(rect.x) &&
@@ -996,7 +1048,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         }
 
         const viewport = page.getViewport({ scale, rotation })
-        const baseViewport = page.getViewport({ scale: 1, rotation })
+        // PHASE 3: Ensure base viewport is always scale=1, rotation=0
+        const baseViewport = page.getViewport({ scale: 1, rotation: 0 })
         baseViewportsRef.current.set(pageNumber, baseViewport)
         
         // High-DPI display support for crisp rendering
@@ -1169,6 +1222,59 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                 textLayerChildren: textLayerRef.current.children.length,
                 spansRendered: spans.length
               })
+
+              // PHASE 1 & 5: Verify and fix text layer alignment
+              const pageContainer = canvas.parentElement
+              if (pageContainer && canvas && textLayerRef.current) {
+                // Verify alignment
+                const alignmentCheck = verifyTextLayerAlignment(
+                  canvas,
+                  textLayerRef.current,
+                  pageContainer as HTMLElement
+                )
+
+                if (!alignmentCheck.isAligned) {
+                  console.warn('⚠️ Text layer alignment issues detected:', {
+                    pageNumber,
+                    errors: alignmentCheck.errors,
+                    warnings: alignmentCheck.warnings,
+                    offsetX: alignmentCheck.offsetX,
+                    offsetY: alignmentCheck.offsetY,
+                    widthMatch: alignmentCheck.widthMatch,
+                    heightMatch: alignmentCheck.heightMatch
+                  })
+
+                  // Attempt to fix alignment
+                  const fixed = fixTextLayerAlignment(
+                    textLayerRef.current,
+                    pageContainer as HTMLElement,
+                    canvas
+                  )
+
+                  if (fixed) {
+                    console.log('✅ Text layer alignment fixed automatically')
+                    // Re-verify after fix
+                    const recheck = verifyTextLayerAlignment(
+                      canvas,
+                      textLayerRef.current,
+                      pageContainer as HTMLElement
+                    )
+                    if (recheck.isAligned) {
+                      console.log('✅ Text layer alignment verified after fix')
+                    } else {
+                      console.warn('⚠️ Text layer still misaligned after fix attempt:', recheck.errors)
+                    }
+                  }
+                } else {
+                  if (import.meta.env.DEV) {
+                    console.log('✅ Text layer alignment verified:', {
+                      pageNumber,
+                      offsetX: alignmentCheck.offsetX,
+                      offsetY: alignmentCheck.offsetY
+                    })
+                  }
+                }
+              }
             } catch (error) {
               console.error('Error rendering text layer with TextLayerBuilder:', error)
             }
@@ -1313,7 +1419,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           if (!context) continue
 
           const viewport = page.getViewport({ scale, rotation })
-          const baseViewport = page.getViewport({ scale: 1, rotation })
+          // PHASE 3: Ensure base viewport is always scale=1, rotation=0
+          const baseViewport = page.getViewport({ scale: 1, rotation: 0 })
           baseViewportsRef.current.set(pageNum, baseViewport)
           
           // High-DPI display support for crisp rendering
@@ -1427,6 +1534,54 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                   textLayerChildren: textLayerDiv.children.length,
                   spansRendered: spans.length
                 })
+
+                // PHASE 1 & 5: Verify and fix text layer alignment (continuous mode)
+                const pageContainer = canvas.parentElement
+                if (pageContainer && canvas && textLayerDiv) {
+                  const alignmentCheck = verifyTextLayerAlignment(
+                    canvas,
+                    textLayerDiv,
+                    pageContainer as HTMLElement
+                  )
+
+                  if (!alignmentCheck.isAligned) {
+                    console.warn(`⚠️ Text layer alignment issues detected (page ${pageNum}):`, {
+                      errors: alignmentCheck.errors,
+                      warnings: alignmentCheck.warnings,
+                      offsetX: alignmentCheck.offsetX,
+                      offsetY: alignmentCheck.offsetY,
+                      widthMatch: alignmentCheck.widthMatch,
+                      heightMatch: alignmentCheck.heightMatch
+                    })
+
+                    const fixed = fixTextLayerAlignment(
+                      textLayerDiv,
+                      pageContainer as HTMLElement,
+                      canvas
+                    )
+
+                    if (fixed) {
+                      console.log(`✅ Text layer alignment fixed automatically (page ${pageNum})`)
+                      const recheck = verifyTextLayerAlignment(
+                        canvas,
+                        textLayerDiv,
+                        pageContainer as HTMLElement
+                      )
+                      if (recheck.isAligned) {
+                        console.log(`✅ Text layer alignment verified after fix (page ${pageNum})`)
+                      } else {
+                        console.warn(`⚠️ Text layer still misaligned after fix attempt (page ${pageNum}):`, recheck.errors)
+                      }
+                    }
+                  } else {
+                    if (import.meta.env.DEV) {
+                      console.log(`✅ Text layer alignment verified (page ${pageNum}):`, {
+                        offsetX: alignmentCheck.offsetX,
+                        offsetY: alignmentCheck.offsetY
+                      })
+                    }
+                  }
+                }
               } catch (error) {
                 console.error(`Failed to use TextLayerBuilder for page ${pageNum}, falling back to manual rendering:`, error)
                 // Fallback to manual rendering if TextLayerBuilder fails
@@ -2682,49 +2837,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       }
 
       const page = await pdfDocRef.current.getPage(activeSelection.pageNumber)
-      const currentViewport = page.getViewport({ scale: viewportScale, rotation })
-      const baseViewport = page.getViewport({ scale: 1, rotation })
+      // PHASE 3: Ensure base viewport is always scale=1, rotation=0
+      const baseViewport = page.getViewport({ scale: 1, rotation: 0 })
       baseViewportsRef.current.set(activeSelection.pageNumber, baseViewport)
-      const baseViewportForScaled = baseViewportsRef.current.get(activeSelection.pageNumber) ?? baseViewport
+      const currentViewport = page.getViewport({ scale: viewportScale, rotation })
       const selectedSpanElements = getSelectedTextLayerSpans(range, textLayerDivForGeometry)
       
-      // Use the client rects we already got from getClientRects() for proper multi-line support
-      // Process all client rects individually, translating each relative to page container
-      const selectionClientRects = validRects.map(rect => {
-        return new DOMRect(
-          rect.left - pageRect.left,
-          rect.top - pageRect.top,
-          rect.width,
-          rect.height
-        )
-      })
-      
-      if (import.meta.env.DEV) {
-        console.debug('Highlight debug: selectionClientRects', selectionClientRects.map(rect => ({
-          x: rect.x,
-          y: rect.y,
-          width: rect.width,
-          height: rect.height
-        })))
-      }
-      
-      const widthLimit = Math.max(
-        selectionRect.width,
-        containerWidth,
-        RECT_SIZE_EPSILON * 2
-      )
-      const heightLimit = Math.max(
-        selectionRect.height,
-        containerHeight,
-        RECT_SIZE_EPSILON * 2
-      )
-
-      // CRITICAL: Calculate span rects relative to page container
-      // This ensures pixel-perfect alignment since highlights are rendered within the page container
-      // Prefer selectedSpanElements over selectionClientRects because span rects have tighter bounds
-      const spanRects = selectedSpanElements.length > 0
+      // PHASE 2: Simplified coordinate conversion - direct span-to-scaled
+      // Get span rects in page container coordinates (screen space)
+      const spanRects: DOMRect[] = selectedSpanElements.length > 0
         ? selectedSpanElements
-            .map(span => getTightBoundingRectForSpan(span))
+            .map(span => getTightBoundingRectForSpan(span, pageContainer))
             .filter((rect): rect is DOMRect => !!rect && rect.width > RECT_SIZE_EPSILON && rect.height > RECT_SIZE_EPSILON)
             .map(rect => new DOMRect(
               rect.left - pageRect.left,
@@ -2732,94 +2855,90 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               rect.width,
               rect.height
             ))
-        : selectionClientRects
+        : validRects.map(rect => new DOMRect(
+            rect.left - pageRect.left,
+            rect.top - pageRect.top,
+            rect.width,
+            rect.height
+          ))
 
-      if (selectedSpanElements.length === 0) {
-        console.debug('Highlight debug: no span intersections; using selectionClientRects', selectionClientRects.map(rect => ({
-          x: rect.x,
-          y: rect.y,
+      if (spanRects.length === 0) {
+        console.error('No valid span rects found for highlight')
+        alert('Cannot create highlight: Invalid text selection. Please try selecting the text again.')
+        setSelectedTextInfo(null)
+        return
+      }
+
+      // Convert directly to scaled coordinates using CURRENT viewport
+      // The library handles scale independence, so we use current viewport here
+      const scaledRects: ScaledHighlightRect[] = spanRects.map(rect => {
+        return viewportToScaled({
+          left: rect.x,
+          top: rect.y,
           width: rect.width,
-          height: rect.height
-        })))
+          height: rect.height,
+          pageNumber: activeSelection.pageNumber
+        }, currentViewport) as ScaledHighlightRect
+      })
+
+      // Calculate bounding rect from scaled rects
+      const boundingScaledRect = scaledRects.reduce((acc, rect) => ({
+        minX: Math.min(acc.minX, rect.x1),
+        minY: Math.min(acc.minY, rect.y1),
+        maxX: Math.max(acc.maxX, rect.x2),
+        maxY: Math.max(acc.maxY, rect.y2)
+      }), {
+        minX: Number.POSITIVE_INFINITY,
+        minY: Number.POSITIVE_INFINITY,
+        maxX: Number.NEGATIVE_INFINITY,
+        maxY: Number.NEGATIVE_INFINITY
+      })
+
+      const scaledBoundingRect: ScaledHighlightRect = {
+        x1: boundingScaledRect.minX,
+        y1: boundingScaledRect.minY,
+        x2: boundingScaledRect.maxX,
+        y2: boundingScaledRect.maxY,
+        width: boundingScaledRect.maxX - boundingScaledRect.minX,
+        height: boundingScaledRect.maxY - boundingScaledRect.minY,
+        pageNumber: activeSelection.pageNumber
       }
 
-      const skipNormalization = selectedSpanElements.length > 0
-      const containerRectNormalized = new DOMRect(0, 0, containerWidth, containerHeight)
-      let screenGeometry = spanRects.length
-        ? buildScreenGeometry(spanRects, containerRectNormalized, widthLimit, heightLimit, true, skipNormalization)
-        : null
-      const geometry = screenGeometry // Back-compat alias for legacy instrumentation
+      // Convert scaled bounding rect back to viewport for storage (base viewport, scale=1)
+      const boundingViewportRect = scaledToViewport(scaledBoundingRect, baseViewport, false)
+      
+      // Store both viewport coordinates (for backward compatibility) and scaled coordinates
+      const rectsForStorage: RectLike[] = scaledRects.map(scaledRect => {
+        const viewportRect = scaledToViewport(scaledRect, baseViewport, false)
+        return {
+          x: viewportRect.left,
+          y: viewportRect.top,
+          width: viewportRect.width,
+          height: viewportRect.height
+        }
+      })
 
-      if (!screenGeometry && selectedSpanElements.length === 0) {
-        console.warn('Highlight debug: geometry failed with no span intersections', {
-          validRectsCount: validRects.length,
-          selectionClientRectsCount: selectionClientRects.length,
-          textLayerContainsStart: textLayerDivForGeometry.contains(range.startContainer),
-          textLayerContainsEnd: textLayerDivForGeometry.contains(range.endContainer),
-          textLayerSpanSample: Array.from(textLayerDivForGeometry.querySelectorAll('span[data-text-index]')).slice(0, 5).map(span => ({
-            text: span.textContent,
-            hasDataAttr: !!span.getAttribute('data-text-index')
-          }))
-        })
-      }
-
-      let highlightPosition: (RectLike & {
+      const highlightPosition: RectLike & {
         rects?: RectLike[];
-        scaleX?: number;
-        scaleY?: number;
         scaledBoundingRect?: ScaledHighlightRect;
         scaledRects?: ScaledHighlightRect[];
         usePdfCoordinates?: boolean;
-      })
-      let rectsForStorage: RectLike[]
-      let rawPosition: RectLike
+      } = {
+        x: boundingViewportRect.left,
+        y: boundingViewportRect.top,
+        width: boundingViewportRect.width,
+        height: boundingViewportRect.height,
+        rects: rectsForStorage,
+        scaledBoundingRect,
+        scaledRects,
+        usePdfCoordinates: false
+      }
 
-      if (screenGeometry) {
-        rawPosition = screenGeometry.boundingScreenRect
-        rectsForStorage = screenGeometry.screenRects.map(rect =>
-          convertScreenRectToBaseViewportRect(rect, currentViewport, baseViewport)
-        )
-        const boundingViewportRect = convertScreenRectToBaseViewportRect(
-          rawPosition,
-          currentViewport,
-          baseViewport
-        )
-        highlightPosition = Object.assign(
-          { ...boundingViewportRect, rects: rectsForStorage },
-          {
-            scaleX: highlightScaleX,
-            scaleY: highlightScaleY
-          }
-        )
-      } else {
-        const clampedFallback = new DOMRect(
-          Math.max(0, selectionRect.x),
-          Math.max(0, selectionRect.y),
-          Math.max(RECT_SIZE_EPSILON, Math.min(containerWidth, selectionRect.width)),
-          Math.max(RECT_SIZE_EPSILON, Math.min(containerHeight, selectionRect.height))
-        )
-
-        const safeFallback: RectLike = {
-          x: clampedFallback.x,
-          y: clampedFallback.y,
-          width: clampedFallback.width,
-          height: clampedFallback.height
-        }
-
-        const position = convertScreenRectToBaseViewportRect(
-          safeFallback,
-          currentViewport,
-          baseViewport
-        )
-        rectsForStorage = [position]
-        highlightPosition = Object.assign(
-          { ...position, rects: rectsForStorage },
-          {
-            scaleX: highlightScaleX,
-            scaleY: highlightScaleY
-          }
-        )
-        rawPosition = safeFallback
+      const rawPosition: RectLike = {
+        x: spanRects.reduce((min, r) => Math.min(min, r.x), Number.POSITIVE_INFINITY),
+        y: spanRects.reduce((min, r) => Math.min(min, r.y), Number.POSITIVE_INFINITY),
+        width: scaledBoundingRect.width,
+        height: scaledBoundingRect.height
       }
 
       const rectCollections = [
@@ -2877,32 +2996,56 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       highlightPosition.width = clampedHighlightWidth
       highlightPosition.height = clampedHighlightHeight
 
-      rectsForStorage = highlightPosition.rects ?? rectsForStorage
-
-      const boundingLtwhForScaled = {
+      // After clamping, we need to recalculate scaled coordinates from clamped viewport coords
+      // This ensures scaled coordinates match the clamped positions
+      const clampedScaledBoundingRect = viewportToScaled({
         left: highlightPosition.x,
         top: highlightPosition.y,
         width: highlightPosition.width,
         height: highlightPosition.height,
         pageNumber: activeSelection.pageNumber
-      }
-      const scaledBoundingRect = viewportToScaled(boundingLtwhForScaled, baseViewportForScaled) as ScaledHighlightRect
-      const scaledRects = rectsForStorage.map(rect =>
-        viewportToScaled(
-          {
-            left: rect.x,
-            top: rect.y,
-            width: rect.width,
-            height: rect.height,
-            pageNumber: activeSelection.pageNumber
-          },
-          baseViewportForScaled
-        ) as ScaledHighlightRect
+      }, baseViewport) as ScaledHighlightRect
+      
+      const clampedScaledRects = rectsForStorage.map(rect =>
+        viewportToScaled({
+          left: rect.x,
+          top: rect.y,
+          width: rect.width,
+          height: rect.height,
+          pageNumber: activeSelection.pageNumber
+        }, baseViewport) as ScaledHighlightRect
       )
-      Object.assign(highlightPosition, {
-        scaledBoundingRect,
-        scaledRects,
-        usePdfCoordinates: false
+      
+      // Update scaled coordinates after clamping
+      highlightPosition.scaledBoundingRect = clampedScaledBoundingRect
+      highlightPosition.scaledRects = clampedScaledRects
+
+      // PHASE 4: Diagnostic logging
+      logHighlightDiagnostics('creation', activeSelection.pageNumber, {
+        highlightPosition: {
+          x: highlightPosition.x,
+          y: highlightPosition.y,
+          width: highlightPosition.width,
+          height: highlightPosition.height
+        },
+        scaledRects: highlightPosition.scaledRects,
+        viewportRects: rectsForStorage.map(r => ({
+          left: r.x,
+          top: r.y,
+          width: r.width,
+          height: r.height
+        })),
+        scale: viewportScale,
+        baseViewport: {
+          width: baseViewport.width,
+          height: baseViewport.height,
+          scale: baseViewport.scale
+        },
+        currentViewport: {
+          width: currentViewport.width,
+          height: currentViewport.height,
+          scale: currentViewport.scale
+        }
       })
 
       const hasInvalidRect = rectsForStorage.some(rect => rect.width <= 0 || rect.height <= 0)
@@ -2962,14 +3105,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           height: textLayerRect.height
         },
         rawPosition,
-        containerWidth: widthLimit,
-        containerHeight: heightLimit,
+        containerWidth: containerWidth,
+        containerHeight: containerHeight,
         selectedSpanCount: selectedSpanElements.length,
-        selectionClientRectCount: selectionClientRects.length,
-        geometryDerived: !!screenGeometry,
+        spanRectsCount: spanRects.length,
+        scaledRectsCount: highlightPosition.scaledRects?.length ?? 0,
         baseViewportPosition: highlightPosition,
         baseViewportRects: rectsForStorage,
-        safeScale: viewportScale,
+        scaledBoundingRect: highlightPosition.scaledBoundingRect,
+        viewportScale: viewportScale,
         textElement: {
           fontSize: textElement?.style?.fontSize,
           lineHeight: textElement?.style?.lineHeight,
