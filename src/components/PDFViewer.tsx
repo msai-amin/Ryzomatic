@@ -575,15 +575,39 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
     if (hasScaledGeometry) {
       try {
         // Convert scaled coordinates to viewport coordinates (base viewport, scale=1)
-        const viewportRects = (highlight.position_data.scaledRects ?? []).map(rect =>
-          scaledToViewport(rect, baseViewport, highlight.position_data.usePdfCoordinates ?? false)
-        )
+        // scaledToViewport expects x1, y1, x2, y2 format and returns {left, top, width, height}
+        const viewportRects = (highlight.position_data.scaledRects ?? []).map(rect => {
+          // Ensure x2 and y2 are correct (x1 + width, y1 + height) before conversion
+          const correctedRect = {
+            ...rect,
+            x2: rect.x1 + rect.width,
+            y2: rect.y1 + rect.height
+          }
+          const viewportRect = scaledToViewport(correctedRect, baseViewport, highlight.position_data.usePdfCoordinates ?? false)
+          
+          if (import.meta.env.DEV) {
+            console.debug('Scaled to viewport conversion:', {
+              scaled: correctedRect,
+              viewport: viewportRect
+            })
+          }
+          
+          return viewportRect
+        })
+        
         const fallbackBounding = highlight.position_data.scaledBoundingRect
-          ? scaledToViewport(
-              highlight.position_data.scaledBoundingRect,
-              baseViewport,
-              highlight.position_data.usePdfCoordinates ?? false
-            )
+          ? (() => {
+              const correctedBounding = {
+                ...highlight.position_data.scaledBoundingRect,
+                x2: highlight.position_data.scaledBoundingRect.x1 + highlight.position_data.scaledBoundingRect.width,
+                y2: highlight.position_data.scaledBoundingRect.y1 + highlight.position_data.scaledBoundingRect.height
+              }
+              return scaledToViewport(
+                correctedBounding,
+                baseViewport,
+                highlight.position_data.usePdfCoordinates ?? false
+              )
+            })()
           : null
         const viewportRectsToUse = viewportRects.length > 0
           ? viewportRects
@@ -600,12 +624,36 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         const renderScaleY = actualCanvasHeight / baseViewport.height
         
         // Use the render scale to position highlights correctly
-        scaledRectsRaw = viewportRectsToUse.map(rect => ({
-          x: rect.left * renderScaleX,
-          y: rect.top * renderScaleY,
-          width: rect.width * renderScaleX,
-          height: rect.height * renderScaleY
-        }))
+        scaledRectsRaw = viewportRectsToUse
+          .map(rect => ({
+            x: rect.left * renderScaleX,
+            y: rect.top * renderScaleY,
+            width: rect.width * renderScaleX,
+            height: rect.height * renderScaleY
+          }))
+          .filter(rect => {
+            const isValid = Number.isFinite(rect.x) &&
+              Number.isFinite(rect.y) &&
+              Number.isFinite(rect.width) &&
+              Number.isFinite(rect.height) &&
+              rect.width > RECT_SIZE_EPSILON &&
+              rect.height > RECT_SIZE_EPSILON
+            
+            if (!isValid && import.meta.env.DEV) {
+              console.warn('Filtered out invalid render rect:', rect)
+            }
+            
+            return isValid
+          })
+        
+        if (import.meta.env.DEV && scaledRectsRaw.length === 0 && viewportRectsToUse.length > 0) {
+          console.warn('All render rects were filtered out!', {
+            viewportRects: viewportRectsToUse,
+            renderScaleX,
+            renderScaleY,
+            baseViewport: { width: baseViewport.width, height: baseViewport.height }
+          })
+        }
 
         // PHASE 4: Diagnostic logging for rendering
         if (import.meta.env.DEV) {
