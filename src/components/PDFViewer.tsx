@@ -644,12 +644,28 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         
         // Use the render scale to position highlights correctly
         scaledRectsRaw = viewportRectsToUse
-          .map(rect => ({
-            x: rect.left * renderScaleX,
-            y: rect.top * renderScaleY,
-            width: rect.width * renderScaleX,
-            height: rect.height * renderScaleY
-          }))
+          .map((rect, idx) => {
+            const renderRect = {
+              x: rect.left * renderScaleX,
+              y: rect.top * renderScaleY,
+              width: rect.width * renderScaleX,
+              height: rect.height * renderScaleY
+            }
+            
+            // CRITICAL DEBUG: Log the first few rects to see what's happening
+            if (import.meta.env.DEV && idx < 3) {
+              console.log('Render rect calculation:', {
+                highlightId: highlight.id,
+                rectIndex: idx,
+                viewportRect: rect,
+                renderScaleX,
+                renderScaleY,
+                renderRect
+              })
+            }
+            
+            return renderRect
+          })
           .filter(rect => {
             const isValid = Number.isFinite(rect.x) &&
               Number.isFinite(rect.y) &&
@@ -658,8 +674,15 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
               rect.width > RECT_SIZE_EPSILON &&
               rect.height > RECT_SIZE_EPSILON
             
-            if (!isValid && import.meta.env.DEV) {
-              console.warn('Filtered out invalid render rect:', rect)
+            if (!isValid) {
+              console.error('❌ Filtered out invalid render rect:', rect, {
+                highlightId: highlight.id,
+                hasCanvas: !!canvas,
+                actualCanvasWidth,
+                actualCanvasHeight,
+                renderScaleX,
+                renderScaleY
+              })
             }
             
             return isValid
@@ -740,11 +763,26 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
       return null
     }
     
-    console.log('mapHighlightToRenderData: Returning data for highlight', highlight.id, {
+    console.log('✅ mapHighlightToRenderData: Returning data for highlight', highlight.id, {
       scaledRectsCount: scaledRectsRaw.length,
       firstRect: scaledRectsRaw[0],
-      pageNumber: highlight.page_number
+      allRects: scaledRectsRaw.slice(0, 3).map(r => ({ x: r.x, y: r.y, w: r.width, h: r.height })),
+      pageNumber: highlight.page_number,
+      scrollMode: pdfViewer.scrollMode
     })
+    
+    if (scaledRectsRaw.length > 0) {
+      const firstRect = scaledRectsRaw[0]
+      // Warn if coordinates seem way off (likely rendering issue)
+      if (firstRect.y > 10000 || firstRect.x > 10000 || firstRect.y < -1000 || firstRect.x < -1000) {
+        console.error('⚠️ SUSPICIOUS COORDINATES - Highlight might be off-screen!', {
+          highlightId: highlight.id,
+          firstRect,
+          pageNumber: highlight.page_number,
+          scrollMode: pdfViewer.scrollMode
+        })
+      }
+    }
 
     // Detect multi-column layouts by measuring typical rect width
     const averageRectWidth = scaledRectsRaw.reduce((sum, rect) => sum + rect.width, 0) / scaledRectsRaw.length
