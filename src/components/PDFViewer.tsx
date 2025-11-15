@@ -4961,29 +4961,44 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
                           }}
                         >
                           {pageHighlightData.flatMap(data =>
-                            data.scaledRects.map((rect, idx) => (
-                              <div
-                                key={`${data.highlight.id}-rect-${idx}`}
-                                className="absolute"
-                                style={{
-                                  left: `${rect.x}px`,
-                                  top: `${rect.y}px`,
-                                  width: `${rect.width}px`,
-                                  height: `${rect.height}px`,
-                                  backgroundColor: data.highlight.color_hex,
-                                  opacity: data.highlight.is_orphaned ? 0.2 : 0.35,
-                                  pointerEvents: 'none',
-                                  transformOrigin: '0 0',
-                                  borderRadius: '2px',
-                                  mixBlendMode: 'multiply',
-                                  outline: data.outlineStyle,
-                                  outlineOffset: data.outlineOffset,
-                                  zIndex: 3
-                                }}
-                                title={data.highlight.is_orphaned ? `Orphaned: ${data.highlight.orphaned_reason}` : data.highlight.highlighted_text}
-                                data-highlight-id={data.highlight.id}
-                              />
-                            ))
+                            data.scaledRects.map((rect, idx) => {
+                              // Log first few renders to debug positioning
+                              if (idx < 2) {
+                                console.log('🎨 RENDERING highlight rect (continuous):', {
+                                  highlightId: data.highlight.id,
+                                  rectIndex: idx,
+                                  coords: { x: rect.x, y: rect.y, w: rect.width, h: rect.height },
+                                  pageNumber: pageNum
+                                })
+                              }
+                              
+                              return (
+                                <div
+                                  key={`${data.highlight.id}-rect-${idx}`}
+                                  className="absolute"
+                                  style={{
+                                    left: `${rect.x}px`,
+                                    top: `${rect.y}px`,
+                                    width: `${rect.width}px`,
+                                    height: `${rect.height}px`,
+                                    backgroundColor: data.highlight.color_hex || '#ffff00', // Fallback yellow
+                                    opacity: data.highlight.is_orphaned ? 0.2 : 0.5, // Increased opacity for visibility
+                                    pointerEvents: 'none',
+                                    transformOrigin: '0 0',
+                                    borderRadius: '2px',
+                                    mixBlendMode: 'multiply',
+                                    outline: data.outlineStyle || '1px solid red', // Force outline for debugging
+                                    outlineOffset: data.outlineOffset || 0,
+                                    zIndex: 999, // Very high z-index to ensure visibility
+                                    border: '1px solid rgba(255,0,0,0.5)' // Red border for debugging
+                                  }}
+                                  title={`HIGHLIGHT DEBUG (continuous): x:${rect.x}, y:${rect.y}, w:${rect.width}, h:${rect.height}`}
+                                  data-highlight-id={data.highlight.id}
+                                  data-debug-rect={idx}
+                                  data-page-number={pageNum}
+                                />
+                              )
+                            })
                           )}
                         </div>
                         {pageHighlightData.map(data => (
