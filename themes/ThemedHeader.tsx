@@ -13,7 +13,12 @@ import {
   FileText,
   Volume2,
   StickyNote,
-  Library
+  Library,
+  Filter,
+  ArrowUpDown,
+  LayoutGrid,
+  List,
+  Rows
 } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { TypographySettings } from '../src/components/TypographySettings'
@@ -46,7 +51,9 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     setCurrentDocument,
     isRightSidebarOpen,
     setIsRightSidebarOpen,
-    setRightSidebarTab
+    setRightSidebarTab,
+    libraryView,
+    setLibraryView
   } = useAppStore()
 
   const [showSettings, setShowSettings] = useState(false)
@@ -55,6 +62,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
   const [showLibrary, setShowLibrary] = useState(false)
   const [showAuth, setShowAuth] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
 
   const handleLogout = async () => {
     await logout()
@@ -157,52 +165,61 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
 
   const tierLabel = useMemo(() => user?.tier?.toUpperCase() ?? 'STANDARD', [user?.tier])
 
+  // Determine if we should show the Page Header (Library page)
+  const isLibraryPage = !currentDocument
+  const shouldShowPageHeader = isLibraryPage
+
+  const handleSortChange = () => {
+    // Toggle sort order or open sort menu
+    const newOrder = libraryView.sortOrder === 'asc' ? 'desc' : 'asc'
+    setLibraryView({ sortOrder: newOrder })
+  }
+
+  const handleViewModeChange = (mode: 'grid' | 'list' | 'comfortable') => {
+    setLibraryView({ viewMode: mode })
+  }
+
+  const viewModeOptions = [
+    { value: 'list' as const, icon: List, label: 'List' },
+    { value: 'grid' as const, icon: LayoutGrid, label: 'Grid' },
+    { value: 'comfortable' as const, icon: Rows, label: 'Focus' }
+  ]
+
   return (
     <header
       ref={headerRef}
       className="sticky top-0 z-50"
       style={{
         background: 'linear-gradient(180deg, var(--color-surface) 0%, rgba(17, 24, 39, 0.95) 100%)',
-        borderBottom: '1px solid var(--color-border)',
-        padding: 'var(--spacing-md) var(--spacing-lg)',
+        borderBottom: shouldShowPageHeader ? 'none' : '1px solid var(--color-border)',
         backdropFilter: 'blur(10px)'
       }}
     >
-      <div className="flex w-full flex-col gap-3">
-        <div className="flex w-full flex-wrap items-center justify-between gap-3">
-          {/* Left: Logo & Brand (Home Button) */}
-          <div className="flex min-w-0 items-center">
-            <button
-              onClick={handleLogoClick}
-              className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:opacity-80"
-              style={{ color: 'var(--color-text-primary)' }}
-              aria-label="Home"
-            >
-              <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-6 w-6" />
-              <span className="text-sm font-semibold tracking-[0.18em]" style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}>
-                ryzomatics
-              </span>
-            </button>
-          </div>
+      {/* Tier 1: App Shell - Global Header */}
+      <div
+        className="flex w-full flex-wrap items-center justify-between gap-3"
+        style={{
+          padding: 'var(--spacing-md) var(--spacing-lg)',
+          borderBottom: shouldShowPageHeader ? '1px solid var(--color-border)' : 'none'
+        }}
+      >
+        {/* Left: Logo & Brand (Home Button) */}
+        <div className="flex min-w-0 items-center">
+          <button
+            onClick={handleLogoClick}
+            className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:opacity-80"
+            style={{ color: 'var(--color-text-primary)' }}
+            aria-label="Home"
+          >
+            <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-6 w-6" />
+            <span className="text-sm font-semibold tracking-[0.18em]" style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}>
+              ryzomatics
+            </span>
+          </button>
+        </div>
 
-          {/* Center: Page Title */}
-          <div className="flex flex-1 items-center justify-center">
-            {!currentDocument && (
-              <button
-                onClick={openLibrary}
-                className="flex items-center gap-2 rounded-lg px-3 py-1.5 transition-colors hover:opacity-80"
-                style={{ color: 'var(--color-text-primary)' }}
-                aria-label="Open Library"
-              >
-                <Library className="h-5 w-5" />
-                <h1 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>
-                  Library
-                </h1>
-              </button>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
+        {/* Right: Global Actions */}
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
             {user && currentDocument && isTimerPristine && (
               <Tooltip content="Start Pomodoro timer" position="bottom">
                 <button
@@ -403,10 +420,109 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
           </div>
         </div>
 
+        {/* Tier 2: Page Header - Contextual Tools */}
+        {shouldShowPageHeader && (
+          <div
+            className="flex w-full items-center justify-between gap-3 border-b pb-3"
+            style={{
+              padding: '0 var(--spacing-lg)',
+              paddingTop: 'var(--spacing-md)',
+              borderColor: 'var(--color-border)'
+            }}
+          >
+            {/* Left: Page Title */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={openLibrary}
+                className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:opacity-80"
+                style={{ color: 'var(--color-text-primary)' }}
+                aria-label="Open Library"
+              >
+                <Library className="h-5 w-5" />
+                <h1 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>
+                  Library
+                </h1>
+              </button>
+            </div>
+
+            {/* Right: Page-specific Actions */}
+            <div className="flex items-center gap-2">
+              {/* Filter Button */}
+              <Tooltip content="Filters" position="bottom">
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                    showFilters ? 'ring-2' : ''
+                  }`}
+                  style={{
+                    color: showFilters ? 'var(--color-primary)' : 'var(--color-text-primary)',
+                    backgroundColor: showFilters ? 'var(--color-primary-light)' : 'transparent',
+                    borderColor: 'var(--color-border)',
+                    border: '1px solid var(--color-border)',
+                    ringColor: showFilters ? 'var(--color-primary)' : 'transparent'
+                  }}
+                  aria-label="Toggle filters"
+                >
+                  <Filter className="h-4 w-4" />
+                </button>
+              </Tooltip>
+
+              {/* Sort Button */}
+              <Tooltip content={`Sort by ${libraryView.sortBy} (${libraryView.sortOrder})`} position="bottom">
+                <button
+                  onClick={handleSortChange}
+                  className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+                  style={{
+                    color: 'var(--color-text-primary)',
+                    borderColor: 'var(--color-border)',
+                    border: '1px solid var(--color-border)'
+                  }}
+                  aria-label="Sort"
+                >
+                  <ArrowUpDown className="h-4 w-4" />
+                  <span>Sort By...</span>
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+              </Tooltip>
+
+              {/* View Mode Toggle */}
+              <div className="flex items-center gap-1 rounded-lg border p-1" style={{ borderColor: 'var(--color-border)' }}>
+                {viewModeOptions.map((option) => {
+                  const Icon = option.icon
+                  const isActive = libraryView.viewMode === option.value
+                  return (
+                    <Tooltip key={option.value} content={option.label} position="bottom">
+                      <button
+                        onClick={() => handleViewModeChange(option.value)}
+                        className={`p-1.5 rounded transition-colors ${
+                          isActive ? '' : ''
+                        }`}
+                        style={{
+                          backgroundColor: isActive ? 'var(--color-primary-light)' : 'transparent',
+                          color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)'
+                        }}
+                        aria-label={option.label}
+                        aria-pressed={isActive}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </button>
+                    </Tooltip>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         {currentDocument && (
           <div
             className="flex flex-wrap items-center justify-between gap-3 border-t pt-3"
-            style={{ borderColor: 'var(--color-border)' }}
+            style={{
+              borderColor: 'var(--color-border)',
+              padding: 'var(--spacing-md) var(--spacing-lg)',
+              paddingTop: 'var(--spacing-md)',
+              paddingBottom: 'var(--spacing-md)'
+            }}
           >
             <div className="flex min-w-0 items-center gap-3">
               <button
