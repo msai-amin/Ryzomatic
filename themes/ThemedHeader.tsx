@@ -186,6 +186,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
   ]
 
   return (
+    <>
     <header
       ref={headerRef}
       className="sticky top-0 z-50"
@@ -894,5 +895,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
           </div>,
           document.body
         )}
+    </>
   )
 }
