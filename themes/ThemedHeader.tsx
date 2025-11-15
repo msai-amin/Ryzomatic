@@ -586,7 +586,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             </div>
           </div>
         )}
-      </div>
+    </header>
 
       {showAuth && (
         <AuthModal
@@ -894,6 +894,5 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
           </div>,
           document.body
         )}
-    </header>
   )
 }
