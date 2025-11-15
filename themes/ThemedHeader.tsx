@@ -8,7 +8,6 @@ import {
   Sparkles,
   Timer,
   HelpCircle,
-  ChevronLeft,
   ChevronDown,
   X,
   FileText,
@@ -189,9 +188,17 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
           {/* Center: Page Title */}
           <div className="flex flex-1 items-center justify-center">
             {!currentDocument && (
-              <h1 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>
-                Library
-              </h1>
+              <button
+                onClick={openLibrary}
+                className="flex items-center gap-2 rounded-lg px-3 py-1.5 transition-colors hover:opacity-80"
+                style={{ color: 'var(--color-text-primary)' }}
+                aria-label="Open Library"
+              >
+                <Library className="h-5 w-5" />
+                <h1 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>
+                  Library
+                </h1>
+              </button>
             )}
           </div>
 
@@ -404,12 +411,13 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             <div className="flex min-w-0 items-center gap-3">
               <button
                 onClick={handleBackToLibrary}
-                className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm transition-colors"
-                style={{ color: 'var(--color-text-secondary)' }}
+                className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+                style={{ color: 'var(--color-text-primary)' }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                aria-label="Back to Library"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <Library className="h-4 w-4" />
                 <span>Library</span>
               </button>
               <span
