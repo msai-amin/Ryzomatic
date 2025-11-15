@@ -585,10 +585,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
           }
           const viewportRect = scaledToViewport(correctedRect, baseViewport, highlight.position_data.usePdfCoordinates ?? false)
           
-          if (import.meta.env.DEV) {
-            console.debug('Scaled to viewport conversion:', {
-              scaled: correctedRect,
-              viewport: viewportRect
+          // CRITICAL DEBUG: Log the conversion to see what's happening
+          if (import.meta.env.DEV && idx < 2) {
+            console.log('🔍 scaledToViewport conversion:', {
+              highlightId: highlight.id,
+              rectIndex: idx,
+              inputScaled: correctedRect,
+              baseViewport: { width: baseViewport.width, height: baseViewport.height, scale: baseViewport.scale },
+              outputViewport: viewportRect
             })
           }
           
@@ -627,18 +631,27 @@ export const PDFViewer: React.FC<PDFViewerProps> = () => {
         const renderScaleY = actualCanvasHeight / baseViewport.height
         
         if (import.meta.env.DEV) {
-          console.log('mapHighlightToRenderData: Render scale calculation:', {
+          console.log('🔍 mapHighlightToRenderData: Render scale calculation:', {
             highlightId: highlight.id,
             pageNumber: highlight.page_number,
             scrollMode: pdfViewer.scrollMode,
             hasCanvas: !!canvas,
+            canvasStyleWidth: canvas ? canvas.style.width : 'N/A',
+            canvasStyleHeight: canvas ? canvas.style.height : 'N/A',
             actualCanvasWidth,
             actualCanvasHeight,
             baseViewportWidth: baseViewport.width,
             baseViewportHeight: baseViewport.height,
+            currentScale,
             renderScaleX,
             renderScaleY,
-            firstViewportRect: viewportRectsToUse[0]
+            firstViewportRect: viewportRectsToUse[0],
+            firstRenderRect: viewportRectsToUse[0] ? {
+              x: viewportRectsToUse[0].left * renderScaleX,
+              y: viewportRectsToUse[0].top * renderScaleY,
+              w: viewportRectsToUse[0].width * renderScaleX,
+              h: viewportRectsToUse[0].height * renderScaleY
+            } : null
           })
         }
         
