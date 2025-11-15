@@ -17,7 +17,8 @@
     "test:e2e:debug": "playwright test --debug",
     "test:all": "npm run test && npm run test:e2e",
     "test:ci": "vitest run --coverage",
-    "test:e2e:ci": "playwright test --reporter=json"
+    "test:e2e:ci": "playwright test --reporter=json",
+    "check-env": "node scripts/check-env.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.901.0",
@@ -48,7 +49,7 @@
     "natural": "^8.1.0",
     "neo4j-driver": "^6.0.0",
     "openai": "^4.20.1",
-    "pdfjs-dist": "^5.4.296",
+    "pdfjs-dist": "^3.11.174",
     "prismjs": "^1.30.0",
     "react-pdf-highlighter-extended": "^8.1.0",
     "react": "^18.2.0",

@@ -462,8 +462,30 @@ class SupabaseStorageService {
               logger.info('Extracting pageTexts for TTS functionality', context);
               const { extractStructuredText } = await import('../utils/pdfTextExtractor');
               
-              // Import PDF.js dynamically
-              const pdfjsLib = await import('pdfjs-dist');
+              // Use globalThis.pdfjsLib if available (set in main.tsx), otherwise try dynamic import
+              let pdfjsLib: any
+              let getDocument: any
+              
+              if (typeof globalThis !== 'undefined' && (globalThis as any).pdfjsLib) {
+                pdfjsLib = (globalThis as any).pdfjsLib
+                getDocument = pdfjsLib.getDocument
+                
+                // Verify getDocument exists, fallback if not
+                if (!getDocument || typeof getDocument !== 'function') {
+                  const pdfjsModule = await import('pdfjs-dist')
+                  pdfjsLib = pdfjsModule.default || pdfjsModule
+                  getDocument = pdfjsLib.getDocument || pdfjsModule.getDocument
+                }
+              } else {
+                const pdfjsModule = await import('pdfjs-dist')
+                pdfjsLib = pdfjsModule.default || pdfjsModule
+                getDocument = pdfjsLib.getDocument || pdfjsModule.getDocument
+              }
+              
+              if (!getDocument || typeof getDocument !== 'function') {
+                throw new Error('getDocument function not found in PDF.js module');
+              }
+              
               configurePDFWorker(pdfjsLib);
               
               // CRITICAL: Create a copy of the ArrayBuffer to prevent detachment
@@ -471,7 +493,7 @@ class SupabaseStorageService {
               const pdfDataCopy = book.fileData.slice(0);
               
               // Load PDF and extract text using the copy
-              const pdf = await pdfjsLib.getDocument({ data: pdfDataCopy }).promise;
+              const pdf = await getDocument({ data: pdfDataCopy }).promise;
               const pageTexts: string[] = [];
               
               for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {

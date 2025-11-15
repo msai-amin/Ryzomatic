@@ -1,10 +1,79 @@
 /**
  * Highlight Service
  * Manages highlight CRUD operations, caching, and syncing with backend
+ * 
+ * Updated to use react-pdf-viewer's HighlightArea format with percentage-based coordinates
  */
 
 import { authService } from './supabaseAuthService';
 
+/**
+ * HighlightArea format from react-pdf-viewer
+ * Uses percentage-based coordinates (0-100) instead of pixels
+ * This eliminates scaling issues and ensures highlights are always correctly positioned
+ */
+export interface HighlightArea {
+  height: number;    // Percentage (0-100)
+  left: number;      // Percentage (0-100)
+  pageIndex: number; // Zero-based page index
+  top: number;       // Percentage (0-100)
+  width: number;     // Percentage (0-100)
+}
+
+/**
+ * DivText format from react-pdf-viewer
+ * Represents a text div on a page
+ */
+export interface DivText {
+  pageIndex: number;
+  divIndex: number;
+  textContent: string;
+}
+
+/**
+ * SelectionData format from react-pdf-viewer
+ * Tracks text selection with precise offsets for text matching
+ */
+export interface SelectionData {
+  divTexts: DivText[];
+  selectedText: string;
+  startPageIndex: number;
+  endPageIndex: number;
+  startOffset: number;
+  startDivIndex: number;
+  endOffset: number;
+  endDivIndex: number;
+}
+
+/**
+ * HighlightPosition using react-pdf-viewer format
+ * Stores highlight areas as percentages and selection data for text matching
+ */
+export interface HighlightPosition {
+  highlightAreas: HighlightArea[];
+  selectionData?: SelectionData;
+  // Legacy support - will be removed after migration
+  scaledBoundingRect?: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    width: number;
+    height: number;
+    pageNumber: number;
+  };
+  scaledRects?: Array<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    width: number;
+    height: number;
+    pageNumber: number;
+  }>;
+}
+
+// Legacy interfaces for backward compatibility during migration
 export interface HighlightRect {
   x: number;
   y: number;
@@ -20,15 +89,6 @@ export interface ScaledHighlightRect {
   width: number;
   height: number;
   pageNumber: number;
-  usePdfCoordinates?: boolean;
-}
-
-export interface HighlightPosition extends HighlightRect {
-  rects?: HighlightRect[];
-  scaleX?: number;
-  scaleY?: number;
-  scaledBoundingRect?: ScaledHighlightRect;
-  scaledRects?: ScaledHighlightRect[];
   usePdfCoordinates?: boolean;
 }
 

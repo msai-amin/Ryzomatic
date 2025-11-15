@@ -18,23 +18,53 @@ const supabaseAnonKey =
 console.log('=== Supabase Environment Variables Debug ===');
 console.log('VITE_SUPABASE_URL:', supabaseUrl);
 console.log('VITE_SUPABASE_ANON_KEY present:', !!supabaseAnonKey);
+console.log('VITE_SUPABASE_ANON_KEY is placeholder:', supabaseAnonKey?.includes('your_') || supabaseAnonKey?.includes('_here'));
 console.log('All env vars:', import.meta.env);
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables:');
-  console.error('URL:', supabaseUrl);
-  console.error('Key present:', !!supabaseAnonKey);
-  console.warn('Running without Supabase - some features may not work');
+// Check if the key is a placeholder
+const isPlaceholderKey = supabaseAnonKey?.includes('your_') || 
+                         supabaseAnonKey?.includes('_here') || 
+                         supabaseAnonKey?.includes('_key_here') ||
+                         !supabaseAnonKey ||
+                         supabaseAnonKey.length < 50; // Real JWT keys are much longer
+
+if (!supabaseUrl || !supabaseAnonKey || isPlaceholderKey) {
+  console.error('❌ Missing or Invalid Supabase environment variables:');
+  console.error('   URL:', supabaseUrl || 'NOT SET');
+  console.error('   Anon Key:', supabaseAnonKey ? (isPlaceholderKey ? 'PLACEHOLDER (NOT VALID)' : 'SET') : 'NOT SET');
+  
+  if (isPlaceholderKey && supabaseAnonKey) {
+    console.error('   ⚠️  The anon key appears to be a placeholder value!');
+    console.error('   ⚠️  Replace it with your actual Supabase anon key from the dashboard');
+  }
+  
+  console.warn('⚠️  Running without Supabase - authentication and database features will not work');
+  
   if (import.meta.env.DEV) {
-    console.warn('Development mode: Supabase not configured');
+    console.warn('📝 To fix this for local development:');
+    console.warn('   1. Open .env.local file in the project root');
+    console.warn('   2. Replace VITE_SUPABASE_ANON_KEY with your actual key');
+    console.warn('   3. Get your key from: https://supabase.com/dashboard/project/pbfipmvtkbivnwwgukpw/settings/api');
+    console.warn('   4. Look for "anon public" key (starts with eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...)');
+    console.warn('   5. Copy the full key and paste it in .env.local');
+    console.warn('   6. Restart the dev server after updating the key');
+    console.warn('   7. See LOCAL_AUTH_SETUP.md or QUICK_START_LOCAL_AUTH.md for detailed instructions');
   }
 }
 
 const authStorage =
   typeof window !== 'undefined' ? window.localStorage : undefined;
 
+// Don't initialize Supabase if the key is a placeholder
+// This prevents confusing errors when authentication is attempted
+const isValidKey = supabaseAnonKey && 
+                   !supabaseAnonKey.includes('your_') && 
+                   !supabaseAnonKey.includes('_here') && 
+                   !supabaseAnonKey.includes('_key_here') &&
+                   supabaseAnonKey.length >= 50; // Real JWT keys are much longer
+
 export const supabase =
-  supabaseUrl && supabaseAnonKey
+  supabaseUrl && isValidKey
     ? createClient(supabaseUrl, supabaseAnonKey, {
         auth: {
           persistSession: true,
@@ -45,6 +75,13 @@ export const supabase =
         },
       })
     : null;
+
+// Log warning if Supabase is not initialized due to invalid key
+if (!supabase && supabaseUrl && supabaseAnonKey && !isValidKey) {
+  console.warn('⚠️  Supabase client not initialized: API key appears to be a placeholder');
+  console.warn('   Please update .env.local with your actual Supabase anon key');
+  console.warn('   Get it from: https://supabase.com/dashboard/project/pbfipmvtkbivnwwgukpw/settings/api');
+}
 
 export interface AuthUser {
   id: string;
@@ -70,6 +107,12 @@ class SupabaseAuthService {
    * Sign up with email and password
    */
   async signUp(data: SignUpData) {
+    if (!supabase) {
+      throw new Error(
+        'Authentication is not configured. Please update VITE_SUPABASE_ANON_KEY in .env.local with your actual Supabase API key.'
+      );
+    }
+    
     const { email, password, fullName } = data;
     
     const { data: authData, error } = await supabase.auth.signUp({
@@ -93,6 +136,12 @@ class SupabaseAuthService {
    * Sign in with email and password
    */
   async signIn(data: SignInData) {
+    if (!supabase) {
+      throw new Error(
+        'Authentication is not configured. Please update VITE_SUPABASE_ANON_KEY in .env.local with your actual Supabase API key.'
+      );
+    }
+    
     const { email, password } = data;
     
     const { data: authData, error } = await supabase.auth.signInWithPassword({
@@ -111,6 +160,24 @@ class SupabaseAuthService {
    * Sign in with Google OAuth
    */
   async signInWithGoogle() {
+    // Check if Supabase is initialized
+    if (!supabase) {
+      const isPlaceholderKey = supabaseAnonKey?.includes('your_') || 
+                               supabaseAnonKey?.includes('_here') || 
+                               supabaseAnonKey?.includes('_key_here') ||
+                               !supabaseAnonKey ||
+                               supabaseAnonKey.length < 50;
+      
+      if (isPlaceholderKey) {
+        throw new Error(
+          'Authentication is not configured. Please update VITE_SUPABASE_ANON_KEY in .env.local with your actual Supabase API key. ' +
+          'Get it from: https://supabase.com/dashboard/project/pbfipmvtkbivnwwgukpw/settings/api'
+        );
+      } else {
+        throw new Error('Supabase is not initialized. Please check your environment variables.');
+      }
+    }
+    
     // Always use current origin to avoid redirect issues
     // This ensures localhost stays on localhost and production stays on production
     const redirectUrl = window.location.origin;
@@ -279,6 +346,12 @@ class SupabaseAuthService {
    */
   async processOAuthCallback(): Promise<boolean> {
     try {
+      if (!supabase) {
+        console.error('Cannot process OAuth callback: Supabase client not initialized');
+        console.error('Make sure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set correctly');
+        return false;
+      }
+      
       console.log('Processing OAuth callback manually...');
       
       // Extract tokens from URL hash
@@ -294,6 +367,21 @@ class SupabaseAuthService {
         return false;
       }
       
+      // Check if Supabase client is properly configured
+      const isPlaceholderKey = supabaseAnonKey?.includes('your_') || 
+                               supabaseAnonKey?.includes('_here') || 
+                               supabaseAnonKey?.includes('_key_here') ||
+                               !supabaseAnonKey ||
+                               supabaseAnonKey.length < 50;
+      
+      if (isPlaceholderKey) {
+        console.error('❌ Cannot process OAuth callback: Invalid Supabase API key');
+        console.error('   The VITE_SUPABASE_ANON_KEY appears to be a placeholder');
+        console.error('   Please update .env.local with your actual Supabase anon key');
+        console.error('   Get it from: https://supabase.com/dashboard/project/pbfipmvtkbivnwwgukpw/settings/api');
+        return false;
+      }
+      
       // Set the session manually using the tokens from the URL
       const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
         access_token: accessToken,
@@ -301,7 +389,11 @@ class SupabaseAuthService {
       });
       
       if (sessionError) {
-        console.error('Session error:', sessionError);
+        console.error('❌ Session error:', sessionError);
+        if (sessionError.message.includes('Invalid API key') || sessionError.message.includes('401')) {
+          console.error('   This usually means VITE_SUPABASE_ANON_KEY is incorrect or placeholder');
+          console.error('   Please check your .env.local file and ensure the key is correct');
+        }
         return false;
       }
       
@@ -313,7 +405,7 @@ class SupabaseAuthService {
       console.log('❌ No session created');
       return false;
     } catch (error) {
-      console.error('Error processing OAuth callback:', error);
+      console.error('❌ Error processing OAuth callback:', error);
       return false;
     }
   }

@@ -70,8 +70,10 @@ export default defineConfig(({ mode }) => ({
         global: 'globalThis',
       },
     },
+    include: [
+      'pdfjs-dist' // Include pdfjs-dist in optimization to ensure proper module structure
+    ],
     exclude: [
-      'pdfjs-dist',
       'pdfjs-dist/web/pdf_viewer.mjs',
       '@google-cloud/text-to-speech',
       '@google-cloud/storage',

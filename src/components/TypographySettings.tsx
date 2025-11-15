@@ -34,7 +34,7 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
     updateTypography({ maxWidth })
   }
 
-  const handleThemeChange = (theme: 'light' | 'dark' | 'sepia') => {
+  const handleThemeChange = (theme: 'light' | 'dark' | 'sepia' | 'reading') => {
     updateTypography({ theme })
   }
 
@@ -167,23 +167,30 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
               <Palette className="w-4 h-4" />
               <span>Theme</span>
             </label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               {[
                 { value: 'light', label: 'Light', preview: '☀️' },
                 { value: 'dark', label: 'Dark', preview: '🌙' },
-                { value: 'sepia', label: 'Sepia', preview: '📜' }
-              ].map(({ value, label, preview }) => (
+                { value: 'sepia', label: 'Sepia', preview: '📜' },
+                { value: 'reading', label: 'Reading', preview: '📖', description: 'Optimized for monitors' }
+              ].map(({ value, label, preview, description }) => (
                 <button
                   key={value}
                   onClick={() => handleThemeChange(value as any)}
                   className={`p-3 rounded-lg border text-center transition-colors ${
                     typography.theme === value
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-300 hover:border-gray-400 text-transparent'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                      : 'border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-500'
                   }`}
+                  style={{
+                    color: typography.theme === value ? undefined : 'var(--color-text-primary)'
+                  }}
                 >
                   <div className="text-2xl mb-1">{preview}</div>
-                  <div className="text-sm">{label}</div>
+                  <div className="text-sm font-medium">{label}</div>
+                  {description && (
+                    <div className="text-xs mt-1 opacity-70">{description}</div>
+                  )}
                 </button>
               ))}
             </div>

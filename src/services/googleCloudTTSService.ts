@@ -75,19 +75,47 @@ class GoogleCloudTTSService {
 
   constructor() {
     // Get API key from environment
-    this.apiKey = import.meta.env.VITE_GOOGLE_CLOUD_TTS_API_KEY || null;
+    const rawApiKey = import.meta.env.VITE_GOOGLE_CLOUD_TTS_API_KEY || null;
+    
+    // Check if API key is a placeholder (not a real key)
+    const isPlaceholderKey = rawApiKey && (
+      rawApiKey.includes('your_') || 
+      rawApiKey.includes('_here') || 
+      rawApiKey.includes('_key_here') ||
+      rawApiKey.length < 20 // Real API keys are longer
+    );
+    
+    // Only set API key if it's not a placeholder
+    this.apiKey = (rawApiKey && !isPlaceholderKey) ? rawApiKey : null;
+    
+    if (isPlaceholderKey && rawApiKey) {
+      console.warn('⚠️  Google Cloud TTS API key appears to be a placeholder');
+      console.warn('   TTS will fall back to native browser TTS');
+      console.warn('   To enable Google Cloud TTS, update VITE_GOOGLE_CLOUD_TTS_API_KEY in .env.local');
+    }
     
     // Initialize audio context
     if (typeof window !== 'undefined' && window.AudioContext) {
       this.audioContext = new AudioContext();
     }
     
-    // Set default voice if configured
-    this.setDefaultVoice();
+    // Set default voice only if properly configured
+    if (this.isConfigured()) {
+      this.setDefaultVoice().catch(error => {
+        console.warn('Failed to initialize Google Cloud TTS voices:', error);
+        // If initialization fails, clear the API key to force fallback
+        this.apiKey = null;
+      });
+    }
   }
 
   isConfigured(): boolean {
-    return this.apiKey !== null && this.apiKey.length > 0;
+    // Check if API key exists and is not a placeholder
+    return this.apiKey !== null && 
+           this.apiKey.length > 0 && 
+           !this.apiKey.includes('your_') && 
+           !this.apiKey.includes('_here') &&
+           this.apiKey.length >= 20; // Real API keys are longer
   }
 
   // Set a default natural voice
@@ -191,7 +219,12 @@ class GoogleCloudTTSService {
 
   async getVoices(): Promise<GoogleCloudVoice[]> {
     if (!this.isConfigured()) {
-      throw new Error('Google Cloud TTS API key not configured');
+      throw new Error('Google Cloud TTS API key not configured or is invalid');
+    }
+    
+    // Double-check API key is valid before making request
+    if (!this.apiKey || this.apiKey.includes('your_') || this.apiKey.includes('_here')) {
+      throw new Error('Google Cloud TTS API key is invalid or placeholder');
     }
 
     try {

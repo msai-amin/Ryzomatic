@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { authService, AuthUser } from '../services/supabaseAuthService'
 import { DocumentRelationshipWithDetails } from '../../lib/supabase'
-import { HighlightPosition as ServiceHighlightPosition } from '../services/highlightService'
+import { HighlightPosition as ServiceHighlightPosition, HighlightArea, SelectionData } from '../services/highlightService'
 
 export interface TextAnchors {
   startIndex?: number
@@ -86,7 +86,7 @@ export interface TypographySettings {
   fontSize: number
   lineHeight: number
   maxWidth: number
-  theme: 'light' | 'dark' | 'sepia'
+  theme: 'light' | 'dark' | 'sepia' | 'reading'
   textAlign: 'left' | 'justify' | 'center'
   spacingMultiplier: number
   focusMode: boolean
@@ -109,6 +109,7 @@ export interface PDFViewerSettings {
   showPageNumbers: boolean
   showProgress: boolean
   readingMode: boolean
+  darkMode: boolean
 }
 
 export interface LibraryFilters {
@@ -417,7 +418,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     scrollMode: 'single', // Default to One Page mode
     showPageNumbers: true,
     showProgress: true,
-    readingMode: false
+    readingMode: false,
+    darkMode: false
   },
   tts: {
     isEnabled: false,

@@ -690,11 +690,51 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
         fileSize: file.size
       });
 
-      // Dynamic import of PDF.js to avoid ES module issues with Vite
-      const pdfjsModule = await import('pdfjs-dist')
+      // Use globalThis.pdfjsLib if available (set in main.tsx), otherwise try dynamic import
+      let pdfjsLib: any
+      let getDocument: any
       
-      // Access the actual library - it might be under .default or directly available
-      const pdfjsLib = pdfjsModule.default || pdfjsModule
+      if (typeof globalThis !== 'undefined' && (globalThis as any).pdfjsLib) {
+        // Use the globally initialized PDF.js library
+        pdfjsLib = (globalThis as any).pdfjsLib
+        getDocument = pdfjsLib.getDocument
+        
+        // Verify getDocument exists
+        if (!getDocument || typeof getDocument !== 'function') {
+          logger.warn('globalThis.pdfjsLib exists but getDocument is missing, falling back to dynamic import', context, {
+            pdfjsLibType: typeof pdfjsLib,
+            hasGetDocument: !!getDocument,
+            pdfjsLibKeys: pdfjsLib ? Object.keys(pdfjsLib).slice(0, 15) : []
+          } as any)
+          
+          // Fallback to dynamic import
+          const pdfjsModule = await import('pdfjs-dist')
+          pdfjsLib = pdfjsModule.default || pdfjsModule
+          getDocument = pdfjsLib.getDocument || pdfjsModule.getDocument
+          logger.info('Using dynamic import fallback for PDF extraction', context)
+        } else {
+          logger.info('Using globalThis.pdfjsLib for PDF extraction', context, {
+            hasGetDocument: typeof getDocument === 'function'
+          } as any)
+        }
+      } else {
+        // Fallback to dynamic import if globalThis.pdfjsLib is not available
+        const pdfjsModule = await import('pdfjs-dist')
+        pdfjsLib = pdfjsModule.default || pdfjsModule
+        getDocument = pdfjsLib.getDocument || pdfjsModule.getDocument
+        logger.info('Using dynamic import for PDF extraction', context)
+      }
+      
+      if (!getDocument || typeof getDocument !== 'function') {
+        logger.error('PDF.js module structure', context, {
+          hasGlobalThis: !!(typeof globalThis !== 'undefined' && (globalThis as any).pdfjsLib),
+          pdfjsLibType: typeof pdfjsLib,
+          hasGetDocument: !!getDocument,
+          pdfjsLibKeys: pdfjsLib ? Object.keys(pdfjsLib).slice(0, 15) : [],
+          pdfjsLibHasGetDocument: pdfjsLib ? typeof pdfjsLib.getDocument : 'N/A'
+        } as any)
+        throw new Error('getDocument function not found in PDF.js module')
+      }
       
       // Set up PDF.js worker
       configurePDFWorker(pdfjsLib)
@@ -706,13 +746,6 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
       
       // For initial processing, read the file
       const arrayBuffer = await file.arrayBuffer()
-      
-      // Try to access getDocument from the module or its properties
-      const getDocument = pdfjsLib.getDocument || pdfjsModule.getDocument
-      
-      if (!getDocument) {
-        throw new Error('getDocument function not found in PDF.js module')
-      }
       
       // Load the PDF document for text extraction
       const pdf = await getDocument({ data: arrayBuffer }).promise
