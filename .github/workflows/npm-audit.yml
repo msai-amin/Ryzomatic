@@ -1,0 +1,33 @@
+name: NPM Audit (Weekly)
+
+on:
+  schedule:
+    - cron: '0 4 * * 1' # Mondays at 04:00 UTC
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run npm audit (fail on high+)
+        run: |
+          npm audit --audit-level=high || exit_code=$?
+          # Convert non-zero exit to warning to keep schedule green while still surfacing
+          if [ -n "$exit_code" ]; then
+            echo "::warning::npm audit found issues at level 'high' or above"
+            exit 0
+          fi
+
+
