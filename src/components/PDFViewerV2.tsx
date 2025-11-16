@@ -666,6 +666,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
               display: 'flex',
               gap: '8px',
               marginTop: '8px',
+              flexWrap: 'wrap'
             }}
           >
             <button
@@ -686,6 +687,97 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
               }}
             >
               Save
+            </button>
+            <button
+              style={{
+                backgroundColor: 'var(--color-surface-hover, #1f2937)',
+                border: '1px solid var(--color-border, #374151)',
+                borderRadius: '4px',
+                padding: '6px 12px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                color: 'var(--color-text-primary, #f9fafb)',
+                flex: 1
+              }}
+              onClick={() => {
+                // Ask AI clarification for the selected text
+                try {
+                  setSelectedTextContext({
+                    selectedText: props.selectedText,
+                    beforeContext: '',
+                    afterContext: '',
+                    pageNumber: (props.highlightAreas?.[0]?.pageIndex ?? 0) + 1,
+                    fullContext: props.selectedText
+                  })
+                  setChatMode('clarification')
+                  if (!isChatOpen) toggleChat()
+                } catch {}
+                props.cancel()
+              }}
+            >
+              Ask AI
+            </button>
+            <button
+              style={{
+                backgroundColor: 'var(--color-surface-hover, #1f2937)',
+                border: '1px solid var(--color-border, #374151)',
+                borderRadius: '4px',
+                padding: '6px 12px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                color: 'var(--color-text-primary, #f9fafb)',
+                flex: 1
+              }}
+              onClick={() => {
+                try {
+                  setSelectedTextContext({
+                    selectedText: props.selectedText,
+                    beforeContext: '',
+                    afterContext: '',
+                    pageNumber: (props.highlightAreas?.[0]?.pageIndex ?? 0) + 1,
+                    fullContext: props.selectedText
+                  })
+                  setChatMode('further-reading')
+                  if (!isChatOpen) toggleChat()
+                } catch {}
+                props.cancel()
+              }}
+            >
+              AI Suggestions
+            </button>
+            <button
+              style={{
+                backgroundColor: 'var(--color-surface-hover, #1f2937)',
+                border: '1px solid var(--color-border, #374151)',
+                borderRadius: '4px',
+                padding: '6px 12px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                color: 'var(--color-text-primary, #f9fafb)',
+                flex: 1
+              }}
+              onClick={async () => {
+                try {
+                  if (document.id && userId) {
+                    await notesService.createNote(
+                      userId,
+                      document.id,
+                      ((props.highlightAreas?.[0]?.pageIndex ?? 0) + 1),
+                      props.selectedText,
+                      'freeform',
+                      undefined,
+                      false
+                    )
+                    setIsRightSidebarOpen(true)
+                    setRightSidebarTab('notes')
+                  }
+                } catch (err) {
+                  console.error('Failed to save note from selection popover', err)
+                }
+                props.cancel()
+              }}
+            >
+              Save to Notes
             </button>
             <button
               style={{
@@ -1678,27 +1770,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             <Highlighter className="w-5 h-5" />
           </button>
           
-          {/* Flexible spacer to push progress bar to the right */}
-          <div className="flex-1" />
-          
-          {/* Document progress bar */}
-          <div className="min-w-[160px] flex items-center gap-2" title="Reading progress">
-            <div 
-              className="h-2 rounded w-full overflow-hidden"
-              style={{ backgroundColor: 'var(--color-surface-hover)', border: '1px solid var(--color-border)' }}
-            >
-              <div
-                className="h-full"
-                style={{ 
-                  width: `${Math.max(0, Math.min(100, Math.round(((pdfViewer.currentPage || 1) / Math.max(1, numPages || 1)) * 100))) }%`,
-                  backgroundColor: 'var(--color-primary)'
-                }}
-              />
-            </div>
-            <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-              {Math.max(1, Math.min(pdfViewer.currentPage || 1, numPages || 1))}/{numPages || 0}
-            </span>
-          </div>
         </div>
         
         
