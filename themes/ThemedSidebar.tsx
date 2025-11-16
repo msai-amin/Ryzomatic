@@ -295,7 +295,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
       >
         <div
           className={`flex items-center ${isOpen ? 'justify-between px-4' : 'justify-center px-2'} py-3 border-b`}
-          style={{ borderColor: 'var(--color-border)' }}
+          style={{ borderColor: 'var(--color-border)', minHeight: '60px' }}
         >
           <button
             onClick={onToggle}
