@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
-import { Viewer, Worker, DocumentLoadEvent, PageChangeEvent, ZoomEvent, RotateEvent, ScrollMode, RotateDirection } from '@react-pdf-viewer/core'
+import { Viewer, Worker, DocumentLoadEvent, PageChangeEvent, ZoomEvent, RotateEvent, ScrollMode } from '@react-pdf-viewer/core'
 import { highlightPlugin, HighlightArea, RenderHighlightTargetProps, RenderHighlightContentProps, RenderHighlightsProps, SelectionData } from '@react-pdf-viewer/highlight'
 import { scrollModePlugin } from '@react-pdf-viewer/scroll-mode'
 import { zoomPlugin } from '@react-pdf-viewer/zoom'
@@ -799,9 +799,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     const mode = (pdfViewer?.scrollMode === 'single' || pdfViewer?.scrollMode === 'continuous')
       ? pdfViewer.scrollMode
       : 'continuous'
-    var scrollModePluginInstance = scrollModePlugin({
-      scrollMode: mode === 'single' ? ScrollMode.Page : ScrollMode.Vertical,
-    })
+    var scrollModePluginInstance = scrollModePlugin()
   }
 
   // Create zoom plugin (do NOT wrap in useMemo)
@@ -925,7 +923,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             e.preventDefault()
             // Programmatically rotate forward
             // @ts-ignore - rotate is provided by plugin instance
-            rotatePluginInstance.rotate?.(RotateDirection.Forward)
+            rotatePluginInstance.rotate?.()
           }
           break
         case 'm':
@@ -1630,7 +1628,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           <button
             onClick={() => {
               // @ts-ignore
-              rotatePluginInstance.rotate?.(RotateDirection.Forward)
+              rotatePluginInstance.rotate?.()
             }}
             className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
             style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}

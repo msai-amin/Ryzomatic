@@ -400,7 +400,6 @@ ${content.substring(0, 5000)}`;
       if (!process.env.GEMINI_API_KEY) {
         return {
           success: false,
-          extracted: '' as any,
           extractedText: '',
           pageTexts: [],
           metadata: { tokensUsed: 0, creditsCharged: 0, processingTime: 0, pagesProcessed: 0 },
