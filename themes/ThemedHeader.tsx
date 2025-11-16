@@ -8,7 +8,6 @@ import {
   Sparkles,
   Timer,
   HelpCircle,
-  ChevronLeft,
   ChevronDown,
   X,
   FileText,
@@ -158,7 +157,9 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
 
   const tierLabel = useMemo(() => user?.tier?.toUpperCase() ?? 'STANDARD', [user?.tier])
 
+
   return (
+    <>
     <header
       ref={headerRef}
       className="sticky top-0 z-50"
@@ -169,38 +170,39 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
         backdropFilter: 'blur(10px)'
       }}
     >
-      <div className="flex w-full flex-col gap-3">
-        <div className="flex w-full flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-6">
-            <div
-              className="flex items-center gap-2 rounded-lg px-2 py-1"
-              style={{ color: 'var(--color-text-primary)' }}
-            >
-              <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-6 w-6" />
-              <span className="text-sm font-semibold tracking-[0.18em]" style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}>
-                ryzomatic
-              </span>
-            </div>
+      <div className="flex w-full flex-wrap items-center justify-between gap-6">
+        {/* Left: Logo & Brand (Home Button) */}
+        <div className="flex min-w-0 items-center gap-6">
+          <button
+            onClick={handleLogoClick}
+            className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:opacity-80"
+            style={{ color: 'var(--color-text-primary)' }}
+            aria-label="Home"
+          >
+            <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-6 w-6" />
+            <span className="text-sm font-semibold tracking-[0.18em]" style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}>
+              ryzomatics
+            </span>
+          </button>
 
-            <nav
-              className="flex items-center gap-4 text-sm font-medium"
-              style={{ color: 'var(--color-text-secondary)' }}
+          {/* Navigation: Library */}
+          <nav className="flex items-center">
+            <button
+              onClick={openLibrary}
+              className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]"
+              style={{ 
+                color: !currentDocument ? 'var(--color-primary)' : 'var(--color-text-primary)',
+              }}
+              aria-label="Open Library"
             >
-              <button
-                onClick={openLibrary}
-                className="transition-colors hover:text-[var(--color-text-primary)]"
-                style={{
-                  color: 'var(--color-text-primary)',
-                  letterSpacing: '0.04em'
-                }}
-              >
-                Library
-              </button>
-              {/* Future navigation links can be added here */}
-            </nav>
-          </div>
+              <Library className="h-4 w-4" />
+              <span>Library</span>
+            </button>
+          </nav>
+        </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
+        {/* Right: Global Actions */}
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
             {user && currentDocument && isTimerPristine && (
               <Tooltip content="Start Pomodoro timer" position="bottom">
                 <button
@@ -403,18 +405,22 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
 
         {currentDocument && (
           <div
-            className="flex flex-wrap items-center justify-between gap-3 border-t pt-3"
-            style={{ borderColor: 'var(--color-border)' }}
+            className="flex flex-wrap items-center justify-between gap-3 border-t pt-3 mt-3"
+            style={{
+              borderColor: 'var(--color-border)',
+              paddingTop: 'var(--spacing-md)'
+            }}
           >
             <div className="flex min-w-0 items-center gap-3">
               <button
                 onClick={handleBackToLibrary}
-                className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm transition-colors"
-                style={{ color: 'var(--color-text-secondary)' }}
+                className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+                style={{ color: 'var(--color-text-primary)' }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                aria-label="Back to Library"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <Library className="h-4 w-4" />
                 <span>Library</span>
               </button>
               <span
@@ -467,7 +473,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             </div>
           </div>
         )}
-      </div>
+    </header>
 
       {showAuth && (
         <AuthModal
@@ -775,6 +781,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
           </div>,
           document.body
         )}
-    </header>
+    </>
   )
 }
