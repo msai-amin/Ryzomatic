@@ -22,6 +22,13 @@ interface AudioWidgetProps {
 }
 
 export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
+  // Version marker to verify live bundle
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // eslint-disable-next-line no-console
+      console.log('🔊 AudioWidget version:', 'v2');
+    }
+  }, []);
   const {
     tts,
     updateTTS,
@@ -953,7 +960,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         onTouchStart={handleWidgetTouchStart}
       >
         {/* Playback Mode Selector - Show when expanded or always visible */}
-        <div className="flex items-center justify-center gap-1 px-3 pt-3 pb-2 border-b" style={{ borderColor: 'var(--color-border)' }}>
+        <div className="flex items-center justify-between px-3 pt-3 pb-2 border-b" style={{ borderColor: 'var(--color-border)' }}>
+          <div className="flex items-center gap-1">
           <button
             onClick={() => handlePlaybackModeChange('paragraph')}
             className={`px-2 py-1 text-xs font-medium rounded transition-all ${
@@ -993,6 +1001,15 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           >
             Continue
           </button>
+          </div>
+          {/* Visible version badge for prod verification */}
+          <span
+            className="text-[10px] px-2 py-0.5 rounded-full"
+            style={{ backgroundColor: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}
+            title="Audio Widget version"
+          >
+            TTS v2
+          </span>
         </div>
 
         {/* Compact Toggle Bar */}

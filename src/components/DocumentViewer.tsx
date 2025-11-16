@@ -74,8 +74,8 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ onUploadClick })
     return <EmptyState onUploadClick={onUploadClick} />
   }
 
-  // Use PDF viewer for PDF documents
-  if (currentDocument.type === 'pdf' && currentDocument.pdfData && currentDocument.totalPages) {
+  // Use PDF viewer for PDF documents (don't require totalPages; let viewer determine)
+  if (currentDocument.type === 'pdf') {
     console.log('📄 DocumentViewer: Rendering PDFViewerV2', {
       documentId: currentDocument.id,
       hasPdfData: !!currentDocument.pdfData,
