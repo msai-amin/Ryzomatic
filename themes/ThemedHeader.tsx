@@ -185,20 +185,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             </span>
           </button>
 
-          {/* Navigation: Library */}
-          <nav className="flex items-center">
-            <button
-              onClick={openLibrary}
-              className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]"
-              style={{ 
-                color: !currentDocument ? 'var(--color-primary)' : 'var(--color-text-primary)',
-              }}
-              aria-label="Open Library"
-            >
-              <Library className="h-4 w-4" />
-              <span>Library</span>
-            </button>
-          </nav>
+          {/* Removed Library breadcrumb from header */}
         </div>
 
         {/* Right: Global Actions */}
@@ -412,23 +399,34 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             }}
           >
             <div className="flex min-w-0 items-center gap-3">
-              <button
-                onClick={handleBackToLibrary}
-                className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
-                style={{ color: 'var(--color-text-primary)' }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                aria-label="Back to Library"
-              >
-                <Library className="h-4 w-4" />
-                <span>Library</span>
-              </button>
               <span
                 className="truncate text-sm font-medium"
                 style={{ color: 'var(--color-text-primary)' }}
+                title={currentDocument.name}
               >
                 {currentDocument.name}
               </span>
+              {/* Progress bar next to document name */}
+              {typeof pdfViewer?.numPages === 'number' && pdfViewer.numPages > 0 && (
+                <div className="flex items-center gap-2 min-w-[160px]">
+                  <div
+                    className="h-2 rounded w-28 sm:w-40 overflow-hidden"
+                    style={{ backgroundColor: 'var(--color-surface-hover)', border: '1px solid var(--color-border)' }}
+                    aria-label="Reading progress"
+                  >
+                    <div
+                      className="h-full"
+                      style={{
+                        width: `${Math.round((Math.max(1, Math.min(pdfViewer.currentPage || 1, pdfViewer.numPages)) / Math.max(1, pdfViewer.numPages)) * 100)}%`,
+                        backgroundColor: 'var(--color-primary)'
+                      }}
+                    />
+                  </div>
+                  <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                    {Math.max(1, Math.min(pdfViewer.currentPage || 1, pdfViewer.numPages))}/{pdfViewer.numPages}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2">

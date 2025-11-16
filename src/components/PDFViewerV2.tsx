@@ -817,7 +817,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const handleDocumentLoad = useCallback((e: DocumentLoadEvent) => {
     console.log('PDF loaded:', e.doc.numPages)
     setNumPages(e.doc.numPages)
-    updatePDFViewer({ currentPage: 1 })
+    updatePDFViewer({ currentPage: 1, numPages: e.doc.numPages })
   }, [updatePDFViewer])
 
   // Handle page change

@@ -100,6 +100,7 @@ export interface ThemeSettings {
 
 export interface PDFViewerSettings {
   currentPage: number
+  numPages: number | null
   zoom: number
   scale: number
   rotation: number
@@ -409,6 +410,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   pdfViewer: {
     currentPage: 1,
+    numPages: null,
     zoom: 1.0,
     scale: 1.0,
     rotation: 0,
