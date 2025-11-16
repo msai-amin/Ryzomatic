@@ -1720,6 +1720,28 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           >
             <Highlighter className="w-5 h-5" />
           </button>
+          
+          {/* Flexible spacer to push progress bar to the right */}
+          <div className="flex-1" />
+          
+          {/* Document progress bar */}
+          <div className="min-w-[160px] flex items-center gap-2" title="Reading progress">
+            <div 
+              className="h-2 rounded w-full overflow-hidden"
+              style={{ backgroundColor: 'var(--color-surface-hover)', border: '1px solid var(--color-border)' }}
+            >
+              <div
+                className="h-full"
+                style={{ 
+                  width: `${Math.max(0, Math.min(100, Math.round(((pdfViewer.currentPage || 1) / Math.max(1, numPages || 1)) * 100))) }%`,
+                  backgroundColor: 'var(--color-primary)'
+                }}
+              />
+            </div>
+            <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+              {Math.max(1, Math.min(pdfViewer.currentPage || 1, numPages || 1))}/{numPages || 0}
+            </span>
+          </div>
         </div>
         
         
