@@ -969,44 +969,50 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         onTouchStart={handleWidgetTouchStart}
       >
         {/* Playback Mode Selector - Show when expanded or always visible */}
-        <div className="flex items-center justify-between px-3 pt-3 pb-2 border-b" style={{ borderColor: 'var(--color-border)' }}>
+        <div className="flex items-center justify-between px-3 pt-2 pb-2 border-b" style={{ borderColor: 'var(--color-border)' }}>
           <div className="flex items-center gap-1">
           <button
             onClick={() => handlePlaybackModeChange('paragraph')}
-            className={`px-2 py-1 text-xs font-medium rounded transition-all ${
+            className={`px-2 py-0.5 text-xs font-medium rounded transition-all ${
               playbackMode === 'paragraph' 
-                ? 'text-blue-600' 
-                : 'text-gray-600 hover:text-gray-800'
+                ? 'text-blue-600 ring-1 ring-blue-500/40 bg-[rgba(59,130,246,0.12)]' 
+                : 'text-gray-500 hover:text-gray-300'
             }`}
             style={{
               backgroundColor: playbackMode === 'paragraph' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
             }}
+            aria-pressed={playbackMode === 'paragraph'}
+            aria-label="Paragraph mode"
           >
             Paragraph
           </button>
           <button
             onClick={() => handlePlaybackModeChange('page')}
-            className={`px-2 py-1 text-xs font-medium rounded transition-all ${
+            className={`px-2 py-0.5 text-xs font-medium rounded transition-all ${
               playbackMode === 'page' 
-                ? 'text-blue-600' 
-                : 'text-gray-600 hover:text-gray-800'
+                ? 'text-blue-600 ring-1 ring-blue-500/40 bg-[rgba(59,130,246,0.12)]' 
+                : 'text-gray-500 hover:text-gray-300'
             }`}
             style={{
               backgroundColor: playbackMode === 'page' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
             }}
+            aria-pressed={playbackMode === 'page'}
+            aria-label="Page mode"
           >
             Page
           </button>
           <button
             onClick={() => handlePlaybackModeChange('continue')}
-            className={`px-2 py-1 text-xs font-medium rounded transition-all ${
+            className={`px-2 py-0.5 text-xs font-medium rounded transition-all ${
               playbackMode === 'continue' 
-                ? 'text-blue-600' 
-                : 'text-gray-600 hover:text-gray-800'
+                ? 'text-blue-600 ring-1 ring-blue-500/40 bg-[rgba(59,130,246,0.12)]' 
+                : 'text-gray-500 hover:text-gray-300'
             }`}
             style={{
               backgroundColor: playbackMode === 'continue' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
             }}
+            aria-pressed={playbackMode === 'continue'}
+            aria-label="Continue mode"
           >
             Continue
           </button>
@@ -1022,7 +1028,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         </div>
 
         {/* Compact Toggle Bar */}
-        <div className="flex items-center gap-2 p-3">
+        <div className="flex items-center gap-2 p-2.5">
           {/* Play/Pause Button - Main Control */}
           <button
             onClick={handlePlayPause}
@@ -1034,6 +1040,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               cursor: isProcessing ? 'not-allowed' : 'pointer',
               boxShadow: 'var(--shadow-md)'
             }}
+            aria-label={isProcessing ? 'Processing' : (tts.isPlaying ? 'Pause' : 'Play')}
             onMouseEnter={(e) => {
               if (!isProcessing) {
                 e.currentTarget.style.transform = 'scale(1.05)'
@@ -1072,6 +1079,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             onClick={handleStop}
             className="p-2 rounded-full transition-all"
             style={{ color: 'var(--color-text-primary)' }}
+            aria-label="Stop"
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'var(--color-error-light)'
               e.currentTarget.style.color = 'var(--color-error)'
@@ -1098,7 +1106,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               }}
             />
             <span 
-              className="text-xs truncate max-w-20"
+              className="text-xs truncate max-w-24"
               style={{ color: 'var(--color-text-secondary)' }}
             >
               {tts.isPlaying ? 'Playing' : ttsManager.isPausedState() ? 'Paused' : 'Ready'}
@@ -1110,6 +1118,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             onClick={() => setIsExpanded(!isExpanded)}
             className="p-2 rounded-full transition-all"
             style={{ color: 'var(--color-text-primary)' }}
+            aria-label={isExpanded ? 'Collapse controls' : 'Expand controls'}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
               e.currentTarget.style.transform = 'scale(1.1)'
