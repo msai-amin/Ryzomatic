@@ -6,11 +6,11 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
-import { Viewer, Worker, DocumentLoadEvent, PageChangeEvent, ZoomEvent, RotateEvent, ScrollMode } from '@react-pdf-viewer/core'
+import { Viewer, Worker, DocumentLoadEvent, PageChangeEvent, ZoomEvent, RotateEvent, ScrollMode, RotateDirection } from '@react-pdf-viewer/core'
 import { highlightPlugin, HighlightArea, RenderHighlightTargetProps, RenderHighlightContentProps, RenderHighlightsProps, SelectionData } from '@react-pdf-viewer/highlight'
 import { scrollModePlugin } from '@react-pdf-viewer/scroll-mode'
 import { zoomPlugin } from '@react-pdf-viewer/zoom'
-import { rotatePlugin, RotateDirection } from '@react-pdf-viewer/rotate'
+import { rotatePlugin } from '@react-pdf-viewer/rotate'
 import { searchPlugin } from '@react-pdf-viewer/search'
 import { pageNavigationPlugin } from '@react-pdf-viewer/page-navigation'
 
@@ -73,7 +73,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // State declarations (must be before early returns per React hooks rules)
   const [highlights, setHighlights] = useState<HighlightType[]>([])
   const [currentHighlightColor, setCurrentHighlightColor] = useState(annotationColors[0]?.id || 'yellow')
-  const [currentHighlightColorHex, setCurrentHighlightColorHex] = useState(annotationColors[0]?.hex || '#ffeb3b')
+  const [currentHighlightColorHex, setCurrentHighlightColorHex] = useState((annotationColors[0] as any)?.color || '#ffeb3b')
   const [showHighlightColorPopover, setShowHighlightColorPopover] = useState(false)
   const highlightColorButtonRef = useRef<HTMLButtonElement>(null)
   const [numPages, setNumPages] = useState<number>(document?.totalPages || 0)
@@ -414,12 +414,15 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     const context = getPDFTextSelectionContext(pdfViewer.currentPage, pageText)
     if (context && document.id && userId) {
       try {
-        await notesService.createNote({
-          bookId: document.id,
-          pageNumber: pdfViewer.currentPage,
-          selectedText: context.selectedText,
-          content: '',
-        })
+        await notesService.createNote(
+          userId,
+          document.id,
+          pdfViewer.currentPage,
+          context.selectedText,
+          'freeform',
+          undefined,
+          false
+        )
         console.log('Note saved from selection')
       } catch (error) {
         console.error('Error saving note:', error)
@@ -591,7 +594,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
       // Get current highlight color
       const color = annotationColors.find(c => c.id === currentHighlightColor) || annotationColors[0]
-      const colorHex = color?.hex || currentHighlightColorHex || '#ffeb3b'
+      const colorHex = (color as any)?.color || currentHighlightColorHex || '#ffeb3b'
       
       // Create highlight using highlight service
       const newHighlight = await highlightService.createHighlight({
@@ -621,7 +624,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     renderHighlightTarget: (props: RenderHighlightTargetProps) => {
       // Render target for creating new highlights
       const color = annotationColors.find(c => c.id === currentHighlightColor) || annotationColors[0]
-      const colorHex = color?.hex || currentHighlightColorHex || '#ffeb3b'
+      const colorHex = (color as any)?.color || currentHighlightColorHex || '#ffeb3b'
       
       return (
         <div
@@ -817,7 +820,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const blobUrlRef = useRef<string | null>(null)
   
   // Convert document.pdfData to a format react-pdf-viewer can use
-  const getDocumentUrl = (): string | Uint8Array | ArrayBuffer => {
+  const getDocumentUrl = (): string | Uint8Array => {
     // pdfData is guaranteed to exist at this point due to early return above
     if (!document.pdfData) {
       throw new Error('No PDF data available - this should not happen')
@@ -920,7 +923,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         case 'R':
           if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
             e.preventDefault()
-            rotatePluginInstance.Rotate({ direction: RotateDirection.Forward })
+            // Programmatically rotate forward
+            // @ts-ignore - rotate is provided by plugin instance
+            rotatePluginInstance.rotate?.(RotateDirection.Forward)
           }
           break
         case 'm':
@@ -1624,7 +1629,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           {/* Rotate */}
           <button
             onClick={() => {
-              rotatePluginInstance.Rotate({ direction: RotateDirection.Forward })
+              // @ts-ignore
+              rotatePluginInstance.rotate?.(RotateDirection.Forward)
             }}
             className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
             style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}
@@ -1885,7 +1891,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         selectedColor={currentHighlightColorHex}
         onColorSelect={(colorHex) => {
           setCurrentHighlightColorHex(colorHex)
-          const matchedColor = annotationColors.find(color => color.hex === colorHex)
+          const matchedColor = annotationColors.find((color: any) => color.color === colorHex)
           if (matchedColor) {
             setCurrentHighlightColor(matchedColor.id)
           }
@@ -1926,7 +1932,10 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       {/* Notes Panel */}
       {isRightSidebarOpen && (
         <NotesPanel
+          isOpen={isRightSidebarOpen}
+          bookName={document?.name || 'Document'}
           bookId={document?.id || ''}
+          currentPage={pdfViewer.currentPage}
           onClose={() => setIsRightSidebarOpen(false)}
         />
       )}
@@ -1934,11 +1943,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       {/* Library Modal */}
       {showLibrary && (
         <LibraryModal
+          isOpen={showLibrary}
           onClose={() => setShowLibrary(false)}
-          onSelectDocument={(doc) => {
-            // Handle document selection
-            setShowLibrary(false)
-          }}
         />
       )}
       

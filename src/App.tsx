@@ -180,10 +180,7 @@ function App() {
               window.history.replaceState({}, document.title, window.location.pathname)
             } else {
               logger.warn('OAuth callback processing failed - check console for details', context);
-              logger.warn('Common issues:', context, {
-                issue: 'Invalid API key',
-                solution: 'Update VITE_SUPABASE_ANON_KEY in .env.local with actual key from Supabase dashboard'
-              });
+              logger.warn('Common issue: Invalid API key. Solution: Update VITE_SUPABASE_ANON_KEY in .env.local with actual key from Supabase dashboard', context);
             }
           } else {
             logger.error('Supabase not available - cannot process OAuth callback', context);

@@ -568,9 +568,21 @@ class HighlightService {
           width: maxX - minX,
           height: maxY - minY
         }
+        // Convert to percentage-based HighlightArea for this page
+        const leftPct = (rect.x / (viewport.width || 1)) * 100
+        const topPct = (rect.y / (viewport.height || 1)) * 100
+        const widthPct = (rect.width / (viewport.width || 1)) * 100
+        const heightPct = (rect.height / (viewport.height || 1)) * 100
+        const area = {
+          left: Math.max(0, Math.min(100, leftPct)),
+          top: Math.max(0, Math.min(100, topPct)),
+          width: Math.max(0, Math.min(100, widthPct)),
+          height: Math.max(0, Math.min(100, heightPct)),
+          pageIndex: pageNumber - 1
+        }
         return {
-          ...rect,
-          rects: [rect]
+          highlightAreas: [area],
+          selectionData: highlight.position_data?.selectionData
         }
       }
       
