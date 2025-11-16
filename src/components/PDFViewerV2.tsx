@@ -622,59 +622,16 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // Create highlight plugin (must NOT be wrapped in useMemo; plugin uses hooks internally)
   const highlightPluginInstance = highlightPlugin({
     renderHighlightTarget: (props: RenderHighlightTargetProps) => {
-      // Render target for creating new highlights
-      const color = annotationColors.find(c => c.id === currentHighlightColor) || annotationColors[0]
-      const colorHex = (color as any)?.color || currentHighlightColorHex || '#ffeb3b'
-      
-      return (
-        <div
-          style={{
-            background: 'var(--color-surface, #111827)',
-            border: '1px solid var(--color-border, #374151)',
-            borderRadius: '4px',
-            display: 'flex',
-            position: 'absolute',
-            left: `${props.selectionRegion.left}%`,
-            top: `${props.selectionRegion.top + props.selectionRegion.height}%`,
-            transform: 'translate(0, 8px)',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-            zIndex: 1,
-          }}
-        >
-          <button
-            onClick={props.toggle}
-            style={{
-              backgroundColor: colorHex,
-              border: 'none',
-              borderRadius: '4px 0 0 4px',
-              padding: '6px 12px',
-              cursor: 'pointer',
-              color: '#000',
-              fontSize: '14px',
-              fontWeight: '500',
-            }}
-            title={`Create highlight (${color?.name || 'yellow'})`}
-          >
-            Highlight
-          </button>
-          <button
-            onClick={props.cancel}
-            style={{
-              backgroundColor: 'var(--color-surface-hover, #1f2937)',
-              border: 'none',
-              borderLeft: '1px solid var(--color-border, #374151)',
-              borderRadius: '0 4px 4px 0',
-              padding: '6px 12px',
-              cursor: 'pointer',
-              color: 'var(--color-text-primary, #f9fafb)',
-              fontSize: '14px',
-            }}
-            title="Cancel"
-          >
-            ×
-          </button>
-        </div>
-      )
+      // Auto-open the highlight content popover at the selection location
+      // so actions appear automatically after selection (without extra click).
+      setTimeout(() => {
+        try {
+          props.toggle()
+        } catch (_) {
+          // no-op
+        }
+      }, 0)
+      return null
     },
     renderHighlightContent: (props: RenderHighlightContentProps) => {
       // Render content for editing highlights
