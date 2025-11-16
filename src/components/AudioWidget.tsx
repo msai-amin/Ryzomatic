@@ -959,9 +959,9 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           borderRadius: '12px',
           boxShadow: isDragging ? '0 12px 32px rgba(0,0,0,0.25)' : 'var(--shadow-lg)',
           backdropFilter: 'blur(10px)',
-          minWidth: '200px',
-          maxWidth: '320px',
-          width: 'min(320px, calc(100vw - 32px))',
+          minWidth: '180px',
+          maxWidth: '260px',
+          width: 'min(260px, calc(100vw - 32px))',
           userSelect: 'none',
           touchAction: isDragging ? 'none' : 'auto'
         }}
