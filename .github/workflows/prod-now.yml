@@ -43,7 +43,9 @@ jobs:
           if [ "$CODE" != "401" ] && [ "$CODE" != "405" ]; then exit 1; fi
 
       - name: OCR status probe (unauthenticated)
+        continue-on-error: false
         run: |
+          set +e  # Don't exit on error, we'll handle it explicitly
           CODE=$(curl -sSL -o /dev/null -w "%{http_code}\n" "$PROD_URL/api/documents?action=ocr-status&documentId=invalid")
           echo "ocr-status: $CODE"
           # Allow 500 as warning (missing server env), otherwise accept 400/401/404
@@ -51,9 +53,11 @@ jobs:
             echo "::warning::/api/documents?action=ocr-status returned 500 (check SUPABASE_* env). Proceeding."
             exit 0
           fi
-          if [ "$CODE" != "401" ] && [ "$CODE" != "400" ] && [ "$CODE" != "404" ]; then
-            exit 1
+          if [ "$CODE" = "401" ] || [ "$CODE" = "400" ] || [ "$CODE" = "404" ]; then
+            exit 0
           fi
+          echo "Unexpected status code: $CODE"
+          exit 1
 
   lighthouse:
     name: Lighthouse (Desktop)

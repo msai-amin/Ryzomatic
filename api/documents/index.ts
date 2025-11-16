@@ -532,6 +532,16 @@ async function handleOCRStatus(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    // Check if Supabase is configured
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      // For unauthenticated requests, return 401; for authenticated, return 500
+      const token = req.headers.authorization?.replace('Bearer ', '');
+      if (!token) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
+
     const { documentId } = req.query;
 
     if (!documentId || typeof documentId !== 'string') {
