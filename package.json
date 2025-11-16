@@ -14,6 +14,7 @@
     "test:coverage": "vitest --coverage",
     "test:watch": "vitest --watch",
     "test:e2e": "playwright test",
+    "size-limit": "size-limit",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "test:all": "npm run test && npm run test:e2e",
@@ -104,6 +105,8 @@
     "tailwindcss": "^3.3.6",
     "typescript": "^5.2.2",
     "vite": "^5.0.8",
+    "@size-limit/file": "^11.1.4",
+    "size-limit": "^11.1.4",
     "vite-plugin-pwa": "^0.17.4",
     "vitest": "^4.0.7",
     "workbox-window": "^7.0.0"

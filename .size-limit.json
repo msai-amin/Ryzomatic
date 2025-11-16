@@ -1,0 +1,13 @@
+[
+  {
+    "name": "App bundle (JS)",
+    "path": "dist/assets/*.js",
+    "limit": "2500 kB"
+  },
+  {
+    "name": "CSS bundle",
+    "path": "dist/assets/*.css",
+    "limit": "400 kB"
+  }
+]
+
