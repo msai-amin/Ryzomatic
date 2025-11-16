@@ -26,7 +26,7 @@ import { highlightService, Highlight as HighlightType } from '../services/highli
 import { useTheme } from '../../themes/ThemeProvider'
 import { getPDFWorkerSrc, configurePDFWorker } from '../utils/pdfjsConfig'
 import { parseTextWithBreaks, TextSegment } from '../utils/readingModeUtils'
-import { Eye, BookOpen, FileText, Type, Highlighter, Sparkles, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ZoomIn, ZoomOut, RotateCw, Search, Palette, Moon, Sun, Maximize2, StickyNote, Library, Upload } from 'lucide-react'
+import { Eye, BookOpen, FileText, Type, Highlighter, Sparkles, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ZoomIn, ZoomOut, RotateCw, Search, Palette, Moon, Sun, Maximize2, StickyNote, Library, Upload, HandPointer } from 'lucide-react'
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { notesService } from '../services/notesService'
@@ -90,6 +90,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const [isTextCleaning, setIsTextCleaning] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const [selectionEnabled, setSelectionEnabled] = useState(true)
 
   // Log component mount
   console.log('🔍 PDFViewerV2: Component rendering', {
@@ -622,6 +623,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // Create highlight plugin (must NOT be wrapped in useMemo; plugin uses hooks internally)
   const highlightPluginInstance = highlightPlugin({
     renderHighlightTarget: (props: RenderHighlightTargetProps) => {
+      if (!selectionEnabled) {
+        return null
+      }
       // Auto-open the highlight content popover at the selection location
       // so actions appear automatically after selection (without extra click).
       setTimeout(() => {
@@ -1758,6 +1762,20 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             <Highlighter className="w-5 h-5" />
           </button>
           
+          {/* Toggle Selection/Highlight (Finger mode) */}
+          <button
+            onClick={() => setSelectionEnabled((v) => !v)}
+            className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
+            style={{ 
+              color: selectionEnabled ? 'var(--color-text-primary)' : 'var(--color-primary)', 
+              backgroundColor: selectionEnabled ? 'transparent' : 'var(--color-primary-light)'
+            }}
+            title={selectionEnabled ? 'Deactivate selection/highlight (Finger mode)' : 'Activate selection/highlight'}
+            aria-pressed={!selectionEnabled}
+          >
+            <HandPointer className="w-5 h-5" />
+          </button>
+          
         </div>
         
         
@@ -1823,7 +1841,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             flex: 1, 
             overflow: 'hidden',
             backgroundColor: 'var(--color-background, #000000)',
-            borderLeft: '1px solid var(--color-border, #374151)'
+            borderLeft: '1px solid var(--color-border, #374151)',
+            userSelect: selectionEnabled ? 'text' : 'none',
+            cursor: selectionEnabled ? undefined as unknown as string : 'pointer'
           }} 
           onContextMenu={handleContextMenu}
           className={`pdf-viewer-container ${pdfViewer.darkMode ? 'pdf-viewer-dark-mode' : ''}`}
