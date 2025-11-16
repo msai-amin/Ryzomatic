@@ -1408,7 +1408,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       >
         {/* Custom Toolbar */}
         <div 
-          className="flex items-center justify-center gap-4 p-4 border-b"
+          className="flex flex-wrap items-center justify-center gap-4 p-4 border-b"
           style={{ 
             backgroundColor: 'var(--color-surface)', 
             borderColor: 'var(--color-border)',
@@ -1416,17 +1416,18 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           }}
           onContextMenu={handleContextMenu}
         >
-          {/* Library */}
+          {/* Download (replaces Library in viewer header) */}
           <button
-            onClick={() => setShowLibrary(true)}
+            onClick={handleDownload}
             className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
             style={{ 
               color: 'var(--color-text-primary)', 
-              backgroundColor: 'transparent'
+              backgroundColor: 'transparent',
+              border: '1px solid var(--color-border)'
             }}
-            title="Library"
+            title="Download PDF"
           >
-            <Library className="w-5 h-5" />
+            <Download className="w-5 h-5" />
           </button>
           
           {/* Upload */}
@@ -1440,22 +1441,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             title="Upload Document"
           >
             <Upload className="w-5 h-5" />
-          </button>
-          
-          {/* Separator */}
-          <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
-          
-          {/* Highlight Management Panel */}
-          <button
-            onClick={() => setShowHighlightPanel(!showHighlightPanel)}
-            className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
-            style={{ 
-              color: 'var(--color-text-primary)', 
-              backgroundColor: showHighlightPanel ? 'var(--color-primary-light)' : 'transparent'
-            }}
-            title="Highlight Management"
-          >
-            <Highlighter className="w-5 h-5" />
           </button>
           
           {/* Separator */}
@@ -1485,23 +1470,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             title="Text Cleanup"
           >
             <Type className="w-5 h-5" />
-          </button>
-          
-          {/* Separator */}
-          <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
-          
-          {/* Download */}
-          <button
-            onClick={handleDownload}
-            className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
-            style={{ 
-              color: 'var(--color-text-primary)', 
-              backgroundColor: 'transparent',
-              border: '1px solid var(--color-border)'
-            }}
-            title="Download PDF"
-          >
-            <Download className="w-5 h-5" />
           </button>
           
           {/* Separator */}
@@ -1547,7 +1515,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                     pageNavigationPluginInstance.jumpToPage(page - 1) // Convert to 0-based
                   }
                 }}
-                className="w-16 px-2 py-1 text-center text-sm rounded border"
+                className="w-12 sm:w-16 px-2 py-1 text-center text-sm rounded border"
                 style={{
                   color: 'var(--color-text-primary)',
                   backgroundColor: 'var(--color-surface)',
@@ -1739,7 +1707,21 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
               }}
             />
           </button>
+          
+          {/* Highlight Management Panel - moved next to Highlight Colors */}
+          <button
+            onClick={() => setShowHighlightPanel(!showHighlightPanel)}
+            className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
+            style={{ 
+              color: 'var(--color-text-primary)', 
+              backgroundColor: showHighlightPanel ? 'var(--color-primary-light)' : 'transparent'
+            }}
+            title="Highlight Management"
+          >
+            <Highlighter className="w-5 h-5" />
+          </button>
         </div>
+        
         
         {/* OCR Banner */}
         {ocrStatus && ocrStatus !== 'not_needed' && (
