@@ -150,10 +150,17 @@ class HighlightService {
 
   /**
    * Check if API is available (only in production/deployed environment)
+   * For local development, we'll try to use the API if it's available
    */
   private isAPIAvailable(): boolean {
-    // API endpoints are Vercel serverless functions - only available in production
-    return import.meta.env.PROD || window.location.hostname !== 'localhost';
+    // Allow local development - API endpoints should work with Vite proxy or direct calls
+    // In production, always available
+    if (import.meta.env.PROD) {
+      return true;
+    }
+    // In development, allow API calls (they may fail gracefully if endpoint doesn't exist)
+    // This allows testing with local API server or Vercel dev server
+    return true;
   }
 
   /**
@@ -254,21 +261,46 @@ class HighlightService {
           console.warn('Book not found when fetching highlights, returning empty array:', bookId);
           return [];
         }
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to fetch highlights');
+        
+        // Check if response is JSON before parsing
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to fetch highlights');
+        } else {
+          throw new Error(`Failed to fetch highlights: ${response.statusText}`);
+        }
       }
 
-      const result = await response.json();
+      // Check if response is actually JSON before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('getHighlights: Response is not JSON, returning empty array');
+        return [];
+      }
+
+      const text = await response.text();
+      if (!text || text.trim().length === 0) {
+        return [];
+      }
+
+      const result = JSON.parse(text);
       
       // Update cache if fetching all highlights for a book
       if (options.pageNumber === undefined) {
         this.cache.set(bookId, result.highlights);
       }
 
-      return result.highlights;
+      return result.highlights || [];
     } catch (error) {
-      console.error('Error fetching highlights:', error);
-      throw error;
+      // Only log if it's not a JSON parse error (which is expected if API is unavailable)
+      if (error instanceof SyntaxError) {
+        console.warn('getHighlights: API endpoint may not be available in local development');
+        return [];
+      } else {
+        console.error('Error fetching highlights:', error);
+        throw error;
+      }
     }
   }
 

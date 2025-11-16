@@ -5,7 +5,7 @@
  * which provides better highlighting support and eliminates coordinate conversion issues.
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { Viewer, Worker, DocumentLoadEvent, PageChangeEvent, ZoomEvent, RotateEvent, ScrollMode } from '@react-pdf-viewer/core'
 import { highlightPlugin, HighlightArea, RenderHighlightTargetProps, RenderHighlightContentProps, RenderHighlightsProps, SelectionData } from '@react-pdf-viewer/highlight'
 import { scrollModePlugin } from '@react-pdf-viewer/scroll-mode'
@@ -26,12 +26,20 @@ import { highlightService, Highlight as HighlightType } from '../services/highli
 import { useTheme } from '../../themes/ThemeProvider'
 import { getPDFWorkerSrc, configurePDFWorker } from '../utils/pdfjsConfig'
 import { parseTextWithBreaks, TextSegment } from '../utils/readingModeUtils'
-import { Eye, BookOpen, FileText, Type, Highlighter, Sparkles, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ZoomIn, ZoomOut, RotateCw, Search, Palette, Moon, Sun } from 'lucide-react'
+import { Eye, BookOpen, FileText, Type, Highlighter, Sparkles, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ZoomIn, ZoomOut, RotateCw, Search, Palette, Moon, Sun, Maximize2, StickyNote, Library, Upload } from 'lucide-react'
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { notesService } from '../services/notesService'
 import { AudioWidget } from './AudioWidget'
 import { HighlightColorPopover } from './HighlightColorPopover'
+import { OCRBanner, OCRStatusBadge } from './OCRStatusBadge'
+import { HighlightManagementPanel } from './HighlightManagementPanel'
+import { NotesPanel } from './NotesPanel'
+import { LibraryModal } from './LibraryModal'
+import { DocumentUpload } from './DocumentUpload'
+import { TextCleanupModal } from './TextCleanupModal'
+import { TTSControls } from './TTSControls'
+import { cleanupDocumentText, CleanupPreferences } from '../services/textCleanupService'
 
 interface PDFViewerV2Props {
   // No props needed - gets document from store
@@ -72,6 +80,16 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const [currentParagraphIndex, setCurrentParagraphIndex] = useState<number | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [isPDFjsReady, setIsPDFjsReady] = useState(false)
+  const [ocrStatus, setOcrStatus] = useState(document?.ocrStatus || 'not_needed')
+  const [ocrError, setOcrError] = useState<string | undefined>()
+  const [ocrCanRetry, setOcrCanRetry] = useState(false)
+  const [showHighlightPanel, setShowHighlightPanel] = useState(false)
+  const [showLibrary, setShowLibrary] = useState(false)
+  const [showUpload, setShowUpload] = useState(false)
+  const [showTextCleanup, setShowTextCleanup] = useState(false)
+  const [isTextCleaning, setIsTextCleaning] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Log component mount
   console.log('🔍 PDFViewerV2: Component rendering', {
@@ -419,16 +437,139 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         const bookHighlights = await highlightService.getHighlights(document.id, {
           includeOrphaned: true
         })
-        setHighlights(bookHighlights)
-        console.log(`Loaded ${bookHighlights.length} highlights from database`)
+        // Don't wipe out existing local highlights if backend returns empty (e.g., local dev/no API)
+        if (Array.isArray(bookHighlights) && bookHighlights.length > 0) {
+          setHighlights(bookHighlights)
+          console.log(`Loaded ${bookHighlights.length} highlights from database`)
+        } else {
+          console.log('Skipping highlight overwrite: backend returned empty; preserving local highlights')
+        }
       } catch (error: any) {
         console.warn('Highlights not available:', error)
-        setHighlights([])
+        // Preserve any locally created highlights instead of clearing
       }
     }
 
     loadHighlights()
   }, [document.id])
+
+  // Poll for OCR status updates
+  useEffect(() => {
+    if (!document?.id) return
+    
+    if (ocrStatus === 'processing' || ocrStatus === 'pending') {
+      // Start polling for status updates
+      pollingIntervalRef.current = setInterval(async () => {
+        try {
+          const response = await fetch(`/api/documents?action=ocr-status&documentId=${document.id}`)
+          
+          if (response.ok) {
+            const data = await response.json()
+            
+            if (data.ocrStatus !== ocrStatus) {
+              setOcrStatus(data.ocrStatus)
+              
+              // Update error info if failed
+              if (data.ocrStatus === 'failed') {
+                setOcrError(data.ocrMetadata?.error || 'OCR processing failed')
+                setOcrCanRetry(data.ocrMetadata?.canRetry ?? true)
+              }
+              
+              // Update document content if completed
+              if (data.ocrStatus === 'completed' && data.content) {
+                console.log('OCR completed successfully, text extracted')
+                // TODO: Update document content in store
+              }
+              
+              // Clear interval if done (completed or failed)
+              if (data.ocrStatus !== 'processing' && data.ocrStatus !== 'pending') {
+                if (pollingIntervalRef.current) {
+                  clearInterval(pollingIntervalRef.current)
+                  pollingIntervalRef.current = null
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error checking OCR status:', error)
+        }
+      }, 3000) // Poll every 3 seconds
+
+      // Cleanup interval on unmount or status change
+      return () => {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current)
+          pollingIntervalRef.current = null
+        }
+      }
+    }
+  }, [ocrStatus, document?.id])
+
+  // Handle fullscreen toggle
+  const toggleFullscreen = useCallback(() => {
+    if (typeof window === 'undefined' || !window.document) return
+
+    if (!isFullscreen) {
+      if (window.document.documentElement.requestFullscreen) {
+        window.document.documentElement.requestFullscreen()
+      }
+    } else {
+      if (window.document.exitFullscreen) {
+        window.document.exitFullscreen()
+      }
+    }
+  }, [isFullscreen])
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!window.document.fullscreenElement)
+    }
+
+    window.document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => {
+      window.document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    }
+  }, [])
+
+  // Handle window resize to ensure responsive sizing
+  // This is especially important after document upload when container size may change
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.document === 'undefined') return
+
+    const handleResize = () => {
+      // Trigger a resize event on the viewer container to force react-pdf-viewer to recalculate
+      const viewerContainer = window.document.querySelector('.pdf-viewer-container')
+      if (viewerContainer) {
+        // Dispatch a custom resize event
+        window.dispatchEvent(new Event('resize'))
+      }
+    }
+
+    window.addEventListener('resize', handleResize)
+    // Also listen for orientation changes on mobile
+    window.addEventListener('orientationchange', handleResize)
+    
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('orientationchange', handleResize)
+    }
+  }, [])
+
+  // Recalculate size when document changes (e.g., after upload)
+  useEffect(() => {
+    if (!document?.id) return
+
+    // Small delay to ensure DOM has updated and container has proper size
+    const timeoutId = setTimeout(() => {
+      // Force a resize event to trigger react-pdf-viewer recalculation
+      window.dispatchEvent(new Event('resize'))
+    }, 200)
+
+    return () => clearTimeout(timeoutId)
+  }, [document?.id])
 
   // Note: PDF.js worker is configured via Worker component wrapper
   // No need to manually configure GlobalWorkerOptions
@@ -473,9 +614,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       console.error('Error creating highlight:', error)
       alert('Failed to create highlight. Please try again.')
     }
-  }, [document.id, userId, currentHighlightColor, annotationColors])
+  }, [document.id, userId, currentHighlightColor, currentHighlightColorHex, annotationColors])
 
-  // Create highlight plugin
+  // Create highlight plugin (must NOT be wrapped in useMemo; plugin uses hooks internally)
   const highlightPluginInstance = highlightPlugin({
     renderHighlightTarget: (props: RenderHighlightTargetProps) => {
       // Render target for creating new highlights
@@ -650,22 +791,26 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     },
   })
 
+  // Create scroll mode plugin (do NOT wrap in useMemo; keep hook order consistent)
+  {
+    const mode = (pdfViewer?.scrollMode === 'single' || pdfViewer?.scrollMode === 'continuous')
+      ? pdfViewer.scrollMode
+      : 'continuous'
+    var scrollModePluginInstance = scrollModePlugin({
+      scrollMode: mode === 'single' ? ScrollMode.Page : ScrollMode.Vertical,
+    })
+  }
 
-  // Create scroll mode plugin
-  const scrollModePluginInstance = scrollModePlugin({
-    scrollMode: pdfViewer.scrollMode === 'single' ? ScrollMode.Page : ScrollMode.Vertical,
-  })
-
-  // Create zoom plugin
+  // Create zoom plugin (do NOT wrap in useMemo)
   const zoomPluginInstance = zoomPlugin({ enableShortcuts: false }) // Disable shortcuts, we'll handle them ourselves
 
-  // Create rotate plugin
+  // Create rotate plugin (do NOT wrap in useMemo)
   const rotatePluginInstance = rotatePlugin()
 
-  // Create search plugin
+  // Create search plugin (do NOT wrap in useMemo)
   const searchPluginInstance = searchPlugin()
 
-  // Create page navigation plugin
+  // Create page navigation plugin (do NOT wrap in useMemo)
   const pageNavigationPluginInstance = pageNavigationPlugin({ enableShortcuts: false }) // Disable shortcuts, we'll handle them ourselves
 
   // Cache blob URL to prevent memory leaks
@@ -1244,7 +1389,20 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // Render PDF viewer with custom toolbar
   return (
     <>
-      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div 
+        style={{ 
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          display: 'flex', 
+          flexDirection: 'column',
+          width: '100%',
+          height: '100%',
+          minHeight: 0  // Allow flex child to shrink below content size
+        }}
+      >
         {/* Custom Toolbar */}
         <div 
           className="flex items-center justify-center gap-4 p-4 border-b"
@@ -1255,6 +1413,80 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           }}
           onContextMenu={handleContextMenu}
         >
+          {/* Library */}
+          <button
+            onClick={() => setShowLibrary(true)}
+            className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
+            style={{ 
+              color: 'var(--color-text-primary)', 
+              backgroundColor: 'transparent'
+            }}
+            title="Library"
+          >
+            <Library className="w-5 h-5" />
+          </button>
+          
+          {/* Upload */}
+          <button
+            onClick={() => setShowUpload(true)}
+            className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
+            style={{ 
+              color: 'var(--color-text-primary)', 
+              backgroundColor: 'transparent'
+            }}
+            title="Upload Document"
+          >
+            <Upload className="w-5 h-5" />
+          </button>
+          
+          {/* Separator */}
+          <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
+          
+          {/* Highlight Management Panel */}
+          <button
+            onClick={() => setShowHighlightPanel(!showHighlightPanel)}
+            className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
+            style={{ 
+              color: 'var(--color-text-primary)', 
+              backgroundColor: showHighlightPanel ? 'var(--color-primary-light)' : 'transparent'
+            }}
+            title="Highlight Management"
+          >
+            <Highlighter className="w-5 h-5" />
+          </button>
+          
+          {/* Separator */}
+          <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
+          
+          {/* Fullscreen */}
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
+            style={{ 
+              color: 'var(--color-text-primary)', 
+              backgroundColor: isFullscreen ? 'var(--color-primary-light)' : 'transparent'
+            }}
+            title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+          >
+            <Maximize2 className="w-5 h-5" />
+          </button>
+          
+          {/* Text Cleanup */}
+          <button
+            onClick={() => setShowTextCleanup(true)}
+            className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
+            style={{ 
+              color: 'var(--color-text-primary)', 
+              backgroundColor: 'transparent'
+            }}
+            title="Text Cleanup"
+          >
+            <Type className="w-5 h-5" />
+          </button>
+          
+          {/* Separator */}
+          <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
+          
           {/* Download */}
           <button
             onClick={handleDownload}
@@ -1505,6 +1737,62 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           </button>
         </div>
         
+        {/* OCR Banner */}
+        {ocrStatus && ocrStatus !== 'not_needed' && (
+          <OCRBanner
+            status={ocrStatus as 'pending' | 'processing' | 'completed' | 'failed'}
+            errorMessage={ocrError}
+            onRetry={ocrCanRetry ? async () => {
+              if (!document?.id) return
+              try {
+                const { authService } = await import('../services/supabaseAuthService')
+                const session = await authService.getSession()
+                const token = session?.access_token
+                if (!token) {
+                  console.error('No access token available')
+                  return
+                }
+                const response = await fetch(`/api/documents?action=ocr-process&documentId=${document.id}`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                  }
+                })
+                if (response.ok) {
+                  setOcrStatus('processing')
+                }
+              } catch (error) {
+                console.error('Error retrying OCR:', error)
+              }
+            } : undefined}
+            onStartOCR={ocrStatus === 'pending' ? async () => {
+              if (!document?.id) return
+              try {
+                const { authService } = await import('../services/supabaseAuthService')
+                const session = await authService.getSession()
+                const token = session?.access_token
+                if (!token) {
+                  console.error('No access token available')
+                  return
+                }
+                const response = await fetch(`/api/documents?action=ocr-process&documentId=${document.id}`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                  }
+                })
+                if (response.ok) {
+                  setOcrStatus('processing')
+                }
+              } catch (error) {
+                console.error('Error starting OCR:', error)
+              }
+            } : undefined}
+          />
+        )}
+        
         {/* PDF Viewer */}
         <div 
           style={{ 
@@ -1604,6 +1892,94 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         }}
         triggerRef={highlightColorButtonRef}
       />
+      
+      {/* Highlight Management Panel */}
+      {showHighlightPanel && (
+        <HighlightManagementPanel
+          isOpen={showHighlightPanel}
+          highlights={highlights}
+          onClose={() => setShowHighlightPanel(false)}
+          onDeleteHighlight={async (id) => {
+            try {
+              await highlightService.deleteHighlight(id)
+              setHighlights(prev => prev.filter(h => h.id !== id))
+            } catch (error) {
+              console.error('Error deleting highlight:', error)
+            }
+          }}
+          onDeleteMultiple={async (ids) => {
+            try {
+              await Promise.all(ids.map(id => highlightService.deleteHighlight(id)))
+              setHighlights(prev => prev.filter(h => !ids.includes(h.id)))
+            } catch (error) {
+              console.error('Error deleting highlights:', error)
+            }
+          }}
+          onJumpToPage={(pageNumber) => {
+            updatePDFViewer({ currentPage: pageNumber })
+            pageNavigationPluginInstance.jumpToPage(pageNumber - 1)
+          }}
+          bookName={document?.name || 'Document'}
+        />
+      )}
+      
+      {/* Notes Panel */}
+      {isRightSidebarOpen && (
+        <NotesPanel
+          bookId={document?.id || ''}
+          onClose={() => setIsRightSidebarOpen(false)}
+        />
+      )}
+      
+      {/* Library Modal */}
+      {showLibrary && (
+        <LibraryModal
+          onClose={() => setShowLibrary(false)}
+          onSelectDocument={(doc) => {
+            // Handle document selection
+            setShowLibrary(false)
+          }}
+        />
+      )}
+      
+      {/* Document Upload Modal */}
+      {showUpload && (
+        <DocumentUpload
+          onClose={() => setShowUpload(false)}
+          onUploadComplete={() => {
+            setShowUpload(false)
+          }}
+        />
+      )}
+      
+      {/* Text Cleanup Modal */}
+      {showTextCleanup && document && (
+        <TextCleanupModal
+          onClose={() => setShowTextCleanup(false)}
+          onApply={async (preferences: CleanupPreferences, applyToAllPages: boolean) => {
+            setIsTextCleaning(true)
+            try {
+              await cleanupDocumentText({
+                document,
+                preferences,
+                pageNumbers: applyToAllPages ? undefined : [pdfViewer.currentPage],
+                userId: userId || undefined,
+                existingCleaned: document.cleanedPageTexts ?? null
+              })
+              setShowTextCleanup(false)
+            } catch (error) {
+              console.error('Text cleanup error:', error)
+              alert('Failed to clean text. Please try again.')
+            } finally {
+              setIsTextCleaning(false)
+            }
+          }}
+          isProcessing={isTextCleaning}
+          currentPageNumber={pdfViewer.currentPage}
+          totalPages={numPages}
+          scrollMode={pdfViewer.scrollMode}
+        />
+      )}
     </>
   )
 }

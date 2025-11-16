@@ -91,7 +91,6 @@ export interface TypographySettings {
   spacingMultiplier: number
   focusMode: boolean
   readingGuide: boolean
-  renderFormulas: boolean
 }
 
 export interface ThemeSettings {
@@ -402,8 +401,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     textAlign: 'left',
     spacingMultiplier: 1.0,
     focusMode: false,
-    readingGuide: false,
-    renderFormulas: true
+    readingGuide: false
   },
   theme: {
     currentTheme: 'default',
@@ -415,7 +413,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     scale: 1.0,
     rotation: 0,
     viewMode: 'pdf',
-    scrollMode: 'single', // Default to One Page mode
+    scrollMode: 'continuous', // Default to Continuous Scrolling mode
     showPageNumbers: true,
     showProgress: true,
     readingMode: false,
