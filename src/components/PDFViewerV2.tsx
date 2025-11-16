@@ -1306,14 +1306,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       <div className={`flex-1 flex flex-col h-full ${themeStyles.background}`} style={{ paddingBottom: '100px' }}>
         {/* Reading Mode Header */}
         <div className={`sticky top-0 z-50 ${themeStyles.headerBg} backdrop-blur-sm border-b ${themeStyles.headerBorder} shadow-sm`}>
-          {/* Progress Bar */}
-          <div className={`h-1 ${themeStyles.text} opacity-10`}>
-            <div 
-              className={`h-full ${themeStyles.progressBg} transition-all duration-300`}
-              style={{ width: `${progressPercentage}%` }}
-              title={`${Math.round(progressPercentage)}% complete`}
-            />
-          </div>
 
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center gap-4">
