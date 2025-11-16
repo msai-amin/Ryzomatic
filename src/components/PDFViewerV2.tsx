@@ -679,7 +679,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     renderHighlightContent: (props: RenderHighlightContentProps) => {
       // Render content for editing highlights
       const color = annotationColors.find(c => c.id === currentHighlightColor) || annotationColors[0]
-      const colorHex = color?.hex || currentHighlightColorHex || '#ffeb3b'
+      const colorHex = (color as any)?.color || currentHighlightColorHex || '#ffeb3b'
       
       return (
         <div
