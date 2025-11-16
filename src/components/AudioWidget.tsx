@@ -969,7 +969,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         onTouchStart={handleWidgetTouchStart}
       >
         {/* Playback Mode Selector - Show when expanded or always visible */}
-        <div className="flex items-center justify-between px-3 pt-2 pb-2 border-b" style={{ borderColor: 'var(--color-border)' }}>
+        <div className="flex items-center justify-between px-3 pt-1.5 pb-1.5 border-b" style={{ borderColor: 'var(--color-border)' }}>
           <div className="flex items-center gap-1">
           <button
             onClick={() => handlePlaybackModeChange('paragraph')}
@@ -1017,23 +1017,16 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             Continue
           </button>
           </div>
-          {/* Visible version badge for prod verification */}
-          <span
-            className="text-[10px] px-2 py-0.5 rounded-full"
-            style={{ backgroundColor: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}
-            title="Audio Widget version"
-          >
-            TTS v2
-          </span>
+          {/* Version badge removed per request */}
         </div>
 
         {/* Compact Toggle Bar */}
-        <div className="flex items-center gap-2 p-2.5">
+        <div className="flex items-center gap-2 p-2">
           {/* Play/Pause Button - Main Control */}
           <button
             onClick={handlePlayPause}
             disabled={isProcessing}
-            className="p-3 rounded-full transition-all shadow-md"
+            className="p-2.5 rounded-full transition-all shadow-md"
             style={{
               backgroundColor: isProcessing ? 'var(--color-text-tertiary)' : 'var(--color-primary)',
               color: 'var(--color-text-inverse)',
