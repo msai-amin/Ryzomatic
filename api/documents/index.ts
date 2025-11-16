@@ -400,12 +400,12 @@ async function handleOCRProcess(req: VercelRequest, res: VercelResponse) {
 
     const pdfBuffer = await streamToBuffer(s3Response.Body as Readable);
 
-    // Perform OCR
-    const ocrResult = await GPT5NanoService.ocrDocument(
-      pdfBuffer,
-      pageCount,
-      options
-    );
+    // Perform OCR using Gemini 2.5 flash-lite (preferred). Fallback to GPT5 if needed.
+    let ocrResult = await geminiService.ocrDocument(pdfBuffer, pageCount, options, profile.tier);
+    if (!ocrResult.success) {
+      console.warn('Gemini OCR failed, falling back to GPT5NanoService:', ocrResult.error);
+      ocrResult = await GPT5NanoService.ocrDocument(pdfBuffer, pageCount, options);
+    }
 
     if (!ocrResult.success) {
       await supabase

@@ -373,6 +373,124 @@ ${content.substring(0, 5000)}`;
       return { safe: true };
     }
   }
+
+  /**
+   * Perform OCR on a PDF document using Gemini vision (e.g., gemini-2.5-flash-lite)
+   */
+  async ocrDocument(
+    pdfBuffer: Buffer,
+    pageCount: number,
+    options: { preserveFormatting?: boolean; extractTables?: boolean } = {},
+    tier: string = 'free'
+  ): Promise<{
+    success: boolean;
+    extractedText: string;
+    pageTexts: string[];
+    metadata: {
+      tokensUsed: number;
+      creditsCharged: number;
+      processingTime: number;
+      confidence?: number;
+      pagesProcessed: number;
+    };
+    error?: string;
+  }> {
+    const start = Date.now();
+    try {
+      if (!process.env.GEMINI_API_KEY) {
+        return {
+          success: false,
+          extracted: '' as any,
+          extractedText: '',
+          pageTexts: [],
+          metadata: { tokensUsed: 0, creditsCharged: 0, processingTime: 0, pagesProcessed: 0 },
+          error: 'GEMINI_API_KEY is not configured',
+        };
+      }
+
+      const model = this.getModel(tier);
+      const pdfBase64 = pdfBuffer.toString('base64');
+
+      let instruction =
+        'You are an OCR engine. Extract all human-readable text from the attached PDF. Return only the plain text content. ' +
+        'Do not include any explanations or formatting artifacts. Preserve paragraph breaks. ';
+      if (options.preserveFormatting) {
+        instruction += 'Preserve paragraph and section breaks where apparent. ';
+      }
+      if (options.extractTables) {
+        instruction += 'Represent tables in simple Markdown tables when encountered. ';
+      }
+
+      const result = await model.generateContent({
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: `${instruction}\n\nThis document has approximately ${pageCount} pages.` },
+              {
+                inlineData: {
+                  data: pdfBase64,
+                  mimeType: 'application/pdf',
+                },
+              },
+            ],
+          },
+        ],
+        // Use tier-based generation config where applicable
+        generationConfig: this.getGenerationConfig(tier),
+      });
+
+      const text = (result.response?.text?.() ?? '').trim();
+      const extractedText = text || '';
+
+      // Best-effort split into page-like chunks
+      const pageTexts = this.splitTextIntoPages(extractedText, Math.max(1, pageCount));
+
+      const elapsed = Date.now() - start;
+      return {
+        success: true,
+        extractedText,
+        pageTexts,
+        metadata: {
+          tokensUsed: 0,
+          creditsCharged: 0,
+          processingTime: elapsed,
+          confidence: 0.9,
+          pagesProcessed: pageCount,
+        },
+      };
+    } catch (err: any) {
+      const elapsed = Date.now() - start;
+      console.error('Gemini OCR error:', err);
+      return {
+        success: false,
+        extractedText: '',
+        pageTexts: [],
+        metadata: { tokensUsed: 0, creditsCharged: 0, processingTime: elapsed, pagesProcessed: 0 },
+        error: err?.message || 'Gemini OCR failed',
+      };
+    }
+  }
+
+  private splitTextIntoPages(text: string, pageCount: number): string[] {
+    const patterns = [/\n---PAGE \d+---\n/gi, /\n\[Page \d+\]\n/gi, /\f/g];
+    let parts: string[] = [];
+    for (const p of patterns) {
+      if (p.test(text)) {
+        parts = text.split(p).filter((t) => t.trim().length > 0);
+        if (parts.length > 1) return parts;
+      }
+    }
+    // Fallback approximate split
+    const per = Math.max(1, Math.ceil(text.length / pageCount));
+    const res: string[] = [];
+    for (let i = 0; i < pageCount; i++) {
+      const s = i * per;
+      const e = Math.min(text.length, (i + 1) * per);
+      res.push(text.slice(s, e));
+    }
+    return res;
+  }
 }
 
 // Export singleton instance
