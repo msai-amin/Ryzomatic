@@ -1408,7 +1408,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       >
         {/* Custom Toolbar */}
         <div 
-          className="flex flex-wrap items-center justify-center gap-4 p-4 border-b"
+          className="flex flex-wrap items-center justify-center gap-4 px-4 py-3 border-b"
           style={{ 
             backgroundColor: 'var(--color-surface)', 
             borderColor: 'var(--color-border)',
