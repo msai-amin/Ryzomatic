@@ -25,7 +25,6 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   // Version marker to verify live bundle
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // eslint-disable-next-line no-console
       console.log('🔊 AudioWidget version:', 'v2');
     }
   }, []);

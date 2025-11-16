@@ -701,17 +701,15 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
               }}
               onClick={() => {
                 // Ask AI clarification for the selected text
-                try {
-                  setSelectedTextContext({
-                    selectedText: props.selectedText,
-                    beforeContext: '',
-                    afterContext: '',
-                    pageNumber: (props.highlightAreas?.[0]?.pageIndex ?? 0) + 1,
-                    fullContext: props.selectedText
-                  })
-                  setChatMode('clarification')
-                  if (!isChatOpen) toggleChat()
-                } catch {}
+                setSelectedTextContext({
+                  selectedText: props.selectedText,
+                  beforeContext: '',
+                  afterContext: '',
+                  pageNumber: (props.highlightAreas?.[0]?.pageIndex ?? 0) + 1,
+                  fullContext: props.selectedText
+                })
+                setChatMode('clarification')
+                if (!isChatOpen) toggleChat()
                 props.cancel()
               }}
             >
@@ -729,17 +727,15 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                 flex: 1
               }}
               onClick={() => {
-                try {
-                  setSelectedTextContext({
-                    selectedText: props.selectedText,
-                    beforeContext: '',
-                    afterContext: '',
-                    pageNumber: (props.highlightAreas?.[0]?.pageIndex ?? 0) + 1,
-                    fullContext: props.selectedText
-                  })
-                  setChatMode('further-reading')
-                  if (!isChatOpen) toggleChat()
-                } catch {}
+                setSelectedTextContext({
+                  selectedText: props.selectedText,
+                  beforeContext: '',
+                  afterContext: '',
+                  pageNumber: (props.highlightAreas?.[0]?.pageIndex ?? 0) + 1,
+                  fullContext: props.selectedText
+                })
+                setChatMode('further-reading')
+                if (!isChatOpen) toggleChat()
                 props.cancel()
               }}
             >
