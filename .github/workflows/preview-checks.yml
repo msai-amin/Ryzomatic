@@ -1,0 +1,26 @@
+name: Preview Checks
+
+on:
+  deployment_status:
+
+jobs:
+  preview-health:
+    if: github.event.deployment_status.state == 'success' && contains(github.event.deployment.environment, 'Preview')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine preview URL
+        id: url
+        run: |
+          echo "url=${{ github.event.deployment_status.target_url }}" >> $GITHUB_OUTPUT
+
+      - name: Hit homepage
+        run: |
+          curl -sSL -o /dev/null -w "%{http_code}\n" "${{ steps.url.outputs.url }}" | tee /tmp/code && \
+          test "$(cat /tmp/code)" = "200"
+
+      - name: Health endpoint
+        run: |
+          curl -sSL -o /dev/null -w "%{http_code}\n" "${{ steps.url.outputs.url }}/api/health" | tee /tmp/hcode && \
+          ( [ "$(cat /tmp/hcode)" = "200" ] || [ "$(cat /tmp/hcode)" = "401" ] )
+
+
