@@ -63,8 +63,18 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const [duration, setDuration] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true
+    const stored = window.localStorage.getItem('audioWidgetExpanded')
+    return stored === null ? true : stored === 'true'
+  })
   const [playbackMode, setPlaybackMode] = useState<'paragraph' | 'page' | 'continue'>('paragraph')
+  // Persist expanded/collapsed state
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('audioWidgetExpanded', String(isExpanded))
+    }
+  }, [isExpanded])
   const [savedPosition, setSavedPosition] = useState<TTSPosition | null>(null)
   const lastClickTimeRef = useRef<number>(0)
   const previousDocumentIdRef = useRef<string | null>(null)
@@ -1091,7 +1101,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               className="text-xs truncate max-w-20"
               style={{ color: 'var(--color-text-secondary)' }}
             >
-              {tts.isPlaying ? 'Playing' : ttsManager.isPausedState() ? 'Paused' : 'Stopped'}
+              {tts.isPlaying ? 'Playing' : ttsManager.isPausedState() ? 'Paused' : 'Ready'}
             </span>
           </div>
 
@@ -1113,6 +1123,22 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
           </button>
         </div>
+
+        {/* Minimal progress indicator when collapsed */}
+        {!isExpanded && (
+          <div className="px-3 pb-2">
+            <div
+              className="w-full h-1 rounded-full"
+              style={{ backgroundColor: 'var(--color-border)' }}
+              title={`${Math.round(progressPercentage)}%`}
+            >
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${progressPercentage}%`, backgroundColor: 'var(--color-primary)' }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Expanded Controls */}
         {isExpanded && (
