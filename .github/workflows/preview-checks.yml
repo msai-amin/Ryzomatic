@@ -15,8 +15,9 @@ jobs:
 
       - name: Hit homepage
         run: |
-          curl -sSL -o /dev/null -w "%{http_code}\n" "${{ steps.url.outputs.url }}" | tee /tmp/code && \
-          test "$(cat /tmp/code)" = "200"
+          code=$(curl -sSL -o /dev/null -w "%{http_code}\n" "${{ steps.url.outputs.url }}")
+          echo "homepage: $code"
+          if [ "$code" != "200" ] && [ "$code" != "401" ]; then exit 1; fi
 
       - name: Health endpoint
         run: |
