@@ -969,64 +969,56 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         onTouchStart={handleWidgetTouchStart}
       >
         {/* Playback Mode Selector - Show when expanded or always visible */}
-        <div className="flex items-center justify-between px-3 pt-1.5 pb-1.5 border-b" style={{ borderColor: 'var(--color-border)' }}>
-          <div className="flex items-center gap-1">
-          <button
-            onClick={() => handlePlaybackModeChange('paragraph')}
-            className={`px-2 py-0.5 text-xs font-medium rounded transition-all ${
-              playbackMode === 'paragraph' 
-                ? 'text-blue-600 ring-1 ring-blue-500/40 bg-[rgba(59,130,246,0.12)]' 
-                : 'text-gray-500 hover:text-gray-300'
-            }`}
-            style={{
-              backgroundColor: playbackMode === 'paragraph' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-            }}
-            aria-pressed={playbackMode === 'paragraph'}
-            aria-label="Paragraph mode"
-          >
-            Paragraph
-          </button>
-          <button
-            onClick={() => handlePlaybackModeChange('page')}
-            className={`px-2 py-0.5 text-xs font-medium rounded transition-all ${
-              playbackMode === 'page' 
-                ? 'text-blue-600 ring-1 ring-blue-500/40 bg-[rgba(59,130,246,0.12)]' 
-                : 'text-gray-500 hover:text-gray-300'
-            }`}
-            style={{
-              backgroundColor: playbackMode === 'page' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-            }}
-            aria-pressed={playbackMode === 'page'}
-            aria-label="Page mode"
-          >
-            Page
-          </button>
-          <button
-            onClick={() => handlePlaybackModeChange('continue')}
-            className={`px-2 py-0.5 text-xs font-medium rounded transition-all ${
-              playbackMode === 'continue' 
-                ? 'text-blue-600 ring-1 ring-blue-500/40 bg-[rgba(59,130,246,0.12)]' 
-                : 'text-gray-500 hover:text-gray-300'
-            }`}
-            style={{
-              backgroundColor: playbackMode === 'continue' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-            }}
-            aria-pressed={playbackMode === 'continue'}
-            aria-label="Continue mode"
-          >
-            Continue
-          </button>
+        {isExpanded && (
+          <div className="flex items-center justify-between px-3 pt-1 pb-1 border-b" style={{ borderColor: 'var(--color-border)' }}>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => handlePlaybackModeChange('paragraph')}
+                className={`px-2 py-0.5 text-[11px] font-medium rounded transition-all ${
+                  playbackMode === 'paragraph' 
+                    ? 'text-blue-500 ring-1 ring-blue-500/40 bg-[rgba(59,130,246,0.12)]' 
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+                aria-pressed={playbackMode === 'paragraph'}
+                aria-label="Paragraph mode"
+              >
+                Paragraph
+              </button>
+              <button
+                onClick={() => handlePlaybackModeChange('page')}
+                className={`px-2 py-0.5 text-[11px] font-medium rounded transition-all ${
+                  playbackMode === 'page' 
+                    ? 'text-blue-500 ring-1 ring-blue-500/40 bg-[rgba(59,130,246,0.12)]' 
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+                aria-pressed={playbackMode === 'page'}
+                aria-label="Page mode"
+              >
+                Page
+              </button>
+              <button
+                onClick={() => handlePlaybackModeChange('continue')}
+                className={`px-2 py-0.5 text-[11px] font-medium rounded transition-all ${
+                  playbackMode === 'continue' 
+                    ? 'text-blue-500 ring-1 ring-blue-500/40 bg-[rgba(59,130,246,0.12)]' 
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+                aria-pressed={playbackMode === 'continue'}
+                aria-label="Continue mode"
+              >
+                Continue
+              </button>
+            </div>
           </div>
-          {/* Version badge removed per request */}
-        </div>
+        )}
 
         {/* Compact Toggle Bar */}
-        <div className="flex items-center gap-2 p-2">
+        <div className="flex items-center gap-2 p-1.5">
           {/* Play/Pause Button - Main Control */}
           <button
             onClick={handlePlayPause}
             disabled={isProcessing}
-            className="p-2.5 rounded-full transition-all shadow-md"
+            className="p-2 rounded-full transition-all shadow-md"
             style={{
               backgroundColor: isProcessing ? 'var(--color-text-tertiary)' : 'var(--color-primary)',
               color: 'var(--color-text-inverse)',
@@ -1128,7 +1120,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
         {/* Minimal progress indicator when collapsed */}
         {!isExpanded && (
-          <div className="px-3 pb-2">
+          <div className="px-2 pb-1">
             <div
               className="w-full h-1 rounded-full"
               style={{ backgroundColor: 'var(--color-border)' }}
