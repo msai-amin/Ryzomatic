@@ -37,9 +37,7 @@ import { HighlightManagementPanel } from './HighlightManagementPanel'
 import { NotesPanel } from './NotesPanel'
 import { LibraryModal } from './LibraryModal'
 import { DocumentUpload } from './DocumentUpload'
-import { TextCleanupModal } from './TextCleanupModal'
 import { TTSControls } from './TTSControls'
-import { cleanupDocumentText, CleanupPreferences } from '../services/textCleanupService'
 
 interface PDFViewerV2Props {
   // No props needed - gets document from store
