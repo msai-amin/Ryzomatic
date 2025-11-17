@@ -923,7 +923,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const blobUrlRef = useRef<string | null>(null)
   
   // Convert document.pdfData to a format react-pdf-viewer can use
-  const getDocumentUrl = (): string | Uint8Array => {
+  // CRITICAL: Memoize this to prevent infinite re-renders
+  // If we return a new Uint8Array on every render, React sees it as a new value and re-renders infinitely
+  const documentUrl = useMemo((): string | Uint8Array => {
     // pdfData is guaranteed to exist at this point due to early return above
     if (!document.pdfData) {
       throw new Error('No PDF data available - this should not happen')
@@ -936,9 +938,12 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
     // If it's a Blob, create a blob URL (cached)
     if (document.pdfData instanceof Blob) {
-      if (!blobUrlRef.current) {
-        blobUrlRef.current = URL.createObjectURL(document.pdfData)
+      // Clean up old blob URL if document changed
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current)
+        blobUrlRef.current = null
       }
+      blobUrlRef.current = URL.createObjectURL(document.pdfData)
       return blobUrlRef.current
     }
 
@@ -968,7 +973,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       console.error('❌ PDFViewerV2: Failed to convert pdfData to Uint8Array:', error)
       throw new Error('PDF data format is invalid. Please try re-opening the document.')
     }
-  }
+  }, [document.pdfData, document.id]) // Re-compute when pdfData or document.id changes
   
   // Cleanup blob URL when document changes or component unmounts
   useEffect(() => {
@@ -1935,7 +1940,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           {isPDFjsReady ? (
             <Worker workerUrl={getPDFWorkerSrc()}>
               <Viewer
-                fileUrl={getDocumentUrl()}
+                fileUrl={documentUrl}
                 plugins={[
                   highlightPluginInstance,
                   scrollModePluginInstance,
