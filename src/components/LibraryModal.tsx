@@ -1012,7 +1012,6 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                       Organise your documents, notes, and audio clips.
                     </p>
                   </div>
-                      Organise your documents, notes, and audio clips.
 
                 <div className="flex flex-wrap items-center gap-3">
                   <div
