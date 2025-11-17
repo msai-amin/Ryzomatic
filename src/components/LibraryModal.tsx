@@ -806,9 +806,9 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         await supabaseStorageService.deleteBook(id);
         console.log('Book moved to trash in Supabase:', id);
         
-        // Move to trash in Supabase (primary storage)
-        await supabaseStorageService.deleteBook(id);
-        console.log('Book moved to trash in Supabase:', id);
+        // Also delete from localStorage as backup
+        try {
+          storageService.deleteBook(id);
           console.log('Book deleted from localStorage:', id);
         } catch (localError) {
           console.warn('Failed to delete from localStorage (non-critical):', localError);
@@ -822,20 +822,13 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         alert('File removed to trash');
       } catch (error) {
         console.error('Error deleting book:', error);
-        alert('File removed to trash');
+        console.error('Error details:', {
           message: error.message,
           stack: error.stack,
           name: error.name
         });
-        alert(`Failed to delete book: ${error.message || 'Unknown error'}`);
-      }
-    }
         alert(`Failed to move book to trash: ${error.message || 'Unknown error'}`);
-
-  const handleDeleteNote = (id: string) => {
-    if (confirm('Delete this note?')) {
-      storageService.deleteNote(id);
-      loadData();
+      }
     }
   };
 
