@@ -778,37 +778,22 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
           ? workingBook.fileData
           : legacyTextContent || '';
 
-    // CRITICAL: Clone ArrayBuffer to prevent detachment issues
-    // When ArrayBuffers are passed around or used in multiple places, they can become detached
-    // Cloning ensures we always have a fresh, non-detached copy
+    // CRITICAL: Always clone ArrayBuffer to prevent detachment issues
+    // When ArrayBuffers are passed around or used in multiple places (e.g., text extraction),
+    // they can become detached. Cloning ensures we always have a fresh, non-detached copy.
+    // We clone BEFORE any operations that might use the buffer to ensure it's still valid.
     let pdfData: ArrayBuffer | undefined
     if (workingBook.type === 'pdf' && workingBook.fileData instanceof ArrayBuffer) {
-      try {
-        // Check if ArrayBuffer is detached
-        new Uint8Array(workingBook.fileData, 0, 1)
-        // Not detached - clone it to be safe
-        pdfData = workingBook.fileData.slice(0)
-      } catch (error) {
-        // Already detached - clone it
-        console.warn('⚠️ LibraryModal: ArrayBuffer is detached, cloning...', error)
-        pdfData = workingBook.fileData.slice(0)
-      }
+      // Always clone to ensure we have a fresh copy that won't be detached
+      // This is safe even if the original is already detached (slice creates new buffer)
+      pdfData = workingBook.fileData.slice(0)
     }
 
     let epubData: Blob | undefined
     if (workingBook.type === 'epub' && workingBook.fileData instanceof ArrayBuffer) {
-      try {
-        // Check if ArrayBuffer is detached before creating Blob
-        new Uint8Array(workingBook.fileData, 0, 1)
-        // Not detached - clone it to be safe
-        const clonedBuffer = workingBook.fileData.slice(0)
-        epubData = new Blob([clonedBuffer], { type: 'application/epub+zip' })
-      } catch (error) {
-        // Already detached - clone it
-        console.warn('⚠️ LibraryModal: EPUB ArrayBuffer is detached, cloning...', error)
-        const clonedBuffer = workingBook.fileData.slice(0)
-        epubData = new Blob([clonedBuffer], { type: 'application/epub+zip' })
-      }
+      // Always clone before creating Blob to ensure we have a fresh copy
+      const clonedBuffer = workingBook.fileData.slice(0)
+      epubData = new Blob([clonedBuffer], { type: 'application/epub+zip' })
     }
 
     const doc = {
