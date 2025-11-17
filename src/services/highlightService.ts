@@ -1,10 +1,79 @@
 /**
  * Highlight Service
  * Manages highlight CRUD operations, caching, and syncing with backend
+ * 
+ * Updated to use react-pdf-viewer's HighlightArea format with percentage-based coordinates
  */
 
 import { authService } from './supabaseAuthService';
 
+/**
+ * HighlightArea format from react-pdf-viewer
+ * Uses percentage-based coordinates (0-100) instead of pixels
+ * This eliminates scaling issues and ensures highlights are always correctly positioned
+ */
+export interface HighlightArea {
+  height: number;    // Percentage (0-100)
+  left: number;      // Percentage (0-100)
+  pageIndex: number; // Zero-based page index
+  top: number;       // Percentage (0-100)
+  width: number;     // Percentage (0-100)
+}
+
+/**
+ * DivText format from react-pdf-viewer
+ * Represents a text div on a page
+ */
+export interface DivText {
+  pageIndex: number;
+  divIndex: number;
+  textContent: string;
+}
+
+/**
+ * SelectionData format from react-pdf-viewer
+ * Tracks text selection with precise offsets for text matching
+ */
+export interface SelectionData {
+  divTexts: DivText[];
+  selectedText: string;
+  startPageIndex: number;
+  endPageIndex: number;
+  startOffset: number;
+  startDivIndex: number;
+  endOffset: number;
+  endDivIndex: number;
+}
+
+/**
+ * HighlightPosition using react-pdf-viewer format
+ * Stores highlight areas as percentages and selection data for text matching
+ */
+export interface HighlightPosition {
+  highlightAreas: HighlightArea[];
+  selectionData?: SelectionData;
+  // Legacy support - will be removed after migration
+  scaledBoundingRect?: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    width: number;
+    height: number;
+    pageNumber: number;
+  };
+  scaledRects?: Array<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    width: number;
+    height: number;
+    pageNumber: number;
+  }>;
+}
+
+// Legacy interfaces for backward compatibility during migration
 export interface HighlightRect {
   x: number;
   y: number;
@@ -12,8 +81,15 @@ export interface HighlightRect {
   height: number;
 }
 
-export interface HighlightPosition extends HighlightRect {
-  rects?: HighlightRect[];
+export interface ScaledHighlightRect {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  width: number;
+  height: number;
+  pageNumber: number;
+  usePdfCoordinates?: boolean;
 }
 
 export interface TextAnchors {
@@ -74,10 +150,17 @@ class HighlightService {
 
   /**
    * Check if API is available (only in production/deployed environment)
+   * For local development, we'll try to use the API if it's available
    */
   private isAPIAvailable(): boolean {
-    // API endpoints are Vercel serverless functions - only available in production
-    return import.meta.env.PROD || window.location.hostname !== 'localhost';
+    // Allow local development - API endpoints should work with Vite proxy or direct calls
+    // In production, always available
+    if (import.meta.env.PROD) {
+      return true;
+    }
+    // In development, allow API calls (they may fail gracefully if endpoint doesn't exist)
+    // This allows testing with local API server or Vercel dev server
+    return true;
   }
 
   /**
@@ -178,21 +261,46 @@ class HighlightService {
           console.warn('Book not found when fetching highlights, returning empty array:', bookId);
           return [];
         }
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to fetch highlights');
+        
+        // Check if response is JSON before parsing
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to fetch highlights');
+        } else {
+          throw new Error(`Failed to fetch highlights: ${response.statusText}`);
+        }
       }
 
-      const result = await response.json();
+      // Check if response is actually JSON before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('getHighlights: Response is not JSON, returning empty array');
+        return [];
+      }
+
+      const text = await response.text();
+      if (!text || text.trim().length === 0) {
+        return [];
+      }
+
+      const result = JSON.parse(text);
       
       // Update cache if fetching all highlights for a book
       if (options.pageNumber === undefined) {
         this.cache.set(bookId, result.highlights);
       }
 
-      return result.highlights;
+      return result.highlights || [];
     } catch (error) {
-      console.error('Error fetching highlights:', error);
-      throw error;
+      // Only log if it's not a JSON parse error (which is expected if API is unavailable)
+      if (error instanceof SyntaxError) {
+        console.warn('getHighlights: API endpoint may not be available in local development');
+        return [];
+      } else {
+        console.error('Error fetching highlights:', error);
+        throw error;
+      }
     }
   }
 
@@ -460,9 +568,21 @@ class HighlightService {
           width: maxX - minX,
           height: maxY - minY
         }
+        // Convert to percentage-based HighlightArea for this page
+        const leftPct = (rect.x / (viewport.width || 1)) * 100
+        const topPct = (rect.y / (viewport.height || 1)) * 100
+        const widthPct = (rect.width / (viewport.width || 1)) * 100
+        const heightPct = (rect.height / (viewport.height || 1)) * 100
+        const area = {
+          left: Math.max(0, Math.min(100, leftPct)),
+          top: Math.max(0, Math.min(100, topPct)),
+          width: Math.max(0, Math.min(100, widthPct)),
+          height: Math.max(0, Math.min(100, heightPct)),
+          pageIndex: pageNumber - 1
+        }
         return {
-          ...rect,
-          rects: [rect]
+          highlightAreas: [area],
+          selectionData: highlight.position_data?.selectionData
         }
       }
       

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { authService, AuthUser } from '../services/supabaseAuthService'
 import { DocumentRelationshipWithDetails } from '../../lib/supabase'
-import { HighlightPosition as ServiceHighlightPosition } from '../services/highlightService'
+import { HighlightPosition as ServiceHighlightPosition, HighlightArea, SelectionData } from '../services/highlightService'
 
 export interface TextAnchors {
   startIndex?: number
@@ -86,12 +86,11 @@ export interface TypographySettings {
   fontSize: number
   lineHeight: number
   maxWidth: number
-  theme: 'light' | 'dark' | 'sepia'
+  theme: 'light' | 'dark' | 'sepia' | 'reading'
   textAlign: 'left' | 'justify' | 'center'
   spacingMultiplier: number
   focusMode: boolean
   readingGuide: boolean
-  renderFormulas: boolean
 }
 
 export interface ThemeSettings {
@@ -101,6 +100,7 @@ export interface ThemeSettings {
 
 export interface PDFViewerSettings {
   currentPage: number
+  numPages: number | null
   zoom: number
   scale: number
   rotation: number
@@ -109,6 +109,7 @@ export interface PDFViewerSettings {
   showPageNumbers: boolean
   showProgress: boolean
   readingMode: boolean
+  darkMode: boolean
 }
 
 export interface LibraryFilters {
@@ -251,6 +252,9 @@ interface AppState {
   pomodoroWidgetPosition: { x: number; y: number }
   showPomodoroDashboard: boolean
   
+  // Audio widget state
+  audioWidgetPosition: { x: number; y: number }
+  
   // Related Documents state
   relatedDocuments: DocumentRelationshipWithDetails[]
   relatedDocumentsRefreshTrigger: number
@@ -319,6 +323,7 @@ interface AppState {
   // Pomodoro widget actions
   setPomodoroWidgetPosition: (position: { x: number; y: number }) => void
   setShowPomodoroDashboard: (show: boolean) => void
+  setAudioWidgetPosition: (position: { x: number; y: number }) => void
   
   // Text selection and AI mode actions
   setSelectedTextContext: (context: TextSelectionContext | null) => void
@@ -397,8 +402,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     textAlign: 'left',
     spacingMultiplier: 1.0,
     focusMode: false,
-    readingGuide: false,
-    renderFormulas: true
+    readingGuide: false
   },
   theme: {
     currentTheme: 'default',
@@ -406,14 +410,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   pdfViewer: {
     currentPage: 1,
+    numPages: null,
     zoom: 1.0,
     scale: 1.0,
     rotation: 0,
     viewMode: 'pdf',
-    scrollMode: 'single', // Default to One Page mode
+    scrollMode: 'continuous', // Default to Continuous Scrolling mode
     showPageNumbers: true,
     showProgress: true,
-    readingMode: false
+    readingMode: false,
+    darkMode: false
   },
   tts: {
     isEnabled: false,
@@ -476,6 +482,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Pomodoro widget state
   pomodoroWidgetPosition: { x: 0, y: 0 },
   showPomodoroDashboard: false,
+  
+  // Audio widget state
+  audioWidgetPosition: {
+    x: readNumberPreference('audioWidgetX', 0),
+    y: readNumberPreference('audioWidgetY', 0)
+  },
   
   // Related Documents state
   relatedDocuments: [],
@@ -830,6 +842,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Pomodoro widget actions
   setPomodoroWidgetPosition: (position) => set({ pomodoroWidgetPosition: position }),
   setShowPomodoroDashboard: (show) => set({ showPomodoroDashboard: show }),
+  setAudioWidgetPosition: (position) => {
+    const safePosition = {
+      x: Number.isFinite(position.x) ? position.x : 0,
+      y: Number.isFinite(position.y) ? position.y : 0
+    }
+    set({ audioWidgetPosition: safePosition })
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('audioWidgetX', String(Math.round(safePosition.x)))
+      window.localStorage.setItem('audioWidgetY', String(Math.round(safePosition.y)))
+    }
+  },
   
   // Library view actions
   setLibraryView: (settings) => set((state) => ({

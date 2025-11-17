@@ -122,10 +122,27 @@ class PomodoroGamificationService {
         return []
       }
 
-      const data = await response.json()
+      // Check if response is actually JSON before parsing
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('getUserAchievements: Response is not JSON, returning empty array')
+        return []
+      }
+
+      const text = await response.text()
+      if (!text || text.trim().length === 0) {
+        return []
+      }
+
+      const data = JSON.parse(text)
       return data.achievements || []
     } catch (error) {
-      console.error('Error in getUserAchievements:', error)
+      // Only log if it's not a JSON parse error (which is expected if API is unavailable)
+      if (error instanceof SyntaxError) {
+        console.warn('getUserAchievements: API endpoint may not be available in local development')
+      } else {
+        console.error('Error in getUserAchievements:', error)
+      }
       return []
     }
   }
@@ -149,10 +166,27 @@ class PomodoroGamificationService {
         return null
       }
 
-      const data = await response.json()
+      // Check if response is actually JSON before parsing
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('getUserStreak: Response is not JSON, returning null')
+        return null
+      }
+
+      const text = await response.text()
+      if (!text || text.trim().length === 0) {
+        return null
+      }
+
+      const data = JSON.parse(text)
       return data.streak || null
     } catch (error) {
-      console.error('Error in getUserStreak:', error)
+      // Only log if it's not a JSON parse error (which is expected if API is unavailable)
+      if (error instanceof SyntaxError) {
+        console.warn('getUserStreak: API endpoint may not be available in local development')
+      } else {
+        console.error('Error in getUserStreak:', error)
+      }
       return null
     }
   }

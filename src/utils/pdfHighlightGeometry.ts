@@ -60,25 +60,62 @@ export const normalizeRectWithinBounds = (
 }
 
 export const mergeSpanRectsByLine = (rects: DOMRect[]): LineRect[] => {
-  const sorted = [...rects].sort((a, b) => a.top - b.top)
+  const sorted = [...rects].sort((a, b) => {
+    // Sort by top first, then by left
+    if (Math.abs(a.top - b.top) > LINE_MERGE_THRESHOLD_PX) {
+      return a.top - b.top
+    }
+    return a.left - b.left
+  })
   const groups: LineRect[] = []
+
+  // Calculate average rect width to detect column gaps
+  const avgWidth = rects.reduce((sum, r) => sum + r.width, 0) / rects.length
+  // Column gap threshold: if horizontal gap is > 3x average width, treat as different column
+  const COLUMN_GAP_THRESHOLD = Math.max(avgWidth * 3, 50) // At least 50px gap
 
   sorted.forEach(rect => {
     if (rect.width <= RECT_SIZE_EPSILON || rect.height <= RECT_SIZE_EPSILON) {
       return
     }
 
-    const match = groups.find(group =>
-      Math.abs(group.top - rect.top) <= LINE_MERGE_THRESHOLD_PX ||
-      Math.abs(group.bottom - rect.bottom) <= LINE_MERGE_THRESHOLD_PX
-    )
+    // Find a group on the same line where this rect overlaps or is adjacent
+    const match = groups.find(group => {
+      const sameLine = Math.abs(group.top - rect.top) <= LINE_MERGE_THRESHOLD_PX ||
+                       Math.abs(group.bottom - rect.bottom) <= LINE_MERGE_THRESHOLD_PX
+      
+      if (!sameLine) return false
+      
+      // CRITICAL: Check for column boundaries FIRST - if horizontal gap is too large, don't merge
+      // This prevents merging rects from different columns in multi-column layouts
+      // Calculate the horizontal distance between rects (handles both overlapping and non-overlapping cases)
+      const horizontalGap = rect.left > group.right 
+        ? rect.left - group.right  // rect is to the right of group
+        : group.left > rect.right
+        ? group.left - rect.right   // group is to the right of rect
+        : 0                          // they overlap horizontally
+      
+      // If there's a significant horizontal gap (likely a column boundary), don't merge
+      if (horizontalGap > COLUMN_GAP_THRESHOLD) {
+        return false
+      }
+      
+      // Check if rect overlaps or is adjacent to the group
+      // Adjacent means rect starts within threshold of group end, or group starts within threshold of rect end
+      const isOverlapping = !(rect.right < group.left - LINE_MERGE_THRESHOLD_PX || 
+                              rect.left > group.right + LINE_MERGE_THRESHOLD_PX)
+      
+      return isOverlapping
+    })
 
     if (match) {
+      // Only expand to actual bounds of selected rects, don't expand beyond
       match.left = Math.min(match.left, rect.left)
       match.right = Math.max(match.right, rect.right)
       match.top = Math.min(match.top, rect.top)
       match.bottom = Math.max(match.bottom, rect.bottom)
     } else {
+      // Create new group with actual rect bounds
       groups.push({
         left: rect.left,
         right: rect.right,
@@ -95,13 +132,34 @@ export const convertLineRectToScreenRect = (
   lineRect: LineRect,
   containerRect: DOMRect,
   widthLimit?: number,
-  heightLimit?: number
+  heightLimit?: number,
+  isRelativeToContainer: boolean = false,
+  skipNormalization: boolean = false
 ): RectLike | null => {
-  const rawRect: RectLike = {
-    x: lineRect.left - containerRect.left,
-    y: lineRect.top - containerRect.top,
-    width: lineRect.right - lineRect.left,
-    height: lineRect.bottom - lineRect.top
+  // If rects are already relative to container (e.g., text layer), don't subtract container position
+  const rawRect: RectLike = isRelativeToContainer
+    ? {
+        x: lineRect.left,
+        y: lineRect.top,
+        width: lineRect.right - lineRect.left,
+        height: lineRect.bottom - lineRect.top
+      }
+    : {
+        x: lineRect.left - containerRect.left,
+        y: lineRect.top - containerRect.top,
+        width: lineRect.right - lineRect.left,
+        height: lineRect.bottom - lineRect.top
+      }
+
+  // If skipNormalization is true (e.g., when using selectionClientRects), return raw rect
+  // Only validate that values are finite and positive
+  if (skipNormalization) {
+    if (!Number.isFinite(rawRect.x) || !Number.isFinite(rawRect.y) || 
+        !Number.isFinite(rawRect.width) || !Number.isFinite(rawRect.height) ||
+        rawRect.width <= RECT_SIZE_EPSILON || rawRect.height <= RECT_SIZE_EPSILON) {
+      return null
+    }
+    return rawRect
   }
 
   const effectiveWidthLimit = widthLimit ?? containerRect.width
@@ -114,7 +172,9 @@ export const buildScreenGeometry = (
   rects: DOMRect[],
   containerRect: DOMRect,
   widthLimit: number,
-  heightLimit: number
+  heightLimit: number,
+  isRelativeToContainer: boolean = false,
+  skipNormalization: boolean = false
 ): ScreenGeometryResult | null => {
   if (!rects.length) {
     return null
@@ -122,7 +182,7 @@ export const buildScreenGeometry = (
 
   const mergedLineRects = mergeSpanRectsByLine(rects)
   const normalizedScreenRects = mergedLineRects
-    .map(lineRect => convertLineRectToScreenRect(lineRect, containerRect, widthLimit, heightLimit))
+    .map(lineRect => convertLineRectToScreenRect(lineRect, containerRect, widthLimit, heightLimit, isRelativeToContainer, skipNormalization))
     .filter((rect): rect is RectLike => !!rect)
 
   if (!normalizedScreenRects.length) {

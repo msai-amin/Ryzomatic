@@ -294,8 +294,8 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
         }}
       >
         <div
-          className={`flex items-center ${isOpen ? 'justify-between px-4' : 'justify-center px-2'} py-4 border-b`}
-          style={{ borderColor: 'var(--color-border)' }}
+          className={`flex items-center ${isOpen ? 'justify-between px-4' : 'justify-center px-2'} py-3 border-b`}
+          style={{ borderColor: 'var(--color-border)', minHeight: '60px' }}
         >
           <button
             onClick={onToggle}
@@ -337,7 +337,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
 
         <div className="flex-1 overflow-y-auto">
           {isOpen ? (
-            <div className="px-4 pb-6">
+            <div className="px-4 pb-6" style={{ paddingTop: '8px' }}>
 
               {/* Recently Viewed Section */}
               <div className="mb-6">

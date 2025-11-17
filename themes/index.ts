@@ -5,6 +5,7 @@
 
 // Theme Configuration
 export { theme1Config, annotationColors } from './theme1-config'
+export { readingModeThemeConfig } from './reading-mode-theme-config'
 export type { ThemeConfig, ThemeColors, ThemeSpacing, ThemeTypography, ThemeBorderRadius, ThemeShadows } from './theme1-config'
 
 // Theme Provider and Hooks

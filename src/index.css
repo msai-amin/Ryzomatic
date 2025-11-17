@@ -505,6 +505,46 @@
     max-height: calc(100vh - 160px); /* Account for pt-20 + pb-8 */
   }
 
+/* Highlight Color Popover Styles - Force dark background everywhere */
+.highlight-popover-dark {
+  background-color: #111827 !important;
+  background: #111827 !important;
+}
+
+/* Force ALL child elements to be transparent so parent dark background shows */
+/* Use universal selector with high specificity */
+.highlight-popover-dark *:not([class*="rounded-full"]):not([style*="rgba(156, 163, 175, 0.2)"]) {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Override any Tailwind bg-* classes */
+.highlight-popover-dark [class*="bg-"]:not([class*="rounded-full"]) {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Force specific common elements */
+.highlight-popover-dark div:not([class*="rounded-full"]),
+.highlight-popover-dark span:not([class*="rounded-full"]),
+.highlight-popover-dark p:not([class*="rounded-full"]),
+.highlight-popover-dark h3:not([class*="rounded-full"]),
+.highlight-popover-dark button:not([class*="rounded-full"]) {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Preserve color swatches - they need their own colors */
+.highlight-popover-dark [class*="rounded-full"] {
+  background-color: revert !important;
+  background: revert !important;
+}
+
+/* Exception: Selected color item can have a subtle background */
+.highlight-popover-dark [style*="rgba(156, 163, 175, 0.2)"] {
+  background-color: rgba(156, 163, 175, 0.2) !important;
+}
+
 /* NeoReader Terminal Styles */
 .neoreader-terminal {
   font-family: 'Courier New', monospace;
@@ -931,6 +971,57 @@
 .chat-message-content .token.important,
 .chat-message-content .token.variable {
   color: #f97316;
+}
+
+/* React PDF Viewer Theme Overrides */
+.pdf-viewer-container {
+  background-color: var(--color-background, #000000) !important;
+  /* Override react-pdf-viewer's CSS variables for theme colors */
+  --rpv-core__inner-page-background-color: var(--color-background, #000000) !important;
+  --rpv-core__doc-loading-background-color: var(--color-background, #000000) !important;
+  --rpv-core__doc-error-background-color: var(--color-background, #000000) !important;
+  --rpv-core__full-screen-target-background-color: var(--color-background, #000000) !important;
+}
+
+/* Override react-pdf-viewer's default white background */
+.pdf-viewer-container .rpv-core__viewer,
+.pdf-viewer-container .rpv-core__viewer > div,
+.pdf-viewer-container .rpv-core__inner-pages,
+.pdf-viewer-container .rpv-core__inner-page,
+.pdf-viewer-container .rpv-core__page-layer,
+.pdf-viewer-container .rpv-core__doc-loading,
+.pdf-viewer-container .rpv-core__doc-error {
+  background-color: var(--color-background, #000000) !important;
+}
+
+/* Override page canvas background */
+.pdf-viewer-container .rpv-core__canvas-layer {
+  background-color: var(--color-background, #000000) !important;
+}
+
+/* Override text layer background */
+.pdf-viewer-container .rpv-core__text-layer {
+  background-color: transparent !important;
+}
+
+/* Dark Mode for PDF Viewer - Invert colors for dark pages with bright text */
+.pdf-viewer-dark-mode .rpv-core__canvas-layer canvas {
+  filter: invert(1) hue-rotate(180deg) !important;
+}
+
+/* Ensure text layer is visible in dark mode - invert to match canvas */
+.pdf-viewer-dark-mode .rpv-core__text-layer {
+  filter: invert(1) hue-rotate(180deg) !important;
+}
+
+/* Dark mode for inner pages - ensure dark background */
+.pdf-viewer-dark-mode .rpv-core__inner-page {
+  background-color: var(--color-background, #1a1a1a) !important;
+}
+
+/* Dark mode for page layer */
+.pdf-viewer-dark-mode .rpv-core__page-layer {
+  background-color: var(--color-background, #1a1a1a) !important;
 }
 
 

@@ -400,12 +400,12 @@ async function handleOCRProcess(req: VercelRequest, res: VercelResponse) {
 
     const pdfBuffer = await streamToBuffer(s3Response.Body as Readable);
 
-    // Perform OCR
-    const ocrResult = await GPT5NanoService.ocrDocument(
-      pdfBuffer,
-      pageCount,
-      options
-    );
+    // Perform OCR using Gemini 2.5 flash-lite (preferred). Fallback to GPT5 if needed.
+    let ocrResult = await geminiService.ocrDocument(pdfBuffer, pageCount, options, profile.tier);
+    if (!ocrResult.success) {
+      console.warn('Gemini OCR failed, falling back to GPT5NanoService:', ocrResult.error);
+      ocrResult = await GPT5NanoService.ocrDocument(pdfBuffer, pageCount, options);
+    }
 
     if (!ocrResult.success) {
       await supabase
@@ -532,6 +532,16 @@ async function handleOCRStatus(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    // Check if Supabase is configured
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      // For unauthenticated requests, return 401; for authenticated, return 500
+      const token = req.headers.authorization?.replace('Bearer ', '');
+      if (!token) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
+
     const { documentId } = req.query;
 
     if (!documentId || typeof documentId !== 'string') {

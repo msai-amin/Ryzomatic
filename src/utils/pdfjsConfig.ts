@@ -5,15 +5,12 @@
 
 /**
  * Get PDF.js worker source URL
- * Uses CDN worker for production to avoid deployment issues
+ * Uses local worker file for both dev and production
+ * The worker file is copied from node_modules during setup
  */
 export function getPDFWorkerSrc(): string {
-  // Use CDN for production to ensure correct version
-  if (import.meta.env.PROD) {
-    return 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.394/build/pdf.worker.min.mjs';
-  }
-  
-  // Use local worker for development
+  // Use local worker file - it's copied from node_modules/pdfjs-dist/build/pdf.worker.min.js
+  // This ensures version match and avoids CDN/CORS issues
   return '/pdf.worker.min.js';
 }
 

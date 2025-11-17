@@ -83,9 +83,51 @@ export async function extractWithFallback(
     // ========================================
     logger.info('Tier 1: Starting PDF.js extraction', context)
     
-    // Dynamic import of PDF.js to avoid ES module issues
-    const pdfjsModule = await import('pdfjs-dist')
-    const pdfjsLib = pdfjsModule.default || pdfjsModule
+    // Use globalThis.pdfjsLib if available (set in main.tsx), otherwise try dynamic import
+    let pdfjsLib: any
+    let getDocument: any
+    
+    if (typeof globalThis !== 'undefined' && (globalThis as any).pdfjsLib) {
+      // Use the globally initialized PDF.js library
+      pdfjsLib = (globalThis as any).pdfjsLib
+      getDocument = pdfjsLib.getDocument
+      
+      // Verify getDocument exists
+      if (!getDocument || typeof getDocument !== 'function') {
+        logger.warn('globalThis.pdfjsLib exists but getDocument is missing, falling back to dynamic import', context, {
+          pdfjsLibType: typeof pdfjsLib,
+          hasGetDocument: !!getDocument,
+          pdfjsLibKeys: pdfjsLib ? Object.keys(pdfjsLib).slice(0, 15) : []
+        } as any)
+        
+        // Fallback to dynamic import
+        const pdfjsModule = await import('pdfjs-dist')
+        pdfjsLib = pdfjsModule.default || pdfjsModule
+        getDocument = pdfjsLib.getDocument || pdfjsModule.getDocument
+        logger.info('Using dynamic import fallback for PDF extraction', context)
+      } else {
+        logger.info('Using globalThis.pdfjsLib for PDF extraction', context, {
+          hasGetDocument: typeof getDocument === 'function'
+        } as any)
+      }
+    } else {
+      // Fallback to dynamic import if globalThis.pdfjsLib is not available
+      const pdfjsModule = await import('pdfjs-dist')
+      pdfjsLib = pdfjsModule.default || pdfjsModule
+      getDocument = pdfjsLib.getDocument || pdfjsModule.getDocument
+      logger.info('Using dynamic import for PDF extraction', context)
+    }
+    
+    if (!getDocument || typeof getDocument !== 'function') {
+      logger.error('PDF.js module structure', context, {
+        hasGlobalThis: !!(typeof globalThis !== 'undefined' && (globalThis as any).pdfjsLib),
+        pdfjsLibType: typeof pdfjsLib,
+        hasGetDocument: !!getDocument,
+        pdfjsLibKeys: pdfjsLib ? Object.keys(pdfjsLib).slice(0, 15) : [],
+        pdfjsLibHasGetDocument: pdfjsLib ? typeof pdfjsLib.getDocument : 'N/A'
+      } as any)
+      throw new Error('getDocument function not found in PDF.js module. Check console for module structure.')
+    }
     
     // Set up PDF.js worker
     configurePDFWorker(pdfjsLib)
@@ -95,12 +137,6 @@ export async function extractWithFallback(
       : new Blob([pdfFile], { type: 'application/pdf' })
     
     const fileArrayBuffer = await fileBlob.arrayBuffer()
-    
-    // Load PDF with PDF.js
-    const getDocument = pdfjsLib.getDocument || pdfjsModule.getDocument
-    if (!getDocument) {
-      throw new Error('getDocument function not found in PDF.js module')
-    }
     
     logger.info('Loading PDF with PDF.js', context, {
       dataSize: fileArrayBuffer.byteLength,

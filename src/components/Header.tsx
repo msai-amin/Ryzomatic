@@ -3,7 +3,7 @@ import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut
 import { useAppStore } from '../store/appStore'
 import { DocumentUpload } from './DocumentUpload'
 import { TypographySettings } from './TypographySettings'
-import { LibraryModal } from './LibraryModal'
+import { ModernLibraryModal } from './ModernLibraryModal'
 import { AuthModal } from './AuthModal'
 import { ThemeSwitcher } from './ThemeSwitcher'
 
@@ -128,7 +128,7 @@ export const Header: React.FC = () => {
       )}
 
       {showLibrary && (
-        <LibraryModal 
+        <ModernLibraryModal 
           isOpen={showLibrary} 
           onClose={() => setShowLibrary(false)} 
           refreshTrigger={libraryRefreshTrigger}
