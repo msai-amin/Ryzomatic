@@ -213,3 +213,4 @@ The built files will be in the `dist` directory.
 ## License
 
 MIT License - see LICENSE file for details
+
