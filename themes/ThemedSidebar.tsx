@@ -489,6 +489,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
                         onPreviewDocument={handlePreviewDocument}
                         onDeleteRelationship={handleDeleteRelationship}
                         onOpenGraphView={() => setShowGraphModal(true)}
+                        onRelationshipCreated={refreshRelatedDocuments}
                       />
                     ) : (
                       <div className="text-center py-6">

@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
-import { FileText, Plus, Eye, Trash2, Loader, CheckCircle, AlertCircle, Clock, Network } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { FileText, Eye, Trash2, Loader, CheckCircle, AlertCircle, Clock, Network, Upload } from 'lucide-react';
 import { DocumentRelationshipWithDetails } from '../../lib/supabase';
 import { Tooltip } from './Tooltip';
+import { useAppStore } from '../store/appStore';
+import { supabaseStorageService } from '../services/supabaseStorageService';
+import { documentRelationships } from '../../lib/supabase';
 
 interface RelatedDocumentsPanelProps {
   relatedDocuments: DocumentRelationshipWithDetails[];
   isLoading: boolean;
-  onAddRelatedDocument: () => void;
+  onAddRelatedDocument: () => void; // Keep for backward compatibility but won't be used
   onPreviewDocument: (relationship: DocumentRelationshipWithDetails) => void;
   onDeleteRelationship: (relationshipId: string) => void;
   onOpenGraphView?: () => void;
+  onRelationshipCreated?: () => void; // Callback to refresh related documents
 }
 
 export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
@@ -18,13 +22,19 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
   onAddRelatedDocument,
   onPreviewDocument,
   onDeleteRelationship,
-  onOpenGraphView
+  onOpenGraphView,
+  onRelationshipCreated
 }) => {
+  const { currentDocument, user } = useAppStore();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
+  const [processingRelationships, setProcessingRelationships] = useState<Set<string>>(new Set());
+  
   const hasActiveAnalysis = relatedDocuments.some((relationship) =>
     relationship.relevance_calculation_status === 'processing' ||
     relationship.relevance_calculation_status === 'pending'
-  );
+  ) || processingRelationships.size > 0;
 
   const getRelevanceColor = (percentage?: number) => {
     if (!percentage) return 'var(--color-text-tertiary)';
@@ -61,6 +71,146 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
     }
   };
 
+  // Check if file format is compatible
+  const isCompatibleFile = (file: File): boolean => {
+    const compatibleTypes = ['application/pdf', 'application/epub+zip', 'text/plain', 'text/markdown'];
+    const compatibleExtensions = ['.pdf', '.epub', '.txt', '.md'];
+    return compatibleTypes.includes(file.type) || 
+           compatibleExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+  };
+
+  // Handle file upload and relationship creation
+  const handleFileUpload = useCallback(async (file: File) => {
+    if (!currentDocument || !user) {
+      alert('Please open a document first');
+      return;
+    }
+
+    if (!isCompatibleFile(file)) {
+      alert('Unsupported file format. Please upload PDF, EPUB, or TXT files.');
+      return;
+    }
+
+    const fileId = `${Date.now()}-${file.name}`;
+    setUploadingFiles(prev => new Set(prev).add(fileId));
+    let documentId: string | undefined;
+
+    try {
+      // Initialize storage service
+      supabaseStorageService.setCurrentUser(user.id);
+
+      // Read file content
+      let fileData: string | Blob;
+      if (file.type === 'text/plain' || file.type === 'text/markdown') {
+        fileData = await file.text();
+      } else {
+        fileData = file;
+      }
+
+      // Upload to library
+      documentId = await supabaseStorageService.saveBook({
+        id: crypto.randomUUID(),
+        title: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
+        fileName: file.name,
+        type: file.type === 'application/pdf' ? 'pdf' : 
+              file.type === 'application/epub+zip' ? 'epub' : 'text',
+        savedAt: new Date(),
+        fileData: fileData,
+      });
+
+      setUploadingFiles(prev => {
+        const next = new Set(prev);
+        next.delete(fileId);
+        return next;
+      });
+
+      // Create relationship with 'pending' status
+      if (documentId) {
+        setProcessingRelationships(prev => new Set(prev).add(documentId));
+
+        const { data: relationship, error } = await documentRelationships.create({
+          source_document_id: currentDocument.id,
+          related_document_id: documentId,
+        });
+
+        if (error) {
+          throw new Error(`Failed to create relationship: ${error.message}`);
+        }
+
+        // Trigger refresh
+        if (onRelationshipCreated) {
+          onRelationshipCreated();
+        }
+
+        // The background service will automatically process the relationship using Gemini
+        // The loader will show until relevance_calculation_status becomes 'completed'
+      }
+
+    } catch (error) {
+      console.error('Error uploading file and creating relationship:', error);
+      alert(`Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setUploadingFiles(prev => {
+        const next = new Set(prev);
+        next.delete(fileId);
+        return next;
+      });
+      if (documentId) {
+        setProcessingRelationships(prev => {
+          const next = new Set(prev);
+          next.delete(documentId);
+          return next;
+        });
+      }
+    }
+  }, [currentDocument, user, onRelationshipCreated]);
+
+  // Drag and drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set isDragging to false if we're leaving the drop zone
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (!currentDocument || !user) {
+      alert('Please open a document first');
+      return;
+    }
+
+    const files = Array.from(e.dataTransfer.files);
+    const compatibleFiles = files.filter(isCompatibleFile);
+
+    if (compatibleFiles.length === 0) {
+      alert('No compatible files found. Please upload PDF, EPUB, or TXT files.');
+      return;
+    }
+
+    // Process all files
+    for (const file of compatibleFiles) {
+      await handleFileUpload(file);
+    }
+  }, [currentDocument, user, handleFileUpload]);
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -83,7 +233,43 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
   }
 
   return (
-    <div className="space-y-3">
+    <div 
+      className="space-y-3"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      style={{
+        position: 'relative',
+        minHeight: '200px',
+        transition: 'all 0.2s ease',
+        border: isDragging ? '2px dashed var(--color-primary)' : 'none',
+        borderRadius: isDragging ? '8px' : '0',
+        backgroundColor: isDragging ? 'var(--color-primary-light)' : 'transparent',
+        padding: isDragging ? '12px' : '0',
+      }}
+    >
+      {/* Drag overlay */}
+      {isDragging && (
+        <div 
+          className="absolute inset-0 flex items-center justify-center z-10 rounded-lg"
+          style={{
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          <div className="text-center">
+            <Upload className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--color-primary)' }} />
+            <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+              Drop files here to add related documents
+            </p>
+            <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+              PDF, EPUB, or TXT files
+            </p>
+          </div>
+        </div>
+      )}
+
       {hasActiveAnalysis && (
         <div
           className="flex items-center space-x-2 px-3 py-2 rounded-lg border text-xs"
@@ -98,33 +284,43 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
         </div>
       )}
 
+      {/* Upload progress indicators */}
+      {uploadingFiles.size > 0 && (
+        <div className="space-y-2">
+          {Array.from(uploadingFiles).map((fileId) => (
+            <div
+              key={fileId}
+              className="flex items-center space-x-2 px-3 py-2 rounded-lg border text-xs"
+              style={{
+                borderColor: 'var(--color-border)',
+                backgroundColor: 'var(--color-surface)',
+              }}
+            >
+              <Loader className="w-3 h-3 animate-spin" style={{ color: 'var(--color-primary)' }} />
+              <span style={{ color: 'var(--color-text-secondary)' }}>
+                Uploading file...
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
           Related Documents
         </h3>
-        <div className="flex items-center gap-1">
-          {onOpenGraphView && (
-            <Tooltip content="View Document Graph" position="left">
-              <button
-                onClick={onOpenGraphView}
-                className="p-1 rounded transition-colors hover:bg-gray-100"
-                style={{ color: 'var(--color-text-secondary)' }}
-              >
-                <Network className="w-4 h-4" />
-              </button>
-            </Tooltip>
-          )}
-          <Tooltip content="Add Related Document" position="left">
+        {onOpenGraphView && (
+          <Tooltip content="View Document Graph" position="left">
             <button
-              onClick={onAddRelatedDocument}
+              onClick={onOpenGraphView}
               className="p-1 rounded transition-colors hover:bg-gray-100"
               style={{ color: 'var(--color-text-secondary)' }}
             >
-              <Plus className="w-4 h-4" />
+              <Network className="w-4 h-4" />
             </button>
           </Tooltip>
-        </div>
+        )}
       </div>
 
       {/* Document Count */}
@@ -133,22 +329,15 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
       </div>
 
       {/* Documents List */}
-      {relatedDocuments.length === 0 ? (
+      {relatedDocuments.length === 0 && uploadingFiles.size === 0 && !isDragging ? (
         <div className="text-center py-6">
           <FileText className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--color-text-tertiary)' }} />
-          <p className="text-xs mb-3" style={{ color: 'var(--color-text-secondary)' }}>
+          <p className="text-xs mb-2" style={{ color: 'var(--color-text-secondary)' }}>
             No related documents yet
           </p>
-          <button
-            onClick={onAddRelatedDocument}
-            className="text-xs px-3 py-1 rounded-lg transition-colors"
-            style={{
-              backgroundColor: 'var(--color-primary)',
-              color: 'var(--color-text-inverse)'
-            }}
-          >
-            Add Related Document
-          </button>
+          <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+            Drag and drop PDF, EPUB, or TXT files here
+          </p>
         </div>
       ) : (
         <div className="space-y-2">
