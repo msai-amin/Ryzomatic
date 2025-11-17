@@ -798,16 +798,31 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
 
   const handleDeleteBook = async (id: string) => {
     console.log('handleDeleteBook called with id:', id);
-    const confirmed = window.confirm('Are you sure you want to delete this book and all its notes?');
+    const confirmed = window.confirm('Are you sure you want to permanently delete this book and all its notes? This action cannot be undone.');
     console.log('Confirmation result:', confirmed);
     
     if (confirmed) {
       try {
-        console.log('Starting deletion process for book:', id);
+        console.log('Starting permanent deletion process for book:', id);
         
-        // Delete from Supabase (primary storage)
-        await supabaseStorageService.deleteBook(id);
-        console.log('Book deleted from Supabase:', id);
+        // Try to permanently delete first (will work if book is already in Trash)
+        try {
+          await supabaseStorageService.permanentlyDeleteBook(id);
+          console.log('Book permanently deleted from Supabase:', id);
+        } catch (permanentDeleteError: any) {
+          // If book is not in Trash, move it there first, then permanently delete
+          if (permanentDeleteError?.message?.includes('Trash collection') || permanentDeleteError?.message?.includes('not in Trash')) {
+            console.log('Book not in Trash, moving to Trash first...');
+            await supabaseStorageService.deleteBook(id);
+            console.log('Book moved to Trash:', id);
+            
+            // Now permanently delete from Trash
+            await supabaseStorageService.permanentlyDeleteBook(id);
+            console.log('Book permanently deleted from Supabase:', id);
+          } else {
+            throw permanentDeleteError;
+          }
+        }
         
         // Also delete from localStorage as backup
         try {
@@ -822,15 +837,15 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         await loadData();
         console.log('Library data reloaded successfully');
         
-        alert('Book deleted successfully!');
-      } catch (error) {
+        alert('Book permanently deleted successfully!');
+      } catch (error: any) {
         console.error('Error deleting book:', error);
         console.error('Error details:', {
-          message: error.message,
-          stack: error.stack,
-          name: error.name
+          message: error?.message,
+          stack: error?.stack,
+          name: error?.name
         });
-        alert(`Failed to delete book: ${error.message || 'Unknown error'}`);
+        alert(`Failed to delete book: ${error?.message || 'Unknown error'}`);
       }
     }
   };
