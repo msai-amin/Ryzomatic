@@ -942,13 +942,31 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       return blobUrlRef.current
     }
 
-    // If it's an ArrayBuffer, return it as Uint8Array
+    // If it's an ArrayBuffer, check if it's detached and clone if necessary
     if (document.pdfData instanceof ArrayBuffer) {
-      return new Uint8Array(document.pdfData)
+      try {
+        // Try to create a Uint8Array view to check if ArrayBuffer is detached
+        new Uint8Array(document.pdfData, 0, 1)
+        // If successful, ArrayBuffer is not detached - create Uint8Array normally
+        return new Uint8Array(document.pdfData)
+      } catch (error) {
+        // ArrayBuffer is detached - clone it first
+        console.warn('⚠️ PDFViewerV2: ArrayBuffer is detached, cloning...', error)
+        const clonedBuffer = document.pdfData.slice(0)
+        return new Uint8Array(clonedBuffer)
+      }
     }
 
     // Fallback: try to convert to Uint8Array
-    return new Uint8Array(document.pdfData as ArrayBuffer)
+    try {
+      return new Uint8Array(document.pdfData as ArrayBuffer)
+    } catch (error) {
+      // If ArrayBuffer is detached, clone it
+      console.warn('⚠️ PDFViewerV2: Fallback conversion failed, cloning ArrayBuffer...', error)
+      const buffer = document.pdfData as ArrayBuffer
+      const clonedBuffer = buffer.slice(0)
+      return new Uint8Array(clonedBuffer)
+    }
   }
   
   // Cleanup blob URL when document changes or component unmounts
