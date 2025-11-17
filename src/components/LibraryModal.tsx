@@ -759,7 +759,6 @@ interface LibraryModalProps {
         }
         return undefined;
       })(),
-      })(),
         workingBook.type === 'epub' && workingBook.fileData instanceof ArrayBuffer
           ? new Blob([workingBook.fileData instanceof ArrayBuffer ? workingBook.fileData.slice(0) : workingBook.fileData], { type: 'application/epub+zip' })
           : undefined,
