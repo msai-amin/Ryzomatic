@@ -798,7 +798,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
     const confirmed = window.confirm('Are you sure you want to delete this book and all its notes?');
     console.log('Confirmation result:', confirmed);
     
-    if (confirmed) {
+    const confirmed = window.confirm('Are you sure you want to move this book to trash?');
       try {
         console.log('Starting deletion process for book:', id);
         
@@ -806,9 +806,9 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         await supabaseStorageService.deleteBook(id);
         console.log('Book deleted from Supabase:', id);
         
-        // Also delete from localStorage as backup
-        try {
-          storageService.deleteBook(id);
+        // Move to trash in Supabase (primary storage)
+        await supabaseStorageService.deleteBook(id);
+        console.log('Book moved to trash in Supabase:', id);
           console.log('Book deleted from localStorage:', id);
         } catch (localError) {
           console.warn('Failed to delete from localStorage (non-critical):', localError);
@@ -822,7 +822,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         alert('Book deleted successfully!');
       } catch (error) {
         console.error('Error deleting book:', error);
-        console.error('Error details:', {
+        alert('File removed to trash');
           message: error.message,
           stack: error.stack,
           name: error.name
@@ -830,7 +830,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         alert(`Failed to delete book: ${error.message || 'Unknown error'}`);
       }
     }
-  };
+        alert(`Failed to move book to trash: ${error.message || 'Unknown error'}`);
 
   const handleDeleteNote = (id: string) => {
     if (confirm('Delete this note?')) {
@@ -1019,7 +1019,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                       Organise your documents, notes, and audio clips with a calming night-mode workspace.
                     </p>
                   </div>
-                </div>
+                      Organise your documents, notes, and audio clips.
 
                 <div className="flex flex-wrap items-center gap-3">
                   <div
