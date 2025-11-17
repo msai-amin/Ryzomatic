@@ -280,7 +280,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                         {user.full_name || user.email}
                       </p>
                       <span
-                        className="mt-1 inline-flex items-center gap-2 rounded-full px-2 py-0.5 text-xs"
+                        className="mt-1 inline-flex items-center gap-2 rounded-full px-2 py-0.5 text-xs whitespace-nowrap"
                         style={{
                           backgroundColor: 'var(--color-primary-light)',
                           color: 'var(--color-primary-dark)'
