@@ -1908,6 +1908,28 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           onContextMenu={handleContextMenu}
           className={`pdf-viewer-container ${pdfViewer.darkMode ? 'pdf-viewer-dark-mode' : ''}`}
         >
+          {/* Override selection preview color - use neutral browser selection color, not highlight color */}
+          <style>{`
+            /* Override react-pdf-viewer highlight selection preview to use neutral color */
+            /* Target all possible selection preview classes */
+            .rpv-highlight__selected-area,
+            .rpv-highlight__selected-area *,
+            [data-testid="highlight-selected-area"],
+            .rpv-core__viewer .rpv-highlight__selected-area,
+            .rpv-core__viewer .rpv-highlight__selected-area *,
+            .pdf-viewer-container .rpv-highlight__selected-area,
+            .pdf-viewer-container [class*="highlight"][class*="selected"],
+            .pdf-viewer-container [class*="selected"][class*="area"],
+            /* Target any element with inline style background-color that matches highlight colors */
+            .pdf-viewer-container [style*="background-color"]:not([data-highlight-id]) {
+              background-color: rgba(0, 123, 255, 0.2) !important;
+              color: inherit !important;
+            }
+            /* Ensure saved highlights (with data-highlight-id) keep their colors */
+            .pdf-viewer-container [data-highlight-id] {
+              /* Let saved highlights use their assigned colors - don't override */
+            }
+          `}</style>
           {isPDFjsReady ? (
             <Worker workerUrl={getPDFWorkerSrc()}>
               <Viewer
