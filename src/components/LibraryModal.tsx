@@ -13,16 +13,7 @@ interface LibraryModalProps {
   isOpen: boolean;
   onClose: () => void;
   refreshTrigger?: number; // Add refresh trigger
-  const [activeTab, setActiveTab] = useState<'documents' | 'notes' | 'audio'>('documents');
-  const [books, setBooks] = useState<EnhancedSavedBook[]>([]);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [audio, setAudio] = useState<SavedAudio[]>([]);
-  const [storageInfo, setStorageInfo] = useState({ used: 0, max: 0, percentage: 0 });
-  const [isGoogleDriveEnabled, setIsGoogleDriveEnabled] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [isConnectingDrive, setIsConnectingDrive] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<{ lastSync: Date | null; isEnabled: boolean }>({ lastSync: null, isEnabled: false });
-  const [viewMode, setViewMode] = useState<'list' | 'grid' | 'comfortable'>('list');
+}
   const [isSupabaseData, setIsSupabaseData] = useState(false);
   const [favoriteBusyIds, setFavoriteBusyIds] = useState<string[]>([]);
   const [renameBusyIds, setRenameBusyIds] = useState<string[]>([]);
