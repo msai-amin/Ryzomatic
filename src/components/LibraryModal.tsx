@@ -965,7 +965,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex items-start justify-center pt-20 pb-12 px-4 md:px-6 overflow-y-auto"
+      className="fixed inset-0 z-[9999] flex items-start justify-center pt-12 pb-8 px-4 md:px-6 overflow-y-auto"
       style={{
         background: 'radial-gradient(circle at top, rgba(99, 102, 241, 0.28), rgba(17, 24, 39, 0.86))',
         backdropFilter: 'blur(18px)'
@@ -981,7 +981,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         <div className="relative">
             <button 
               onClick={onClose} 
-            className="absolute top-6 right-6 p-2 rounded-xl transition-colors"
+            className="absolute top-6 right-8 p-2 rounded-xl transition-colors"
             style={{
               color: 'var(--color-text-tertiary)',
               backgroundColor: 'rgba(148,163,184,0.08)',
@@ -1001,7 +1001,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
             </button>
 
           {/* Header */}
-          <div className="px-8 pt-8 pb-6 border-b" style={{ borderColor: 'rgba(148,163,184,0.12)' }}>
+          <div className="px-8 pt-6 pb-4 border-b" style={{ borderColor: 'rgba(148,163,184,0.12)' }}>
             <div className="flex flex-col gap-6">
               <div className="flex flex-wrap items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
@@ -1054,7 +1054,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-3 text-xs md:text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
+              <div className="flex flex-wrap gap-2 text-xs md:text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
                 <span className="flex items-center gap-2 px-3 py-1 rounded-full" style={{ backgroundColor: 'rgba(148,163,184,0.08)' }}>
                   <HardDrive className="w-3 h-3" />
                   Storage: {(storageInfo.used / 1024 / 1024).toFixed(2)} MB of{' '}
@@ -1073,7 +1073,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
           </div>
 
           {/* Tabs */}
-          <div className="px-8 pt-4">
+          <div className="px-8 pt-4 pb-4">
             <div
               className="flex items-center gap-2 rounded-full p-1"
               style={{
@@ -1121,7 +1121,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
           </div>
 
           {/* Content */}
-          <div className="px-8 py-6 max-h-[60vh] overflow-y-auto">
+          <div className="px-8 py-4 max-h-[60vh] overflow-y-auto">
             {activeTab === 'documents' && (
               <div className="flex flex-col gap-4 lg:flex-row">
                 <aside className="w-full lg:w-72 xl:w-80 flex-shrink-0">
@@ -1176,7 +1176,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                         onToggleFavorite={handleToggleCollectionFavorite}
                         onReorderCollections={handleReorderCollections}
                         onMoveCollection={handleMoveCollection}
-                        className="max-h-[420px] overflow-y-auto pr-1"
+                        className="max-h-[420px] overflow-y-auto pr-2"
                       />
                     )}
                   </div>
@@ -1189,7 +1189,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                       {totalDocuments === 1 ? 'document' : 'documents'}
                     </p>
                     <div
-                      className="flex items-center gap-1 rounded-full px-1.5 py-1.5"
+                      className="flex items-center gap-1 rounded-full px-2 py-2"
                       style={{
                         backgroundColor: 'rgba(148,163,184,0.08)',
                         border: '1px solid rgba(148,163,184,0.16)'
@@ -1750,7 +1750,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
 
           {/* Footer */}
           <div
-            className="px-8 py-6 border-t"
+            className="px-8 py-4 border-t"
             style={{
               borderColor: 'rgba(148,163,184,0.12)',
               background: 'linear-gradient(135deg, rgba(17,24,39,0.82), rgba(15,23,42,0.9))'
