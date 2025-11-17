@@ -185,7 +185,20 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             </span>
           </button>
 
-          {/* Removed Library breadcrumb from header */}
+          {/* Library Navigation */}
+          {user && (
+            <button
+              onClick={openLibrary}
+              className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]"
+              style={{ 
+                color: !currentDocument ? 'var(--color-primary)' : 'var(--color-text-primary)',
+              }}
+              aria-label="Open Library"
+            >
+              <Library className="h-4 w-4" />
+              <span>Library</span>
+            </button>
+          )}
         </div>
 
         {/* Right: Global Actions - Grouped with logical separation */}
