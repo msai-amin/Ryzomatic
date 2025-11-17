@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Book, FileText, Music, Trash2, Download, Upload, HardDrive, Cloud, CloudOff, RefreshCw, Star, LayoutList, LayoutGrid, Rows, Plus, Edit3, Loader2 } from 'lucide-react';
+import { X, Book, FileText, Music, Trash2, Download, Upload, HardDrive, Cloud, CloudOff, RefreshCw, Star, LayoutList, LayoutGrid, Rows, Plus, Edit3, Loader2, Check } from 'lucide-react';
 import { storageService, SavedBook, Note, SavedAudio } from '../services/storageService'
 import { supabaseStorageService } from '../services/supabaseStorageService';
 import { useAppStore } from '../store/appStore';
@@ -44,6 +44,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
   const [isCreatingCollection, setIsCreatingCollection] = useState(false);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [collectionActionBusyId, setCollectionActionBusyId] = useState<string | null>(null);
+  const [selectedBooks, setSelectedBooks] = useState<Set<string>>(new Set());
   const { /* setCurrentDocument, */ addDocument, user } = useAppStore();
   const viewModes: Array<{ key: 'list' | 'grid' | 'comfortable'; label: string; icon: typeof LayoutList }> = [
     { key: 'list', label: 'List', icon: LayoutList },
@@ -116,6 +117,13 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
 
     return '—';
   };
+
+  // Clear selection when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedBooks(new Set());
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (user?.id) {
@@ -857,6 +865,91 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
     }
   };
 
+  // Selection handlers
+  const toggleBookSelection = (bookId: string) => {
+    setSelectedBooks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(bookId)) {
+        newSet.delete(bookId);
+      } else {
+        newSet.add(bookId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllBooks = () => {
+    if (selectedBooks.size === displayedBooks.length) {
+      setSelectedBooks(new Set());
+    } else {
+      setSelectedBooks(new Set(displayedBooks.map(book => book.id)));
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedBooks(new Set());
+  };
+
+  // Bulk delete handler
+  const handleBulkDelete = async () => {
+    if (selectedBooks.size === 0) return;
+    
+    const count = selectedBooks.size;
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete ${count} book${count === 1 ? '' : 's'} and all their notes? This action cannot be undone.`
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      const bookIds = Array.from(selectedBooks);
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const bookId of bookIds) {
+        try {
+          // Try to permanently delete first (will work if book is already in Trash)
+          try {
+            await supabaseStorageService.permanentlyDeleteBook(bookId);
+          } catch (permanentDeleteError: any) {
+            // If book is not in Trash, move it there first, then permanently delete
+            if (permanentDeleteError?.message?.includes('Trash collection') || permanentDeleteError?.message?.includes('not in Trash')) {
+              await supabaseStorageService.deleteBook(bookId);
+              await supabaseStorageService.permanentlyDeleteBook(bookId);
+            } else {
+              throw permanentDeleteError;
+            }
+          }
+          
+          // Also delete from localStorage as backup
+          try {
+            storageService.deleteBook(bookId);
+          } catch (localError) {
+            console.warn('Failed to delete from localStorage (non-critical):', localError);
+          }
+          
+          successCount++;
+        } catch (error: any) {
+          console.error(`Failed to delete book ${bookId}:`, error);
+          failCount++;
+        }
+      }
+
+      // Clear selection and reload
+      clearSelection();
+      await loadData();
+
+      if (failCount === 0) {
+        alert(`Successfully deleted ${successCount} book${successCount === 1 ? '' : 's'}!`);
+      } else {
+        alert(`Deleted ${successCount} book${successCount === 1 ? '' : 's'}, but ${failCount} failed.`);
+      }
+    } catch (error: any) {
+      console.error('Error in bulk delete:', error);
+      alert(`Failed to delete books: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
   const handleDeleteAudio = async (id: string) => {
     if (confirm('Delete this audio file?')) {
       await storageService.deleteAudio(id);
@@ -1184,11 +1277,66 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                 </aside>
 
                 <div className="flex-1 space-y-5">
+                  {/* Bulk Actions Toolbar */}
+                  {selectedBooks.size > 0 && (
+                    <div className="flex items-center justify-between gap-3 rounded-lg border p-3" style={{ borderColor: 'rgba(59,130,246,0.3)', backgroundColor: 'rgba(59,130,246,0.1)' }}>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                          {selectedBooks.size} {selectedBooks.size === 1 ? 'book' : 'books'} selected
+                        </span>
+                        <button
+                          onClick={clearSelection}
+                          className="text-xs underline"
+                          style={{ color: 'var(--color-text-secondary)' }}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <button
+                        onClick={handleBulkDelete}
+                        className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                        style={{
+                          backgroundColor: '#ef4444',
+                          color: '#ffffff'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ef4444'}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete Selected
+                      </button>
+                    </div>
+                  )}
+
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm md:text-base" style={{ color: 'var(--color-text-secondary)' }}>
-                      Showing <span style={{ color: 'var(--color-text-primary)' }}>{totalDocuments}</span>{' '}
-                      {totalDocuments === 1 ? 'document' : 'documents'}
-                    </p>
+                    <div className="flex items-center gap-3">
+                      {totalDocuments > 0 && (
+                        <button
+                          onClick={selectAllBooks}
+                          className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+                          style={{
+                            borderColor: selectedBooks.size === displayedBooks.length ? '#3b82f6' : 'var(--color-border)',
+                            backgroundColor: selectedBooks.size === displayedBooks.length ? 'rgba(59,130,246,0.1)' : 'transparent',
+                            color: selectedBooks.size === displayedBooks.length ? '#3b82f6' : 'var(--color-text-secondary)'
+                          }}
+                        >
+                          <div className="w-4 h-4 rounded border-2 flex items-center justify-center"
+                            style={{
+                              backgroundColor: selectedBooks.size === displayedBooks.length ? '#3b82f6' : 'transparent',
+                              borderColor: selectedBooks.size === displayedBooks.length ? '#3b82f6' : 'var(--color-border)',
+                              color: selectedBooks.size === displayedBooks.length ? 'white' : 'transparent'
+                            }}
+                          >
+                            {selectedBooks.size === displayedBooks.length && <Check className="w-3 h-3" />}
+                          </div>
+                          {selectedBooks.size === displayedBooks.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                      )}
+                      <p className="text-sm md:text-base" style={{ color: 'var(--color-text-secondary)' }}>
+                        Showing <span style={{ color: 'var(--color-text-primary)' }}>{totalDocuments}</span>{' '}
+                        {totalDocuments === 1 ? 'document' : 'documents'}
+                      </p>
+                    </div>
                     <div
                       className="flex items-center gap-1 rounded-full px-2 py-2"
                       style={{
@@ -1260,10 +1408,26 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                           />
                           <div className="relative space-y-4 p-6">
                             <div className="flex flex-wrap items-start justify-between gap-4">
-                              <div
-                                className="flex-1 cursor-pointer space-y-2"
-                                onClick={() => handleOpenBook(book)}
-                              >
+                              <div className="flex items-start gap-3 flex-1">
+                                {/* Selection Checkbox */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleBookSelection(book.id);
+                                  }}
+                                  className="mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0"
+                                  style={{
+                                    backgroundColor: selectedBooks.has(book.id) ? '#3b82f6' : 'transparent',
+                                    borderColor: selectedBooks.has(book.id) ? '#3b82f6' : 'var(--color-border)',
+                                    color: selectedBooks.has(book.id) ? 'white' : 'transparent'
+                                  }}
+                                >
+                                  {selectedBooks.has(book.id) && <Check className="w-3 h-3" />}
+                                </button>
+                                <div
+                                  className="flex-1 cursor-pointer space-y-2"
+                                  onClick={() => handleOpenBook(book)}
+                                >
                                 <div className="flex items-center gap-3">
                                   <span
                                     className="rounded-full px-3 py-1 text-xs font-medium uppercase tracking-wide"
@@ -1372,6 +1536,21 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                             }}
                           />
                           <div className="flex items-start justify-between gap-2">
+                            {/* Selection Checkbox */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleBookSelection(book.id);
+                              }}
+                              className="mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0"
+                              style={{
+                                backgroundColor: selectedBooks.has(book.id) ? '#3b82f6' : 'transparent',
+                                borderColor: selectedBooks.has(book.id) ? '#3b82f6' : 'var(--color-border)',
+                                color: selectedBooks.has(book.id) ? 'white' : 'transparent'
+                              }}
+                            >
+                              {selectedBooks.has(book.id) && <Check className="w-3 h-3" />}
+                            </button>
                             <div
                               className="flex-1 cursor-pointer"
                               onClick={() => handleOpenBook(book)}
@@ -1463,10 +1642,26 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                           />
                           <div className="relative flex flex-col gap-5 p-7">
                             <div className="flex items-start justify-between gap-4">
-                              <div
-                                className="flex-1 cursor-pointer"
-                                onClick={() => handleOpenBook(book)}
-                              >
+                              <div className="flex items-start gap-3 flex-1">
+                                {/* Selection Checkbox */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleBookSelection(book.id);
+                                  }}
+                                  className="mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0"
+                                  style={{
+                                    backgroundColor: selectedBooks.has(book.id) ? '#3b82f6' : 'transparent',
+                                    borderColor: selectedBooks.has(book.id) ? '#3b82f6' : 'var(--color-border)',
+                                    color: selectedBooks.has(book.id) ? 'white' : 'transparent'
+                                  }}
+                                >
+                                  {selectedBooks.has(book.id) && <Check className="w-3 h-3" />}
+                                </button>
+                                <div
+                                  className="flex-1 cursor-pointer"
+                                  onClick={() => handleOpenBook(book)}
+                                >
                                 <h3 className="text-xl font-semibold leading-tight" style={{ color: 'var(--color-text-primary)' }}>
                                   {book.title}
                                 </h3>
