@@ -749,14 +749,6 @@ interface LibraryModalProps {
               clonedSize: clonedBuffer.byteLength,
               blobSize: blob.size
             });
-            return blob;
-            // Already detached - try to clone anyway
-            console.warn('LibraryModal: ArrayBuffer is detached, attempting clone...', error);
-            try {
-              return workingBook.fileData.slice(0);
-            } catch (cloneError) {
-              console.error('LibraryModal: Failed to clone detached ArrayBuffer:', cloneError);
-              throw new Error('PDF data is corrupted. Please try re-opening the document.');
             }
           }
         }
