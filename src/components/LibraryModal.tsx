@@ -748,8 +748,6 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
             // Check if ArrayBuffer is already detached
             new Uint8Array(workingBook.fileData, 0, 1);
             // Not detached - clone it to ensure we have a fresh copy
-            const cloned = workingBook.fileData.slice(0);
-            // Not detached - clone it and convert to Blob for safety
             const clonedBuffer = workingBook.fileData.slice(0);
             const blob = new Blob([clonedBuffer], { type: 'application/pdf' });
             console.log('LibraryModal: Cloned PDF ArrayBuffer and converted to Blob:', {
@@ -757,6 +755,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
               clonedSize: clonedBuffer.byteLength,
               blobSize: blob.size
             });
+          } catch (error) {
             return blob;
             // Already detached - try to clone anyway
             console.warn('LibraryModal: ArrayBuffer is detached, attempting clone...', error);
