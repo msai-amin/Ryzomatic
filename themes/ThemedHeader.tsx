@@ -171,19 +171,17 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
       }}
     >
       <div className="flex w-full flex-wrap items-center justify-between gap-6">
-        {/* Left: Logo & Brand (Home Button) */}
+        {/* Left: Logo & Brand (Static) */}
         <div className="flex min-w-0 items-center gap-6">
-          <button
-            onClick={handleLogoClick}
-            className="flex items-center gap-3 rounded-lg px-3 py-1.5 transition-colors hover:opacity-80"
+          <div
+            className="flex items-center gap-3 px-3 py-1.5"
             style={{ color: 'var(--color-text-primary)' }}
-            aria-label="Home"
           >
             <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-8 w-8" />
             <span className="text-base font-semibold tracking-[0.18em]" style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}>
               ryzomatic
             </span>
-          </button>
+          </div>
 
           {/* Library Navigation */}
           {user && (
