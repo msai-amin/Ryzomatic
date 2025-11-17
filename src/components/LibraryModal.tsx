@@ -1869,6 +1869,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       </div>
     </div>
   </div>
+          </div>
+        </div>
     </div>,
     modalRoot
   );
