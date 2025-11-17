@@ -181,23 +181,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                 ryzomatic
               </span>
             </div>
-
-            <nav
-              className="flex items-center gap-4 text-sm font-medium"
-              style={{ color: 'var(--color-text-secondary)' }}
-            >
-              <button
-                onClick={openLibrary}
-                className="transition-colors hover:text-[var(--color-text-primary)]"
-                style={{
-                  color: 'var(--color-text-primary)',
-                  letterSpacing: '0.04em'
-                }}
-              >
-                Library
-              </button>
-              {/* Future navigation links can be added here */}
-            </nav>
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-4 sm:flex-nowrap">
