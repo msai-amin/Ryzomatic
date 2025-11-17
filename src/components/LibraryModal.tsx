@@ -795,16 +795,16 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
 
   const handleDeleteBook = async (id: string) => {
     console.log('handleDeleteBook called with id:', id);
-    const confirmed = window.confirm('Are you sure you want to delete this book and all its notes?');
+    const confirmed = window.confirm('Are you sure you want to move this book to trash?');
     console.log('Confirmation result:', confirmed);
     
     const confirmed = window.confirm('Are you sure you want to move this book to trash?');
       try {
         console.log('Starting deletion process for book:', id);
         
-        // Delete from Supabase (primary storage)
+        // Move to trash in Supabase (primary storage)
         await supabaseStorageService.deleteBook(id);
-        console.log('Book deleted from Supabase:', id);
+        console.log('Book moved to trash in Supabase:', id);
         
         // Move to trash in Supabase (primary storage)
         await supabaseStorageService.deleteBook(id);
@@ -819,7 +819,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         await loadData();
         console.log('Library data reloaded successfully');
         
-        alert('Book deleted successfully!');
+        alert('File removed to trash');
       } catch (error) {
         console.error('Error deleting book:', error);
         alert('File removed to trash');
@@ -1016,7 +1016,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                       My Library
                     </h2>
                     <p className="text-sm md:text-base" style={{ color: 'var(--color-text-tertiary)' }}>
-                      Organise your documents, notes, and audio clips with a calming night-mode workspace.
+                      Organise your documents, notes, and audio clips.
                     </p>
                   </div>
                       Organise your documents, notes, and audio clips.
