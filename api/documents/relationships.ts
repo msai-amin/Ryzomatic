@@ -168,18 +168,79 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    // Authenticate user - get JWT token from Authorization header
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.replace('Bearer ', '');
+    
+    // Create authenticated Supabase client
+    // Use service role key if available (bypasses RLS), otherwise use user's token with anon key
+    let authenticatedSupabase = supabase;
+    
+    // If service role key exists, use it (bypasses RLS)
+    if (supabaseServiceKey && supabaseUrl) {
+      authenticatedSupabase = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+      
+      // Verify user matches userId from request (if token provided)
+      if (token) {
+        const { data: { user }, error: authError } = await authenticatedSupabase.auth.getUser(token);
+        if (authError || !user) {
+          console.error('Auth error:', authError);
+          return res.status(401).json({ error: 'Invalid or expired token' });
+        }
+        
+        // Verify userId matches authenticated user
+        if (user.id !== userId) {
+          return res.status(403).json({ error: 'Access denied - userId mismatch' });
+        }
+      }
+    } else if (token && supabaseUrl && supabaseAnonKey) {
+      // Create client with user's token for RLS to work properly
+      authenticatedSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        },
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+      
+      // Verify user matches userId from request
+      const { data: { user }, error: authError } = await authenticatedSupabase.auth.getUser(token);
+      if (authError || !user) {
+        console.error('Auth error:', authError);
+        return res.status(401).json({ error: 'Invalid or expired token' });
+      }
+      
+      // Verify userId matches authenticated user
+      if (user.id !== userId) {
+        return res.status(403).json({ error: 'Access denied - userId mismatch' });
+      }
+    } else {
+      // If no token and no service key, we can't authenticate
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     // Check if relationship already exists
-    if (!supabase) {
+    if (!authenticatedSupabase) {
       console.error('Supabase client not initialized');
       console.error('Environment variables:', {
         supabaseUrl: !!supabaseUrl,
-        supabaseAnonKey: !!supabaseAnonKey
+        supabaseAnonKey: !!supabaseAnonKey,
+        supabaseServiceKey: !!supabaseServiceKey
       });
       return res.status(500).json({ error: 'Database not initialized' });
     }
     
     console.log('Checking for existing relationship...');
-    const { data: existing, error: checkError } = await supabase
+    const { data: existing, error: checkError } = await authenticatedSupabase
       .from('document_relationships')
       .select('id')
       .eq('source_document_id', sourceDocumentId)
@@ -208,7 +269,7 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
     };
     console.log('Insert data:', insertData);
     
-    const { data: relationship, error } = await supabase
+    const { data: relationship, error } = await authenticatedSupabase
       .from('document_relationships')
       .insert(insertData)
       .select()

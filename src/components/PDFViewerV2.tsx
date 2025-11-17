@@ -1382,8 +1382,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                       paddingLeft: hasParagraphIndicator && segment.wordIndex === segment.paragraphIndex ? '0.5em' : undefined
                     }}
                     title={userHighlight ? `Highlight: ${userHighlight.highlighted_text}` : undefined}
-                    onMouseEnter={() => {
-                      if (segment.paragraphIndex !== undefined) {
+                    onMouseEnter={(e: React.MouseEvent) => {
+                      if (segment.paragraphIndex !== undefined && currentParagraphIndex !== segment.paragraphIndex) {
                         setCurrentParagraphIndex(segment.paragraphIndex)
                       }
                     }}
