@@ -942,30 +942,31 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       return blobUrlRef.current
     }
 
-    // If it's an ArrayBuffer, check if it's detached and clone if necessary
+    // If it's an ArrayBuffer, always clone it to prevent detachment issues
+    // Even if not detached now, cloning ensures it won't become detached when passed to PDF.js worker
     if (document.pdfData instanceof ArrayBuffer) {
       try {
-        // Try to create a Uint8Array view to check if ArrayBuffer is detached
-        new Uint8Array(document.pdfData, 0, 1)
-        // If successful, ArrayBuffer is not detached - create Uint8Array normally
-        return new Uint8Array(document.pdfData)
-      } catch (error) {
-        // ArrayBuffer is detached - clone it first
-        console.warn('⚠️ PDFViewerV2: ArrayBuffer is detached, cloning...', error)
+        // Always clone the ArrayBuffer to prevent detachment
+        // This ensures the buffer remains valid even if transferred to a worker
         const clonedBuffer = document.pdfData.slice(0)
+        console.log('✅ PDFViewerV2: Cloned ArrayBuffer for PDF.js:', {
+          originalSize: document.pdfData.byteLength,
+          clonedSize: clonedBuffer.byteLength
+        });
         return new Uint8Array(clonedBuffer)
+      } catch (error) {
+        // If cloning fails, the ArrayBuffer is likely already detached or corrupted
+        console.error('❌ PDFViewerV2: Failed to clone ArrayBuffer:', error)
+        throw new Error('PDF data is corrupted or detached. Please try re-opening the document.')
       }
     }
 
-    // Fallback: try to convert to Uint8Array
+    // Fallback: try to convert to Uint8Array (shouldn't reach here if pdfData is ArrayBuffer)
     try {
       return new Uint8Array(document.pdfData as ArrayBuffer)
     } catch (error) {
-      // If ArrayBuffer is detached, clone it
-      console.warn('⚠️ PDFViewerV2: Fallback conversion failed, cloning ArrayBuffer...', error)
-      const buffer = document.pdfData as ArrayBuffer
-      const clonedBuffer = buffer.slice(0)
-      return new Uint8Array(clonedBuffer)
+      console.error('❌ PDFViewerV2: Failed to convert pdfData to Uint8Array:', error)
+      throw new Error('PDF data format is invalid. Please try re-opening the document.')
     }
   }
   

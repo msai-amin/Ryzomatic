@@ -463,13 +463,18 @@ class SupabaseStorageService {
         try {
           logger.info('Downloading book from S3', context, { s3Key: data.s3_key, fileType: data.file_type });
           
-          book.fileData = await bookStorageService.downloadBook(
+          const downloadedBuffer = await bookStorageService.downloadBook(
             data.s3_key,
             this.currentUserId!
           );
           
+          // CRITICAL: Always clone the ArrayBuffer to prevent detachment issues
+          // The ArrayBuffer from downloadBook might be transferred or detached when used in multiple places
+          book.fileData = downloadedBuffer.slice(0);
+          
           logger.info('Book downloaded from S3 successfully', context, {
-            size: book.fileData.byteLength / 1024 / 1024 + 'MB'
+            size: book.fileData.byteLength / 1024 / 1024 + 'MB',
+            cloned: true
           });
 
           if (data.file_type === 'pdf') {
@@ -479,30 +484,8 @@ class SupabaseStorageService {
               logger.info('Extracting pageTexts for TTS functionality', context);
               const { extractStructuredText } = await import('../utils/pdfTextExtractor');
               
-              // Use globalThis.pdfjsLib if available (set in main.tsx), otherwise try dynamic import
-              let pdfjsLib: any
-              let getDocument: any
-              
-              if (typeof globalThis !== 'undefined' && (globalThis as any).pdfjsLib) {
-                pdfjsLib = (globalThis as any).pdfjsLib
-                getDocument = pdfjsLib.getDocument
-                
-                // Verify getDocument exists, fallback if not
-                if (!getDocument || typeof getDocument !== 'function') {
-                  const pdfjsModule = await import('pdfjs-dist')
-                  pdfjsLib = pdfjsModule.default || pdfjsModule
-                  getDocument = pdfjsLib.getDocument || pdfjsModule.getDocument
-                }
-              } else {
-                const pdfjsModule = await import('pdfjs-dist')
-                pdfjsLib = pdfjsModule.default || pdfjsModule
-                getDocument = pdfjsLib.getDocument || pdfjsModule.getDocument
-              }
-              
-              if (!getDocument || typeof getDocument !== 'function') {
-                throw new Error('getDocument function not found in PDF.js module');
-              }
-              
+              // Import PDF.js dynamically
+              const pdfjsLib = await import('pdfjs-dist');
               configurePDFWorker(pdfjsLib);
               
               // CRITICAL: Create a copy of the ArrayBuffer to prevent detachment
@@ -510,7 +493,7 @@ class SupabaseStorageService {
               const pdfDataCopy = book.fileData.slice(0);
               
               // Load PDF and extract text using the copy
-              const pdf = await getDocument({ data: pdfDataCopy }).promise;
+              const pdf = await pdfjsLib.getDocument({ data: pdfDataCopy }).promise;
               const pageTexts: string[] = [];
               
               for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
