@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useState, useEffect } from 'react'
 import { X, Upload, FileText, AlertCircle, Save, Cloud } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { storageService } from '../services/storageService'
@@ -31,7 +31,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
   setAsCurrentDocument = true,
   zIndexClass = 'z-50'
 }) => {
-  const { addDocument, setLoading, refreshLibrary } = useAppStore()
+  const { addDocument, setLoading, refreshLibrary, user } = useAppStore()
   const [dragActive, setDragActive] = useState(false)
   const [showOCRDialog, setShowOCRDialog] = useState(false)
   const [ocrPendingData, setOcrPendingData] = useState<any>(null)
@@ -39,6 +39,17 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const [saveToLibrary, setSaveToLibrary] = useState(true)
   const [userProfile, setUserProfile] = useState<any>({ tier: 'free', credits: 0, ocr_count_monthly: 0 })
   const [extractionProgress, setExtractionProgress] = useState<string>('')
+
+  // Initialize supabaseStorageService with current user when component mounts or user changes
+  useEffect(() => {
+    if (user?.id) {
+      console.log('DocumentUpload: Initializing supabaseStorageService with user:', user.id)
+      supabaseStorageService.setCurrentUser(user.id)
+    } else {
+      console.warn('DocumentUpload: No user ID available, supabaseStorageService not initialized')
+      supabaseStorageService.setCurrentUser(null)
+    }
+  }, [user?.id])
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -84,10 +95,29 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
     let resultingDocumentId: string | null = null
 
     try {
+      // CRITICAL: Check authentication before starting upload
+      if (saveToLibrary) {
+        if (!user?.id) {
+          const authError = errorHandler.createError(
+            'You must be signed in to save documents to your library. Please sign in and try again.',
+            ErrorType.AUTHENTICATION,
+            ErrorSeverity.HIGH,
+            context
+          );
+          throw authError;
+        }
+
+        // Ensure service is initialized with user ID
+        console.log('DocumentUpload: Verifying supabaseStorageService is initialized with user:', user.id)
+        supabaseStorageService.setCurrentUser(user.id)
+      }
+
       logger.info('Starting file upload', context, {
         fileName: file.name,
         fileSize: file.size,
-        fileType: file.type
+        fileType: file.type,
+        userId: user?.id || 'not authenticated',
+        saveToLibrary
       });
 
       // Validate file
@@ -241,6 +271,21 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
         if (saveToLibrary) {
           await trackPerformance('saveToLibrary', async () => {
             try {
+              // Double-check authentication before saving
+              if (!user?.id) {
+                throw new Error('User authentication lost. Please sign in again and try uploading.');
+              }
+
+              // Ensure service is initialized
+              supabaseStorageService.setCurrentUser(user.id)
+
+              logger.info('Saving PDF to Supabase', context, {
+                documentId: document.id,
+                userId: user.id,
+                fileName: file.name,
+                totalPages
+              });
+
               // Save to Supabase (primary storage) and get the database-generated ID
               const databaseId = await supabaseStorageService.saveBook({
                 id: document.id,
@@ -304,11 +349,27 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
               }
             } catch (err) {
               // Save failed - don't add document to store if saveToLibrary was requested
-              logger.error('Failed to save PDF to library', context, err as Error);
+              const error = err instanceof Error ? err : new Error('Unknown error occurred while saving');
+              logger.error('Failed to save PDF to library', context, error, {
+                errorMessage: error.message,
+                errorStack: error.stack,
+                userId: user?.id
+              });
               saveSucceeded = false;
-              // Show error to user
-              const errorMessage = err instanceof Error ? err.message : 'Failed to save document to library';
-              setError(`Failed to save document to library: ${errorMessage}. The document will not be available for notes or highlights.`);
+              
+              // Provide user-friendly error message
+              let userMessage = 'Failed to save document to library. ';
+              if (error.message.includes('authenticated') || error.message.includes('authentication')) {
+                userMessage += 'Please sign in and try again.';
+              } else if (error.message.includes('bucket') || error.message.includes('storage')) {
+                userMessage += 'Storage service error. Please try again or contact support.';
+              } else if (error.message.includes('database') || error.message.includes('RLS')) {
+                userMessage += 'Database error. Please try again or contact support.';
+              } else {
+                userMessage += error.message || 'Please try again.';
+              }
+              
+              setError(userMessage);
               // Don't throw - we'll check saveSucceeded below
             }
           }, context);
@@ -389,6 +450,21 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
         if (saveToLibrary) {
           await trackPerformance('saveEpubToLibrary', async () => {
             try {
+              // Double-check authentication before saving
+              if (!user?.id) {
+                throw new Error('User authentication lost. Please sign in again and try uploading.');
+              }
+
+              // Ensure service is initialized
+              supabaseStorageService.setCurrentUser(user.id)
+
+              logger.info('Saving EPUB to Supabase', context, {
+                documentId: document.id,
+                userId: user.id,
+                fileName: file.name,
+                totalPages: extractionResult.totalSections
+              });
+
               const databaseId = await supabaseStorageService.saveBook({
                 id: document.id,
                 title: document.name,
@@ -436,12 +512,27 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
               refreshLibrary();
             } catch (err) {
-              logger.error('Failed to save EPUB to library', context, err as Error);
+              const error = err instanceof Error ? err : new Error('Unknown error occurred while saving');
+              logger.error('Failed to save EPUB to library', context, error, {
+                errorMessage: error.message,
+                errorStack: error.stack,
+                userId: user?.id
+              });
               saveSucceeded = false;
-              const errorMessage = err instanceof Error ? err.message : 'Failed to save document to library';
-              setError(
-                `Failed to save document to library: ${errorMessage}. The document will not be available for notes or highlights.`
-              );
+              
+              // Provide user-friendly error message
+              let userMessage = 'Failed to save document to library. ';
+              if (error.message.includes('authenticated') || error.message.includes('authentication')) {
+                userMessage += 'Please sign in and try again.';
+              } else if (error.message.includes('bucket') || error.message.includes('storage')) {
+                userMessage += 'Storage service error. Please try again or contact support.';
+              } else if (error.message.includes('database') || error.message.includes('RLS')) {
+                userMessage += 'Database error. Please try again or contact support.';
+              } else {
+                userMessage += error.message || 'Please try again.';
+              }
+              
+              setError(userMessage);
             }
           }, context);
         }
@@ -488,6 +579,20 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
         if (saveToLibrary) {
           await trackPerformance('saveToLibrary', async () => {
             try {
+              // Double-check authentication before saving
+              if (!user?.id) {
+                throw new Error('User authentication lost. Please sign in again and try uploading.');
+              }
+
+              // Ensure service is initialized
+              supabaseStorageService.setCurrentUser(user.id)
+
+              logger.info('Saving text file to Supabase', context, {
+                documentId: document.id,
+                userId: user.id,
+                fileName: file.name
+              });
+
               // Save to Supabase (primary storage) and get the database-generated ID
               const databaseId = await supabaseStorageService.saveBook({
                 id: document.id,
@@ -533,11 +638,27 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
               refreshLibrary();
             } catch (err) {
               // Save failed - don't add document to store if saveToLibrary was requested
-              logger.error('Failed to save text file to library', context, err as Error);
+              const error = err instanceof Error ? err : new Error('Unknown error occurred while saving');
+              logger.error('Failed to save text file to library', context, error, {
+                errorMessage: error.message,
+                errorStack: error.stack,
+                userId: user?.id
+              });
               saveSucceeded = false;
-              // Show error to user
-              const errorMessage = err instanceof Error ? err.message : 'Failed to save document to library';
-              setError(`Failed to save document to library: ${errorMessage}. The document will not be available for notes or highlights.`);
+              
+              // Provide user-friendly error message
+              let userMessage = 'Failed to save document to library. ';
+              if (error.message.includes('authenticated') || error.message.includes('authentication')) {
+                userMessage += 'Please sign in and try again.';
+              } else if (error.message.includes('bucket') || error.message.includes('storage')) {
+                userMessage += 'Storage service error. Please try again or contact support.';
+              } else if (error.message.includes('database') || error.message.includes('RLS')) {
+                userMessage += 'Database error. Please try again or contact support.';
+              } else {
+                userMessage += error.message || 'Please try again.';
+              }
+              
+              setError(userMessage);
               // Don't throw - we'll check saveSucceeded below
             }
           }, context);
@@ -571,10 +692,29 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
       onClose()
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to process file');
-      logger.error('File upload failed', context, error);
+      logger.error('File upload failed', context, error, {
+        errorMessage: error.message,
+        errorStack: error.stack,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        userId: user?.id
+      });
       
       await errorHandler.handleError(error, context);
-      setError(error.message);
+      
+      // Provide user-friendly error message
+      let userMessage = error.message;
+      if (error.message.includes('authenticated') || error.message.includes('authentication')) {
+        userMessage = 'You must be signed in to upload documents. Please sign in and try again.';
+      } else if (error.message.includes('Failed to save document to library')) {
+        // Keep the specific error message from save failures
+        userMessage = error.message;
+      } else if (!userMessage || userMessage === 'Failed to process file') {
+        userMessage = 'Failed to process file. Please check the file format and try again.';
+      }
+      
+      setError(userMessage);
     } finally {
       setLoading(false)
     }
@@ -585,6 +725,10 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
     if (!ocrPendingData) return;
 
     const { document, file, saveToLibrary: shouldSave } = ocrPendingData;
+    const context = {
+      component: 'DocumentUpload',
+      action: 'handleOCRApprove'
+    };
     
     try {
       setShowOCRDialog(false);
@@ -592,6 +736,20 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
       // CRITICAL: Save to database FIRST (if saveToLibrary is checked) to get the database ID
       if (shouldSave) {
+        // Double-check authentication before saving
+        if (!user?.id) {
+          throw new Error('User authentication lost. Please sign in again and try uploading.');
+        }
+
+        // Ensure service is initialized
+        supabaseStorageService.setCurrentUser(user.id)
+
+        logger.info('OCR Approve: Saving PDF to Supabase', context, {
+          documentId: document.id,
+          userId: user.id,
+          fileName: file.name
+        });
+
         const databaseId = await supabaseStorageService.saveBook({
           id: document.id,
           title: document.name,
@@ -622,8 +780,26 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
       setOcrPendingData(null);
       onClose();
     } catch (error) {
-      logger.error('OCR approval failed', { component: 'DocumentUpload' }, error as Error);
-      setError('Failed to process OCR request');
+      const err = error instanceof Error ? error : new Error('Unknown error occurred');
+      logger.error('OCR approval failed', context, err, {
+        errorMessage: err.message,
+        errorStack: err.stack,
+        userId: user?.id
+      });
+      
+      // Provide user-friendly error message
+      let userMessage = 'Failed to process OCR request. ';
+      if (err.message.includes('authenticated') || err.message.includes('authentication')) {
+        userMessage += 'Please sign in and try again.';
+      } else if (err.message.includes('bucket') || err.message.includes('storage')) {
+        userMessage += 'Storage service error. Please try again or contact support.';
+      } else if (err.message.includes('database') || err.message.includes('RLS')) {
+        userMessage += 'Database error. Please try again or contact support.';
+      } else {
+        userMessage += err.message || 'Please try again.';
+      }
+      
+      setError(userMessage);
     } finally {
       setLoading(false);
     }

@@ -68,12 +68,14 @@ class SupabaseStorageService {
   // Check if user is authenticated
   private ensureAuthenticated() {
     if (!this.currentUserId) {
-      throw errorHandler.createError(
-        'User not authenticated',
+      const error = errorHandler.createError(
+        'User not authenticated. Please sign in and try again.',
         ErrorType.AUTHENTICATION,
         ErrorSeverity.HIGH,
-        { context: 'SupabaseStorageService' }
+        { context: 'SupabaseStorageService', currentUserId: this.currentUserId }
       );
+      logger.error('Authentication check failed', { context: 'SupabaseStorageService' }, error);
+      throw error;
     }
   }
 
@@ -251,14 +253,29 @@ class SupabaseStorageService {
         
         logger.error('Database save error', context, error, {
           errorCode: error.code,
-          errorMessage: error.message
+          errorMessage: error.message,
+          errorDetails: error.details,
+          errorHint: error.hint,
+          userId: this.currentUserId
         });
         
+        // Provide more specific error message based on error code
+        let userMessage = `Failed to save book: ${error.message}`;
+        if (error.code === '42501') {
+          userMessage = 'Permission denied. Please check your account permissions.';
+        } else if (error.code === '23505') {
+          userMessage = 'A book with this ID already exists. Please try again.';
+        } else if (error.message.includes('RLS') || error.message.includes('row-level security')) {
+          userMessage = 'Database security policy error. Please sign in again and try uploading.';
+        } else if (error.message.includes('violates foreign key')) {
+          userMessage = 'Database integrity error. Please try again or contact support.';
+        }
+        
         throw errorHandler.createError(
-          `Failed to save book: ${error.message}`,
+          userMessage,
           ErrorType.DATABASE,
           ErrorSeverity.HIGH,
-          { context, error: error.message }
+          { context, error: error.message, errorCode: error.code }
         );
       }
 

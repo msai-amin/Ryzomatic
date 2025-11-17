@@ -169,6 +169,14 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
 
   useEffect(() => {
     if (isOpen) {
+      // Initialize supabaseStorageService with current user
+      if (user?.id) {
+        console.log('LibraryModal: Initializing supabaseStorageService with user:', user.id)
+        supabaseStorageService.setCurrentUser(user.id)
+      } else {
+        console.warn('LibraryModal: No user ID available')
+        supabaseStorageService.setCurrentUser(null)
+      }
       loadData();
     }
   }, [isOpen, activeTab, refreshTrigger, user?.id]);

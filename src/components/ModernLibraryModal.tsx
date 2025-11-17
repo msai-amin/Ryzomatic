@@ -2571,10 +2571,12 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
       {/* Document Upload Modal */}
       {showUploadModal && (
         <DocumentUpload
-          onClose={() => setShowUploadModal(false)}
+          onClose={() => {
+            setShowUploadModal(false);
+          }}
           onUploadComplete={() => {
             setShowUploadModal(false);
-            loadData();
+            searchBooks(); // Refresh the book list after upload
           }}
           setAsCurrentDocument={false}
         />
