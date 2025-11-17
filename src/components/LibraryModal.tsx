@@ -757,7 +757,7 @@ interface LibraryModalProps {
             throw new Error('PDF data is corrupted. Please try re-opening the document.');
           }
         }
-        return undefined;
+      epubData:   return undefined;
       })(),
         workingBook.type === 'epub' && workingBook.fileData instanceof ArrayBuffer
           ? new Blob([workingBook.fileData instanceof ArrayBuffer ? workingBook.fileData.slice(0) : workingBook.fileData], { type: 'application/epub+zip' })
