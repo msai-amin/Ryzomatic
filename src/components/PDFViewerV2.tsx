@@ -26,7 +26,7 @@ import { highlightService, Highlight as HighlightType } from '../services/highli
 import { useTheme } from '../../themes/ThemeProvider'
 import { getPDFWorkerSrc, configurePDFWorker } from '../utils/pdfjsConfig'
 import { parseTextWithBreaks, TextSegment } from '../utils/readingModeUtils'
-import { Eye, BookOpen, FileText, Type, Highlighter, Sparkles, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ZoomIn, ZoomOut, RotateCw, Search, Palette, Moon, Sun, Maximize2, StickyNote, Library, Upload, MousePointer } from 'lucide-react'
+import { Eye, BookOpen, FileText, Type, Highlighter, Sparkles, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ZoomIn, ZoomOut, RotateCw, Search, Palette, Moon, Sun, Maximize2, StickyNote, Library, Upload, MousePointer, Save, MessageSquare, Lightbulb, X } from 'lucide-react'
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { notesService } from '../services/notesService'
@@ -642,69 +642,100 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       const color = annotationColors.find(c => c.id === currentHighlightColor) || annotationColors[0]
       const colorHex = (color as any)?.color || currentHighlightColorHex || '#ffeb3b'
       
+      // Calculate position with viewport boundary detection
+      const leftPercent = props.selectionRegion.left
+      const topPercent = props.selectionRegion.top + props.selectionRegion.height
+      // Adjust if popup would go off right edge (assuming ~300px width)
+      const adjustedLeft = leftPercent > 70 ? `${leftPercent - 15}%` : `${leftPercent}%`
+      
       return (
         <div
           style={{
             background: 'var(--color-surface, #111827)',
             border: '1px solid var(--color-border, #374151)',
-            borderRadius: '4px',
-            padding: '12px',
+            borderRadius: '8px',
+            padding: '10px',
             position: 'absolute',
-            left: `${props.selectionRegion.left}%`,
-            top: `${props.selectionRegion.top + props.selectionRegion.height}%`,
-            zIndex: 1,
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-            minWidth: '200px',
+            left: adjustedLeft,
+            top: `${topPercent}%`,
+            zIndex: 1000,
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+            minWidth: '240px',
+            maxWidth: '320px',
             color: 'var(--color-text-primary, #f9fafb)',
           }}
         >
-          <div style={{ marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-secondary, #d1d5db)' }}>
-            Selected: "{props.selectedText.substring(0, 50)}{props.selectedText.length > 50 ? '...' : ''}"
+          {/* Selected text preview - simplified */}
+          <div style={{ 
+            marginBottom: '10px', 
+            fontSize: '13px', 
+            color: 'var(--color-text-secondary, #d1d5db)',
+            lineHeight: '1.4',
+            padding: '6px 8px',
+            borderRadius: '4px',
+            backgroundColor: 'var(--color-background, #0f172a)',
+            maxHeight: '60px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+            "{props.selectedText.length > 80 ? props.selectedText.substring(0, 80) + '...' : props.selectedText}"
           </div>
-          {/* Color indicator */}
-          <div style={{ marginBottom: '8px', fontSize: '12px', color: 'var(--color-text-tertiary, #9ca3af)' }}>
-            Color: <span style={{ fontWeight: '500', color: colorHex }}>{color?.name || 'yellow'}</span>
-          </div>
-          <div
+
+          {/* Primary Action - Save Highlight */}
+          <button
             style={{
+              backgroundColor: colorHex,
+              color: '#000',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '8px 16px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              width: '100%',
               display: 'flex',
-              gap: '8px',
-              marginTop: '8px',
-              flexWrap: 'wrap'
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              marginBottom: '8px',
+              transition: 'opacity 0.2s',
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+            onClick={async () => {
+              await handleCreateHighlight(props.highlightAreas, props.selectedText, props.selectionData)
+              props.cancel()
             }}
           >
-            <button
-              style={{
-                backgroundColor: colorHex,
-                color: '#000',
-                border: 'none',
-                borderRadius: '4px',
-                padding: '6px 12px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
-                flex: 1,
-              }}
-              onClick={async () => {
-                await handleCreateHighlight(props.highlightAreas, props.selectedText, props.selectionData)
-                props.cancel()
-              }}
-            >
-              Save
-            </button>
+            <Save className="w-4 h-4" />
+            Save Highlight
+          </button>
+
+          {/* Secondary Actions - Grouped */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '6px',
+            marginBottom: '6px'
+          }}>
             <button
               style={{
                 backgroundColor: 'var(--color-surface-hover, #1f2937)',
                 border: '1px solid var(--color-border, #374151)',
-                borderRadius: '4px',
-                padding: '6px 12px',
+                borderRadius: '6px',
+                padding: '6px 10px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '12px',
                 color: 'var(--color-text-primary, #f9fafb)',
-                flex: 1
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                transition: 'background-color 0.2s',
               }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface, #111827)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover, #1f2937)'}
               onClick={() => {
-                // Ask AI clarification for the selected text
                 setSelectedTextContext({
                   selectedText: props.selectedText,
                   beforeContext: '',
@@ -717,19 +748,26 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                 props.cancel()
               }}
             >
+              <MessageSquare className="w-3.5 h-3.5" />
               Ask AI
             </button>
             <button
               style={{
                 backgroundColor: 'var(--color-surface-hover, #1f2937)',
                 border: '1px solid var(--color-border, #374151)',
-                borderRadius: '4px',
-                padding: '6px 12px',
+                borderRadius: '6px',
+                padding: '6px 10px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '12px',
                 color: 'var(--color-text-primary, #f9fafb)',
-                flex: 1
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                transition: 'background-color 0.2s',
               }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface, #111827)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover, #1f2937)'}
               onClick={() => {
                 setSelectedTextContext({
                   selectedText: props.selectedText,
@@ -743,19 +781,34 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                 props.cancel()
               }}
             >
-              AI Suggestions
+              <Lightbulb className="w-3.5 h-3.5" />
+              Suggestions
             </button>
+          </div>
+
+          {/* Tertiary Actions */}
+          <div style={{
+            display: 'flex',
+            gap: '6px'
+          }}>
             <button
               style={{
                 backgroundColor: 'var(--color-surface-hover, #1f2937)',
                 border: '1px solid var(--color-border, #374151)',
-                borderRadius: '4px',
-                padding: '6px 12px',
+                borderRadius: '6px',
+                padding: '6px 10px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '12px',
                 color: 'var(--color-text-primary, #f9fafb)',
-                flex: 1
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                flex: 1,
+                transition: 'background-color 0.2s',
               }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface, #111827)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover, #1f2937)'}
               onClick={async () => {
                 try {
                   if (document.id && userId) {
@@ -777,21 +830,28 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                 props.cancel()
               }}
             >
-              Save to Notes
+              <StickyNote className="w-3.5 h-3.5" />
+              Save Note
             </button>
             <button
               style={{
-                backgroundColor: 'var(--color-surface-hover, #1f2937)',
+                backgroundColor: 'transparent',
                 border: '1px solid var(--color-border, #374151)',
-                borderRadius: '4px',
-                padding: '6px 12px',
+                borderRadius: '6px',
+                padding: '6px 10px',
                 cursor: 'pointer',
-                fontSize: '14px',
-                color: 'var(--color-text-primary, #f9fafb)',
+                fontSize: '12px',
+                color: 'var(--color-text-secondary, #d1d5db)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background-color 0.2s',
               }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover, #1f2937)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               onClick={props.cancel}
             >
-              Cancel
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
