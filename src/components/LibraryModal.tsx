@@ -798,7 +798,6 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
     const confirmed = window.confirm('Are you sure you want to move this book to trash?');
     console.log('Confirmation result:', confirmed);
     
-    const confirmed = window.confirm('Are you sure you want to move this book to trash?');
       try {
         console.log('Starting deletion process for book:', id);
         
