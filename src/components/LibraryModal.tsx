@@ -754,10 +754,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
             console.log('LibraryModal: Cloned PDF ArrayBuffer and converted to Blob:', {
               originalSize: workingBook.fileData.byteLength,
               blobSize: blob.size
-            });
-            return blob;
               clonedSize: clonedBuffer.byteLength,
-          } catch (error) {
+            });
             return blob;
             // Already detached - try to clone anyway
             console.warn('LibraryModal: ArrayBuffer is detached, attempting clone...', error);
