@@ -736,12 +736,13 @@ interface LibraryModalProps {
       type: workingBook.type,
       uploadedAt: workingBook.savedAt,
       pdfData: (() => {
-        // CRITICAL: Always clone ArrayBuffer to prevent detachment issues
+        // CRITICAL: Clone ArrayBuffer and convert to Blob to prevent detachment issues
+        // Blobs are safer than ArrayBuffers because they can't be detached by workers
         if (workingBook.type === 'pdf' && workingBook.fileData instanceof ArrayBuffer) {
           try {
             // Check if ArrayBuffer is already detached
             new Uint8Array(workingBook.fileData, 0, 1);
-            // Not detached - clone it to ensure we have a fresh copy
+            // Not detached - clone it and convert to Blob for safety
             const clonedBuffer = workingBook.fileData.slice(0);
             const blob = new Blob([clonedBuffer], { type: 'application/pdf' });
             console.log('LibraryModal: Cloned PDF ArrayBuffer and converted to Blob:', {
@@ -749,18 +750,15 @@ interface LibraryModalProps {
               clonedSize: clonedBuffer.byteLength,
               blobSize: blob.size
             });
-            }
-          }
-        }
-        return undefined;
-      })(),
             return blob;
           } catch (error) {
             // Already detached - this shouldn't happen if cloning in supabaseStorageService worked
             console.error('LibraryModal: ArrayBuffer is detached, cannot clone:', error);
             throw new Error('PDF data is corrupted. Please try re-opening the document.');
           }
-            return blob;
+        }
+        return undefined;
+      })(),
         workingBook.type === 'epub' && workingBook.fileData instanceof ArrayBuffer
           ? new Blob([workingBook.fileData instanceof ArrayBuffer ? workingBook.fileData.slice(0) : workingBook.fileData], { type: 'application/epub+zip' })
           : undefined,
