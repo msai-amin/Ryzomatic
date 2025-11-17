@@ -15,7 +15,6 @@ interface LibraryModalProps {
 }
 
 export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalProps) {
-export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalProps) {
   const [activeTab, setActiveTab] = useState<'documents' | 'notes' | 'audio'>('documents');
   const [books, setBooks] = useState<EnhancedSavedBook[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
