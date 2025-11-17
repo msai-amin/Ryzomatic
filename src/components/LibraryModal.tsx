@@ -13,11 +13,6 @@ interface LibraryModalProps {
   isOpen: boolean;
   onClose: () => void;
   refreshTrigger?: number; // Add refresh trigger
-          } catch (error) {
-            // Already detached - this shouldn't happen if cloning in supabaseStorageService worked
-            console.error('LibraryModal: ArrayBuffer is detached, cannot clone:', error);
-            throw new Error('PDF data is corrupted. Please try re-opening the document.');
-          }
   const [activeTab, setActiveTab] = useState<'documents' | 'notes' | 'audio'>('documents');
   const [books, setBooks] = useState<EnhancedSavedBook[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
