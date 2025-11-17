@@ -238,7 +238,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ onClose }) => {
           >
             <Sparkles className="h-5 w-5" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-1">
             <p
               className="text-sm font-semibold leading-tight"
               style={{ color: 'var(--color-text-primary)' }}
@@ -322,7 +322,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ onClose }) => {
                 The assistant reads alongside you and answers with relevant context.
               </p>
             </div>
-            <div className="flex flex-wrap justify-center gap-2">
+            <div className="flex flex-wrap justify-center gap-3">
               <button
                 onClick={triggerUpload}
                 className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
@@ -409,8 +409,8 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ onClose }) => {
         )}
       </div>
 
-      <div className="pt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
-        <div className="flex gap-3">
+      <div className="px-6 pt-4 pb-6" style={{ borderTop: '1px solid var(--color-border)' }}>
+        <div className="flex gap-4">
           <input
             ref={inputRef}
             type="text"
