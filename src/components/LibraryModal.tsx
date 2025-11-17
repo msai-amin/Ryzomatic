@@ -754,7 +754,12 @@ interface LibraryModalProps {
         }
         return undefined;
       })(),
-      epubData:
+            return blob;
+          } catch (error) {
+            // Already detached - this shouldn't happen if cloning in supabaseStorageService worked
+            console.error('LibraryModal: ArrayBuffer is detached, cannot clone:', error);
+            throw new Error('PDF data is corrupted. Please try re-opening the document.');
+          }
             return blob;
         workingBook.type === 'epub' && workingBook.fileData instanceof ArrayBuffer
           ? new Blob([workingBook.fileData instanceof ArrayBuffer ? workingBook.fileData.slice(0) : workingBook.fileData], { type: 'application/epub+zip' })
