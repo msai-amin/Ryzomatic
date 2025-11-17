@@ -468,13 +468,18 @@ class SupabaseStorageService {
             this.currentUserId!
           );
           
-          // CRITICAL: Always clone the ArrayBuffer to prevent detachment issues
-          // The ArrayBuffer from downloadBook might be transferred or detached when used in multiple places
-          book.fileData = downloadedBuffer.slice(0);
+          // CRITICAL: Clone the ArrayBuffer IMMEDIATELY after download, BEFORE any operations
+          // This ensures we have a fresh copy that won't be detached by PDF.js workers
+          const clonedBuffer = downloadedBuffer.slice(0);
+          
+          // Store the cloned buffer - this is what will be used by PDFViewer
+          book.fileData = clonedBuffer;
           
           logger.info('Book downloaded from S3 successfully', context, {
             size: book.fileData.byteLength / 1024 / 1024 + 'MB',
-            cloned: true
+            cloned: true,
+            originalSize: downloadedBuffer.byteLength,
+            clonedSize: clonedBuffer.byteLength
           });
 
           if (data.file_type === 'pdf') {
@@ -488,9 +493,10 @@ class SupabaseStorageService {
               const pdfjsLib = await import('pdfjs-dist');
               configurePDFWorker(pdfjsLib);
               
-              // CRITICAL: Create a copy of the ArrayBuffer to prevent detachment
-              // The original ArrayBuffer will be used by PDFViewer, so we need a copy for text extraction
-              const pdfDataCopy = book.fileData.slice(0);
+              // CRITICAL: Create ANOTHER copy for text extraction
+              // PDF.js workers can detach ArrayBuffers, so we need a separate copy
+              // The clonedBuffer (book.fileData) will remain intact for PDFViewer
+              const pdfDataCopy = clonedBuffer.slice(0);
               
               // Load PDF and extract text using the copy
               const pdf = await pdfjsLib.getDocument({ data: pdfDataCopy }).promise;
