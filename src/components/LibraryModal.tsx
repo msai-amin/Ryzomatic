@@ -1875,3 +1875,4 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
   );
 }
 // Ensure correct version
+// Build trigger: 20251117-025024
