@@ -14,7 +14,6 @@ interface LibraryModalProps {
   onClose: () => void;
 }
 
-export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalProps) {
 }
   const [isSupabaseData, setIsSupabaseData] = useState(false);
   const [favoriteBusyIds, setFavoriteBusyIds] = useState<string[]>([]);
