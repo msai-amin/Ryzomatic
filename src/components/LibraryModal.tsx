@@ -13,14 +13,11 @@ interface LibraryModalProps {
   isOpen: boolean;
   onClose: () => void;
   refreshTrigger?: number; // Add refresh trigger
-}
-
-type EnhancedSavedBook = SavedBook & {
-  isFavorite?: boolean;
-  is_favorite?: boolean;
-  text_content?: string;
-  fileSize?: number;
-  file_size?: number;
+          } catch (error) {
+            // Already detached - this shouldn't happen if cloning in supabaseStorageService worked
+            console.error('LibraryModal: ArrayBuffer is detached, cannot clone:', error);
+            throw new Error('PDF data is corrupted. Please try re-opening the document.');
+          }
 };
 
 export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalProps) {
