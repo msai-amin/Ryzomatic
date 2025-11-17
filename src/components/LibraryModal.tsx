@@ -12,9 +12,22 @@ import { CollectionTree } from './library/CollectionTree';
 interface LibraryModalProps {
   isOpen: boolean;
   onClose: () => void;
-}
-
-}
+  refreshTrigger?: number; // Add refresh trigger
+          } catch (error) {
+            // Already detached - this shouldn't happen if cloning in supabaseStorageService worked
+            console.error('LibraryModal: ArrayBuffer is detached, cannot clone:', error);
+            throw new Error('PDF data is corrupted. Please try re-opening the document.');
+          }
+  const [activeTab, setActiveTab] = useState<'documents' | 'notes' | 'audio'>('documents');
+  const [books, setBooks] = useState<EnhancedSavedBook[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [audio, setAudio] = useState<SavedAudio[]>([]);
+  const [storageInfo, setStorageInfo] = useState({ used: 0, max: 0, percentage: 0 });
+  const [isGoogleDriveEnabled, setIsGoogleDriveEnabled] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isConnectingDrive, setIsConnectingDrive] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{ lastSync: Date | null; isEnabled: boolean }>({ lastSync: null, isEnabled: false });
+  const [viewMode, setViewMode] = useState<'list' | 'grid' | 'comfortable'>('list');
   const [isSupabaseData, setIsSupabaseData] = useState(false);
   const [favoriteBusyIds, setFavoriteBusyIds] = useState<string[]>([]);
   const [renameBusyIds, setRenameBusyIds] = useState<string[]>([]);
