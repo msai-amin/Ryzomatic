@@ -188,17 +188,23 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
           {/* Removed Library breadcrumb from header */}
         </div>
 
-        {/* Right: Global Actions */}
-        <div className="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
-            {user && currentDocument && isTimerPristine && (
-              <Tooltip content="Start Pomodoro timer" position="bottom">
+        {/* Right: Global Actions - Grouped with logical separation */}
+        <div className="flex flex-wrap items-center justify-end gap-4 sm:flex-nowrap">
+          {/* Tools Group: Pomodoro & AI Assistant */}
+          <div className="flex items-center gap-3">
+            {user && currentDocument && (
+              <Tooltip content={timerState.isRunning ? "Pause Pomodoro timer" : "Start Pomodoro timer"} position="bottom">
                 <button
                   data-tour="pomodoro-button"
                   onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
                   className={`rounded-lg p-2 transition-all duration-300 ${
-                    !hasSeenPomodoroTour ? 'animate-pulse ring-2 ring-blue-500/60' : ''
+                    timerState.isRunning ? 'animate-pulse ring-2 ring-blue-500/60' : ''
                   }`}
-                  style={{ backgroundColor: 'transparent', border: 'none', fontSize: '1.35rem' }}
+                  style={{ 
+                    backgroundColor: 'transparent', 
+                    border: timerState.isRunning ? '1px solid var(--color-border)' : 'none', 
+                    fontSize: '1.35rem' 
+                  }}
                   aria-label="Toggle Pomodoro timer"
                 >
                   🍅
@@ -206,31 +212,40 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
               </Tooltip>
             )}
 
-            <Tooltip content="Ask the AI Assistant" position="bottom">
-              <button
-                data-tour="ai-assistant-button"
-                onClick={() => toggleChat()}
-                className={`rounded-lg p-2 transition-all ${
-                  isChatOpen ? 'bg-[var(--color-primary-light)] ring-2 ring-blue-500/60' : ''
-                }`}
-                style={{
-                  color: 'var(--color-text-primary)',
-                  border: '1px solid var(--color-border)',
-                  boxShadow: isChatOpen
-                    ? '0 8px 20px rgba(56, 189, 248, 0.25)'
-                    : '0 6px 16px rgba(148, 163, 184, 0.18)',
-                  background:
-                    'linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(236, 72, 153, 0.08))'
-                }}
-                aria-pressed={isChatOpen}
-                aria-expanded={isChatOpen}
-                aria-label="Toggle AI assistant"
-              >
-                <Sparkles className="h-5 w-5" />
-              </button>
-            </Tooltip>
+            <button
+              data-tour="ai-assistant-button"
+              onClick={() => toggleChat()}
+              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
+                isChatOpen ? 'bg-[var(--color-primary-light)] ring-2 ring-blue-500/60' : ''
+              }`}
+              style={{
+                color: 'var(--color-text-primary)',
+                border: '1px solid var(--color-border)',
+                boxShadow: isChatOpen
+                  ? '0 8px 20px rgba(56, 189, 248, 0.25)'
+                  : '0 6px 16px rgba(148, 163, 184, 0.18)',
+                background:
+                  'linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(236, 72, 153, 0.08))'
+              }}
+              aria-pressed={isChatOpen}
+              aria-expanded={isChatOpen}
+              aria-label="Toggle AI assistant"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>AI Assistant</span>
+            </button>
+          </div>
 
-            {user && (
+          {/* Visual Separator */}
+          <div 
+            className="h-6 w-px" 
+            style={{ backgroundColor: 'var(--color-border)' }}
+            aria-hidden="true"
+          />
+
+          {/* Action Group: Upload */}
+          {user && (
+            <div className="flex items-center">
               <Tooltip content="Upload new material" position="bottom">
                 <button
                   data-tour="upload-button"
@@ -247,7 +262,19 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                   <span>New Material</span>
                 </button>
               </Tooltip>
-            )}
+            </div>
+          )}
+
+          {/* Visual Separator */}
+          {user && (
+            <div 
+              className="h-6 w-px" 
+              style={{ backgroundColor: 'var(--color-border)' }}
+              aria-hidden="true"
+            />
+          )}
+
+          {/* Account Group: User Profile */}
 
             {isAuthenticated && user ? (
               <div className="relative">
