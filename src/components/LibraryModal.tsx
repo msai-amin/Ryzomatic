@@ -1459,6 +1459,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                                   {' • Saved '}
                                   {new Date(book.savedAt).toLocaleDateString()}
                                 </p>
+                                </div>
                               </div>
                               <div className="flex items-center gap-2">
                                 {renderFavoriteButton(book)}
@@ -1672,7 +1673,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                           Saved {new Date(book.savedAt).toLocaleDateString()}
                                   {book.lastReadPage && ` • Last read page ${book.lastReadPage}`}
                         </p>
-                      </div>
+                                </div>
+                              </div>
                               <div className="flex items-center gap-2">
                                 {renderFavoriteButton(book)}
                       <button
