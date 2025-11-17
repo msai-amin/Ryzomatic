@@ -8,7 +8,6 @@ import {
   Sparkles,
   Timer,
   HelpCircle,
-  ChevronLeft,
   ChevronDown,
   X,
   FileText,
@@ -158,7 +157,9 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
 
   const tierLabel = useMemo(() => user?.tier?.toUpperCase() ?? 'STANDARD', [user?.tier])
 
+
   return (
+    <>
     <header
       ref={headerRef}
       className="sticky top-0 z-50"
@@ -169,102 +170,83 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
         backdropFilter: 'blur(10px)'
       }}
     >
-      <div className="flex w-full flex-col gap-3">
-        <div className="flex w-full flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-6">
-            <div
-              className="flex items-center gap-2 rounded-lg px-2 py-1"
-              style={{ color: 'var(--color-text-primary)' }}
-            >
-              <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-6 w-6" />
-              <span className="text-sm font-semibold tracking-[0.18em]" style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}>
-                ryzomatic
-              </span>
-            </div>
-          </div>
+      <div className="flex w-full flex-wrap items-center justify-between gap-6">
+        {/* Left: Logo & Brand (Home Button) */}
+        <div className="flex min-w-0 items-center gap-6">
+          <button
+            onClick={handleLogoClick}
+            className="flex items-center gap-3 rounded-lg px-3 py-1.5 transition-colors hover:opacity-80"
+            style={{ color: 'var(--color-text-primary)' }}
+            aria-label="Home"
+          >
+            <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-8 w-8" />
+            <span className="text-base font-semibold tracking-[0.18em]" style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}>
+              ryzomatic
+            </span>
+          </button>
 
-          <div className="flex flex-wrap items-center justify-end gap-4 sm:flex-nowrap">
-            {/* Tools Group: Pomodoro + AI Assistant */}
-            <div className="flex items-center gap-2">
-              {user && currentDocument && isTimerPristine && (
-                <Tooltip content="Start Pomodoro timer" position="bottom">
-                  <button
-                    data-tour="pomodoro-button"
-                    onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
-                    className="rounded-lg p-2 transition-all duration-300"
-                    style={{ 
-                      backgroundColor: 'transparent', 
-                      border: '1px solid var(--color-border)',
-                      fontSize: '1.35rem' 
-                    }}
-                    aria-label="Toggle Pomodoro timer"
-                  >
-                    🍅
-                  </button>
-                </Tooltip>
-              )}
+          {/* Removed Library breadcrumb from header */}
+        </div>
 
-              <Tooltip content="Ask the AI Assistant" position="bottom">
+        {/* Right: Global Actions */}
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
+            {user && currentDocument && isTimerPristine && (
+              <Tooltip content="Start Pomodoro timer" position="bottom">
                 <button
-                  data-tour="ai-assistant-button"
-                  onClick={() => toggleChat()}
-                  className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
-                    isChatOpen ? 'bg-[var(--color-primary-light)] ring-2 ring-blue-500/60' : ''
+                  data-tour="pomodoro-button"
+                  onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
+                  className={`rounded-lg p-2 transition-all duration-300 ${
+                    !hasSeenPomodoroTour ? 'animate-pulse ring-2 ring-blue-500/60' : ''
                   }`}
-                  style={{
-                    color: 'var(--color-text-primary)',
-                    border: '1px solid var(--color-border)',
-                    boxShadow: isChatOpen
-                      ? '0 8px 20px rgba(56, 189, 248, 0.25)'
-                      : '0 6px 16px rgba(148, 163, 184, 0.18)',
-                    background:
-                      'linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(236, 72, 153, 0.08))'
-                  }}
-                  aria-pressed={isChatOpen}
-                  aria-expanded={isChatOpen}
-                  aria-label="Toggle AI assistant"
+                  style={{ backgroundColor: 'transparent', border: 'none', fontSize: '1.35rem' }}
+                  aria-label="Toggle Pomodoro timer"
                 >
-                  <Sparkles className="h-4 w-4" />
-                  <span>AI Chat</span>
+                  🍅
                 </button>
               </Tooltip>
-            </div>
+            )}
 
-            {/* Actions Group: Library + New Material */}
+            <Tooltip content="Ask the AI Assistant" position="bottom">
+              <button
+                data-tour="ai-assistant-button"
+                onClick={() => toggleChat()}
+                className={`rounded-lg p-2 transition-all ${
+                  isChatOpen ? 'bg-[var(--color-primary-light)] ring-2 ring-blue-500/60' : ''
+                }`}
+                style={{
+                  color: 'var(--color-text-primary)',
+                  border: '1px solid var(--color-border)',
+                  boxShadow: isChatOpen
+                    ? '0 8px 20px rgba(56, 189, 248, 0.25)'
+                    : '0 6px 16px rgba(148, 163, 184, 0.18)',
+                  background:
+                    'linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(236, 72, 153, 0.08))'
+                }}
+                aria-pressed={isChatOpen}
+                aria-expanded={isChatOpen}
+                aria-label="Toggle AI assistant"
+              >
+                <Sparkles className="h-5 w-5" />
+              </button>
+            </Tooltip>
+
             {user && (
-              <div className="flex items-center gap-2">
-                <Tooltip content="Open Library" position="bottom">
-                  <button
-                    onClick={openLibrary}
-                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]"
-                    style={{
-                      color: 'var(--color-text-primary)',
-                      border: '1px solid var(--color-border)'
-                    }}
-                    aria-label="Open Library"
-                  >
-                    <Library className="h-4 w-4" />
-                    <span>Library</span>
-                  </button>
-                </Tooltip>
-
-                <Tooltip content="Upload new material" position="bottom">
-                  <button
-                    data-tour="upload-button"
-                    onClick={onUploadClick}
-                    className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors hover:opacity-90"
-                    style={{
-                      backgroundColor: 'var(--color-primary)',
-                      color: 'var(--color-text-inverse)',
-                      border: 'none',
-                      boxShadow: '0 12px 28px rgba(56, 189, 248, 0.22)'
-                    }}
-                  >
-                    <Upload className="h-4 w-4" />
-                    <span>New Material</span>
-                  </button>
-                </Tooltip>
-              </div>
+              <Tooltip content="Upload new material" position="bottom">
+                <button
+                  data-tour="upload-button"
+                  onClick={onUploadClick}
+                  className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors hover:opacity-90"
+                  style={{
+                    backgroundColor: 'var(--color-primary)',
+                    color: 'var(--color-text-inverse)',
+                    border: 'none',
+                    boxShadow: '0 12px 28px rgba(56, 189, 248, 0.22)'
+                  }}
+                >
+                  <Upload className="h-4 w-4" />
+                    <span>New</span>
+                </button>
+              </Tooltip>
             )}
 
             {isAuthenticated && user ? (
@@ -371,19 +353,19 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                       >
                         <Upload className="h-4 w-4" />
-                        <span>New Material</span>
+                        <span>New</span>
                       </button>
                     </div>
                     <div className="border-t px-4 py-2" style={{ borderColor: 'var(--color-border)' }}>
                       <button
                         onClick={handleLogout}
-                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-colors"
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
                         style={{ color: '#ef4444' }}
                         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)')}
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                       >
                         <LogOut className="h-4 w-4" />
-                        Sign Out
+                        <span>Sign Out</span>
                       </button>
                     </div>
                   </div>
@@ -410,26 +392,41 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
 
         {currentDocument && (
           <div
-            className="flex flex-wrap items-center justify-between gap-3 border-t pt-3"
-            style={{ borderColor: 'var(--color-border)' }}
+            className="flex flex-wrap items-center justify-between gap-3 border-t pt-3 mt-3"
+            style={{
+              borderColor: 'var(--color-border)',
+              paddingTop: 'var(--spacing-md)'
+            }}
           >
             <div className="flex min-w-0 items-center gap-3">
-              <button
-                onClick={handleBackToLibrary}
-                className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm transition-colors"
-                style={{ color: 'var(--color-text-secondary)' }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-              >
-                <ChevronLeft className="h-4 w-4" />
-                <span>Library</span>
-              </button>
               <span
                 className="truncate text-sm font-medium"
                 style={{ color: 'var(--color-text-primary)' }}
+                title={currentDocument.name}
               >
                 {currentDocument.name}
               </span>
+              {/* Progress bar next to document name */}
+              {typeof pdfViewer?.numPages === 'number' && pdfViewer.numPages > 0 && (
+                <div className="flex items-center gap-2 min-w-[160px]">
+                  <div
+                    className="h-2 rounded w-28 sm:w-40 overflow-hidden"
+                    style={{ backgroundColor: 'var(--color-surface-hover)', border: '1px solid var(--color-border)' }}
+                    aria-label="Reading progress"
+                  >
+                    <div
+                      className="h-full"
+                      style={{
+                        width: `${Math.round((Math.max(1, Math.min(pdfViewer.currentPage || 1, pdfViewer.numPages)) / Math.max(1, pdfViewer.numPages)) * 100)}%`,
+                        backgroundColor: 'var(--color-primary)'
+                      }}
+                    />
+                  </div>
+                  <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                    {Math.max(1, Math.min(pdfViewer.currentPage || 1, pdfViewer.numPages))}/{pdfViewer.numPages}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -474,7 +471,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             </div>
           </div>
         )}
-      </div>
+    </header>
 
       {showAuth && (
         <AuthModal
@@ -782,6 +779,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
           </div>,
           document.body
         )}
-    </header>
+    </>
   )
 }
