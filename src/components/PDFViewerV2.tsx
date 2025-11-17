@@ -919,12 +919,14 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // Create page navigation plugin (do NOT wrap in useMemo)
   const pageNavigationPluginInstance = pageNavigationPlugin({ enableShortcuts: false }) // Disable shortcuts, we'll handle them ourselves
 
-  // Cache blob URL to prevent memory leaks
+  // Cache blob URL and Uint8Array to prevent memory leaks and infinite re-renders
   const blobUrlRef = useRef<string | null>(null)
+  const uint8ArrayRef = useRef<Uint8Array | null>(null)
+  const documentIdRef = useRef<string | null>(null)
   
   // Convert document.pdfData to a format react-pdf-viewer can use
-  // CRITICAL: Memoize this to prevent infinite re-renders
-  // If we return a new Uint8Array on every render, React sees it as a new value and re-renders infinitely
+  // CRITICAL: Use refs to cache values and prevent infinite re-renders
+  // Creating new Uint8Array on every render causes React to see it as a new value
   const documentUrl = useMemo((): string | Uint8Array => {
     // pdfData is guaranteed to exist at this point due to early return above
     if (!document.pdfData) {
@@ -938,49 +940,65 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
     // If it's a Blob, create a blob URL (cached)
     if (document.pdfData instanceof Blob) {
-      // Clean up old blob URL if document changed
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current)
-        blobUrlRef.current = null
+      // Only create new blob URL if document changed
+      if (documentIdRef.current !== document.id || !blobUrlRef.current) {
+        // Clean up old blob URL if document changed
+        if (blobUrlRef.current) {
+          URL.revokeObjectURL(blobUrlRef.current)
+        }
+        blobUrlRef.current = URL.createObjectURL(document.pdfData)
+        documentIdRef.current = document.id
       }
-      blobUrlRef.current = URL.createObjectURL(document.pdfData)
       return blobUrlRef.current
     }
 
-    // If it's an ArrayBuffer, always clone it to prevent detachment issues
-    // Even if not detached now, cloning ensures it won't become detached when passed to PDF.js worker
+    // If it's an ArrayBuffer, cache the Uint8Array to prevent infinite re-renders
     if (document.pdfData instanceof ArrayBuffer) {
-      try {
-        // Always clone the ArrayBuffer to prevent detachment
-        // This ensures the buffer remains valid even if transferred to a worker
-        const clonedBuffer = document.pdfData.slice(0)
-        console.log('✅ PDFViewerV2: Cloned ArrayBuffer for PDF.js:', {
-          originalSize: document.pdfData.byteLength,
-          clonedSize: clonedBuffer.byteLength
-        });
-        return new Uint8Array(clonedBuffer)
-      } catch (error) {
-        // If cloning fails, the ArrayBuffer is likely already detached or corrupted
-        console.error('❌ PDFViewerV2: Failed to clone ArrayBuffer:', error)
-        throw new Error('PDF data is corrupted or detached. Please try re-opening the document.')
+      // Only recreate if document changed or ref is empty
+      if (documentIdRef.current !== document.id || !uint8ArrayRef.current) {
+        try {
+          // Always clone the ArrayBuffer to prevent detachment
+          const clonedBuffer = document.pdfData.slice(0)
+          uint8ArrayRef.current = new Uint8Array(clonedBuffer)
+          documentIdRef.current = document.id
+          console.log('✅ PDFViewerV2: Cloned ArrayBuffer for PDF.js:', {
+            originalSize: document.pdfData.byteLength,
+            clonedSize: clonedBuffer.byteLength,
+            documentId: document.id
+          });
+        } catch (error) {
+          // If cloning fails, the ArrayBuffer is likely already detached or corrupted
+          console.error('❌ PDFViewerV2: Failed to clone ArrayBuffer:', error)
+          throw new Error('PDF data is corrupted or detached. Please try re-opening the document.')
+        }
       }
+      return uint8ArrayRef.current
     }
 
     // Fallback: try to convert to Uint8Array (shouldn't reach here if pdfData is ArrayBuffer)
     try {
-      return new Uint8Array(document.pdfData as ArrayBuffer)
+      if (documentIdRef.current !== document.id || !uint8ArrayRef.current) {
+        uint8ArrayRef.current = new Uint8Array(document.pdfData as ArrayBuffer)
+        documentIdRef.current = document.id
+      }
+      return uint8ArrayRef.current
     } catch (error) {
       console.error('❌ PDFViewerV2: Failed to convert pdfData to Uint8Array:', error)
       throw new Error('PDF data format is invalid. Please try re-opening the document.')
     }
-  }, [document.pdfData, document.id]) // Re-compute when pdfData or document.id changes
+  }, [document.id]) // Only depend on document.id, not pdfData (which might change reference)
   
-  // Cleanup blob URL when document changes or component unmounts
+  // Cleanup blob URL and refs when document changes or component unmounts
   useEffect(() => {
     return () => {
       if (blobUrlRef.current) {
         URL.revokeObjectURL(blobUrlRef.current)
         blobUrlRef.current = null
+      }
+      // Clear Uint8Array ref when document changes
+      if (documentIdRef.current !== document.id) {
+        uint8ArrayRef.current = null
+        documentIdRef.current = null
       }
     }
   }, [document.id])
