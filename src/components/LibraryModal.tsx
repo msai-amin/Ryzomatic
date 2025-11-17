@@ -1874,4 +1874,3 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
     modalRoot
   );
 }
-// Build fix
