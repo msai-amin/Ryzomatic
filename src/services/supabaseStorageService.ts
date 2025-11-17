@@ -972,6 +972,13 @@ class SupabaseStorageService {
       const { data, error } = await userAudio.list(this.currentUserId!);
       
       if (error) {
+        // user_audio table was replaced by tts_audio_cache in migration 020
+        // Return empty array gracefully instead of throwing error
+        if (error.message.includes('user_audio') || error.message.includes('Could not find the table')) {
+          logger.warn('user_audio table not found (replaced by tts_audio_cache), returning empty array', { userId: this.currentUserId });
+          return [];
+        }
+        
         throw errorHandler.createError(
           `Failed to load audio from Supabase: ${error.message}`,
           ErrorType.DATABASE,
