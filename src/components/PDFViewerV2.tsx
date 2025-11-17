@@ -86,8 +86,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const [showHighlightPanel, setShowHighlightPanel] = useState(false)
   const [showLibrary, setShowLibrary] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
-  const [showTextCleanup, setShowTextCleanup] = useState(false)
-  const [isTextCleaning, setIsTextCleaning] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const [selectionEnabled, setSelectionEnabled] = useState(true)
@@ -1560,19 +1558,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             <Maximize2 className="w-5 h-5" />
           </button>
           
-          {/* Text Cleanup */}
-          <button
-            onClick={() => setShowTextCleanup(true)}
-            className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
-            style={{ 
-              color: 'var(--color-text-primary)', 
-              backgroundColor: 'transparent'
-            }}
-            title="Text Cleanup"
-          >
-            <Type className="w-5 h-5" />
-          </button>
-          
           {/* Separator */}
           <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
           
@@ -2078,34 +2063,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         />
       )}
       
-      {/* Text Cleanup Modal */}
-      {showTextCleanup && document && (
-        <TextCleanupModal
-          onClose={() => setShowTextCleanup(false)}
-          onApply={async (preferences: CleanupPreferences, applyToAllPages: boolean) => {
-            setIsTextCleaning(true)
-            try {
-              await cleanupDocumentText({
-                document,
-                preferences,
-                pageNumbers: applyToAllPages ? undefined : [pdfViewer.currentPage],
-                userId: userId || undefined,
-                existingCleaned: document.cleanedPageTexts ?? null
-              })
-              setShowTextCleanup(false)
-            } catch (error) {
-              console.error('Text cleanup error:', error)
-              alert('Failed to clean text. Please try again.')
-            } finally {
-              setIsTextCleaning(false)
-            }
-          }}
-          isProcessing={isTextCleaning}
-          currentPageNumber={pdfViewer.currentPage}
-          totalPages={numPages}
-          scrollMode={pdfViewer.scrollMode}
-        />
-      )}
     </>
   )
 }

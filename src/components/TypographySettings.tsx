@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Type, Palette, AlignLeft, AlignJustify, AlignCenter, Space, Eye, Crosshair } from 'lucide-react'
+import { X, Type, Palette, AlignLeft, AlignJustify, AlignCenter, Space, Eye, Crosshair, Sparkles } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
+import { TextCleanupModal } from './TextCleanupModal'
+import { cleanupDocumentText, CleanupPreferences } from '../services/textCleanupService'
 
 interface TypographySettingsProps {
   onClose: () => void
 }
 
 export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose }) => {
-  const { typography, updateTypography } = useAppStore()
+  const { typography, updateTypography, currentDocument, pdfViewer, user } = useAppStore()
+  const [showTextCleanup, setShowTextCleanup] = useState(false)
+  const [isTextCleaning, setIsTextCleaning] = useState(false)
 
   const handleFontFamilyChange = (fontFamily: 'serif' | 'sans' | 'mono') => {
     updateTypography({ fontFamily })
@@ -260,8 +264,64 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
               </label>
             </div>
           </div>
+
+          {/* Text Cleanup & Organization */}
+          {currentDocument && (
+            <div className="border-t pt-6" style={{ borderColor: 'var(--color-border)' }}>
+              <label className="flex items-center space-x-2 text-sm font-medium mb-3 text-gray-900 dark:text-gray-100" style={{ color: 'var(--color-text-primary, #1f2937)' }}>
+                <Sparkles className="w-4 h-4" />
+                <span>Text Cleanup & Organization</span>
+              </label>
+              <p className="text-sm mb-4 text-gray-600 dark:text-gray-400" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
+                Clean and reorganize document text for better readability in reading mode.
+              </p>
+              <button
+                onClick={() => setShowTextCleanup(true)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border transition-colors"
+                style={{
+                  borderColor: 'var(--color-border)',
+                  color: 'var(--color-text-primary)',
+                  backgroundColor: 'transparent'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Open Text Cleanup</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Text Cleanup Modal */}
+      {showTextCleanup && currentDocument && (
+        <TextCleanupModal
+          onClose={() => setShowTextCleanup(false)}
+          onApply={async (preferences: CleanupPreferences, applyToAllPages: boolean) => {
+            setIsTextCleaning(true)
+            try {
+              await cleanupDocumentText({
+                document: currentDocument,
+                preferences,
+                pageNumbers: applyToAllPages ? undefined : [pdfViewer.currentPage],
+                userId: user?.id || undefined,
+                existingCleaned: currentDocument.cleanedPageTexts ?? null
+              })
+              setShowTextCleanup(false)
+            } catch (error) {
+              console.error('Text cleanup error:', error)
+              alert('Failed to clean text. Please try again.')
+            } finally {
+              setIsTextCleaning(false)
+            }
+          }}
+          isProcessing={isTextCleaning}
+          currentPageNumber={pdfViewer.currentPage}
+          totalPages={pdfViewer.numPages || 0}
+          scrollMode={pdfViewer.scrollMode}
+        />
+      )}
     </div>,
     document.body
   )
