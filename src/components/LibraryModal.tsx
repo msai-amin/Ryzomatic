@@ -12,6 +12,7 @@ import { CollectionTree } from './library/CollectionTree';
 interface LibraryModalProps {
   isOpen: boolean;
   onClose: () => void;
+            });
   refreshTrigger?: number; // Add refresh trigger
 }
 
