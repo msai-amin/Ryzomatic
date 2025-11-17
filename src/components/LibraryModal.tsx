@@ -1874,5 +1874,3 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
     modalRoot
   );
 }
-// Ensure correct version
-// Build trigger: 20251117-025024
