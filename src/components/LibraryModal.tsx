@@ -1025,20 +1025,6 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                  <div
-                    className="flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium"
-                    style={{
-                      backgroundColor: 'rgba(148,163,184,0.12)',
-                      color: 'var(--color-text-secondary)',
-                      border: '1px solid rgba(148,163,184,0.16)'
-                    }}
-                  >
-                    <span
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: isSupabaseData ? '#34d399' : '#fbbf24' }}
-                    ></span>
-                    <span>{isSupabaseData ? 'Supabase Sync' : 'Local Workspace'}</span>
-                  </div>
                   {syncStatus.lastSync && (
                     <div
                       className="rounded-full px-3 py-1 text-xs"
