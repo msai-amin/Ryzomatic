@@ -200,64 +200,88 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             </nav>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
-            {user && currentDocument && isTimerPristine && (
-              <Tooltip content="Start Pomodoro timer" position="bottom">
+          <div className="flex flex-wrap items-center justify-end gap-4 sm:flex-nowrap">
+            {/* Tools Group: Pomodoro + AI Assistant */}
+            <div className="flex items-center gap-2">
+              {user && currentDocument && isTimerPristine && (
+                <Tooltip content="Start Pomodoro timer" position="bottom">
+                  <button
+                    data-tour="pomodoro-button"
+                    onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
+                    className="rounded-lg p-2 transition-all duration-300"
+                    style={{ 
+                      backgroundColor: 'transparent', 
+                      border: '1px solid var(--color-border)',
+                      fontSize: '1.35rem' 
+                    }}
+                    aria-label="Toggle Pomodoro timer"
+                  >
+                    🍅
+                  </button>
+                </Tooltip>
+              )}
+
+              <Tooltip content="Ask the AI Assistant" position="bottom">
                 <button
-                  data-tour="pomodoro-button"
-                  onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
-                  className={`rounded-lg p-2 transition-all duration-300 ${
-                    !hasSeenPomodoroTour ? 'animate-pulse ring-2 ring-blue-500/60' : ''
+                  data-tour="ai-assistant-button"
+                  onClick={() => toggleChat()}
+                  className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
+                    isChatOpen ? 'bg-[var(--color-primary-light)] ring-2 ring-blue-500/60' : ''
                   }`}
-                  style={{ backgroundColor: 'transparent', border: 'none', fontSize: '1.35rem' }}
-                  aria-label="Toggle Pomodoro timer"
-                >
-                  🍅
-                </button>
-              </Tooltip>
-            )}
-
-            <Tooltip content="Ask the AI Assistant" position="bottom">
-              <button
-                data-tour="ai-assistant-button"
-                onClick={() => toggleChat()}
-                className={`rounded-lg p-2 transition-all ${
-                  isChatOpen ? 'bg-[var(--color-primary-light)] ring-2 ring-blue-500/60' : ''
-                }`}
-                style={{
-                  color: 'var(--color-text-primary)',
-                  border: '1px solid var(--color-border)',
-                  boxShadow: isChatOpen
-                    ? '0 8px 20px rgba(56, 189, 248, 0.25)'
-                    : '0 6px 16px rgba(148, 163, 184, 0.18)',
-                  background:
-                    'linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(236, 72, 153, 0.08))'
-                }}
-                aria-pressed={isChatOpen}
-                aria-expanded={isChatOpen}
-                aria-label="Toggle AI assistant"
-              >
-                <Sparkles className="h-5 w-5" />
-              </button>
-            </Tooltip>
-
-            {user && (
-              <Tooltip content="Upload new material" position="bottom">
-                <button
-                  data-tour="upload-button"
-                  onClick={onUploadClick}
-                  className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors hover:opacity-90"
                   style={{
-                    backgroundColor: 'var(--color-primary)',
-                    color: 'var(--color-text-inverse)',
-                    border: 'none',
-                    boxShadow: '0 12px 28px rgba(56, 189, 248, 0.22)'
+                    color: 'var(--color-text-primary)',
+                    border: '1px solid var(--color-border)',
+                    boxShadow: isChatOpen
+                      ? '0 8px 20px rgba(56, 189, 248, 0.25)'
+                      : '0 6px 16px rgba(148, 163, 184, 0.18)',
+                    background:
+                      'linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(236, 72, 153, 0.08))'
                   }}
+                  aria-pressed={isChatOpen}
+                  aria-expanded={isChatOpen}
+                  aria-label="Toggle AI assistant"
                 >
-                  <Upload className="h-4 w-4" />
-                  <span>New Material</span>
+                  <Sparkles className="h-4 w-4" />
+                  <span>AI Chat</span>
                 </button>
               </Tooltip>
+            </div>
+
+            {/* Actions Group: Library + New Material */}
+            {user && (
+              <div className="flex items-center gap-2">
+                <Tooltip content="Open Library" position="bottom">
+                  <button
+                    onClick={openLibrary}
+                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]"
+                    style={{
+                      color: 'var(--color-text-primary)',
+                      border: '1px solid var(--color-border)'
+                    }}
+                    aria-label="Open Library"
+                  >
+                    <Library className="h-4 w-4" />
+                    <span>Library</span>
+                  </button>
+                </Tooltip>
+
+                <Tooltip content="Upload new material" position="bottom">
+                  <button
+                    data-tour="upload-button"
+                    onClick={onUploadClick}
+                    className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors hover:opacity-90"
+                    style={{
+                      backgroundColor: 'var(--color-primary)',
+                      color: 'var(--color-text-inverse)',
+                      border: 'none',
+                      boxShadow: '0 12px 28px rgba(56, 189, 248, 0.22)'
+                    }}
+                  >
+                    <Upload className="h-4 w-4" />
+                    <span>New Material</span>
+                  </button>
+                </Tooltip>
+              </div>
             )}
 
             {isAuthenticated && user ? (
