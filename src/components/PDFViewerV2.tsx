@@ -101,12 +101,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // CRITICAL: This must be defined before any useMemo hooks to prevent undefined.length errors
   const safeAnnotationColors = Array.isArray(annotationColors) ? annotationColors : []
   const safeAnnotationColorsLength = safeAnnotationColors.length
-  
-  // CRITICAL: Memoize the stringified array to create a stable reference for dependency comparison
-  // This prevents React's 'co' function from receiving undefined dependency arrays
-  const safeAnnotationColorsKey = useMemo(() => {
-    return JSON.stringify(safeAnnotationColors)
-  }, [safeAnnotationColors])
 
   // CRITICAL: Normalize all dependencies to ensure they're never undefined
   // This prevents React's dependency comparison function from accessing .length on undefined
@@ -977,6 +971,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   }, [
     // CRITICAL: All dependencies must be defined and normalized to prevent React's 'co' function error
     // Use primitive values instead of array references to avoid comparison issues
+    // NOTE: safeAnnotationColors is accessed inside the callback (closure), not in deps
+    // This prevents React's 'co' function from receiving undefined dependency arrays
     selectionEnabled ?? false,
     currentHighlightColor ?? 'yellow',
     currentHighlightColorHex ?? '#ffeb3b',
@@ -985,8 +981,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     normalizedUserId,
     safeAnnotationColorsLength ?? 0,
     isChatOpen ?? false,
-    // Use memoized string key instead of array reference for stable comparison
-    safeAnnotationColorsKey,
   ])
 
   // Create scroll mode plugin (do NOT wrap in useMemo; keep hook order consistent)
