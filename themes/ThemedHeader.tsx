@@ -170,21 +170,25 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
         backdropFilter: 'blur(10px)'
       }}
     >
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
       <div className="flex w-full flex-wrap items-center justify-between gap-6">
-        {/* Left: Logo & Brand (Static) */}
+        {/* Left: Logo & Brand (Home Button) */}
         <div className="flex min-w-0 items-center gap-6">
-          <div
-            className="flex items-center gap-3 px-3 py-1.5"
+          <button
+            onClick={handleLogoClick}
+            className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:opacity-80"
             style={{ color: 'var(--color-text-primary)' }}
+            aria-label="Home"
           >
-            <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-8 w-8" />
-            <span className="text-base font-semibold tracking-[0.18em]" style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}>
-              ryzomatic
+            <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-6 w-6" />
+            <span className="text-sm font-semibold tracking-[0.18em]" style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}>
+              ryzomatics
             </span>
-          </div>
+          </button>
 
-          {/* Library Navigation */}
-          {user && (
+          {/* Navigation: Library */}
+          <nav className="flex items-center">
             <button
               onClick={openLibrary}
               className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]"
@@ -196,26 +200,20 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
               <Library className="h-4 w-4" />
               <span>Library</span>
             </button>
-          )}
+          </nav>
         </div>
 
-        {/* Right: Global Actions - Grouped with logical separation */}
-        <div className="flex flex-wrap items-center justify-end gap-4 sm:flex-nowrap">
-          {/* Tools Group: Pomodoro & AI Assistant */}
-          <div className="flex items-center gap-3">
-            {user && currentDocument && (
-              <Tooltip content={timerState.isRunning ? "Pause Pomodoro timer" : "Start Pomodoro timer"} position="bottom">
+        {/* Right: Global Actions */}
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
+            {user && currentDocument && isTimerPristine && (
+              <Tooltip content="Start Pomodoro timer" position="bottom">
                 <button
                   data-tour="pomodoro-button"
                   onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
                   className={`rounded-lg p-2 transition-all duration-300 ${
-                    timerState.isRunning ? 'animate-pulse ring-2 ring-blue-500/60' : ''
+                    !hasSeenPomodoroTour ? 'animate-pulse ring-2 ring-blue-500/60' : ''
                   }`}
-                  style={{ 
-                    backgroundColor: 'transparent', 
-                    border: timerState.isRunning ? '1px solid var(--color-border)' : 'none', 
-                    fontSize: '1.35rem' 
-                  }}
+                  style={{ backgroundColor: 'transparent', border: 'none', fontSize: '1.35rem' }}
                   aria-label="Toggle Pomodoro timer"
                 >
                   🍅
@@ -223,69 +221,165 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
               </Tooltip>
             )}
 
-            <button
-              data-tour="ai-assistant-button"
-              onClick={() => toggleChat()}
-              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
-                isChatOpen ? 'bg-[var(--color-primary-light)] ring-2 ring-blue-500/60' : ''
-              }`}
-              style={{
-                color: 'var(--color-text-primary)',
-                border: '1px solid var(--color-border)',
-                boxShadow: isChatOpen
-                  ? '0 8px 20px rgba(56, 189, 248, 0.25)'
-                  : '0 6px 16px rgba(148, 163, 184, 0.18)',
-                background:
-                  'linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(236, 72, 153, 0.08))'
-              }}
-              aria-pressed={isChatOpen}
-              aria-expanded={isChatOpen}
-              aria-label="Toggle AI assistant"
+            <Tooltip content="Ask the AI Assistant" position="bottom">
+              <button
+                data-tour="ai-assistant-button"
+                onClick={() => toggleChat()}
+                className={`rounded-lg p-2 transition-all ${
+                  isChatOpen ? 'bg-[var(--color-primary-light)] ring-2 ring-blue-500/60' : ''
+                }`}
+                style={{
+                  color: 'var(--color-text-primary)',
+                  border: '1px solid var(--color-border)',
+                  boxShadow: isChatOpen
+                    ? '0 8px 20px rgba(56, 189, 248, 0.25)'
+                    : '0 6px 16px rgba(148, 163, 184, 0.18)',
+                  background:
+                    'linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(236, 72, 153, 0.08))'
+                }}
+                aria-pressed={isChatOpen}
+                aria-expanded={isChatOpen}
+                aria-label="Toggle AI assistant"
+              >
+                <Sparkles className="h-5 w-5" />
+              </button>
+            </Tooltip>
+=======
+      <div className="flex w-full flex-col gap-3">
+        <div className="flex w-full flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-6">
+            <div
+              className="flex items-center gap-2 rounded-lg px-2 py-1"
+              style={{ color: 'var(--color-text-primary)' }}
             >
-              <Sparkles className="h-4 w-4" />
-              <span>AI Assistant</span>
-            </button>
+              <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-6 w-6" />
+              <span className="text-sm font-semibold tracking-[0.18em]" style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}>
+                ryzomatic
+              </span>
+            </div>
           </div>
 
-          {/* Visual Separator */}
-          <div 
-            className="h-6 w-px" 
-            style={{ backgroundColor: 'var(--color-border)' }}
-            aria-hidden="true"
-          />
+          <div className="flex flex-wrap items-center justify-end gap-4 sm:flex-nowrap">
+            {/* Tools Group: Pomodoro + AI Assistant */}
+            <div className="flex items-center gap-2">
+              {user && currentDocument && isTimerPristine && (
+                <Tooltip content="Start Pomodoro timer" position="bottom">
+                  <button
+                    data-tour="pomodoro-button"
+                    onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
+                    className="rounded-lg p-2 transition-all duration-300"
+                    style={{ 
+                      backgroundColor: 'transparent', 
+                      border: '1px solid var(--color-border)',
+                      fontSize: '1.35rem' 
+                    }}
+                    aria-label="Toggle Pomodoro timer"
+                  >
+                    🍅
+                  </button>
+                </Tooltip>
+              )}
+>>>>>>> Incoming (Background Agent changes)
 
-          {/* Action Group: Upload */}
-          {user && (
-            <div className="flex items-center">
-              <Tooltip content="Upload new material" position="bottom">
+=======
+      <div className="flex w-full flex-col gap-3">
+        <div className="flex w-full flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-6">
+            <div
+              className="flex items-center gap-2 rounded-lg px-2 py-1"
+              style={{ color: 'var(--color-text-primary)' }}
+            >
+              <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-6 w-6" />
+              <span className="text-sm font-semibold tracking-[0.18em]" style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}>
+                ryzomatic
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-4 sm:flex-nowrap">
+            {/* Tools Group: Pomodoro + AI Assistant */}
+            <div className="flex items-center gap-2">
+              {user && currentDocument && isTimerPristine && (
+                <Tooltip content="Start Pomodoro timer" position="bottom">
+                  <button
+                    data-tour="pomodoro-button"
+                    onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
+                    className="rounded-lg p-2 transition-all duration-300"
+                    style={{ 
+                      backgroundColor: 'transparent', 
+                      border: '1px solid var(--color-border)',
+                      fontSize: '1.35rem' 
+                    }}
+                    aria-label="Toggle Pomodoro timer"
+                  >
+                    🍅
+                  </button>
+                </Tooltip>
+              )}
+
+>>>>>>> Incoming (Background Agent changes)
+              <Tooltip content="Ask the AI Assistant" position="bottom">
                 <button
-                  data-tour="upload-button"
-                  onClick={onUploadClick}
-                  className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors hover:opacity-90"
+                  data-tour="ai-assistant-button"
+                  onClick={() => toggleChat()}
+                  className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
+                    isChatOpen ? 'bg-[var(--color-primary-light)] ring-2 ring-blue-500/60' : ''
+                  }`}
                   style={{
-                    backgroundColor: 'var(--color-primary)',
-                    color: 'var(--color-text-inverse)',
-                    border: 'none',
-                    boxShadow: '0 12px 28px rgba(56, 189, 248, 0.22)'
+                    color: 'var(--color-text-primary)',
+                    border: '1px solid var(--color-border)',
+                    boxShadow: isChatOpen
+                      ? '0 8px 20px rgba(56, 189, 248, 0.25)'
+                      : '0 6px 16px rgba(148, 163, 184, 0.18)',
+                    background:
+                      'linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(236, 72, 153, 0.08))'
                   }}
+                  aria-pressed={isChatOpen}
+                  aria-expanded={isChatOpen}
+                  aria-label="Toggle AI assistant"
                 >
-                  <Upload className="h-4 w-4" />
-                  <span>New Material</span>
+                  <Sparkles className="h-4 w-4" />
+                  <span>AI Chat</span>
                 </button>
               </Tooltip>
             </div>
-          )}
 
-          {/* Visual Separator */}
-          {user && (
-            <div 
-              className="h-6 w-px" 
-              style={{ backgroundColor: 'var(--color-border)' }}
-              aria-hidden="true"
-            />
-          )}
+            {/* Actions Group: Library + New Material */}
+            {user && (
+              <div className="flex items-center gap-2">
+                <Tooltip content="Open Library" position="bottom">
+                  <button
+                    onClick={openLibrary}
+                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]"
+                    style={{
+                      color: 'var(--color-text-primary)',
+                      border: '1px solid var(--color-border)'
+                    }}
+                    aria-label="Open Library"
+                  >
+                    <Library className="h-4 w-4" />
+                    <span>Library</span>
+                  </button>
+                </Tooltip>
 
-          {/* Account Group: User Profile */}
+                <Tooltip content="Upload new material" position="bottom">
+                  <button
+                    data-tour="upload-button"
+                    onClick={onUploadClick}
+                    className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors hover:opacity-90"
+                    style={{
+                      backgroundColor: 'var(--color-primary)',
+                      color: 'var(--color-text-inverse)',
+                      border: 'none',
+                      boxShadow: '0 12px 28px rgba(56, 189, 248, 0.22)'
+                    }}
+                  >
+                    <Upload className="h-4 w-4" />
+                    <span>New Material</span>
+                  </button>
+                </Tooltip>
+              </div>
+            )}
 
             {isAuthenticated && user ? (
               <div className="relative">
@@ -318,7 +412,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                         {user.full_name || user.email}
                       </p>
                       <span
-                        className="mt-1 inline-flex items-center gap-2 rounded-full px-2 py-0.5 text-xs whitespace-nowrap"
+                        className="mt-1 inline-flex items-center gap-2 rounded-full px-2 py-0.5 text-xs"
                         style={{
                           backgroundColor: 'var(--color-primary-light)',
                           color: 'var(--color-primary-dark)'
@@ -391,19 +485,19 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                       >
                         <Upload className="h-4 w-4" />
-                        <span>New</span>
+                        <span>New Material</span>
                       </button>
                     </div>
                     <div className="border-t px-4 py-2" style={{ borderColor: 'var(--color-border)' }}>
                       <button
                         onClick={handleLogout}
-                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-colors"
                         style={{ color: '#ef4444' }}
                         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)')}
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                       >
                         <LogOut className="h-4 w-4" />
-                        <span>Sign Out</span>
+                        Sign Out
                       </button>
                     </div>
                   </div>
@@ -437,34 +531,23 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             }}
           >
             <div className="flex min-w-0 items-center gap-3">
+              <button
+                onClick={handleBackToLibrary}
+                className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+                style={{ color: 'var(--color-text-primary)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                aria-label="Back to Library"
+              >
+                <Library className="h-4 w-4" />
+                <span>Library</span>
+              </button>
               <span
                 className="truncate text-sm font-medium"
                 style={{ color: 'var(--color-text-primary)' }}
-                title={currentDocument.name}
               >
                 {currentDocument.name}
               </span>
-              {/* Progress bar next to document name */}
-              {typeof pdfViewer?.numPages === 'number' && pdfViewer.numPages > 0 && (
-                <div className="flex items-center gap-2 min-w-[160px]">
-                  <div
-                    className="h-2 rounded w-28 sm:w-40 overflow-hidden"
-                    style={{ backgroundColor: 'var(--color-surface-hover)', border: '1px solid var(--color-border)' }}
-                    aria-label="Reading progress"
-                  >
-                    <div
-                      className="h-full"
-                      style={{
-                        width: `${Math.round((Math.max(1, Math.min(pdfViewer.currentPage || 1, pdfViewer.numPages)) / Math.max(1, pdfViewer.numPages)) * 100)}%`,
-                        backgroundColor: 'var(--color-primary)'
-                      }}
-                    />
-                  </div>
-                  <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                    {Math.max(1, Math.min(pdfViewer.currentPage || 1, pdfViewer.numPages))}/{pdfViewer.numPages}
-                  </span>
-                </div>
-              )}
             </div>
 
             <div className="flex items-center gap-2">

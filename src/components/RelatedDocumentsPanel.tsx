@@ -5,7 +5,6 @@ import { Tooltip } from './Tooltip';
 import { useAppStore } from '../store/appStore';
 import { supabaseStorageService } from '../services/supabaseStorageService';
 import { authService } from '../services/supabaseAuthService';
-import { RelationshipAnalysisCard } from './RelationshipAnalysisCard';
 
 interface RelatedDocumentsPanelProps {
   relatedDocuments: DocumentRelationshipWithDetails[];
@@ -374,11 +373,12 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
           {relatedDocuments.map((relationship) => (
             <div
               key={relationship.relationship_id}
-              className="p-3 rounded-lg border transition-colors group"
+              className="p-3 rounded-lg border transition-colors cursor-pointer group"
               style={{ 
                 borderColor: 'var(--color-border)',
                 backgroundColor: 'var(--color-surface)'
               }}
+              onClick={() => onPreviewDocument(relationship)}
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center space-x-2 flex-1 min-w-0">
@@ -414,12 +414,78 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
                 </div>
               </div>
 
-              {/* Enhanced Relationship Analysis Card */}
-              <RelationshipAnalysisCard
-                relationship={relationship}
-                onPreviewDocument={onPreviewDocument}
-                compact={true}
-              />
+              {/* Relevance Bar */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span style={{ color: 'var(--color-text-secondary)' }}>
+                    {relationship.relevance_calculation_status === 'completed' && relationship.relevance_percentage
+                      ? `${relationship.relevance_percentage}% relevant`
+                      : relationship.relevance_calculation_status === 'processing'
+                      ? 'AI is analyzing documents...'
+                      : relationship.relevance_calculation_status === 'failed'
+                      ? 'Analysis failed - will retry automatically'
+                      : 'Waiting for AI analysis...'
+                    }
+                  </span>
+                  <div className="flex items-center space-x-1">
+                    <Tooltip content="Preview Document" position="top">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPreviewDocument(relationship);
+                        }}
+                        className="p-1 rounded transition-colors opacity-0 group-hover:opacity-100"
+                        style={{ 
+                          color: 'var(--color-text-secondary)',
+                          backgroundColor: 'transparent'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <Eye className="w-3 h-3" />
+                      </button>
+                    </Tooltip>
+                  </div>
+                </div>
+
+                {relationship.relevance_percentage && (
+                  <div 
+                    className="w-full h-1.5 rounded-full"
+                    style={{ backgroundColor: 'var(--color-border-light)' }}
+                  >
+                    <div
+                      className="h-1.5 rounded-full transition-all duration-300"
+                      style={{ 
+                        width: `${relationship.relevance_percentage}%`,
+                        backgroundColor: getRelevanceColor(relationship.relevance_percentage)
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Description Preview */}
+              {(relationship.relationship_description || relationship.ai_generated_description) && (
+                <div className="mt-2">
+                  <p className="text-xs line-clamp-2" style={{ color: 'var(--color-text-secondary)' }}>
+                    {relationship.relationship_description || relationship.ai_generated_description}
+                  </p>
+                </div>
+              )}
+
+              {/* Document Type Badge */}
+              <div className="mt-2">
+                <span 
+                  className="text-xs px-2 py-1 rounded-full"
+                  style={{
+                    backgroundColor: 'var(--color-primary-light)',
+                    color: 'var(--color-primary-dark)'
+                  }}
+                >
+                  {relationship.related_file_type.toUpperCase()}
+                  {relationship.related_total_pages && ` • ${relationship.related_total_pages} pages`}
+                </span>
+              </div>
             </div>
           ))}
         </div>

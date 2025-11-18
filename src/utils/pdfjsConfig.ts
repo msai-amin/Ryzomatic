@@ -5,6 +5,17 @@
 
 /**
  * Get PDF.js worker source URL
+<<<<<<< Current (Your changes)
+ * Uses CDN worker for production to avoid deployment issues
+ */
+export function getPDFWorkerSrc(): string {
+  // Use CDN for production to ensure correct version
+  if (import.meta.env.PROD) {
+    return 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.394/build/pdf.worker.min.mjs';
+  }
+  
+  // Use local worker for development
+=======
  * Uses CDN for production to avoid deployment issues, local file for development
  */
 export function getPDFWorkerSrc(): string {
@@ -16,6 +27,7 @@ export function getPDFWorkerSrc(): string {
   }
   
   // Use local worker file for development
+>>>>>>> Incoming (Background Agent changes)
   return '/pdf.worker.min.js';
 }
 

@@ -68,8 +68,23 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // Get document from store
   const document = currentDocument
 
+  // Early return if no document - prevents infinite loops
+  if (!document || !document.pdfData) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <p className="text-lg mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+            No document loaded
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   // State declarations (must be before early returns per React hooks rules)
   const [highlights, setHighlights] = useState<HighlightType[]>([])
+  // Ref to store highlights for use in plugin render functions (avoids recreating plugin on every highlight change)
+  const highlightsRef = useRef<HighlightType[]>([])
   const [currentHighlightColor, setCurrentHighlightColor] = useState(annotationColors[0]?.id || 'yellow')
   const [currentHighlightColorHex, setCurrentHighlightColorHex] = useState((annotationColors[0] as any)?.color || '#ffeb3b')
   const [showHighlightColorPopover, setShowHighlightColorPopover] = useState(false)
@@ -430,6 +445,11 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     setContextMenu(null)
   }, [document.id, document.pageTexts, userId, pdfViewer.currentPage])
 
+  // Sync highlights ref with state
+  useEffect(() => {
+    highlightsRef.current = highlights
+  }, [highlights])
+
   // Load highlights when document loads
   useEffect(() => {
     const loadHighlights = async () => {
@@ -618,8 +638,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     }
   }, [document.id, userId, currentHighlightColor, currentHighlightColorHex, annotationColors])
 
-  // Create highlight plugin (must NOT be wrapped in useMemo; plugin uses hooks internally)
-  const highlightPluginInstance = highlightPlugin({
+  // Create highlight plugin - MUST be memoized to prevent infinite re-renders
+  // The plugin instance must be stable across renders unless dependencies change
+  const highlightPluginInstance = useMemo(() => highlightPlugin({
     renderHighlightTarget: (props: RenderHighlightTargetProps) => {
       if (!selectionEnabled) {
         return null
@@ -856,8 +877,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       )
     },
     renderHighlights: (props: RenderHighlightsProps) => {
-      // Render existing highlights
-      const pageHighlights = highlights.filter((highlight) => highlight.page_number - 1 === props.pageIndex)
+      // Render existing highlights - use ref to avoid plugin recreation on highlight changes
+      const pageHighlights = highlightsRef.current.filter((highlight) => highlight.page_number - 1 === props.pageIndex)
       
       if (pageHighlights.length === 0) {
         return null
@@ -899,7 +920,20 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         </div>
       )
     },
-  })
+  }), [
+    // Dependencies that affect the plugin behavior
+    // Note: Only include primitive values and stable references
+    // highlights is accessed via ref, so we don't need it in dependencies
+    selectionEnabled,
+    currentHighlightColor,
+    currentHighlightColorHex,
+    handleCreateHighlight,
+    document.id,
+    userId,
+    // Store setters are stable and don't need to be in dependencies
+    // isChatOpen is a primitive value that affects behavior
+    isChatOpen,
+  ])
 
   // Create scroll mode plugin (do NOT wrap in useMemo; keep hook order consistent)
   const scrollModePluginInstance = scrollModePlugin()
@@ -915,6 +949,25 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
   // Create page navigation plugin (do NOT wrap in useMemo)
   const pageNavigationPluginInstance = pageNavigationPlugin({ enableShortcuts: false }) // Disable shortcuts, we'll handle them ourselves
+
+  // CRITICAL: Memoize plugins array to prevent infinite re-renders
+  // The plugins themselves are stable, but the array reference changes on every render
+  const plugins = useMemo(() => [
+    highlightPluginInstance,
+    scrollModePluginInstance,
+    zoomPluginInstance,
+    rotatePluginInstance,
+    searchPluginInstance,
+    pageNavigationPluginInstance,
+  ], [
+    // Only recreate if these dependencies change
+    highlightPluginInstance,
+    scrollModePluginInstance,
+    zoomPluginInstance,
+    rotatePluginInstance,
+    searchPluginInstance,
+    pageNavigationPluginInstance,
+  ])
 
   // Cache blob URL and Uint8Array to prevent memory leaks and infinite re-renders
   const blobUrlRef = useRef<string | null>(null)
@@ -1989,14 +2042,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             <Worker workerUrl={getPDFWorkerSrc()}>
               <Viewer
                 fileUrl={documentUrl}
-                plugins={[
-                  highlightPluginInstance,
-                  scrollModePluginInstance,
-                  zoomPluginInstance,
-                  rotatePluginInstance,
-                  searchPluginInstance,
-                  pageNavigationPluginInstance,
-                ]}
+                plugins={plugins}
                 initialPage={pdfViewer.currentPage - 1} // Convert 1-based to 0-based (zero-based index per docs)
                 defaultScale={pdfViewer.zoom}
                 initialRotation={pdfViewer.rotation}
