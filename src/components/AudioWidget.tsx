@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAppStore, Voice, TTSPosition } from '../store/appStore'
 import { ttsManager } from '../services/ttsManager'
 import { AudioSettingsPanel } from './AudioSettingsPanel'
@@ -45,6 +45,17 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   // CRITICAL: Normalize IDs to prevent React comparison error
   const normalizedDocumentId = currentDocument?.id ?? ''
   const normalizedUserId = user?.id ?? ''
+  
+  // CRITICAL FIX: Normalize pageTexts and cleanedPageTexts to always be arrays
+  // React's dependency comparison function accesses .length on arrays, so undefined causes errors
+  // Use useMemo to create stable references that are always arrays
+  const normalizedPageTexts = useMemo(() => {
+    return Array.isArray(currentDocument?.pageTexts) ? currentDocument.pageTexts : []
+  }, [currentDocument?.pageTexts])
+  
+  const normalizedCleanedPageTexts = useMemo(() => {
+    return Array.isArray(currentDocument?.cleanedPageTexts) ? currentDocument.cleanedPageTexts : []
+  }, [currentDocument?.cleanedPageTexts])
   
   const widgetRef = useRef<HTMLDivElement>(null)
   const widgetSizeRef = useRef({ width: 280, height: 160 })
@@ -469,7 +480,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       console.log('🔍 AudioWidget: No text available, clearing paragraphs')
       updateTTS({ paragraphs: [], currentParagraphIndex: 0 })
     }
-  }, [normalizedDocumentId, currentDocument?.cleanedPageTexts, currentDocument?.pageTexts, pdfViewer.readingMode, updateTTS])
+  }, [normalizedDocumentId, normalizedCleanedPageTexts, normalizedPageTexts, pdfViewer.readingMode, updateTTS])
 
   // Sync store state with TTSManager's actual state periodically
   useEffect(() => {
