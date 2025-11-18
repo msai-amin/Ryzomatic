@@ -926,9 +926,13 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
 
       // Convert to Document format
       const cleanedPageTexts = sanitizePageTexts(bookData.pageTexts);
+      // CRITICAL FIX: Ensure cleanedPageTexts is always an array to prevent undefined.length errors
+      const safePageTexts = Array.isArray(cleanedPageTexts) ? cleanedPageTexts : [];
+      const safeCleanedPageTexts = Array.isArray(bookData.cleanedPageTexts) ? bookData.cleanedPageTexts : safePageTexts;
+      
       const combinedContent =
-        cleanedPageTexts.length > 0
-          ? cleanedPageTexts.join('\n\n')
+        safePageTexts.length > 0
+          ? safePageTexts.join('\n\n')
           : typeof bookData.text_content === 'string'
             ? bookData.text_content
             : typeof bookData.fileData === 'string'
@@ -948,8 +952,8 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
             : undefined,
         totalPages: bookData.totalPages,
         lastReadPage: bookData.lastReadPage,
-        pageTexts: cleanedPageTexts,
-        cleanedPageTexts: bookData.cleanedPageTexts || cleanedPageTexts
+        pageTexts: safePageTexts,
+        cleanedPageTexts: safeCleanedPageTexts
       };
 
       // Set the current document and close the library

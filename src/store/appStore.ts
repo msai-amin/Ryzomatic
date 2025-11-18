@@ -599,8 +599,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Comprehensive sanitization of document data
       const sanitizedDocument = { ...document };
       
+      // CRITICAL FIX: Initialize pageTexts to empty array if undefined/null
+      // This prevents "Cannot read properties of undefined (reading 'length')" errors
+      if (!sanitizedDocument.pageTexts || !Array.isArray(sanitizedDocument.pageTexts)) {
+        sanitizedDocument.pageTexts = [];
+      }
+      
+      // CRITICAL FIX: Initialize cleanedPageTexts to empty array if undefined/null
+      if (!sanitizedDocument.cleanedPageTexts || !Array.isArray(sanitizedDocument.cleanedPageTexts)) {
+        sanitizedDocument.cleanedPageTexts = [];
+      }
+      
       // Sanitize pageTexts array
-      if (sanitizedDocument.pageTexts) {
+      if (sanitizedDocument.pageTexts && sanitizedDocument.pageTexts.length > 0) {
         // Debug: Log the pageTexts before sanitization
         console.log('🔍 setCurrentDocument: Before sanitization:');
         console.log('  Document ID:', sanitizedDocument.id);
@@ -649,6 +660,26 @@ export const useAppStore = create<AppState>((set, get) => ({
           isString: typeof text === 'string',
           value: (String(text).substring(0, 50) + (String(text).length > 50 ? '...' : ''))
         })));
+      }
+      
+      // Sanitize cleanedPageTexts array if it exists and has content
+      if (sanitizedDocument.cleanedPageTexts && sanitizedDocument.cleanedPageTexts.length > 0) {
+        sanitizedDocument.cleanedPageTexts = sanitizedDocument.cleanedPageTexts.map((text, index) => {
+          if (text === null || text === undefined) {
+            return '';
+          }
+          if (typeof text === 'string') {
+            return text;
+          }
+          if (typeof text === 'object') {
+            try {
+              return JSON.stringify(text);
+            } catch {
+              return String(text);
+            }
+          }
+          return String(text);
+        });
       }
       
       // Sanitize other text fields that might cause issues

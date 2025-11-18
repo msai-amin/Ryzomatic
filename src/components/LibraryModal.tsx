@@ -722,10 +722,14 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
     );
 
     const cleanedPageTexts = sanitizePageTexts(workingBook.pageTexts);
+    // CRITICAL FIX: Ensure cleanedPageTexts is always an array to prevent undefined.length errors
+    const safePageTexts = Array.isArray(cleanedPageTexts) ? cleanedPageTexts : [];
+    const safeCleanedPageTexts = Array.isArray(workingBook.cleanedPageTexts) ? workingBook.cleanedPageTexts : safePageTexts;
+    
     const legacyTextContent = (workingBook as { text_content?: string }).text_content;
     const combinedContent =
-      cleanedPageTexts.length > 0
-        ? cleanedPageTexts.join('\n\n')
+      safePageTexts.length > 0
+        ? safePageTexts.join('\n\n')
         : typeof workingBook.fileData === 'string'
           ? workingBook.fileData
           : legacyTextContent || '';
@@ -771,8 +775,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
           : undefined,
       totalPages: workingBook.totalPages,
       lastReadPage: workingBook.lastReadPage,
-      pageTexts: cleanedPageTexts,
-      cleanedPageTexts
+      pageTexts: safePageTexts,
+      cleanedPageTexts: safeCleanedPageTexts
     };
 
       console.log('Document created for app store:', {
@@ -782,15 +786,15 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         pdfDataType: doc.pdfData ? doc.pdfData.constructor.name : 'undefined',
         pdfDataLength: doc.pdfData ? doc.pdfData.byteLength : 0,
         hasPageTexts: !!doc.pageTexts,
-        pageTextsLength: doc.pageTexts?.length || 0,
-        pageTextsPreview: doc.pageTexts?.slice(0, 2).map((text, i) => {
+        pageTextsLength: doc.pageTexts.length,
+        pageTextsPreview: doc.pageTexts.slice(0, 2).map((text, i) => {
           const safeText = typeof text === 'string' ? text : String(text || '')
           return {
             page: i + 1,
             textLength: safeText.length,
             textPreview: safeText.substring(0, 30) + (safeText.length > 30 ? '...' : '')
           }
-        }) || []
+        })
       });
 
       useAppStore.getState().setCurrentDocument(doc as any);
