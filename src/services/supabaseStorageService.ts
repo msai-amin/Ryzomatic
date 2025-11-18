@@ -980,16 +980,34 @@ class SupabaseStorageService {
       if (error) {
         // user_audio table was replaced by tts_audio_cache in migration 020
         // Return empty array gracefully instead of throwing error
-        if (error.message.includes('user_audio') || error.message.includes('Could not find the table')) {
-          logger.warn('user_audio table not found (replaced by tts_audio_cache), returning empty array', { userId: this.currentUserId });
+        // Check for various error patterns that indicate missing table
+        const errorMessage = error.message?.toLowerCase() || '';
+        const errorCode = error.code || '';
+        
+        const isTableNotFound = 
+          errorMessage.includes('user_audio') ||
+          errorMessage.includes('could not find the table') ||
+          errorMessage.includes('relation') && errorMessage.includes('does not exist') ||
+          errorMessage.includes('schema cache') ||
+          errorCode === 'PGRST116' || // Not found
+          errorCode === '42P01' || // Undefined table
+          errorCode === '404';
+        
+        if (isTableNotFound) {
+          logger.warn('user_audio table not found (replaced by tts_audio_cache), returning empty array', { 
+            userId: this.currentUserId,
+            errorCode,
+            errorMessage: error.message
+          });
           return [];
         }
         
+        // For other errors, still throw
         throw errorHandler.createError(
           `Failed to load audio from Supabase: ${error.message}`,
           ErrorType.DATABASE,
           ErrorSeverity.HIGH,
-          { context: 'getAllAudio', error: error.message }
+          { context: 'getAllAudio', error: error.message, errorCode }
         );
       }
 
@@ -1010,6 +1028,27 @@ class SupabaseStorageService {
       return audio;
 
     } catch (error) {
+      // If it's already an AppError from above, rethrow it
+      if (error instanceof Error && 'type' in error && 'severity' in error) {
+        throw error;
+      }
+      
+      // For unexpected errors, check if it's a table not found error
+      const errorMessage = (error as Error)?.message?.toLowerCase() || '';
+      const isTableNotFound = 
+        errorMessage.includes('user_audio') ||
+        errorMessage.includes('could not find the table') ||
+        errorMessage.includes('relation') && errorMessage.includes('does not exist');
+      
+      if (isTableNotFound) {
+        logger.warn('user_audio table not found (replaced by tts_audio_cache), returning empty array', { 
+          userId: this.currentUserId,
+          errorMessage: (error as Error).message
+        });
+        return [];
+      }
+      
+      // For other errors, log and throw
       logger.error('Error loading audio from Supabase', { userId: this.currentUserId }, error as Error);
       throw error;
     }
