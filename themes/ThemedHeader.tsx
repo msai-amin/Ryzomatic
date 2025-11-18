@@ -479,6 +479,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             </div>
           </div>
         )}
+      </div>
     </header>
 
       {showAuth && (
