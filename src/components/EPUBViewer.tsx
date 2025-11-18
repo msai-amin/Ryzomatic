@@ -23,15 +23,28 @@ export const EPUBViewer: React.FC = () => {
   // React's dependency comparison function accesses .length on nested array properties
   const normalizedDocumentId = currentDocument?.id ?? ''
   
+  // CRITICAL: Safe destructuring with defaults - guarantees arrays are always arrays
+  // Level 1 Guard: Default currentDocument to {} if null/undefined
+  // Level 2 Guard: Default pageTexts and metadata.chapters to [] if missing
+  // This ensures React's dependency comparison never accesses .length on undefined
+  const { 
+    pageTexts: safePageTexts = [],
+    metadata: safeMetadata = {}
+  } = currentDocument || {}
+  
+  const { chapters: safeChapters = [] } = safeMetadata || {}
+  
   // Normalize pageTexts to always be an array
+  // CRITICAL: Use safe destructured values in dependency array, not optional chaining
   const normalizedPageTexts = useMemo(() => {
-    return Array.isArray(currentDocument?.pageTexts) ? currentDocument.pageTexts : []
-  }, [currentDocument?.pageTexts])
+    return Array.isArray(safePageTexts) ? safePageTexts : []
+  }, [safePageTexts])
   
   // Normalize metadata.chapters to always be an array
+  // CRITICAL: Use safe destructured values in dependency array, not optional chaining
   const normalizedChapters = useMemo(() => {
-    return Array.isArray(currentDocument?.metadata?.chapters) ? currentDocument.metadata.chapters : []
-  }, [currentDocument?.metadata?.chapters])
+    return Array.isArray(safeChapters) ? safeChapters : []
+  }, [safeChapters])
 
   // Ensure current page is within EPUB bounds
   const totalSections = normalizedPageTexts.length
