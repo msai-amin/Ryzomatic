@@ -75,12 +75,28 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ onUploadClick })
   }
 
   // Use PDF viewer for PDF documents when PDF binary/url is present
+  // CRITICAL: Only render PDFViewerV2 if currentDocument.id is defined
+  // This prevents React's comparison function from throwing on first render
   if (currentDocument.type === 'pdf' && currentDocument.pdfData) {
     console.log('📄 DocumentViewer: Rendering PDFViewerV2', {
       documentId: currentDocument.id,
       hasPdfData: !!currentDocument.pdfData,
       totalPages: currentDocument.totalPages
     })
+    
+    // Guard: Don't render if document.id is undefined
+    if (!currentDocument.id) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <p className="text-lg mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+              Loading document...
+            </p>
+          </div>
+        </div>
+      )
+    }
+    
     return <PDFViewerV2 />
   }
 
