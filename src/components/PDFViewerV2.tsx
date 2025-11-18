@@ -968,10 +968,19 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       )
     },
     })
-    highlightPluginDepsRef.current = currentDeps
-  }
-  
-  const highlightPluginInstance = highlightPluginInstanceRef.current
+  }, [
+    // CRITICAL: All dependencies must be defined and normalized to prevent React's 'co' function error
+    selectionEnabled ?? false,
+    currentHighlightColor ?? 'yellow',
+    currentHighlightColorHex ?? '#ffeb3b',
+    handleCreateHighlight,
+    normalizedDocumentId,
+    normalizedUserId,
+    safeAnnotationColorsLength ?? 0,
+    isChatOpen ?? false,
+    // Include safeAnnotationColors in deps to ensure plugin has access to colors
+    safeAnnotationColors,
+  ])
 
   // Create scroll mode plugin (do NOT wrap in useMemo; keep hook order consistent)
   const scrollModePluginInstance = scrollModePlugin()
