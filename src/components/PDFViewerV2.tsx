@@ -648,7 +648,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       console.error('Error creating highlight:', error)
       alert('Failed to create highlight. Please try again.')
     }
-  }, [document.id, userId, currentHighlightColor, currentHighlightColorHex, annotationColors])
+  }, [normalizedDocumentId, normalizedUserId, currentHighlightColor, currentHighlightColorHex, safeAnnotationColors])
 
   // Create highlight plugin - MUST be memoized to prevent infinite re-renders
   // The plugin instance must be stable across renders unless dependencies change
@@ -1034,15 +1034,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // This prevents React's dependency comparison from receiving undefined
   const documentIdForDeps = document.id ?? ''
   
-  // CRITICAL: Use a stable dependency array reference to prevent React comparison errors
-  // React's 'co' function throws if previous dependency array is undefined
-  // By using a ref, we ensure the dependency array reference is stable
-  const documentUrlDepsRef = useRef<[string]>([documentIdForDeps])
-  // Update the ref value if documentId changed, but keep the same array reference
-  if (documentUrlDepsRef.current[0] !== documentIdForDeps) {
-    documentUrlDepsRef.current[0] = documentIdForDeps
-  }
-  
   // Convert document.pdfData to a format react-pdf-viewer can use
   // CRITICAL: Use refs to cache values and prevent infinite re-renders
   // Creating new Uint8Array on every render causes React to see it as a new value
@@ -1105,8 +1096,10 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       console.error('❌ PDFViewerV2: Failed to convert pdfData to Uint8Array:', error)
       throw new Error('PDF data format is invalid. Please try re-opening the document.')
     }
-  }, documentUrlDepsRef.current) // Use stable array reference to prevent React comparison error
-  // CRITICAL: Using ref.current ensures React always receives a valid array (never undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentIdForDeps]) // Only depend on document.id, not pdfData (which might change reference)
+  // CRITICAL: Use normalized documentIdForDeps (always a string) to prevent React comparison error
+  // Note: eslint-disable is needed because we intentionally don't include document.pdfData
   
   // Cleanup blob URL and refs when document changes or component unmounts
   useEffect(() => {
