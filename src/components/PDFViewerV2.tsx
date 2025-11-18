@@ -398,7 +398,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       console.error('Error downloading PDF:', error)
       alert('Failed to download PDF. Please try again.')
     }
-  }, [user, document, highlights])
+  }, [user, normalizedDocumentId, highlights])
 
   // Handle context menu actions
   const handleClarification = useCallback(() => {
@@ -412,10 +412,10 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       }
     }
     setContextMenu(null)
-  }, [pdfViewer.currentPage, document.pageTexts, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
+  }, [pdfViewer.currentPage, normalizedDocumentId, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
   
   const handleFurtherReading = useCallback(() => {
-    const pageText = document.pageTexts?.[pdfViewer.currentPage - 1]
+    const pageText = document?.pageTexts?.[pdfViewer.currentPage - 1]
     const context = getPDFTextSelectionContext(pdfViewer.currentPage, pageText)
     if (context) {
       setSelectedTextContext(context)
@@ -425,7 +425,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       }
     }
     setContextMenu(null)
-  }, [pdfViewer.currentPage, document.pageTexts, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
+  }, [pdfViewer.currentPage, normalizedDocumentId, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
   
   const handleSaveNote = useCallback(async () => {
     const pageText = document.pageTexts?.[pdfViewer.currentPage - 1]
@@ -447,7 +447,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       }
     }
     setContextMenu(null)
-  }, [normalizedDocumentId, document.pageTexts, normalizedUserId, pdfViewer.currentPage])
+  }, [normalizedDocumentId, normalizedUserId, pdfViewer.currentPage])
 
   // Sync highlights ref with state
   useEffect(() => {
@@ -1016,9 +1016,10 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // CRITICAL: Process document.pdfData immediately without useMemo
   // This avoids React's dependency comparison function which throws on first render
   // when the previous dependency array is undefined
+  // CRITICAL: Use normalizedDocumentId instead of document.id to prevent undefined access
   const processDocumentUrl = (): string | Uint8Array => {
     // pdfData is guaranteed to exist at this point due to early return above
-    if (!document.pdfData) {
+    if (!document?.pdfData) {
       throw new Error('No PDF data available - this should not happen')
     }
 
@@ -1030,13 +1031,14 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     // If it's a Blob, create a blob URL (cached)
     if (document.pdfData instanceof Blob) {
       // Only create new blob URL if document changed
-      if (documentIdRef.current !== document.id || !blobUrlRef.current) {
+      // CRITICAL: Use normalizedDocumentId instead of document.id
+      if (documentIdRef.current !== normalizedDocumentId || !blobUrlRef.current) {
         // Clean up old blob URL if document changed
         if (blobUrlRef.current) {
           URL.revokeObjectURL(blobUrlRef.current)
         }
         blobUrlRef.current = URL.createObjectURL(document.pdfData)
-        documentIdRef.current = document.id
+        documentIdRef.current = normalizedDocumentId
       }
       return blobUrlRef.current
     }
@@ -1044,16 +1046,17 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     // If it's an ArrayBuffer, cache the Uint8Array to prevent infinite re-renders
     if (document.pdfData instanceof ArrayBuffer) {
       // Only recreate if document changed or ref is empty
-      if (documentIdRef.current !== document.id || !uint8ArrayRef.current) {
+      // CRITICAL: Use normalizedDocumentId instead of document.id
+      if (documentIdRef.current !== normalizedDocumentId || !uint8ArrayRef.current) {
         try {
           // Always clone the ArrayBuffer to prevent detachment
           const clonedBuffer = document.pdfData.slice(0)
           uint8ArrayRef.current = new Uint8Array(clonedBuffer)
-          documentIdRef.current = document.id
+          documentIdRef.current = normalizedDocumentId
           console.log('✅ PDFViewerV2: Cloned ArrayBuffer for PDF.js:', {
             originalSize: document.pdfData.byteLength,
             clonedSize: clonedBuffer.byteLength,
-            documentId: document.id
+            documentId: normalizedDocumentId
           });
         } catch (error) {
           // If cloning fails, the ArrayBuffer is likely already detached or corrupted
@@ -1066,9 +1069,10 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
     // Fallback: try to convert to Uint8Array (shouldn't reach here if pdfData is ArrayBuffer)
     try {
-      if (documentIdRef.current !== document.id || !uint8ArrayRef.current) {
+      // CRITICAL: Use normalizedDocumentId instead of document.id
+      if (documentIdRef.current !== normalizedDocumentId || !uint8ArrayRef.current) {
         uint8ArrayRef.current = new Uint8Array(document.pdfData as ArrayBuffer)
-        documentIdRef.current = document.id
+        documentIdRef.current = normalizedDocumentId
       }
       return uint8ArrayRef.current
     } catch (error) {
@@ -1091,7 +1095,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         blobUrlRef.current = null
       }
       // Clear Uint8Array ref when document changes
-      if (documentIdRef.current !== document.id) {
+      // CRITICAL: Use normalizedDocumentId instead of document.id to prevent undefined access
+      if (documentIdRef.current !== normalizedDocumentId) {
         uint8ArrayRef.current = null
         documentIdRef.current = null
       }
