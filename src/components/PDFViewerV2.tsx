@@ -932,6 +932,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const documentUrl = useMemo((): string | Uint8Array => {
     // pdfData is guaranteed to exist at this point due to early return above
     if (!document.pdfData) {
+      // This should never happen due to early return, but add safety check
+      console.error('PDFViewerV2: document.pdfData is null/undefined despite early return check')
       throw new Error('No PDF data available - this should not happen')
     }
 
@@ -942,16 +944,26 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
     // If it's a Blob, create a blob URL (cached)
     if (document.pdfData instanceof Blob) {
-      // Only create new blob URL if document changed
-      if (documentIdRef.current !== document.id || !blobUrlRef.current) {
+      // CRITICAL: Only create new blob URL if document ID changed
+      // Don't recreate if it's the same document (even if Blob reference changed)
+      // This prevents infinite re-renders when Blob instances are recreated
+      if (documentIdRef.current !== document.id) {
         // Clean up old blob URL if document changed
         if (blobUrlRef.current) {
           URL.revokeObjectURL(blobUrlRef.current)
+          blobUrlRef.current = null
         }
+        // Create new blob URL for new document
         blobUrlRef.current = URL.createObjectURL(document.pdfData)
         documentIdRef.current = document.id
+        console.log('✅ PDFViewerV2: Created new blob URL for document:', document.id)
+      } else if (!blobUrlRef.current) {
+        // Document ID matches but blob URL is missing (shouldn't happen, but handle it)
+        blobUrlRef.current = URL.createObjectURL(document.pdfData)
+        console.log('⚠️ PDFViewerV2: Recreated missing blob URL for document:', document.id)
       }
-      return blobUrlRef.current
+      // Always return cached blob URL if document ID matches (prevents infinite loops)
+      return blobUrlRef.current!
     }
 
     // If it's an ArrayBuffer, cache the Uint8Array to prevent infinite re-renders
