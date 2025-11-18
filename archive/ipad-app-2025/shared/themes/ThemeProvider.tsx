@@ -193,7 +193,20 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
 export const useTheme = (): ThemeContextType => {
   const context = useContext(ThemeContext);
   if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider');
+    // Return a safe default object instead of throwing an error
+    // This prevents crashes during component initialization or when ThemeProvider is not yet mounted
+    console.warn('useTheme called outside of ThemeProvider, using default values');
+    return {
+      currentTheme: theme1Config,
+      setTheme: () => {},
+      annotationColors: defaultAnnotationColors,
+      updateAnnotationColor: () => {},
+      addAnnotationColor: () => {},
+      deleteAnnotationColor: () => {},
+      resetAnnotationColor: () => {},
+      isDarkMode: false,
+      toggleDarkMode: () => {},
+    };
   }
   return context;
 };
