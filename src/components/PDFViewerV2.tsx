@@ -614,7 +614,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     selectedText: string,
     selectionData?: SelectionData
   ) => {
-    if (!document.id || !userId || !highlightAreas || highlightAreas.length === 0) return
+    // Use normalized values to ensure they're always defined
+    if (!normalizedDocumentId || !normalizedUserId || !highlightAreas || highlightAreas.length === 0) return
 
     try {
       // Get the first highlight area (react-pdf-viewer provides multiple areas for multi-line selections)
@@ -629,7 +630,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       
       // Create highlight using highlight service
       const newHighlight = await highlightService.createHighlight({
-        bookId: document.id,
+        bookId: normalizedDocumentId,
         pageNumber,
         highlightedText: selectedText || '',
         colorId: currentHighlightColor,
