@@ -699,7 +699,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             overflow: 'hidden',
             textOverflow: 'ellipsis'
           }}>
-            "{props.selectedText.length > 80 ? props.selectedText.substring(0, 80) + '...' : props.selectedText}"
+            "{props.selectedText && props.selectedText.length > 80 ? props.selectedText.substring(0, 80) + '...' : (props.selectedText || '')}"
           </div>
 
           {/* Primary Action - Save Highlight */}
@@ -724,7 +724,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
             onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
             onClick={async () => {
-              await handleCreateHighlight(props.highlightAreas, props.selectedText, props.selectionData)
+              if (props.selectedText) {
+                await handleCreateHighlight(props.highlightAreas, props.selectedText, props.selectionData)
+              }
               props.cancel()
             }}
           >
@@ -757,15 +759,17 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface, #111827)'}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover, #1f2937)'}
               onClick={() => {
-                setSelectedTextContext({
-                  selectedText: props.selectedText,
-                  beforeContext: '',
-                  afterContext: '',
-                  pageNumber: (props.highlightAreas?.[0]?.pageIndex ?? 0) + 1,
-                  fullContext: props.selectedText
-                })
-                setChatMode('clarification')
-                if (!isChatOpen) toggleChat()
+                if (props.selectedText) {
+                  setSelectedTextContext({
+                    selectedText: props.selectedText,
+                    beforeContext: '',
+                    afterContext: '',
+                    pageNumber: (props.highlightAreas?.[0]?.pageIndex ?? 0) + 1,
+                    fullContext: props.selectedText
+                  })
+                  setChatMode('clarification')
+                  if (!isChatOpen) toggleChat()
+                }
                 props.cancel()
               }}
             >
@@ -790,15 +794,17 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface, #111827)'}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover, #1f2937)'}
               onClick={() => {
-                setSelectedTextContext({
-                  selectedText: props.selectedText,
-                  beforeContext: '',
-                  afterContext: '',
-                  pageNumber: (props.highlightAreas?.[0]?.pageIndex ?? 0) + 1,
-                  fullContext: props.selectedText
-                })
-                setChatMode('further-reading')
-                if (!isChatOpen) toggleChat()
+                if (props.selectedText) {
+                  setSelectedTextContext({
+                    selectedText: props.selectedText,
+                    beforeContext: '',
+                    afterContext: '',
+                    pageNumber: (props.highlightAreas?.[0]?.pageIndex ?? 0) + 1,
+                    fullContext: props.selectedText
+                  })
+                  setChatMode('further-reading')
+                  if (!isChatOpen) toggleChat()
+                }
                 props.cancel()
               }}
             >
@@ -832,7 +838,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover, #1f2937)'}
               onClick={async () => {
                 try {
-                  if (document.id && userId) {
+                  if (document.id && userId && props.selectedText) {
                     await notesService.createNote(
                       userId,
                       document.id,
