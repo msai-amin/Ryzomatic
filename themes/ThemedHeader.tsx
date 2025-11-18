@@ -170,8 +170,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
         backdropFilter: 'blur(10px)'
       }}
     >
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
       <div className="flex w-full flex-wrap items-center justify-between gap-6">
         {/* Left: Logo & Brand (Home Button) */}
         <div className="flex min-w-0 items-center gap-6">
@@ -244,105 +242,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                 <Sparkles className="h-5 w-5" />
               </button>
             </Tooltip>
-=======
-      <div className="flex w-full flex-col gap-3">
-        <div className="flex w-full flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-6">
-            <div
-              className="flex items-center gap-2 rounded-lg px-2 py-1"
-              style={{ color: 'var(--color-text-primary)' }}
-            >
-              <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-6 w-6" />
-              <span className="text-sm font-semibold tracking-[0.18em]" style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}>
-                ryzomatic
-              </span>
-            </div>
           </div>
-
-          <div className="flex flex-wrap items-center justify-end gap-4 sm:flex-nowrap">
-            {/* Tools Group: Pomodoro + AI Assistant */}
-            <div className="flex items-center gap-2">
-              {user && currentDocument && isTimerPristine && (
-                <Tooltip content="Start Pomodoro timer" position="bottom">
-                  <button
-                    data-tour="pomodoro-button"
-                    onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
-                    className="rounded-lg p-2 transition-all duration-300"
-                    style={{ 
-                      backgroundColor: 'transparent', 
-                      border: '1px solid var(--color-border)',
-                      fontSize: '1.35rem' 
-                    }}
-                    aria-label="Toggle Pomodoro timer"
-                  >
-                    🍅
-                  </button>
-                </Tooltip>
-              )}
->>>>>>> Incoming (Background Agent changes)
-
-=======
-      <div className="flex w-full flex-col gap-3">
-        <div className="flex w-full flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-6">
-            <div
-              className="flex items-center gap-2 rounded-lg px-2 py-1"
-              style={{ color: 'var(--color-text-primary)' }}
-            >
-              <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-6 w-6" />
-              <span className="text-sm font-semibold tracking-[0.18em]" style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}>
-                ryzomatic
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-end gap-4 sm:flex-nowrap">
-            {/* Tools Group: Pomodoro + AI Assistant */}
-            <div className="flex items-center gap-2">
-              {user && currentDocument && isTimerPristine && (
-                <Tooltip content="Start Pomodoro timer" position="bottom">
-                  <button
-                    data-tour="pomodoro-button"
-                    onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
-                    className="rounded-lg p-2 transition-all duration-300"
-                    style={{ 
-                      backgroundColor: 'transparent', 
-                      border: '1px solid var(--color-border)',
-                      fontSize: '1.35rem' 
-                    }}
-                    aria-label="Toggle Pomodoro timer"
-                  >
-                    🍅
-                  </button>
-                </Tooltip>
-              )}
-
->>>>>>> Incoming (Background Agent changes)
-              <Tooltip content="Ask the AI Assistant" position="bottom">
-                <button
-                  data-tour="ai-assistant-button"
-                  onClick={() => toggleChat()}
-                  className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
-                    isChatOpen ? 'bg-[var(--color-primary-light)] ring-2 ring-blue-500/60' : ''
-                  }`}
-                  style={{
-                    color: 'var(--color-text-primary)',
-                    border: '1px solid var(--color-border)',
-                    boxShadow: isChatOpen
-                      ? '0 8px 20px rgba(56, 189, 248, 0.25)'
-                      : '0 6px 16px rgba(148, 163, 184, 0.18)',
-                    background:
-                      'linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(236, 72, 153, 0.08))'
-                  }}
-                  aria-pressed={isChatOpen}
-                  aria-expanded={isChatOpen}
-                  aria-label="Toggle AI assistant"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  <span>AI Chat</span>
-                </button>
-              </Tooltip>
-            </div>
 
             {/* Actions Group: Library + New Material */}
             {user && (
