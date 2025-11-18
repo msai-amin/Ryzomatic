@@ -9,8 +9,9 @@ import { PomodoroDashboard } from '../src/components/PomodoroDashboard'
 import { RelatedDocumentsPanel } from '../src/components/RelatedDocumentsPanel'
 import { AddRelatedDocumentModal } from '../src/components/AddRelatedDocumentModal'
 import { DocumentPreviewModal } from '../src/components/DocumentPreviewModal'
-import { DocumentGraphViewer } from '../src/components/DocumentGraphViewer'
+import { DocumentRelationshipGraph } from '../src/components/DocumentRelationshipGraph'
 import { userBooks, documentRelationships, DocumentRelationshipWithDetails } from '../lib/supabase'
+import { supabaseStorageService } from '../src/services/supabaseStorageService'
 
 interface ThemedSidebarProps {
   isOpen: boolean
@@ -294,8 +295,8 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
         }}
       >
         <div
-          className={`flex items-center ${isOpen ? 'justify-between px-4' : 'justify-center px-2'} py-4 border-b`}
-          style={{ borderColor: 'var(--color-border)' }}
+          className={`flex items-center ${isOpen ? 'justify-between px-4' : 'justify-center px-2'} py-3 border-b`}
+          style={{ borderColor: 'var(--color-border)', minHeight: '60px' }}
         >
           <button
             onClick={onToggle}
@@ -337,7 +338,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
 
         <div className="flex-1 overflow-y-auto">
           {isOpen ? (
-            <div className="px-4 pb-6">
+            <div className="px-4 pb-6" style={{ paddingTop: '8px' }}>
 
               {/* Recently Viewed Section */}
               <div className="mb-6">
@@ -489,6 +490,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
                         onPreviewDocument={handlePreviewDocument}
                         onDeleteRelationship={handleDeleteRelationship}
                         onOpenGraphView={() => setShowGraphModal(true)}
+                        onRelationshipCreated={refreshRelatedDocuments}
                       />
                     ) : (
                       <div className="text-center py-6">
@@ -796,7 +798,60 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
                   </button>
                 </div>
                 <div className="p-6 max-h-[70vh] overflow-y-auto">
-                  <DocumentGraphViewer documentId={currentDocument.id} userId={user.id} />
+                  <DocumentRelationshipGraph 
+                    sourceDocumentId={currentDocument.id} 
+                    userId={user.id}
+                    onOpenDocument={async (documentId) => {
+                      // Load and open the document
+                      try {
+                        supabaseStorageService.setCurrentUser(user.id);
+                        const fullBook = await supabaseStorageService.getBook(documentId);
+                        if (fullBook && fullBook.fileData) {
+                          // Convert to Document format (same as LibraryModal)
+                          const sanitizePageTexts = (pageTexts: any[]): string[] => {
+                            if (!Array.isArray(pageTexts)) return [];
+                            return pageTexts.map((text) => {
+                              if (typeof text === 'string') return text;
+                              if (text === null || text === undefined) return '';
+                              try {
+                                return String(text);
+                              } catch {
+                                return '';
+                              }
+                            });
+                          };
+                          const cleanedPageTexts = sanitizePageTexts(fullBook.pageTexts || []);
+                          const combinedContent = cleanedPageTexts.length > 0
+                            ? cleanedPageTexts.join('\n\n')
+                            : fullBook.text_content || '';
+                          const doc = {
+                            id: fullBook.id,
+                            name: fullBook.title,
+                            content: combinedContent,
+                            type: fullBook.type,
+                            uploadedAt: fullBook.savedAt,
+                            pdfData: fullBook.type === 'pdf' && fullBook.fileData instanceof ArrayBuffer
+                              ? new Blob([fullBook.fileData.slice(0)], { type: 'application/pdf' })
+                              : undefined,
+                            epubData: fullBook.type === 'epub' && fullBook.fileData instanceof ArrayBuffer
+                              ? new Blob([fullBook.fileData.slice(0)], { type: 'application/epub+zip' })
+                              : undefined,
+                            totalPages: fullBook.totalPages,
+                            lastReadPage: fullBook.lastReadPage,
+                            pageTexts: cleanedPageTexts,
+                            cleanedPageTexts,
+                            highlights: [],
+                            highlightsLoaded: false
+                          };
+                          setCurrentDocument(doc as any);
+                          setShowGraphModal(false);
+                        }
+                      } catch (error) {
+                        console.error('Error opening document from graph:', error);
+                        alert('Failed to open document. Please try again.');
+                      }
+                    }}
+                  />
                 </div>
               </div>
             </div>

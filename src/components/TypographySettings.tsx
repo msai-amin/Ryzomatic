@@ -1,22 +1,18 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Type, Palette, AlignLeft, AlignJustify, AlignCenter, Space, Eye, Crosshair, Calculator, RefreshCw } from 'lucide-react'
+import { X, Type, Palette, AlignLeft, AlignJustify, AlignCenter, Space, Eye, Crosshair, Sparkles } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
-import { getCacheStats, clearFormulaCache } from '../services/formulaService'
+import { TextCleanupModal } from './TextCleanupModal'
+import { cleanupDocumentText, CleanupPreferences } from '../services/textCleanupService'
 
 interface TypographySettingsProps {
   onClose: () => void
 }
 
 export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose }) => {
-  const { typography, updateTypography } = useAppStore()
-  // Fixed syntax error in handleClearCache function
-  const [cacheStats, setCacheStats] = useState({ count: 0, totalSize: 0, oldestEntry: null as number | null })
-  const [clearing, setClearing] = useState(false)
-
-  useEffect(() => {
-    setCacheStats(getCacheStats())
-  }, [])
+  const { typography, updateTypography, currentDocument, pdfViewer, user } = useAppStore()
+  const [showTextCleanup, setShowTextCleanup] = useState(false)
+  const [isTextCleaning, setIsTextCleaning] = useState(false)
 
   const handleFontFamilyChange = (fontFamily: 'serif' | 'sans' | 'mono') => {
     updateTypography({ fontFamily })
@@ -34,7 +30,7 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
     updateTypography({ maxWidth })
   }
 
-  const handleThemeChange = (theme: 'light' | 'dark' | 'sepia') => {
+  const handleThemeChange = (theme: 'light' | 'dark' | 'sepia' | 'reading') => {
     updateTypography({ theme })
   }
 
@@ -52,19 +48,6 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
 
   const handleReadingGuideChange = (readingGuide: boolean) => {
     updateTypography({ readingGuide })
-  }
-
-  const handleRenderFormulasChange = (renderFormulas: boolean) => {
-    updateTypography({ renderFormulas })
-  }
-
-  const handleClearCache = () => {
-    if (window.confirm('Clear all cached formula conversions? You may need to re-convert formulas.')) {
-      setClearing(true)
-      clearFormulaCache()
-      setCacheStats(getCacheStats())
-      setTimeout(() => setClearing(false), 500)
-    }
   }
 
   return createPortal(
@@ -167,23 +150,30 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
               <Palette className="w-4 h-4" />
               <span>Theme</span>
             </label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               {[
                 { value: 'light', label: 'Light', preview: '☀️' },
                 { value: 'dark', label: 'Dark', preview: '🌙' },
-                { value: 'sepia', label: 'Sepia', preview: '📜' }
-              ].map(({ value, label, preview }) => (
+                { value: 'sepia', label: 'Sepia', preview: '📜' },
+                { value: 'reading', label: 'Reading', preview: '📖', description: 'Optimized for monitors' }
+              ].map(({ value, label, preview, description }) => (
                 <button
                   key={value}
                   onClick={() => handleThemeChange(value as any)}
                   className={`p-3 rounded-lg border text-center transition-colors ${
                     typography.theme === value
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-300 hover:border-gray-400 text-transparent'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                      : 'border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-500'
                   }`}
+                  style={{
+                    color: typography.theme === value ? undefined : 'var(--color-text-primary)'
+                  }}
                 >
                   <div className="text-2xl mb-1">{preview}</div>
-                  <div className="text-sm">{label}</div>
+                  <div className="text-sm font-medium">{label}</div>
+                  {description && (
+                    <div className="text-xs mt-1 opacity-70">{description}</div>
+                  )}
                 </button>
               ))}
             </div>
@@ -272,57 +262,66 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
                 </div>
                 <span className="text-xs ml-auto text-gray-600 dark:text-gray-400" style={{ color: 'var(--color-text-tertiary, #6b7280)' }}>Highlight current paragraph</span>
               </label>
-              
-              <label className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={typography.renderFormulas}
-                  onChange={(e) => handleRenderFormulasChange(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <div className="flex items-center space-x-2">
-                  <Calculator className="w-4 h-4 text-gray-600 dark:text-gray-400" style={{ color: 'var(--color-text-secondary, #6b7280)' }} />
-                  <span className="text-sm text-gray-900 dark:text-gray-100" style={{ color: 'var(--color-text-primary, #1f2937)' }}>Render Formulas</span>
-                </div>
-                <span className="text-xs ml-auto text-gray-600 dark:text-gray-400" style={{ color: 'var(--color-text-tertiary, #6b7280)' }}>Convert math to LaTeX</span>
-              </label>
             </div>
           </div>
 
-          {/* Formula Cache Management */}
-          {typography.renderFormulas && (
-            <div className="pt-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+          {/* Text Cleanup & Organization */}
+          {currentDocument && (
+            <div className="border-t pt-6" style={{ borderColor: 'var(--color-border)' }}>
               <label className="flex items-center space-x-2 text-sm font-medium mb-3 text-gray-900 dark:text-gray-100" style={{ color: 'var(--color-text-primary, #1f2937)' }}>
-                <Calculator className="w-4 h-4" />
-                <span>Formula Cache</span>
+                <Sparkles className="w-4 h-4" />
+                <span>Text Cleanup & Organization</span>
               </label>
-              <div className="p-4 rounded-lg space-y-3" style={{ backgroundColor: 'var(--color-background-secondary)' }}>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>Cached formulas:</span>
-                  <span className="font-medium text-gray-900 dark:text-gray-100" style={{ color: 'var(--color-text-primary, #1f2937)' }}>{cacheStats.count}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>Cache size:</span>
-                  <span className="font-medium text-gray-900 dark:text-gray-100" style={{ color: 'var(--color-text-primary, #1f2937)' }}>
-                    {(cacheStats.totalSize / 1024).toFixed(1)} KB
-                  </span>
-                </div>
-                <button
-                  onClick={handleClearCache}
-                  disabled={clearing || cacheStats.count === 0}
-                  className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm"
-                >
-                  <RefreshCw className={`w-4 h-4 ${clearing ? 'animate-spin' : ''}`} />
-                  <span>{clearing ? 'Clearing...' : 'Clear Cache'}</span>
-                </button>
-                <p className="text-xs text-center text-gray-600 dark:text-gray-400" style={{ color: 'var(--color-text-tertiary, #6b7280)' }}>
-                  Clearing cache will require re-converting formulas on next view
-                </p>
-              </div>
+              <p className="text-sm mb-4 text-gray-600 dark:text-gray-400" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
+                Clean and reorganize document text for better readability in reading mode.
+              </p>
+              <button
+                onClick={() => setShowTextCleanup(true)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border transition-colors"
+                style={{
+                  borderColor: 'var(--color-border)',
+                  color: 'var(--color-text-primary)',
+                  backgroundColor: 'transparent'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Open Text Cleanup</span>
+              </button>
             </div>
           )}
         </div>
       </div>
+
+      {/* Text Cleanup Modal */}
+      {showTextCleanup && currentDocument && (
+        <TextCleanupModal
+          onClose={() => setShowTextCleanup(false)}
+          onApply={async (preferences: CleanupPreferences, applyToAllPages: boolean) => {
+            setIsTextCleaning(true)
+            try {
+              await cleanupDocumentText({
+                document: currentDocument,
+                preferences,
+                pageNumbers: applyToAllPages ? undefined : [pdfViewer.currentPage],
+                userId: user?.id || undefined,
+                existingCleaned: currentDocument.cleanedPageTexts ?? null
+              })
+              setShowTextCleanup(false)
+            } catch (error) {
+              console.error('Text cleanup error:', error)
+              alert('Failed to clean text. Please try again.')
+            } finally {
+              setIsTextCleaning(false)
+            }
+          }}
+          isProcessing={isTextCleaning}
+          currentPageNumber={pdfViewer.currentPage}
+          totalPages={pdfViewer.numPages || 0}
+          scrollMode={pdfViewer.scrollMode}
+        />
+      )}
     </div>,
     document.body
   )

@@ -68,12 +68,14 @@ class SupabaseStorageService {
   // Check if user is authenticated
   private ensureAuthenticated() {
     if (!this.currentUserId) {
-      throw errorHandler.createError(
-        'User not authenticated',
+      const error = errorHandler.createError(
+        'User not authenticated. Please sign in and try again.',
         ErrorType.AUTHENTICATION,
         ErrorSeverity.HIGH,
-        { context: 'SupabaseStorageService' }
+        { context: 'SupabaseStorageService', currentUserId: this.currentUserId }
       );
+      logger.error('Authentication check failed', { context: 'SupabaseStorageService' }, error);
+      throw error;
     }
   }
 
@@ -251,14 +253,29 @@ class SupabaseStorageService {
         
         logger.error('Database save error', context, error, {
           errorCode: error.code,
-          errorMessage: error.message
+          errorMessage: error.message,
+          errorDetails: error.details,
+          errorHint: error.hint,
+          userId: this.currentUserId
         });
         
+        // Provide more specific error message based on error code
+        let userMessage = `Failed to save book: ${error.message}`;
+        if (error.code === '42501') {
+          userMessage = 'Permission denied. Please check your account permissions.';
+        } else if (error.code === '23505') {
+          userMessage = 'A book with this ID already exists. Please try again.';
+        } else if (error.message.includes('RLS') || error.message.includes('row-level security')) {
+          userMessage = 'Database security policy error. Please sign in again and try uploading.';
+        } else if (error.message.includes('violates foreign key')) {
+          userMessage = 'Database integrity error. Please try again or contact support.';
+        }
+        
         throw errorHandler.createError(
-          `Failed to save book: ${error.message}`,
+          userMessage,
           ErrorType.DATABASE,
           ErrorSeverity.HIGH,
-          { context, error: error.message }
+          { context, error: error.message, errorCode: error.code }
         );
       }
 
@@ -446,13 +463,23 @@ class SupabaseStorageService {
         try {
           logger.info('Downloading book from S3', context, { s3Key: data.s3_key, fileType: data.file_type });
           
-          book.fileData = await bookStorageService.downloadBook(
+          const downloadedBuffer = await bookStorageService.downloadBook(
             data.s3_key,
             this.currentUserId!
           );
           
+          // CRITICAL: Clone the ArrayBuffer IMMEDIATELY after download, BEFORE any operations
+          // This ensures we have a fresh copy that won't be detached by PDF.js workers
+          const clonedBuffer = downloadedBuffer.slice(0);
+          
+          // Store the cloned buffer - this is what will be used by PDFViewer
+          book.fileData = clonedBuffer;
+          
           logger.info('Book downloaded from S3 successfully', context, {
-            size: book.fileData.byteLength / 1024 / 1024 + 'MB'
+            size: book.fileData.byteLength / 1024 / 1024 + 'MB',
+            cloned: true,
+            originalSize: downloadedBuffer.byteLength,
+            clonedSize: clonedBuffer.byteLength
           });
 
           if (data.file_type === 'pdf') {
@@ -466,9 +493,10 @@ class SupabaseStorageService {
               const pdfjsLib = await import('pdfjs-dist');
               configurePDFWorker(pdfjsLib);
               
-              // CRITICAL: Create a copy of the ArrayBuffer to prevent detachment
-              // The original ArrayBuffer will be used by PDFViewer, so we need a copy for text extraction
-              const pdfDataCopy = book.fileData.slice(0);
+              // CRITICAL: Create ANOTHER copy for text extraction
+              // PDF.js workers can detach ArrayBuffers, so we need a separate copy
+              // The clonedBuffer (book.fileData) will remain intact for PDFViewer
+              const pdfDataCopy = clonedBuffer.slice(0);
               
               // Load PDF and extract text using the copy
               const pdf = await pdfjsLib.getDocument({ data: pdfDataCopy }).promise;
@@ -950,11 +978,36 @@ class SupabaseStorageService {
       const { data, error } = await userAudio.list(this.currentUserId!);
       
       if (error) {
+        // user_audio table was replaced by tts_audio_cache in migration 020
+        // Return empty array gracefully instead of throwing error
+        // Check for various error patterns that indicate missing table
+        const errorMessage = error.message?.toLowerCase() || '';
+        const errorCode = error.code || '';
+        
+        const isTableNotFound = 
+          errorMessage.includes('user_audio') ||
+          errorMessage.includes('could not find the table') ||
+          errorMessage.includes('relation') && errorMessage.includes('does not exist') ||
+          errorMessage.includes('schema cache') ||
+          errorCode === 'PGRST116' || // Not found
+          errorCode === '42P01' || // Undefined table
+          errorCode === '404';
+        
+        if (isTableNotFound) {
+          logger.warn('user_audio table not found (replaced by tts_audio_cache), returning empty array', { 
+            userId: this.currentUserId,
+            errorCode,
+            errorMessage: error.message
+          });
+          return [];
+        }
+        
+        // For other errors, still throw
         throw errorHandler.createError(
           `Failed to load audio from Supabase: ${error.message}`,
           ErrorType.DATABASE,
           ErrorSeverity.HIGH,
-          { context: 'getAllAudio', error: error.message }
+          { context: 'getAllAudio', error: error.message, errorCode }
         );
       }
 
@@ -975,6 +1028,27 @@ class SupabaseStorageService {
       return audio;
 
     } catch (error) {
+      // If it's already an AppError from above, rethrow it
+      if (error instanceof Error && 'type' in error && 'severity' in error) {
+        throw error;
+      }
+      
+      // For unexpected errors, check if it's a table not found error
+      const errorMessage = (error as Error)?.message?.toLowerCase() || '';
+      const isTableNotFound = 
+        errorMessage.includes('user_audio') ||
+        errorMessage.includes('could not find the table') ||
+        errorMessage.includes('relation') && errorMessage.includes('does not exist');
+      
+      if (isTableNotFound) {
+        logger.warn('user_audio table not found (replaced by tts_audio_cache), returning empty array', { 
+          userId: this.currentUserId,
+          errorMessage: (error as Error).message
+        });
+        return [];
+      }
+      
+      // For other errors, log and throw
       logger.error('Error loading audio from Supabase', { userId: this.currentUserId }, error as Error);
       throw error;
     }

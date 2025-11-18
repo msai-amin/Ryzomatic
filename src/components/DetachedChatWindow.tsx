@@ -127,10 +127,12 @@ export const DetachedChatWindow: React.FC = () => {
         borderRadius: '18px',
         overflow: 'hidden',
         backgroundColor: 'var(--color-surface)',
-        border: '1px solid var(--color-border)'
+        border: '1px solid var(--color-border)',
+        display: 'flex',
+        flexDirection: 'column'
       }}
     >
-      <div className="flex h-full flex-col">
+      <div className="flex h-full flex-col w-full" style={{ margin: 0, padding: 0 }}>
         <AIChatPanel onClose={toggleChat} />
       </div>
 

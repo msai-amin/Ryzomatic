@@ -33,7 +33,6 @@ function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
   const [showNeoReader, setShowNeoReader] = useState(false)
-  const [showLandingPage, setShowLandingPage] = useState(false)
 
   useEffect(() => {
     ensurePdfViewerStyles()
@@ -46,9 +45,11 @@ function App() {
   }, [])
 
   // Sync AuthContext session changes with Zustand store and initialize services
+  // This is critical for OAuth callback - ensures store is updated as soon as session is available
   useEffect(() => {
     if (!authLoading && session) {
-      // Session is available from AuthContext, sync with Zustand store
+      // Session is available from AuthContext, sync with Zustand store immediately
+      // This prevents landing page from showing after OAuth callback
       checkAuth(session).catch((error) => {
         logger.error('Failed to sync session with store', { component: 'App' }, error);
       });
@@ -124,26 +125,19 @@ function App() {
       return
     }
 
-    // Check if we should show landing page (default behavior)
-    logger.debug('Checking landing page conditions', context);
+    // Check for OAuth callback parameters
+    // Note: Don't show landing page here - let the render logic decide based on session/auth state
+    // This prevents showing landing page when user is already authenticated
+    logger.debug('Checking OAuth callback parameters', context);
     const hasCodeParam = urlParams.has('code');
     const hasAccessTokenParam = hashParams.has('access_token');
-    const shouldShowLandingPage = !hasCodeParam && !hasAccessTokenParam;
     
-    logger.debug('Landing page conditions evaluated', context, {
+    logger.debug('OAuth callback parameters evaluated', context, {
       hasCodeParam,
       hasAccessTokenParam,
-      shouldShowLandingPage
+      hasSession: !!session,
+      isAuthenticated
     });
-    
-    if (shouldShowLandingPage) {
-      logger.info('Showing landing page - no OAuth params', context);
-      setShowLandingPage(true)
-      setIsInitialized(true)
-      return
-    } else {
-      logger.info('Not showing landing page - has OAuth params', context);
-    }
 
     // Wait for AuthContext to finish loading before initializing
     // This prevents the race condition where checkAuth runs before session is restored
@@ -167,13 +161,30 @@ function App() {
             const success = await authService.processOAuthCallback()
             if (success) {
               logger.info('OAuth callback processed successfully', context);
+              
+              // Wait a moment for AuthContext to pick up the new session
+              // Then force a checkAuth to ensure store is updated
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
+              // Force check auth again after OAuth callback to ensure store is updated
+              // The session should now be available from AuthContext
+              if (supabase) {
+                const { data: { session: newSession } } = await supabase.auth.getSession();
+                if (newSession) {
+                  logger.info('Session available after OAuth, syncing with store', context);
+                  await checkAuth(newSession);
+                }
+              }
+              
               // Clear the URL parameters after successful processing
               window.history.replaceState({}, document.title, window.location.pathname)
             } else {
-              logger.warn('OAuth callback processing failed', context);
+              logger.warn('OAuth callback processing failed - check console for details', context);
+              logger.warn('Common issue: Invalid API key. Solution: Update VITE_SUPABASE_ANON_KEY in .env.local with actual key from Supabase dashboard', context);
             }
           } else {
-            logger.warn('Supabase not available - skipping OAuth processing', context);
+            logger.error('Supabase not available - cannot process OAuth callback', context);
+            logger.error('Make sure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set correctly in .env.local', context);
           }
         } catch (error) {
           logger.error('Error processing OAuth callback', context, error as Error);
@@ -341,8 +352,42 @@ function App() {
     );
   }
 
-  // Show landing page if not authenticated and not in auth flow
-  if (!isAuthenticated) {
+  // Show landing page only if not authenticated AND no session
+  // Check both isAuthenticated (from store) and session (from AuthContext) to avoid race conditions
+  // After OAuth callback, session might be available but isAuthenticated might not be updated yet
+  const hasSession = !!session;
+  const shouldShowLandingPage = !isAuthenticated && !hasSession;
+  
+  // Check if we're in the middle of OAuth callback (URL has OAuth params)
+  // This needs to be checked in render to catch OAuth redirects
+  const isOAuthCallback = typeof window !== 'undefined' && (
+    new URLSearchParams(window.location.search).has('code') ||
+    new URLSearchParams(window.location.hash.substring(1)).has('access_token')
+  );
+  
+  // If we have a session but isAuthenticated is false, show loading while syncing
+  // This handles the case where OAuth callback completed but store hasn't updated yet
+  // Also show loading if we're processing OAuth callback
+  if ((hasSession && !isAuthenticated) || isOAuthCallback) {
+    return (
+      <div 
+        className="min-h-screen flex items-center justify-center"
+        style={{ backgroundColor: 'var(--color-background)' }}
+      >
+        <div className="text-center">
+          <div 
+            className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto"
+            style={{ borderColor: 'var(--color-primary)' }}
+          ></div>
+          <p className="mt-4" style={{ color: 'var(--color-text-secondary)' }}>
+            {isOAuthCallback ? 'Completing sign in...' : 'Signing you in...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (shouldShowLandingPage) {
     return (
       <div className="min-h-screen">
         <LandingPage />

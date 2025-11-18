@@ -22,6 +22,12 @@ interface AudioWidgetProps {
 }
 
 export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
+  // Version marker to verify live bundle
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      console.log('🔊 AudioWidget version:', 'v2');
+    }
+  }, []);
   const {
     tts,
     updateTTS,
@@ -57,8 +63,18 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const [duration, setDuration] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true
+    const stored = window.localStorage.getItem('audioWidgetExpanded')
+    return stored === null ? true : stored === 'true'
+  })
   const [playbackMode, setPlaybackMode] = useState<'paragraph' | 'page' | 'continue'>('paragraph')
+  // Persist expanded/collapsed state
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('audioWidgetExpanded', String(isExpanded))
+    }
+  }, [isExpanded])
   const [savedPosition, setSavedPosition] = useState<TTSPosition | null>(null)
   const lastClickTimeRef = useRef<number>(0)
   const previousDocumentIdRef = useRef<string | null>(null)
@@ -943,9 +959,9 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           borderRadius: '12px',
           boxShadow: isDragging ? '0 12px 32px rgba(0,0,0,0.25)' : 'var(--shadow-lg)',
           backdropFilter: 'blur(10px)',
-          minWidth: '200px',
-          maxWidth: '320px',
-          width: 'min(320px, calc(100vw - 32px))',
+          minWidth: '180px',
+          maxWidth: '260px',
+          width: 'min(260px, calc(100vw - 32px))',
           userSelect: 'none',
           touchAction: isDragging ? 'none' : 'auto'
         }}
@@ -953,61 +969,63 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         onTouchStart={handleWidgetTouchStart}
       >
         {/* Playback Mode Selector - Show when expanded or always visible */}
-        <div className="flex items-center justify-center gap-1 px-3 pt-3 pb-2 border-b" style={{ borderColor: 'var(--color-border)' }}>
-          <button
-            onClick={() => handlePlaybackModeChange('paragraph')}
-            className={`px-2 py-1 text-xs font-medium rounded transition-all ${
-              playbackMode === 'paragraph' 
-                ? 'text-blue-600' 
-                : 'text-gray-600 hover:text-gray-800'
-            }`}
-            style={{
-              backgroundColor: playbackMode === 'paragraph' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-            }}
-          >
-            Paragraph
-          </button>
-          <button
-            onClick={() => handlePlaybackModeChange('page')}
-            className={`px-2 py-1 text-xs font-medium rounded transition-all ${
-              playbackMode === 'page' 
-                ? 'text-blue-600' 
-                : 'text-gray-600 hover:text-gray-800'
-            }`}
-            style={{
-              backgroundColor: playbackMode === 'page' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-            }}
-          >
-            Page
-          </button>
-          <button
-            onClick={() => handlePlaybackModeChange('continue')}
-            className={`px-2 py-1 text-xs font-medium rounded transition-all ${
-              playbackMode === 'continue' 
-                ? 'text-blue-600' 
-                : 'text-gray-600 hover:text-gray-800'
-            }`}
-            style={{
-              backgroundColor: playbackMode === 'continue' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-            }}
-          >
-            Continue
-          </button>
-        </div>
+        {isExpanded && (
+          <div className="flex items-center justify-between px-3 pt-1 pb-1 border-b" style={{ borderColor: 'var(--color-border)' }}>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => handlePlaybackModeChange('paragraph')}
+                className={`px-2 py-0.5 text-[11px] font-medium rounded transition-all ${
+                  playbackMode === 'paragraph' 
+                    ? 'text-blue-500 ring-1 ring-blue-500/40 bg-[rgba(59,130,246,0.12)]' 
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+                aria-pressed={playbackMode === 'paragraph'}
+                aria-label="Paragraph mode"
+              >
+                Paragraph
+              </button>
+              <button
+                onClick={() => handlePlaybackModeChange('page')}
+                className={`px-2 py-0.5 text-[11px] font-medium rounded transition-all ${
+                  playbackMode === 'page' 
+                    ? 'text-blue-500 ring-1 ring-blue-500/40 bg-[rgba(59,130,246,0.12)]' 
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+                aria-pressed={playbackMode === 'page'}
+                aria-label="Page mode"
+              >
+                Page
+              </button>
+              <button
+                onClick={() => handlePlaybackModeChange('continue')}
+                className={`px-2 py-0.5 text-[11px] font-medium rounded transition-all ${
+                  playbackMode === 'continue' 
+                    ? 'text-blue-500 ring-1 ring-blue-500/40 bg-[rgba(59,130,246,0.12)]' 
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+                aria-pressed={playbackMode === 'continue'}
+                aria-label="Continue mode"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Compact Toggle Bar */}
-        <div className="flex items-center gap-2 p-3">
+        <div className="flex items-center gap-2 p-1.5">
           {/* Play/Pause Button - Main Control */}
           <button
             onClick={handlePlayPause}
             disabled={isProcessing}
-            className="p-3 rounded-full transition-all shadow-md"
+            className="p-2 rounded-full transition-all shadow-md"
             style={{
               backgroundColor: isProcessing ? 'var(--color-text-tertiary)' : 'var(--color-primary)',
               color: 'var(--color-text-inverse)',
               cursor: isProcessing ? 'not-allowed' : 'pointer',
               boxShadow: 'var(--shadow-md)'
             }}
+            aria-label={isProcessing ? 'Processing' : (tts.isPlaying ? 'Pause' : 'Play')}
             onMouseEnter={(e) => {
               if (!isProcessing) {
                 e.currentTarget.style.transform = 'scale(1.05)'
@@ -1046,6 +1064,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             onClick={handleStop}
             className="p-2 rounded-full transition-all"
             style={{ color: 'var(--color-text-primary)' }}
+            aria-label="Stop"
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'var(--color-error-light)'
               e.currentTarget.style.color = 'var(--color-error)'
@@ -1072,10 +1091,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               }}
             />
             <span 
-              className="text-xs truncate max-w-20"
+              className="text-xs truncate max-w-24"
               style={{ color: 'var(--color-text-secondary)' }}
             >
-              {tts.isPlaying ? 'Playing' : ttsManager.isPausedState() ? 'Paused' : 'Stopped'}
+              {tts.isPlaying ? 'Playing' : ttsManager.isPausedState() ? 'Paused' : 'Ready'}
             </span>
           </div>
 
@@ -1084,6 +1103,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             onClick={() => setIsExpanded(!isExpanded)}
             className="p-2 rounded-full transition-all"
             style={{ color: 'var(--color-text-primary)' }}
+            aria-label={isExpanded ? 'Collapse controls' : 'Expand controls'}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
               e.currentTarget.style.transform = 'scale(1.1)'
@@ -1097,6 +1117,22 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
           </button>
         </div>
+
+        {/* Minimal progress indicator when collapsed */}
+        {!isExpanded && (
+          <div className="px-2 pb-1">
+            <div
+              className="w-full h-1 rounded-full"
+              style={{ backgroundColor: 'var(--color-border)' }}
+              title={`${Math.round(progressPercentage)}%`}
+            >
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${progressPercentage}%`, backgroundColor: 'var(--color-primary)' }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Expanded Controls */}
         {isExpanded && (

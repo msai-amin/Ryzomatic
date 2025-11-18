@@ -168,18 +168,90 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    // Authenticate user - get JWT token from Authorization header
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.replace('Bearer ', '');
+    
+    // Create authenticated Supabase client
+    // Use service role key if available (bypasses RLS), otherwise use user's token with anon key
+    let authenticatedSupabase = supabase;
+    
+    // If service role key exists, use it (bypasses RLS)
+    if (supabaseServiceKey && supabaseUrl) {
+      authenticatedSupabase = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+      
+      // Verify user matches userId from request (if token provided)
+      if (token) {
+        const { data: { user }, error: authError } = await authenticatedSupabase.auth.getUser(token);
+        if (authError || !user) {
+          console.error('Auth error:', authError);
+          return res.status(401).json({ error: 'Invalid or expired token' });
+        }
+        
+        // Verify userId matches authenticated user
+        if (user.id !== userId) {
+          return res.status(403).json({ error: 'Access denied - userId mismatch' });
+        }
+      }
+    } else if (token && supabaseUrl && supabaseAnonKey) {
+      // Create client with user's token for RLS to work properly
+      // CRITICAL: Set the session on the client so auth.uid() works in RLS policies
+      authenticatedSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        },
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+          detectSessionInUrl: false
+        }
+      });
+      
+      // Set the session explicitly so RLS policies can access auth.uid()
+      try {
+        const { data: { user }, error: authError } = await authenticatedSupabase.auth.getUser(token);
+        if (authError || !user) {
+          console.error('Auth error:', authError);
+          return res.status(401).json({ error: 'Invalid or expired token' });
+        }
+        
+        // Verify userId matches authenticated user
+        if (user.id !== userId) {
+          return res.status(403).json({ error: 'Access denied - userId mismatch' });
+        }
+        
+        // For RLS to work, we need to ensure the client has the user context
+        // The Authorization header in global headers should be sufficient
+        // But we verify the user here to ensure security
+      } catch (sessionError) {
+        console.error('Error verifying user:', sessionError);
+        return res.status(401).json({ error: 'Authentication failed' });
+      }
+    } else {
+      // If no token and no service key, we can't authenticate
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     // Check if relationship already exists
-    if (!supabase) {
+    if (!authenticatedSupabase) {
       console.error('Supabase client not initialized');
       console.error('Environment variables:', {
         supabaseUrl: !!supabaseUrl,
-        supabaseAnonKey: !!supabaseAnonKey
+        supabaseAnonKey: !!supabaseAnonKey,
+        supabaseServiceKey: !!supabaseServiceKey
       });
       return res.status(500).json({ error: 'Database not initialized' });
     }
     
     console.log('Checking for existing relationship...');
-    const { data: existing, error: checkError } = await supabase
+    const { data: existing, error: checkError } = await authenticatedSupabase
       .from('document_relationships')
       .select('id')
       .eq('source_document_id', sourceDocumentId)
@@ -199,6 +271,12 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
 
     // Create new relationship
     console.log('Creating new relationship...');
+    console.log('Using authenticated client:', {
+      hasServiceKey: !!supabaseServiceKey,
+      hasToken: !!token,
+      userId
+    });
+    
     const insertData = {
       user_id: userId,
       source_document_id: sourceDocumentId,
@@ -208,7 +286,10 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
     };
     console.log('Insert data:', insertData);
     
-    const { data: relationship, error } = await supabase
+    // CRITICAL: Use the authenticated client for the insert
+    // If service role key is used, RLS is bypassed
+    // If anon key with token is used, RLS should work via auth.uid()
+    const { data: relationship, error } = await authenticatedSupabase
       .from('document_relationships')
       .insert(insertData)
       .select()

@@ -166,9 +166,26 @@ export class BookStorageService {
       };
 
     } catch (error) {
-      logger.error('Failed to upload book', context, error as Error);
+      const err = error instanceof Error ? error : new Error('Unknown error');
+      logger.error('Failed to upload book', context, err, {
+        errorMessage: err.message,
+        errorStack: err.stack,
+        userId: metadata.userId,
+        fileName: metadata.fileName
+      });
+      
+      // Provide more specific error message
+      let userMessage = `Failed to upload book: ${err.message}`;
+      if (err.message.includes('bucket') || err.message.includes('Bucket not found')) {
+        userMessage = 'Storage bucket not found. Please contact support.';
+      } else if (err.message.includes('permission') || err.message.includes('access denied')) {
+        userMessage = 'Storage access denied. Please sign in again and try uploading.';
+      } else if (err.message.includes('413') || err.message.includes('too large')) {
+        userMessage = 'File is too large. Please use a smaller file.';
+      }
+      
       throw errorHandler.createError(
-        `Failed to upload book: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        userMessage,
         ErrorType.STORAGE,
         ErrorSeverity.HIGH,
         context

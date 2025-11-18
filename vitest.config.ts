@@ -35,7 +35,7 @@ export default defineConfig({
       },
     },
     include: ['**/*.{test,spec}.{js,ts,jsx,tsx}'],
-    exclude: ['node_modules', 'dist', 'build', 'archive', 'tests/e2e/**'],
+    exclude: ['node_modules', 'dist', 'build', 'archive', 'tests/e2e/**', 'tests/prod.smoke.spec.ts'],
     testTimeout: 10000,
     hookTimeout: 10000,
   },

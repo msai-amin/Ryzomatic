@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import { useAppStore } from '../store/appStore'
 import { EmptyState } from './EmptyState'
-import { PDFViewer } from './PDFViewer'
+import { PDFViewerV2 } from './PDFViewerV2'
 import { EPUBViewer } from './EPUBViewer'
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getTextSelectionContext, hasTextSelection } from '../utils/textSelection'
@@ -74,9 +74,14 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ onUploadClick })
     return <EmptyState onUploadClick={onUploadClick} />
   }
 
-  // Use PDF viewer for PDF documents
-  if (currentDocument.type === 'pdf' && currentDocument.pdfData && currentDocument.totalPages) {
-    return <PDFViewer />
+  // Use PDF viewer for PDF documents when PDF binary/url is present
+  if (currentDocument.type === 'pdf' && currentDocument.pdfData) {
+    console.log('📄 DocumentViewer: Rendering PDFViewerV2', {
+      documentId: currentDocument.id,
+      hasPdfData: !!currentDocument.pdfData,
+      totalPages: currentDocument.totalPages
+    })
+    return <PDFViewerV2 />
   }
 
   if (currentDocument.type === 'epub') {

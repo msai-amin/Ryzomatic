@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { theme1Config, ThemeConfig, annotationColors as defaultAnnotationColors } from './theme1-config';
+import { readingModeThemeConfig } from './reading-mode-theme-config';
 import '../src/themes/theme1-variables.css';
 import { MoreVertical, Plus } from 'lucide-react';
 import { ColorEditModal } from './ColorEditModal';
@@ -431,11 +432,11 @@ export const AnnotationColorPicker: React.FC<{
 
   return (
     <>
-      <div className="space-y-2">
-        <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+      <div className="space-y-2" style={{ backgroundColor: 'transparent', color: 'inherit' }}>
+        <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)', backgroundColor: 'transparent' }}>
           Color Coding System
         </h3>
-        <div className="space-y-2">
+        <div className="space-y-2" style={{ backgroundColor: 'transparent' }}>
           {annotationColors.map((item) => (
             <div
               key={item.id}
@@ -443,6 +444,7 @@ export const AnnotationColorPicker: React.FC<{
               style={{
                 backgroundColor: selectedColor === item.color ? 'rgba(156, 163, 175, 0.2)' : 'transparent',
                 border: selectedColor === item.color ? '2px solid var(--color-primary)' : '2px solid transparent',
+                color: 'inherit',
               }}
               onClick={() => onColorSelect(item.color)}
               onMouseEnter={() => setHoveredId(item.id)}

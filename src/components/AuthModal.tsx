@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { X, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
-import { authService } from '../services/supabaseAuthService';
+import { X, Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { authService, supabase } from '../services/supabaseAuthService';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -264,13 +264,14 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
 
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !supabase}
               className="w-full py-2 px-4 rounded-md focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold flex items-center justify-center"
               style={{
                 backgroundColor: 'var(--color-primary)',
                 color: 'var(--color-text-inverse)',
                 borderRadius: 'var(--border-radius-md)',
               }}
+              title={!supabase ? 'Authentication is not configured. Please update .env.local' : ''}
             >
               {isLoading && (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -278,6 +279,42 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
               {isLoading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Sign In')}
             </button>
           </form>
+
+          {/* Show warning if Supabase is not configured */}
+          {!supabase && (
+            <div 
+              className="mt-4 p-4 rounded-lg border-2"
+              style={{
+                backgroundColor: '#fef3c7',
+                borderColor: '#f59e0b',
+                color: '#92400e'
+              }}
+            >
+              <div className="flex items-start">
+                <AlertCircle className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="font-semibold mb-1">⚠️ Authentication Not Configured</p>
+                  <p className="text-sm mb-2">
+                    Supabase API key is missing or invalid. Sign-in will not work until you update your configuration.
+                  </p>
+                  <ol className="text-sm list-decimal list-inside space-y-1 ml-2">
+                    <li>Get your Supabase anon key from the dashboard</li>
+                    <li>Update <code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_ANON_KEY</code> in <code className="bg-amber-100 px-1 rounded">.env.local</code></li>
+                    <li>Restart the dev server</li>
+                  </ol>
+                  <a
+                    href="https://supabase.com/dashboard/project/pbfipmvtkbivnwwgukpw/settings/api"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm underline mt-2 inline-block font-semibold"
+                    style={{ color: '#92400e' }}
+                  >
+                    → Get Supabase API Key
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="mt-6">
             <div className="relative">
@@ -291,7 +328,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
 
             <button
               onClick={handleGoogleAuth}
-              disabled={isLoading}
+              disabled={isLoading || !supabase}
               className="mt-4 w-full flex items-center justify-center px-4 py-2 rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               style={{
                 border: '1px solid var(--color-border)',
@@ -299,6 +336,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                 color: 'var(--color-text-primary)',
                 borderRadius: 'var(--border-radius-md)',
               }}
+              title={!supabase ? 'Authentication is not configured. Please update .env.local' : ''}
             >
               {isLoading && (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>

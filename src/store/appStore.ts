@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { authService, AuthUser } from '../services/supabaseAuthService'
 import { DocumentRelationshipWithDetails } from '../../lib/supabase'
-import { HighlightPosition as ServiceHighlightPosition } from '../services/highlightService'
+import { HighlightPosition as ServiceHighlightPosition, HighlightArea, SelectionData } from '../services/highlightService'
 
 export interface TextAnchors {
   startIndex?: number
@@ -86,12 +86,11 @@ export interface TypographySettings {
   fontSize: number
   lineHeight: number
   maxWidth: number
-  theme: 'light' | 'dark' | 'sepia'
+  theme: 'light' | 'dark' | 'sepia' | 'reading'
   textAlign: 'left' | 'justify' | 'center'
   spacingMultiplier: number
   focusMode: boolean
   readingGuide: boolean
-  renderFormulas: boolean
 }
 
 export interface ThemeSettings {
@@ -101,6 +100,7 @@ export interface ThemeSettings {
 
 export interface PDFViewerSettings {
   currentPage: number
+  numPages: number | null
   zoom: number
   scale: number
   rotation: number
@@ -109,6 +109,7 @@ export interface PDFViewerSettings {
   showPageNumbers: boolean
   showProgress: boolean
   readingMode: boolean
+  darkMode: boolean
 }
 
 export interface LibraryFilters {
@@ -401,8 +402,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     textAlign: 'left',
     spacingMultiplier: 1.0,
     focusMode: false,
-    readingGuide: false,
-    renderFormulas: true
+    readingGuide: false
   },
   theme: {
     currentTheme: 'default',
@@ -410,14 +410,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   pdfViewer: {
     currentPage: 1,
+    numPages: null,
     zoom: 1.0,
     scale: 1.0,
     rotation: 0,
     viewMode: 'pdf',
-    scrollMode: 'single', // Default to One Page mode
+    scrollMode: 'continuous', // Default to Continuous Scrolling mode
     showPageNumbers: true,
     showProgress: true,
-    readingMode: false
+    readingMode: false,
+    darkMode: false
   },
   tts: {
     isEnabled: false,

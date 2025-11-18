@@ -4,6 +4,7 @@ import { useAppStore } from '../store/appStore';
 import { userBooks } from '../../lib/supabase';
 import { DocumentUpload } from './DocumentUpload';
 import { Tooltip } from './Tooltip';
+import { authService } from '../services/supabaseAuthService';
 
 interface AddRelatedDocumentModalProps {
   isOpen: boolean;
@@ -84,10 +85,19 @@ export const AddRelatedDocumentModal: React.FC<AddRelatedDocumentModalProps> = (
       setIsCreating(true);
       setError(null);
 
+      // Get auth token for API request
+      const session = await authService.getSession();
+      const authToken = session?.access_token;
+      
+      if (!authToken) {
+        throw new Error('Not authenticated. Please sign in and try again.');
+      }
+
       const response = await fetch('/api/documents/relationships', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
           sourceDocumentId,
@@ -146,10 +156,19 @@ export const AddRelatedDocumentModal: React.FC<AddRelatedDocumentModalProps> = (
       setIsCreating(true);
       setError(null);
 
+      // Get auth token for API request
+      const session = await authService.getSession();
+      const authToken = session?.access_token;
+      
+      if (!authToken) {
+        throw new Error('Not authenticated. Please sign in and try again.');
+      }
+
       const response = await fetch('/api/documents/relationships', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
           sourceDocumentId,

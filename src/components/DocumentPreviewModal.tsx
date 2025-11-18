@@ -3,6 +3,9 @@ import { X, FileText, Calendar, Clock, Edit3, Trash2, ExternalLink, AlertCircle,
 import { useAppStore } from '../store/appStore';
 import { DocumentRelationshipWithDetails, userBooks } from '../../lib/supabase';
 import { Tooltip } from './Tooltip';
+import { supabaseStorageService } from '../services/supabaseStorageService';
+import { RelationshipAnalysisCard } from './RelationshipAnalysisCard';
+import { RelevanceBreakdown } from './RelevanceBreakdown';
 import { 
   parseRelationshipDescription, 
   getOverviewText, 
@@ -89,30 +92,109 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   const handleOpenInViewer = async () => {
     try {
-      const { data: document, error } = await userBooks.get(relationship.related_document_id);
-      
-      if (error || !document) {
-        console.error('Error loading document:', error);
+      const { user } = useAppStore.getState();
+      if (!user?.id) {
+        alert('You must be signed in to open documents.');
         return;
       }
 
-      // Convert to Document format expected by the app
-      const appDocument = {
-        id: document.id,
-        name: document.title || document.file_name || 'Untitled Document',
-        content: document.text_content || '',
-        type: (document.file_type === 'pdf' || document.file_type === 'epub' ? document.file_type : 'text') as 'pdf' | 'text' | 'epub',
-        uploadedAt: new Date(document.created_at),
-        totalPages: document.total_pages,
-        pageTexts: document.page_texts || [],
+      // Initialize supabaseStorageService with current user
+      supabaseStorageService.setCurrentUser(user.id);
+
+      // Use getBook() to download full PDF data from S3, not just metadata
+      console.log('DocumentPreviewModal: Loading full book data for', relationship.related_document_id);
+      const fullBook = await supabaseStorageService.getBook(relationship.related_document_id);
+      
+      if (!fullBook) {
+        console.error('Error loading document: Book not found');
+        alert('Document not found. Please try again.');
+        return;
+      }
+
+      if (!fullBook.fileData) {
+        console.error('Error loading document: No file data available');
+        alert('Document file data is missing. Please try re-uploading the document.');
+        return;
+      }
+
+      // Sanitize page texts (same pattern as LibraryModal)
+      const sanitizePageTexts = (pageTexts: any[]): string[] => {
+        if (!Array.isArray(pageTexts)) return [];
+        return pageTexts.map((text, index) => {
+          if (typeof text === 'string') return text;
+          if (text === null || text === undefined) return '';
+          try {
+            return String(text);
+          } catch {
+            console.warn(`Failed to sanitize page text at index ${index}`);
+            return '';
+          }
+        });
+      };
+
+      const cleanedPageTexts = sanitizePageTexts(fullBook.pageTexts || []);
+      const combinedContent = cleanedPageTexts.length > 0
+        ? cleanedPageTexts.join('\n\n')
+        : fullBook.text_content || '';
+
+      // Convert SavedBook to Document format (same pattern as LibraryModal)
+      const doc = {
+        id: fullBook.id,
+        name: fullBook.title,
+        content: combinedContent,
+        type: fullBook.type,
+        uploadedAt: fullBook.savedAt,
+        pdfData: (() => {
+          // CRITICAL: Clone ArrayBuffer and convert to Blob to prevent detachment issues
+          // Blobs are safer than ArrayBuffers because they can't be detached by workers
+          if (fullBook.type === 'pdf' && fullBook.fileData instanceof ArrayBuffer) {
+            try {
+              // Check if ArrayBuffer is already detached
+              new Uint8Array(fullBook.fileData, 0, 1);
+              // Not detached - clone it and convert to Blob for safety
+              const clonedBuffer = fullBook.fileData.slice(0);
+              const blob = new Blob([clonedBuffer], { type: 'application/pdf' });
+              console.log('DocumentPreviewModal: Cloned PDF ArrayBuffer and converted to Blob:', {
+                originalSize: fullBook.fileData.byteLength,
+                clonedSize: clonedBuffer.byteLength,
+                blobSize: blob.size
+              });
+              return blob;
+            } catch (error) {
+              // Already detached - this shouldn't happen if cloning in supabaseStorageService worked
+              console.error('DocumentPreviewModal: ArrayBuffer is detached, cannot clone:', error);
+              throw new Error('PDF data is corrupted. Please try re-opening the document.');
+            }
+          }
+          return undefined;
+        })(),
+        epubData:
+          fullBook.type === 'epub' && fullBook.fileData instanceof ArrayBuffer
+            ? new Blob([fullBook.fileData instanceof ArrayBuffer ? fullBook.fileData.slice(0) : fullBook.fileData], { type: 'application/epub+zip' })
+            : undefined,
+        totalPages: fullBook.totalPages,
+        lastReadPage: fullBook.lastReadPage,
+        pageTexts: cleanedPageTexts,
+        cleanedPageTexts,
         highlights: [],
         highlightsLoaded: false
       };
 
-      setCurrentDocument(appDocument);
+      console.log('DocumentPreviewModal: Document created for app store:', {
+        id: doc.id,
+        type: doc.type,
+        hasPdfData: !!doc.pdfData,
+        pdfDataType: doc.pdfData ? doc.pdfData.constructor.name : 'undefined',
+        pdfDataLength: doc.pdfData ? (doc.pdfData as Blob).size : 0,
+        hasPageTexts: !!doc.pageTexts,
+        pageTextsLength: doc.pageTexts?.length || 0
+      });
+
+      setCurrentDocument(doc as any);
       onClose();
     } catch (error) {
       console.error('Error opening document:', error);
+      alert(`Failed to open document: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -259,145 +341,23 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 </div>
               </div>
 
-              {/* Relationship Description */}
+              {/* Enhanced Relationship Analysis */}
               {(relationship.relationship_description || relationship.ai_generated_description) && (
                 <div className="p-4 rounded-lg border" style={{ borderColor: 'var(--color-border)' }}>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-medium">Relationship Analysis</h3>
-                    <button
-                      onClick={() => setShowDetails(!showDetails)}
-                      className="text-xs flex items-center space-x-1 transition-colors"
-                      style={{ color: 'var(--color-text-secondary)' }}
-                    >
-                      <span>{showDetails ? 'Hide Details' : 'Show Details'}</span>
-                      {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                    </button>
-                  </div>
+                  <RelationshipAnalysisCard
+                    relationship={relationship}
+                    onOpenInViewer={handleOpenInViewer}
+                    compact={false}
+                  />
                   
-                  {(() => {
-                    const parsed = parseRelationshipDescription(relationship.ai_generated_description || relationship.relationship_description);
-                    
-                    if (parsed.isStructured) {
-                      const data = parsed.data as any;
-                      const sharedTopics = getSharedTopics(relationship.ai_generated_description);
-                      const keyConnections = getKeyConnections(relationship.ai_generated_description);
-                      const readingRec = getReadingRecommendation(relationship.ai_generated_description);
-                      const rawAnalysis = getRawAnalysis(relationship.ai_generated_description);
-                      
-                      return (
-                        <div className="space-y-4 text-sm">
-                          {/* Overview */}
-                          <div>
-                            <p className="font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Overview</p>
-                            <p style={{ color: 'var(--color-text-primary)' }}>{data.overview}</p>
-                          </div>
-                          
-                          {/* Collapsible Details */}
-                          {showDetails && (
-                            <div className="space-y-3 pt-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
-                              {/* Shared Topics */}
-                              {sharedTopics.length > 0 && (
-                                <div>
-                                  <p className="font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Shared Topics</p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {sharedTopics.map((topic, idx) => (
-                                      <span
-                                        key={idx}
-                                        className="px-2 py-1 rounded text-xs"
-                                        style={{
-                                          backgroundColor: 'var(--color-primary-light)',
-                                          color: 'var(--color-primary)'
-                                        }}
-                                      >
-                                        {topic}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              
-                              {/* Key Connections */}
-                              {keyConnections.length > 0 && (
-                                <div>
-                                  <p className="font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Key Connections</p>
-                                  <ul className="list-disc list-inside space-y-1" style={{ color: 'var(--color-text-primary)' }}>
-                                    {keyConnections.map((connection, idx) => (
-                                      <li key={idx}>{connection}</li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-                              
-                              {/* Reading Recommendation */}
-                              {readingRec && (
-                                <div>
-                                  <p className="font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Reading Recommendation</p>
-                                  <p style={{ color: 'var(--color-text-primary)' }}>{readingRec}</p>
-                                </div>
-                              )}
-                              
-                              {/* Raw Analysis Data */}
-                              {rawAnalysis.commonKeywords && rawAnalysis.commonKeywords.length > 0 && (
-                                <div className="pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
-                                  <p className="font-medium mb-2 text-xs" style={{ color: 'var(--color-text-secondary)' }}>Common Keywords</p>
-                                  <div className="flex flex-wrap gap-1">
-                                    {rawAnalysis.commonKeywords.slice(0, 8).map((keyword, idx) => (
-                                      <span
-                                        key={idx}
-                                        className="px-1.5 py-0.5 rounded text-xs"
-                                        style={{
-                                          backgroundColor: 'var(--color-surface-hover)',
-                                          color: 'var(--color-text-secondary)'
-                                        }}
-                                      >
-                                        {keyword}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    } else {
-                      // Plain text / JSON fallback
-                      const userDescription = relationship.relationship_description;
-                      const aiDescription = relationship.ai_generated_description;
-                      const prettyJson = getPrettyJson(aiDescription);
-
-                      return (
-                        <div className="space-y-3 text-sm">
-                          {userDescription && (
-                            <div>
-                              <p className="font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>Your Description:</p>
-                              <p style={{ color: 'var(--color-text-primary)' }}>{userDescription}</p>
-                            </div>
-                          )}
-                          {prettyJson ? (
-                            <div>
-                              <p className="font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>AI Analysis (JSON):</p>
-                              <pre
-                                className="p-3 rounded-md overflow-x-auto text-[13px]"
-                                style={{
-                                  backgroundColor: 'var(--color-surface-hover)',
-                                  color: 'var(--color-text-primary)',
-                                  border: `1px solid var(--color-border)`
-                                }}
-                              >
-                                {prettyJson}
-                              </pre>
-                            </div>
-                          ) : aiDescription && (
-                            <div>
-                              <p className="font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>AI Analysis:</p>
-                              <p style={{ color: 'var(--color-text-primary)' }}>{aiDescription}</p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    }
-                  })()}
+                  {/* Relevance Breakdown Visualization */}
+                  <div className="mt-4">
+                    <RelevanceBreakdown
+                      relevancePercentage={relationship.relevance_percentage ?? undefined}
+                      aiGeneratedDescription={relationship.ai_generated_description}
+                      relationshipDescription={relationship.relationship_description}
+                    />
+                  </div>
                 </div>
               )}
             </div>

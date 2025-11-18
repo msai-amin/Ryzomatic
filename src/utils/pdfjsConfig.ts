@@ -5,15 +5,17 @@
 
 /**
  * Get PDF.js worker source URL
- * Uses CDN worker for production to avoid deployment issues
+ * Uses CDN for production to avoid deployment issues, local file for development
  */
 export function getPDFWorkerSrc(): string {
-  // Use CDN for production to ensure correct version
+  // Use CDN for production to ensure correct version and avoid file deployment issues
   if (import.meta.env.PROD) {
-    return 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.394/build/pdf.worker.min.mjs';
+    // Use jsdelivr CDN - matches pdfjs-dist version in package.json (3.11.174)
+    // Use .js instead of .mjs to avoid import.meta issues in worker context
+    return 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
   }
   
-  // Use local worker for development
+  // Use local worker file for development
   return '/pdf.worker.min.js';
 }
 

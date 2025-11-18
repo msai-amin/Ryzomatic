@@ -15,15 +15,6 @@ interface LibraryModalProps {
   refreshTrigger?: number; // Add refresh trigger
 }
 
-type EnhancedSavedBook = SavedBook & {
-  isFavorite?: boolean;
-  is_favorite?: boolean;
-  text_content?: string;
-  fileSize?: number;
-  file_size?: number;
-  cleanedPageTexts?: string[];
-};
-
 export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalProps) {
   const [activeTab, setActiveTab] = useState<'documents' | 'notes' | 'audio'>('documents');
   const [books, setBooks] = useState<EnhancedSavedBook[]>([]);
@@ -61,38 +52,6 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       ...book,
       isFavorite: Boolean(normalizedFavorite),
     };
-  };
-
-  const getFileDataByteLength = (fileData: unknown): number | null => {
-    if (!fileData) {
-      return null;
-    }
-
-    if (fileData instanceof ArrayBuffer) {
-      return fileData.byteLength;
-    }
-
-    if (fileData instanceof Uint8Array) {
-      return fileData.byteLength;
-    }
-
-    if (fileData instanceof Blob) {
-      return fileData.size;
-    }
-
-    if (typeof fileData === 'string') {
-      return new TextEncoder().encode(fileData).length;
-    }
-
-    if (Array.isArray(fileData)) {
-      return fileData.length;
-    }
-
-    if (typeof fileData === 'object' && 'byteLength' in fileData && typeof (fileData as { byteLength?: unknown }).byteLength === 'number') {
-      return (fileData as { byteLength: number }).byteLength;
-    }
-
-    return null;
   };
 
   const formatBookSize = (book: EnhancedSavedBook): string => {
@@ -161,6 +120,14 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
 
   useEffect(() => {
     if (isOpen) {
+      // Initialize supabaseStorageService with current user
+      if (user?.id) {
+        console.log('LibraryModal: Initializing supabaseStorageService with user:', user.id)
+        supabaseStorageService.setCurrentUser(user.id)
+      } else {
+        console.warn('LibraryModal: No user ID available')
+        supabaseStorageService.setCurrentUser(null)
+      }
       loadData();
     }
   }, [isOpen, activeTab, refreshTrigger, user?.id]);
@@ -612,8 +579,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         hasFileData: !!workingBook.fileData,
         hasPdfDataBase64: !!workingBook.pdfDataBase64,
         fileDataType: typeof workingBook.fileData,
-        fileDataConstructor: (workingBook.fileData as any)?.constructor?.name,
-        fileDataLength: getFileDataByteLength(workingBook.fileData) ?? 0
+        fileDataConstructor: workingBook.fileData?.constructor?.name,
+        fileDataLength: workingBook.fileData ? (workingBook.fileData as any).byteLength || (workingBook.fileData as any).length : 0
       });
 
       // If the book was loaded from Supabase metadata and the binary data isn't loaded yet, fetch it now.
@@ -636,7 +603,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
               text_content: fullBook.text_content ?? workingBook.text_content,
             };
             console.log('Supabase book data loaded:', {
-              byteLength: getFileDataByteLength(fullBook.fileData),
+              byteLength: fullBook.fileData.byteLength,
               totalPages: fullBook.totalPages,
               hasPageTexts: !!fullBook.pageTexts?.length
             });
@@ -665,12 +632,10 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
             bytes[i] = binary.charCodeAt(i);
           }
           workingBook.fileData = bytes.buffer as ArrayBuffer;
-          if (workingBook.fileData instanceof ArrayBuffer) {
-            console.log('Converted to ArrayBuffer:', {
-              byteLength: workingBook.fileData.byteLength,
-              constructor: workingBook.fileData.constructor.name
-            });
-          }
+          console.log('Converted to ArrayBuffer:', {
+            byteLength: workingBook.fileData.byteLength,
+            constructor: workingBook.fileData.constructor.name
+          });
         } catch (error) {
           console.error('Error converting base64 to ArrayBuffer:', error);
           throw new Error(`Failed to load ${formatLabel} data from library`);
@@ -693,48 +658,40 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
             // If it's an array of numbers, convert to ArrayBuffer
             const bytes = new Uint8Array(workingBook.fileData);
             workingBook.fileData = bytes.buffer as ArrayBuffer;
-          } else if (workingBook.fileData instanceof Blob) {
-            const arrayBuffer = await workingBook.fileData.arrayBuffer();
-            workingBook.fileData = arrayBuffer as ArrayBuffer;
           } else if (typeof workingBook.fileData === 'object' && workingBook.fileData !== null) {
             // Handle legacy data format - this is likely corrupted data from before base64 conversion
             console.warn(`Legacy ${formatLabel} data detected, this book may need to be re-uploaded:`, {
               fileDataType: typeof workingBook.fileData,
-              fileDataConstructor: (workingBook.fileData as any).constructor?.name,
-              fileDataKeys: Object.keys(workingBook.fileData as Record<string, unknown>),
+              fileDataConstructor: workingBook.fileData.constructor?.name,
+              fileDataKeys: Object.keys(workingBook.fileData),
               hasPdfDataBase64: !!workingBook.pdfDataBase64
             });
             throw new Error(`This ${formatLabel} was saved in an old format and cannot be loaded. Please re-upload the file.`);
-          } else if (typeof workingBook.fileData === 'string') {
-            const textBytes = new TextEncoder().encode(workingBook.fileData);
-            workingBook.fileData = textBytes.buffer as ArrayBuffer;
           } else {
-            console.error('Unknown fileData type:', typeof book.fileData, (book.fileData as any)?.constructor?.name);
+            console.error('Unknown fileData type:', typeof book.fileData, book.fileData?.constructor?.name);
             throw new Error(`Invalid ${formatLabel} data format in library`);
           }
-          if (workingBook.fileData instanceof ArrayBuffer) {
-            console.log('Conversion successful:', {
-              byteLength: workingBook.fileData.byteLength,
-              constructor: workingBook.fileData.constructor.name
-            });
-          }
+          console.log('Conversion successful:', {
+            byteLength: workingBook.fileData.byteLength,
+            constructor: workingBook.fileData.constructor.name
+          });
         } catch (error) {
           console.error('Error converting fileData to ArrayBuffer:', error);
           throw new Error(`Failed to convert ${formatLabel} data to proper format`);
         }
       }
-
+      
       // Final validation
       if (!workingBook.fileData || !(workingBook.fileData instanceof ArrayBuffer)) {
         console.error(`${formatLabel} data validation failed:`, {
           hasFileData: !!workingBook.fileData,
           fileDataType: typeof workingBook.fileData,
-          fileDataConstructor: (workingBook.fileData as any)?.constructor?.name,
+          fileDataConstructor: workingBook.fileData?.constructor?.name,
           hasPdfDataBase64: !!workingBook.pdfDataBase64,
           pdfDataBase64Length: workingBook.pdfDataBase64?.length || 0,
-          pdfDataBase64Preview: workingBook.pdfDataBase64 ? `${workingBook.pdfDataBase64.substring(0, 50)}...` : 'N/A'
+          pdfDataBase64Preview: workingBook.pdfDataBase64?.substring(0, 50) + '...' || 'N/A'
         });
-
+        
         // Try to provide a more helpful error message
         if (workingBook.pdfDataBase64) {
           throw new Error(`${formatLabel} data conversion failed. The file may be corrupted. Please try re-uploading.`);
@@ -776,20 +733,60 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       content: combinedContent,
       type: workingBook.type,
       uploadedAt: workingBook.savedAt,
-      pdfData: workingBook.type === 'pdf' ? (workingBook.fileData as ArrayBuffer) : undefined,
+      pdfData: (() => {
+        // CRITICAL: Clone ArrayBuffer and convert to Blob to prevent detachment issues
+        // Blobs are safer than ArrayBuffers because they can't be detached by workers
+        if (workingBook.type === 'pdf' && workingBook.fileData instanceof ArrayBuffer) {
+          try {
+            // Check if ArrayBuffer is already detached
+            new Uint8Array(workingBook.fileData, 0, 1);
+            // Not detached - clone it and convert to Blob for safety
+            const clonedBuffer = workingBook.fileData.slice(0);
+            const blob = new Blob([clonedBuffer], { type: 'application/pdf' });
+            console.log('LibraryModal: Cloned PDF ArrayBuffer and converted to Blob:', {
+              originalSize: workingBook.fileData.byteLength,
+              clonedSize: clonedBuffer.byteLength,
+              blobSize: blob.size
+            });
+            return blob;
+          } catch (error) {
+            // Already detached - this shouldn't happen if cloning in supabaseStorageService worked
+            console.error('LibraryModal: ArrayBuffer is detached, cannot clone:', error);
+            throw new Error('PDF data is corrupted. Please try re-opening the document.');
+          }
+        }
+        return undefined;
+      })(),
       epubData:
         workingBook.type === 'epub' && workingBook.fileData instanceof ArrayBuffer
-          ? new Blob([workingBook.fileData], { type: 'application/epub+zip' })
+          ? new Blob([workingBook.fileData instanceof ArrayBuffer ? workingBook.fileData.slice(0) : workingBook.fileData], { type: 'application/epub+zip' })
           : undefined,
       totalPages: workingBook.totalPages,
+      lastReadPage: workingBook.lastReadPage,
       pageTexts: cleanedPageTexts,
-      cleanedPageTexts: workingBook.cleanedPageTexts,
-      text_content: workingBook.text_content,
+      cleanedPageTexts
     };
 
-    addDocument(doc);
+      console.log('Document created for app store:', {
+        id: doc.id,
+        type: doc.type,
+        hasPdfData: !!doc.pdfData,
+        pdfDataType: doc.pdfData ? doc.pdfData.constructor.name : 'undefined',
+        pdfDataLength: doc.pdfData ? doc.pdfData.byteLength : 0,
+        hasPageTexts: !!doc.pageTexts,
+        pageTextsLength: doc.pageTexts?.length || 0,
+        pageTextsPreview: doc.pageTexts?.slice(0, 2).map((text, i) => {
+          const safeText = typeof text === 'string' ? text : String(text || '')
+          return {
+            page: i + 1,
+            textLength: safeText.length,
+            textPreview: safeText.substring(0, 30) + (safeText.length > 30 ? '...' : '')
+          }
+        }) || []
+      });
 
-    onClose();
+      useAppStore.getState().setCurrentDocument(doc as any);
+      onClose();
     } catch (error) {
       console.error('Failed to open book:', error);
       alert('Failed to open book. Please try again.');
@@ -798,16 +795,16 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
 
   const handleDeleteBook = async (id: string) => {
     console.log('handleDeleteBook called with id:', id);
-    const confirmed = window.confirm('Are you sure you want to delete this book and all its notes?');
+    const confirmed = window.confirm('Are you sure you want to move this book to trash?');
     console.log('Confirmation result:', confirmed);
     
     if (confirmed) {
       try {
         console.log('Starting deletion process for book:', id);
         
-        // Delete from Supabase (primary storage)
+        // Move to trash in Supabase (primary storage)
         await supabaseStorageService.deleteBook(id);
-        console.log('Book deleted from Supabase:', id);
+        console.log('Book moved to trash in Supabase:', id);
         
         // Also delete from localStorage as backup
         try {
@@ -822,7 +819,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         await loadData();
         console.log('Library data reloaded successfully');
         
-        alert('Book deleted successfully!');
+        alert('File removed to trash');
       } catch (error) {
         console.error('Error deleting book:', error);
         console.error('Error details:', {
@@ -830,15 +827,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
           stack: error.stack,
           name: error.name
         });
-        alert(`Failed to delete book: ${error.message || 'Unknown error'}`);
+        alert(`Failed to move book to trash: ${error.message || 'Unknown error'}`);
       }
-    }
-  };
-
-  const handleDeleteNote = (id: string) => {
-    if (confirm('Delete this note?')) {
-      storageService.deleteNote(id);
-      loadData();
     }
   };
 
@@ -1019,10 +1009,9 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                       My Library
                     </h2>
                     <p className="text-sm md:text-base" style={{ color: 'var(--color-text-tertiary)' }}>
-                      Organise your documents, notes, and audio clips with a calming night-mode workspace.
+                      Organise your documents, notes, and audio clips.
                     </p>
                   </div>
-                </div>
 
                 <div className="flex flex-wrap items-center gap-3">
                   <div
@@ -1876,11 +1865,12 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                 />
               </label>
             </div>
-          </div>
-      </div>
-    </div>
         </div>
       </div>
+    </div>
+  </div>
+          </div>
+        </div>
     </div>,
     modalRoot
   );

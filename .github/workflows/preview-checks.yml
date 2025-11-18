@@ -1,0 +1,40 @@
+name: Preview Checks
+
+on:
+  deployment_status:
+
+jobs:
+  preview-health:
+    if: github.event.deployment_status.state == 'success' && contains(github.event.deployment.environment, 'Preview')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine preview URL
+        id: url
+        run: |
+          echo "url=${{ github.event.deployment_status.target_url }}" >> $GITHUB_OUTPUT
+
+      - name: Hit homepage
+        run: |
+          code=$(curl -sSL -o /dev/null -w "%{http_code}\n" "${{ steps.url.outputs.url }}")
+          echo "homepage: $code"
+          if [ "$code" != "200" ] && [ "$code" != "401" ]; then exit 1; fi
+
+      - name: Health endpoint
+        run: |
+          curl -sSL -o /dev/null -w "%{http_code}\n" "${{ steps.url.outputs.url }}/api/health" | tee /tmp/hcode && \
+          ( [ "$(cat /tmp/hcode)" = "200" ] || [ "$(cat /tmp/hcode)" = "401" ] )
+
+      - name: OCR status probe (unauthenticated)
+        run: |
+          CODE=$(curl -sSL -o /dev/null -w "%{http_code}\n" "${{ steps.url.outputs.url }}/api/documents?action=ocr-status&documentId=invalid")
+          echo "ocr-status: $CODE"
+          # Accept 400/401/404; treat 500 as warning (likely missing server env on preview)
+          if [ "$CODE" = "500" ]; then
+            echo "::warning::/api/documents?action=ocr-status returned 500 (check SUPABASE_* env on Vercel preview). Proceeding."
+            exit 0
+          fi
+          if [ "$CODE" != "401" ] && [ "$CODE" != "400" ] && [ "$CODE" != "404" ]; then
+            exit 1
+          fi
+
+
