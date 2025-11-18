@@ -1030,15 +1030,12 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const blobUrlRef = useRef<string | null>(null)
   const uint8ArrayRef = useRef<Uint8Array | null>(null)
   const documentIdRef = useRef<string | null>(null)
+  const documentUrlRef = useRef<string | Uint8Array | null>(null)
   
-  // CRITICAL: Normalize document.id to ensure it's always a string (never undefined)
-  // This prevents React's dependency comparison from receiving undefined
-  const documentIdForDeps = document.id ?? ''
-  
-  // Convert document.pdfData to a format react-pdf-viewer can use
-  // CRITICAL: Use refs to cache values and prevent infinite re-renders
-  // Creating new Uint8Array on every render causes React to see it as a new value
-  const documentUrl = useMemo((): string | Uint8Array => {
+  // CRITICAL: Process document.pdfData immediately without useMemo
+  // This avoids React's dependency comparison function which throws on first render
+  // when the previous dependency array is undefined
+  const processDocumentUrl = (): string | Uint8Array => {
     // pdfData is guaranteed to exist at this point due to early return above
     if (!document.pdfData) {
       throw new Error('No PDF data available - this should not happen')
@@ -1097,11 +1094,12 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       console.error('❌ PDFViewerV2: Failed to convert pdfData to Uint8Array:', error)
       throw new Error('PDF data format is invalid. Please try re-opening the document.')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, documentIdForDeps ? [documentIdForDeps] : []) // Always pass a valid array (never undefined)
-  // CRITICAL: Using conditional array ensures React always receives a valid array
-  // Empty array if documentIdForDeps is falsy, otherwise array with the value
-  // Note: eslint-disable is needed because we intentionally don't include document.pdfData
+  }
+  
+  // Process the document URL directly without useMemo to avoid React's comparison function
+  // This prevents the "Cannot read properties of undefined (reading 'length')" error
+  // that occurs when React's 'co' function tries to compare with an undefined previous deps array
+  const documentUrl = processDocumentUrl()
   
   // Cleanup blob URL and refs when document changes or component unmounts
   useEffect(() => {
