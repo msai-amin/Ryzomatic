@@ -86,6 +86,11 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const safeAnnotationColors = Array.isArray(annotationColors) ? annotationColors : []
   const safeAnnotationColorsLength = safeAnnotationColors.length
 
+  // CRITICAL: Normalize all dependencies to ensure they're never undefined
+  // This prevents React's dependency comparison function from accessing .length on undefined
+  const normalizedDocumentId = document.id ?? ''
+  const normalizedUserId = userId ?? ''
+
   // State declarations (must be before early returns per React hooks rules)
   const [highlights, setHighlights] = useState<HighlightType[]>([])
   // Ref to store highlights for use in plugin render functions (avoids recreating plugin on every highlight change)
@@ -950,9 +955,10 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     currentHighlightColor,
     currentHighlightColorHex,
     handleCreateHighlight,
-    // Use nullish coalescing to ensure these are never undefined (React comparison issue)
-    document.id ?? '',
-    userId ?? '',
+    // CRITICAL: Use normalized values (always defined) to prevent React comparison error
+    // React's 'co' function compares dependency arrays and throws if previous array is undefined
+    normalizedDocumentId,
+    normalizedUserId,
     // annotationColors is used in renderHighlightContent, but we check if it's an array
     // Include it to ensure plugin updates if colors change
     // Note: Use safeAnnotationColorsLength (number) instead of array to prevent React comparison issues
@@ -1023,6 +1029,10 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const uint8ArrayRef = useRef<Uint8Array | null>(null)
   const documentIdRef = useRef<string | null>(null)
   
+  // CRITICAL: Normalize document.id to ensure it's always a string (never undefined)
+  // This prevents React's dependency comparison from receiving undefined
+  const documentIdForDeps = document.id ?? ''
+  
   // Convert document.pdfData to a format react-pdf-viewer can use
   // CRITICAL: Use refs to cache values and prevent infinite re-renders
   // Creating new Uint8Array on every render causes React to see it as a new value
@@ -1085,8 +1095,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       console.error('❌ PDFViewerV2: Failed to convert pdfData to Uint8Array:', error)
       throw new Error('PDF data format is invalid. Please try re-opening the document.')
     }
-  }, [document.id ?? '']) // Only depend on document.id, not pdfData (which might change reference)
-  // CRITICAL: Use nullish coalescing to ensure dependency is never undefined (prevents React comparison error)
+  }, [documentIdForDeps]) // Only depend on document.id, not pdfData (which might change reference)
+  // CRITICAL: Use normalized documentIdForDeps (always a string) to prevent React comparison error
   
   // Cleanup blob URL and refs when document changes or component unmounts
   useEffect(() => {
