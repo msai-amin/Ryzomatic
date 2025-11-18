@@ -472,7 +472,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       }
     }
     setContextMenu(null)
-  }, [document.id, document.pageTexts, userId, pdfViewer.currentPage])
+  }, [normalizedDocumentId, document.pageTexts, normalizedUserId, pdfViewer.currentPage])
 
   // Sync highlights ref with state
   useEffect(() => {
@@ -502,7 +502,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     }
 
     loadHighlights()
-  }, [document.id])
+  }, [normalizedDocumentId])
 
   // Poll for OCR status updates
   useEffect(() => {
@@ -554,7 +554,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         }
       }
     }
-  }, [ocrStatus, document?.id])
+  }, [ocrStatus, normalizedDocumentId])
 
   // Handle fullscreen toggle
   const toggleFullscreen = useCallback(() => {
@@ -620,7 +620,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     }, 200)
 
     return () => clearTimeout(timeoutId)
-  }, [document?.id])
+  }, [normalizedDocumentId])
 
   // Note: PDF.js worker is configured via Worker component wrapper
   // No need to manually configure GlobalWorkerOptions
