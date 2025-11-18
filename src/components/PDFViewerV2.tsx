@@ -1081,11 +1081,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     }
   }
   
-  // Process the document URL directly without useMemo to avoid React's comparison function
-  // This prevents the "Cannot read properties of undefined (reading 'length')" error
-  // that occurs when React's 'co' function tries to compare with an undefined previous deps array
-  const documentUrl = processDocumentUrl()
-  
   // Cleanup blob URL and refs when document changes or component unmounts
   // CRITICAL: Use normalized documentId in dependency array to prevent React comparison error
   useEffect(() => {
@@ -1182,6 +1177,10 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       </div>
     )
   }
+  
+  // CRITICAL: Process document URL AFTER early returns to ensure document exists
+  // This prevents accessing undefined properties during render
+  const documentUrl = processDocumentUrl()
   
   // Keyboard shortcuts
   useEffect(() => {
