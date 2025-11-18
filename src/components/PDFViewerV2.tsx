@@ -666,9 +666,14 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       const color = colors.find(c => c.id === currentHighlightColor) || colors[0]
       const colorHex = (color as any)?.color || currentHighlightColorHex || '#ffeb3b'
       
+      // Safety check: ensure selectionRegion exists
+      if (!props.selectionRegion) {
+        return null
+      }
+      
       // Calculate position with viewport boundary detection
-      const leftPercent = props.selectionRegion.left
-      const topPercent = props.selectionRegion.top + props.selectionRegion.height
+      const leftPercent = props.selectionRegion.left || 0
+      const topPercent = (props.selectionRegion.top || 0) + (props.selectionRegion.height || 0)
       // Adjust if popup would go off right edge (assuming ~300px width)
       const adjustedLeft = leftPercent > 70 ? `${leftPercent - 15}%` : `${leftPercent}%`
       
