@@ -981,6 +981,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // CRITICAL: Memoize plugins array to prevent infinite re-renders
   // The plugins themselves are stable, but the array reference changes on every render
   // Filter out any undefined plugins to prevent errors
+  // CRITICAL: Ensure all dependencies are always defined to prevent React comparison errors
   const plugins = useMemo(() => {
     // Ensure all plugins are defined before creating array
     if (!highlightPluginInstance || !scrollModePluginInstance || !zoomPluginInstance || 
@@ -1007,12 +1008,14 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     return pluginList
   }, [
     // Only recreate if these dependencies change
-    highlightPluginInstance,
-    scrollModePluginInstance,
-    zoomPluginInstance,
-    rotatePluginInstance,
+    // CRITICAL: Use nullish coalescing to ensure dependencies are never undefined
+    // This prevents React's comparison function from accessing .length on undefined
+    highlightPluginInstance ?? null,
+    scrollModePluginInstance ?? null,
+    zoomPluginInstance ?? null,
+    rotatePluginInstance ?? null,
     // searchPluginInstance, // TEMPORARILY DISABLED
-    pageNavigationPluginInstance,
+    pageNavigationPluginInstance ?? null,
   ])
 
   // Cache blob URL and Uint8Array to prevent memory leaks and infinite re-renders
@@ -1082,7 +1085,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       console.error('❌ PDFViewerV2: Failed to convert pdfData to Uint8Array:', error)
       throw new Error('PDF data format is invalid. Please try re-opening the document.')
     }
-  }, [document.id]) // Only depend on document.id, not pdfData (which might change reference)
+  }, [document.id ?? '']) // Only depend on document.id, not pdfData (which might change reference)
+  // CRITICAL: Use nullish coalescing to ensure dependency is never undefined (prevents React comparison error)
   
   // Cleanup blob URL and refs when document changes or component unmounts
   useEffect(() => {
