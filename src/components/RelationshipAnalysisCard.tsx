@@ -47,7 +47,14 @@ export const RelationshipAnalysisCard: React.FC<RelationshipAnalysisCardProps> =
   
   const relationshipType = getRelationshipType(description);
   const relationshipScore = getRelationshipScore(description);
-  const relevancePercentage = relationship.relevance_percentage ?? relationshipScore ?? null;
+  
+  // Prioritize database value, but if NULL and status is completed, try AI description
+  // If status is pending/processing, relevance_percentage should be NULL (not 0)
+  const relevancePercentage = relationship.relevance_percentage !== null && relationship.relevance_percentage !== undefined
+    ? relationship.relevance_percentage
+    : relationship.relevance_calculation_status === 'completed' && relationshipScore !== null
+    ? relationshipScore
+    : null;
   
   const overview = getOverviewText(description);
   const sharedTopics = getSharedTopics(description);
@@ -94,16 +101,22 @@ export const RelationshipAnalysisCard: React.FC<RelationshipAnalysisCardProps> =
               </div>
             )}
           </div>
-          {relevancePercentage !== null && (
+          {relevancePercentage !== null && relevancePercentage !== undefined ? (
             <div className="flex items-center gap-2 ml-2">
               <span className="text-sm font-semibold" style={{ color: getRelevanceColor(relevancePercentage) }}>
                 {relevancePercentage}%
               </span>
             </div>
-          )}
+          ) : relationship.relevance_calculation_status === 'pending' || relationship.relevance_calculation_status === 'processing' ? (
+            <div className="flex items-center gap-2 ml-2">
+              <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+                Calculating...
+              </span>
+            </div>
+          ) : null}
         </div>
         
-        {relevancePercentage !== null && (
+        {relevancePercentage !== null && relevancePercentage !== undefined ? (
           <div 
             className="w-full h-1.5 rounded-full mb-2"
             style={{ backgroundColor: 'var(--color-border-light)' }}
@@ -116,7 +129,11 @@ export const RelationshipAnalysisCard: React.FC<RelationshipAnalysisCardProps> =
               }}
             />
           </div>
-        )}
+        ) : relationship.relevance_calculation_status === 'pending' || relationship.relevance_calculation_status === 'processing' ? (
+          <div className="text-xs mb-2" style={{ color: 'var(--color-text-tertiary)' }}>
+            AI is analyzing relationship...
+          </div>
+        ) : null}
         
         {overview && overview !== 'No overview available' && (
           <p className="text-xs line-clamp-2 mt-2" style={{ color: 'var(--color-text-secondary)' }}>
@@ -149,7 +166,7 @@ export const RelationshipAnalysisCard: React.FC<RelationshipAnalysisCardProps> =
             </div>
           )}
           
-          {relevancePercentage !== null && (
+          {relevancePercentage !== null && relevancePercentage !== undefined ? (
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold" style={{ color: getRelevanceColor(relevancePercentage) }}>
@@ -160,7 +177,23 @@ export const RelationshipAnalysisCard: React.FC<RelationshipAnalysisCardProps> =
                 </span>
               </div>
             </div>
-          )}
+          ) : relationship.relevance_calculation_status === 'pending' || relationship.relevance_calculation_status === 'processing' ? (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
+                  Calculating relevance...
+                </span>
+              </div>
+            </div>
+          ) : relationship.relevance_calculation_status === 'failed' ? (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm" style={{ color: 'var(--color-error)' }}>
+                  Calculation failed
+                </span>
+              </div>
+            </div>
+          ) : null}
         </div>
         
         <div className="flex items-center gap-2">
