@@ -242,7 +242,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                 <Sparkles className="h-5 w-5" />
               </button>
             </Tooltip>
-          </div>
 
             {/* Actions Group: Library + New Material */}
             {user && (
@@ -420,7 +419,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
               </Tooltip>
             )}
           </div>
-        </div>
+      </div>
 
         {currentDocument && (
           <div
