@@ -646,7 +646,18 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // CRITICAL: highlightPlugin() uses React hooks internally, so it MUST be called unconditionally
   // Use useMemo with a guaranteed array dependency to prevent React's 'co' function from receiving undefined
   // All dependencies are normalized to ensure they're never undefined
+  // CRITICAL: Ensure handleCreateHighlight is defined before using it
   const highlightPluginInstance = useMemo(() => {
+    // Safety check: ensure all required dependencies are defined
+    if (!handleCreateHighlight) {
+      console.error('PDFViewerV2: handleCreateHighlight is undefined, cannot create highlight plugin')
+      // Return a minimal plugin instance to prevent crashes
+      return highlightPlugin({
+        renderHighlightTarget: () => null,
+        renderHighlightContent: () => null,
+        renderHighlights: () => null,
+      })
+    }
     return highlightPlugin({
     renderHighlightTarget: (props: RenderHighlightTargetProps) => {
       if (!selectionEnabled) {
