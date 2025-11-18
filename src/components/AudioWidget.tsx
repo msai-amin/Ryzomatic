@@ -373,14 +373,14 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     
     // In reading mode, prioritize cleaned text if available
     // Check if cleanedPageTexts exists, has length > 0, AND has at least one non-null entry
+    // CRITICAL: Use normalized arrays to prevent undefined.length errors
     const hasCleanedTexts = pdfViewer.readingMode && 
-      currentDocument.cleanedPageTexts && 
-      currentDocument.cleanedPageTexts.length > 0 &&
-      currentDocument.cleanedPageTexts.some(text => text !== null && text !== undefined && text.length > 0)
+      normalizedCleanedPageTexts.length > 0 &&
+      normalizedCleanedPageTexts.some(text => text !== null && text !== undefined && text.length > 0)
     
     // In reading mode, if we don't have pageTexts yet, wait for them to load
     // This prevents using old paragraphs from previous document
-    if (pdfViewer.readingMode && !hasCleanedTexts && (!currentDocument.pageTexts || currentDocument.pageTexts.length === 0)) {
+    if (pdfViewer.readingMode && !hasCleanedTexts && normalizedPageTexts.length === 0) {
       console.log('🔍 AudioWidget: Waiting for pageTexts or cleanedPageTexts in reading mode')
       // Reset paragraphs to empty to clear old ones
       updateTTS({ paragraphs: [], currentParagraphIndex: 0 })
@@ -388,7 +388,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     }
     
     const useCleanedText = hasCleanedTexts
-    const sourceTexts = useCleanedText ? currentDocument.cleanedPageTexts : currentDocument.pageTexts
+    // CRITICAL: Use normalized arrays to ensure we never have undefined
+    const sourceTexts = useCleanedText ? normalizedCleanedPageTexts : normalizedPageTexts
     const sourceType = useCleanedText ? 'cleanedPageTexts' : 'pageTexts'
     
     console.log('🔍 AudioWidget: Text source decision', {
@@ -403,7 +404,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     
     // Priority: cleanedPageTexts (in reading mode) > pageTexts (for PDFs) > string content (for text files)
     // For PDFs, content is ArrayBuffer (binary data), so we must use pageTexts or cleanedPageTexts
-    if (sourceTexts && sourceTexts.length > 0) {
+    // CRITICAL: sourceTexts is always an array (normalized), so we can safely check length
+    if (sourceTexts.length > 0) {
       console.log(`🔍 AudioWidget: Processing ${sourceType}`, {
         pageTextsTypes: sourceTexts.map((text, i) => ({
           index: i,

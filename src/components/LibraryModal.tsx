@@ -786,15 +786,15 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         pdfDataType: doc.pdfData ? doc.pdfData.constructor.name : 'undefined',
         pdfDataLength: doc.pdfData ? doc.pdfData.byteLength : 0,
         hasPageTexts: !!doc.pageTexts,
-        pageTextsLength: doc.pageTexts.length,
-        pageTextsPreview: doc.pageTexts.slice(0, 2).map((text, i) => {
+        pageTextsLength: Array.isArray(doc.pageTexts) ? doc.pageTexts.length : 0,
+        pageTextsPreview: Array.isArray(doc.pageTexts) ? doc.pageTexts.slice(0, 2).map((text, i) => {
           const safeText = typeof text === 'string' ? text : String(text || '')
           return {
             page: i + 1,
             textLength: safeText.length,
             textPreview: safeText.substring(0, 30) + (safeText.length > 30 ? '...' : '')
           }
-        })
+        }) : []
       });
 
       useAppStore.getState().setCurrentDocument(doc as any);
