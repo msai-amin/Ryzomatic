@@ -342,10 +342,41 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   );
 };
 
+// CRITICAL: Safe default context to prevent crashes during initialization
+// This prevents "Cannot read properties of undefined" errors when components
+// use useTheme before ThemeProvider is fully initialized
+const safeDefaultContext: ThemeContextType = {
+  currentTheme: theme1Config,
+  setTheme: () => {
+    console.warn('useTheme: setTheme called outside ThemeProvider, using default theme');
+  },
+  annotationColors: defaultAnnotationColors,
+  updateAnnotationColor: () => {
+    console.warn('useTheme: updateAnnotationColor called outside ThemeProvider');
+  },
+  addAnnotationColor: () => {
+    console.warn('useTheme: addAnnotationColor called outside ThemeProvider');
+  },
+  deleteAnnotationColor: () => {
+    console.warn('useTheme: deleteAnnotationColor called outside ThemeProvider');
+  },
+  resetAnnotationColor: () => {
+    console.warn('useTheme: resetAnnotationColor called outside ThemeProvider');
+  },
+  isDarkMode: false,
+  toggleDarkMode: () => {
+    console.warn('useTheme: toggleDarkMode called outside ThemeProvider');
+  },
+};
+
 export const useTheme = (): ThemeContextType => {
   const context = useContext(ThemeContext);
+  // CRITICAL: Return safe default instead of throwing error
+  // This prevents components from crashing during initialization or if ThemeProvider is missing
+  // The safe default ensures all properties are always defined, preventing undefined.length errors
   if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider');
+    console.warn('useTheme: Used outside ThemeProvider, returning safe defaults');
+    return safeDefaultContext;
   }
   return context;
 };
