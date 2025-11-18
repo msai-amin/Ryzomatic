@@ -727,7 +727,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
             onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
             onClick={async () => {
-              if (props.selectedText) {
+              if (props.selectedText && props.highlightAreas) {
                 await handleCreateHighlight(props.highlightAreas, props.selectedText, props.selectionData)
               }
               props.cancel()
