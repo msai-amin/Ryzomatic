@@ -4,7 +4,7 @@ import { DocumentRelationshipWithDetails } from '../../lib/supabase';
 import { Tooltip } from './Tooltip';
 import { useAppStore } from '../store/appStore';
 import { supabaseStorageService } from '../services/supabaseStorageService';
-import { documentRelationships } from '../../lib/supabase';
+import { authService } from '../services/supabaseAuthService';
 
 interface RelatedDocumentsPanelProps {
   relatedDocuments: DocumentRelationshipWithDetails[];
@@ -124,17 +124,46 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
         return next;
       });
 
-      // Create relationship with 'pending' status
+      // Create relationship with 'pending' status using authenticated API endpoint
       if (documentId) {
         setProcessingRelationships(prev => new Set(prev).add(documentId));
 
-        const { data: relationship, error } = await documentRelationships.create({
-          source_document_id: currentDocument.id,
-          related_document_id: documentId,
+        // Get auth token for API request
+        const session = await authService.getSession();
+        const authToken = session?.access_token;
+        
+        if (!authToken) {
+          throw new Error('Not authenticated. Please sign in and try again.');
+        }
+
+        const response = await fetch('/api/documents/relationships', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            sourceDocumentId: currentDocument.id,
+            relatedDocumentId: documentId,
+            userId: user.id
+          }),
         });
 
-        if (error) {
-          throw new Error(`Failed to create relationship: ${error.message}`);
+        if (!response.ok) {
+          let errorMessage = 'Failed to create relationship';
+          try {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const errorData = await response.json();
+              errorMessage = errorData.error || errorData.message || errorData.details || errorMessage;
+            } else {
+              const text = await response.text();
+              errorMessage = `Server error: ${response.status} ${response.statusText}. ${text.substring(0, 100)}`;
+            }
+          } catch (parseError) {
+            errorMessage = `Server error: ${response.status} ${response.statusText}`;
+          }
+          throw new Error(errorMessage);
         }
 
         // Trigger refresh

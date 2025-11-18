@@ -76,6 +76,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const highlightColorButtonRef = useRef<HTMLButtonElement>(null)
   const [numPages, setNumPages] = useState<number>(document?.totalPages || 0)
   const [currentParagraphIndex, setCurrentParagraphIndex] = useState<number | null>(null)
+  const currentParagraphIndexRef = useRef<number | null>(null)
+  const isUpdatingParagraphRef = useRef<boolean>(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [isPDFjsReady, setIsPDFjsReady] = useState(false)
   const [ocrStatus, setOcrStatus] = useState(document?.ocrStatus || 'not_needed')
@@ -1003,6 +1005,11 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     }
   }, [document.id])
 
+  // Sync ref with state when currentParagraphIndex changes
+  useEffect(() => {
+    currentParagraphIndexRef.current = currentParagraphIndex
+  }, [currentParagraphIndex])
+
   // Handle document load
   const handleDocumentLoad = useCallback((e: DocumentLoadEvent) => {
     console.log('PDF loaded:', e.doc.numPages)
@@ -1383,8 +1390,20 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                     }}
                     title={userHighlight ? `Highlight: ${userHighlight.highlighted_text}` : undefined}
                     onMouseEnter={(e: React.MouseEvent) => {
-                      if (segment.paragraphIndex !== undefined && currentParagraphIndex !== segment.paragraphIndex) {
-                        setCurrentParagraphIndex(segment.paragraphIndex)
+                      // Prevent updates during render cycles to avoid infinite loops
+                      if (isUpdatingParagraphRef.current) return
+                      
+                      // Use ref to prevent unnecessary state updates and infinite loops
+                      const paragraphIdx = segment.paragraphIndex
+                      if (paragraphIdx !== undefined && 
+                          currentParagraphIndexRef.current !== paragraphIdx) {
+                        isUpdatingParagraphRef.current = true
+                        currentParagraphIndexRef.current = paragraphIdx
+                        setCurrentParagraphIndex(paragraphIdx)
+                        // Reset flag after state update completes to prevent rapid-fire updates
+                        requestAnimationFrame(() => {
+                          isUpdatingParagraphRef.current = false
+                        })
                       }
                     }}
                   >
