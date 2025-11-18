@@ -970,6 +970,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     })
   }, [
     // CRITICAL: All dependencies must be defined and normalized to prevent React's 'co' function error
+    // Use primitive values instead of array references to avoid comparison issues
     selectionEnabled ?? false,
     currentHighlightColor ?? 'yellow',
     currentHighlightColorHex ?? '#ffeb3b',
@@ -978,8 +979,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     normalizedUserId,
     safeAnnotationColorsLength ?? 0,
     isChatOpen ?? false,
-    // Include safeAnnotationColors in deps to ensure plugin has access to colors
-    safeAnnotationColors,
+    // Use JSON.stringify to create a stable string representation of the array
+    // This ensures React can properly compare dependencies even if the array reference changes
+    JSON.stringify(safeAnnotationColors),
   ])
 
   // Create scroll mode plugin (do NOT wrap in useMemo; keep hook order consistent)
