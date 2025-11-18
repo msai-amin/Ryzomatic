@@ -989,14 +989,16 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     // Use primitive values instead of array references to avoid comparison issues
     // NOTE: safeAnnotationColors is accessed inside the callback (closure), not in deps
     // This prevents React's 'co' function from receiving undefined dependency arrays
-    selectionEnabled ?? false,
-    currentHighlightColor ?? 'yellow',
-    currentHighlightColorHex ?? '#ffeb3b',
+    // CRITICAL: All values are normalized above - no nullish coalescing needed here
+    // Removing ?? operators ensures React's comparison function never receives undefined
+    selectionEnabled ? true : false,
+    currentHighlightColor || 'yellow',
+    currentHighlightColorHex || '#ffeb3b',
     handleCreateHighlight,
     normalizedDocumentId,
     normalizedUserId,
-    safeAnnotationColorsLength ?? 0,
-    isChatOpen ?? false,
+    safeAnnotationColorsLength, // Already normalized to always be a number (never undefined)
+    isChatOpen ? true : false,
   ])
 
   // Create scroll mode plugin (do NOT wrap in useMemo; keep hook order consistent)
