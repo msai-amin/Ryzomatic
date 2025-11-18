@@ -57,6 +57,18 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     return Array.isArray(currentDocument?.cleanedPageTexts) ? currentDocument.cleanedPageTexts : []
   }, [currentDocument?.cleanedPageTexts])
   
+  // CRITICAL: Normalize currentDocument to ensure all array properties are always arrays
+  // This prevents React's dependency comparison from accessing .length on undefined
+  // We create a normalized version that's safe to use in dependency arrays
+  const normalizedDocument = useMemo(() => {
+    if (!currentDocument) return null
+    return {
+      ...currentDocument,
+      pageTexts: normalizedPageTexts,
+      cleanedPageTexts: normalizedCleanedPageTexts
+    }
+  }, [currentDocument, normalizedPageTexts, normalizedCleanedPageTexts])
+  
   const widgetRef = useRef<HTMLDivElement>(null)
   const widgetSizeRef = useRef({ width: 280, height: 160 })
   const dragOffsetRef = useRef({ x: 0, y: 0 })
@@ -558,7 +570,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     
     const index = tts.currentParagraphIndex ?? 0
     return tts.paragraphs[index] || tts.paragraphs[0] || ''
-  }, [tts.paragraphs, tts.currentParagraphIndex, currentDocument, pdfViewer.currentPage, pdfViewer.readingMode])
+  }, [tts.paragraphs, tts.currentParagraphIndex, normalizedDocumentId, pdfViewer.currentPage, pdfViewer.readingMode])
 
   // Get text for page mode
   const getCurrentPageText = useCallback((): string => {
@@ -586,7 +598,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       }
     }
     return ''
-  }, [currentDocument, pdfViewer.currentPage, pdfViewer.readingMode])
+  }, [normalizedDocumentId, pdfViewer.currentPage, pdfViewer.readingMode, normalizedPageTexts, normalizedCleanedPageTexts])
 
   // Get all remaining text (for continue to end mode)
   const getAllRemainingText = useCallback((): string => {
@@ -623,7 +635,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         .join('\n\n')
     }
     return ''
-  }, [currentDocument, pdfViewer.currentPage, pdfViewer.readingMode])
+  }, [normalizedDocumentId, pdfViewer.currentPage, pdfViewer.readingMode, normalizedPageTexts, normalizedCleanedPageTexts])
 
   // Get text based on playback mode
   const getTextForPlaybackMode = useCallback((mode: 'paragraph' | 'page' | 'continue'): string => {
@@ -891,7 +903,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         setIsProcessing(false)
       }
     }
-  }, [playbackMode, tts.isPlaying, tts.autoAdvanceParagraph, isProcessing, updateTTS, getTextForPlaybackMode, currentDocument, pdfViewer.currentPage, tts.currentParagraphIndex, tts.voiceName, tts.rate, tts.pitch, saveCurrentPosition])
+  }, [playbackMode, tts.isPlaying, tts.autoAdvanceParagraph, isProcessing, updateTTS, getTextForPlaybackMode, normalizedDocumentId, pdfViewer.currentPage, tts.currentParagraphIndex, tts.voiceName, tts.rate, tts.pitch, saveCurrentPosition])
 
   // Handle playback mode change
   const handlePlaybackModeChange = useCallback((newMode: 'paragraph' | 'page' | 'continue') => {
