@@ -68,34 +68,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // Get document from store
   const document = currentDocument
 
-  // CRITICAL: Early return if no document - prevents infinite loops
-  // Also prevents React's comparison function from receiving undefined dependencies
-  if (!document || !document.pdfData) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <p className="text-lg mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-            No document loaded
-          </p>
-        </div>
-      </div>
-    )
-  }
-  
-  // CRITICAL: Early return if document.id is undefined
-  // React's 'co' comparison function throws when previous dependency array is undefined
-  // This ensures all dependencies are defined before any hooks are called
-  if (!document.id) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <p className="text-lg mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-            Loading document...
-          </p>
-        </div>
-      </div>
-    )
-  }
+  // CRITICAL: ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
+  // This is required by React's Rules of Hooks - hooks must be called in the same order every render
+  // Early returns cause hooks to be skipped, which breaks React's internal dependency tracking
 
   // Safety check: ensure annotationColors is an array
   // CRITICAL: This must be defined before any useMemo hooks to prevent undefined.length errors
@@ -104,10 +79,10 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
   // CRITICAL: Normalize all dependencies to ensure they're never undefined
   // This prevents React's dependency comparison function from accessing .length on undefined
-  const normalizedDocumentId = document.id ?? ''
+  const normalizedDocumentId = document?.id ?? ''
   const normalizedUserId = userId ?? ''
 
-  // State declarations (must be before early returns per React hooks rules)
+  // State declarations (MUST be before early returns per React hooks rules)
   const [highlights, setHighlights] = useState<HighlightType[]>([])
   // Ref to store highlights for use in plugin render functions (avoids recreating plugin on every highlight change)
   const highlightsRef = useRef<HighlightType[]>([])
@@ -1176,6 +1151,32 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const handleRotate = useCallback((e: RotateEvent) => {
     updatePDFViewer({ rotation: e.rotation })
   }, [updatePDFViewer])
+  
+  // CRITICAL: Early returns MUST come AFTER all hooks are called
+  // This ensures React's Rules of Hooks are followed - hooks must be called in the same order every render
+  if (!document || !document.pdfData) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <p className="text-lg mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+            No document loaded
+          </p>
+        </div>
+      </div>
+    )
+  }
+  
+  if (!document.id) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <p className="text-lg mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+            Loading document...
+          </p>
+        </div>
+      </div>
+    )
+  }
   
   // Keyboard shortcuts
   useEffect(() => {
