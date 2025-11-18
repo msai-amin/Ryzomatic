@@ -75,6 +75,14 @@ export const CustomizableReadingWizard: React.FC = () => {
   // CRITICAL: Normalize document ID to prevent React comparison error
   // React's dependency comparison function accesses .length on nested array properties
   const normalizedDocumentId = currentDocument?.id ?? ''
+  
+  // CRITICAL: Safe destructuring with defaults - guarantees arrays are always arrays
+  // Level 1 Guard: Default currentDocument to {} if null/undefined
+  // Level 2 Guard: Default pageTexts and cleanedPageTexts to [] if missing
+  const { 
+    pageTexts: safePageTexts = [], 
+    cleanedPageTexts: safeCleanedPageTexts = [] 
+  } = currentDocument || {}
 
   useEffect(() => {
     if (!customReadingWizard.isOpen) {
@@ -106,9 +114,10 @@ export const CustomizableReadingWizard: React.FC = () => {
       return
     }
 
+    // CRITICAL: Use safe destructured arrays instead of accessing document directly
     const totalSegments =
-      (document.pageTexts && document.pageTexts.length) ||
-      (document.cleanedPageTexts && document.cleanedPageTexts.length) ||
+      safePageTexts.length ||
+      safeCleanedPageTexts.length ||
       (document.content ? 1 : 0)
 
     setProgress({ current: 0, total: Math.max(totalSegments, 1) })
@@ -126,7 +135,7 @@ export const CustomizableReadingWizard: React.FC = () => {
             }
           },
           userId,
-          existingCleaned: document.cleanedPageTexts ?? null
+          existingCleaned: Array.isArray(safeCleanedPageTexts) && safeCleanedPageTexts.length > 0 ? safeCleanedPageTexts : null
         })
 
         if (cancelled) return
