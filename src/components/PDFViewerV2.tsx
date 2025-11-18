@@ -945,7 +945,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const rotatePluginInstance = rotatePlugin()
 
   // Create search plugin (do NOT wrap in useMemo)
-  const searchPluginInstance = searchPlugin()
+  // TEMPORARILY DISABLED: searchPlugin causing "t.get is not a function" error
+  // const searchPluginInstance = searchPlugin()
 
   // Create page navigation plugin (do NOT wrap in useMemo)
   const pageNavigationPluginInstance = pageNavigationPlugin({ enableShortcuts: false }) // Disable shortcuts, we'll handle them ourselves
@@ -957,7 +958,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     scrollModePluginInstance,
     zoomPluginInstance,
     rotatePluginInstance,
-    searchPluginInstance,
+    // searchPluginInstance, // TEMPORARILY DISABLED due to "t.get is not a function" error
     pageNavigationPluginInstance,
   ], [
     // Only recreate if these dependencies change
@@ -965,7 +966,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     scrollModePluginInstance,
     zoomPluginInstance,
     rotatePluginInstance,
-    searchPluginInstance,
+    // searchPluginInstance, // TEMPORARILY DISABLED
     pageNavigationPluginInstance,
   ])
 
