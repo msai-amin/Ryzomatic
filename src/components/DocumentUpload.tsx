@@ -40,6 +40,9 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const [userProfile, setUserProfile] = useState<any>({ tier: 'free', credits: 0, ocr_count_monthly: 0 })
   const [extractionProgress, setExtractionProgress] = useState<string>('')
 
+  // CRITICAL: Normalize user.id to prevent React comparison error
+  const normalizedUserId = user?.id ?? ''
+
   // Initialize supabaseStorageService with current user when component mounts or user changes
   useEffect(() => {
     if (user?.id) {
@@ -49,7 +52,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
       console.warn('DocumentUpload: No user ID available, supabaseStorageService not initialized')
       supabaseStorageService.setCurrentUser(null)
     }
-  }, [user?.id])
+  }, [normalizedUserId])
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()

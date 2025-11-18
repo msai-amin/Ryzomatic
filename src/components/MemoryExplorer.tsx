@@ -18,11 +18,14 @@ export const MemoryExplorer: React.FC<MemoryExplorerProps> = ({ onClose }) => {
   const [relatedGraph, setRelatedGraph] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
 
+  // CRITICAL: Normalize user.id to prevent React comparison error
+  const normalizedUserId = user?.id ?? ''
+
   useEffect(() => {
     if (user?.id) {
       loadStats();
     }
-  }, [user?.id]);
+  }, [normalizedUserId]);
 
   const loadStats = async () => {
     if (!user?.id) return;

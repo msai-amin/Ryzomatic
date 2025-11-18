@@ -28,6 +28,10 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
   const { user } = useAppStore()
   const [timerState, setTimerState] = useState<TimerState>(timerService.getState())
   
+  // CRITICAL: Normalize IDs to prevent React comparison error
+  const normalizedUserId = user?.id ?? ''
+  const normalizedDocumentId = documentId ?? ''
+  
   const [settings, setSettings] = useState<PomodoroSettings>({
     workDuration: 25,
     shortBreakDuration: 5,
@@ -78,7 +82,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
 
   const toggleTimer = useCallback(async () => {
     await timerService.toggleTimer(user?.id, documentId || undefined)
-  }, [user?.id, documentId])
+  }, [normalizedUserId, normalizedDocumentId])
 
   // Register toggle function for external access
   useEffect(() => {

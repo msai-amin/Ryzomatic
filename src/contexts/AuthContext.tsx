@@ -54,6 +54,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // CRITICAL: Normalize session values to prevent React comparison error
+  const normalizedProvider = session?.user?.app_metadata?.provider ?? ''
+  const normalizedSessionUserId = session?.user?.id ?? ''
+
   useEffect(() => {
     if (loading) return;
     if (typeof window === 'undefined') return;
@@ -97,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [loading, session?.user?.app_metadata?.provider, session?.user?.id]);
+  }, [loading, normalizedProvider, normalizedSessionUserId]);
 
   const value = {
     session,
