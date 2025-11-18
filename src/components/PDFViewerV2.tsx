@@ -102,10 +102,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const [numPages, setNumPages] = useState<number>(document?.totalPages || 0)
   const [currentParagraphIndex, setCurrentParagraphIndex] = useState<number | null>(null)
   
-  // CRITICAL: Use useState + useEffect instead of useMemo to avoid React's comparison function error
-  // React's 'co' function throws when previous dependency array is undefined on first render
-  const [highlightPluginInstance, setHighlightPluginInstance] = useState<any>(null)
-  const [plugins, setPlugins] = useState<any[]>([])
   const currentParagraphIndexRef = useRef<number | null>(null)
   const isUpdatingParagraphRef = useRef<boolean>(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
@@ -656,11 +652,11 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     }
   }, [normalizedDocumentId, normalizedUserId, currentHighlightColor, currentHighlightColorHex, safeAnnotationColors])
 
-  // CRITICAL: Use useEffect instead of useMemo to avoid React's comparison function error
-  // React's 'co' function throws when previous dependency array is undefined on first render
-  // Create highlight plugin - MUST be stable to prevent infinite re-renders
-  useEffect(() => {
-    const plugin = highlightPlugin({
+  // Create highlight plugin - MUST be memoized to prevent infinite re-renders
+  // The plugin instance must be stable across renders unless dependencies change
+  // CRITICAL: highlightPlugin() uses React hooks internally, so it MUST be called at component level (not in useEffect)
+  // We use useMemo with a stable dependency array to avoid React's comparison function error
+  const highlightPluginInstance = useMemo(() => highlightPlugin({
     renderHighlightTarget: (props: RenderHighlightTargetProps) => {
       if (!selectionEnabled) {
         return null
@@ -955,30 +951,32 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         </div>
       )
     },
-    })
-    
-    setHighlightPluginInstance(plugin)
-  }, [
-    // Dependencies that affect the plugin behavior
-    // Note: Only include primitive values and stable references
-    // highlights is accessed via ref, so we don't need it in dependencies
-    // CRITICAL: All dependencies must be defined (never undefined) to prevent React comparison error
-    selectionEnabled,
-    currentHighlightColor,
-    currentHighlightColorHex,
-    handleCreateHighlight,
-    // CRITICAL: Use normalized values (always defined) to prevent React comparison error
-    // React's 'co' function compares dependency arrays and throws if previous array is undefined
-    normalizedDocumentId,
-    normalizedUserId,
-    // annotationColors is used in renderHighlightContent, but we check if it's an array
-    // Include it to ensure plugin updates if colors change
-    // Note: Use safeAnnotationColorsLength (number) instead of array to prevent React comparison issues
-    safeAnnotationColorsLength,
-    // Store setters are stable and don't need to be in dependencies
-    // isChatOpen is a primitive value that affects behavior
-    isChatOpen,
-  ])
+  }), (() => {
+    // CRITICAL: Create dependency array in a function to ensure it's always valid
+    // This prevents React's 'co' function from receiving undefined on first render
+    const deps = [
+      // Dependencies that affect the plugin behavior
+      // Note: Only include primitive values and stable references
+      // highlights is accessed via ref, so we don't need it in dependencies
+      // CRITICAL: All dependencies must be defined (never undefined) to prevent React comparison error
+      selectionEnabled ?? false,
+      currentHighlightColor ?? 'yellow',
+      currentHighlightColorHex ?? '#ffeb3b',
+      handleCreateHighlight ?? (() => {}),
+      // CRITICAL: Use normalized values (always defined) to prevent React comparison error
+      // React's 'co' function compares dependency arrays and throws if previous array is undefined
+      normalizedDocumentId,
+      normalizedUserId,
+      // annotationColors is used in renderHighlightContent, but we check if it's an array
+      // Include it to ensure plugin updates if colors change
+      // Note: Use safeAnnotationColorsLength (number) instead of array to prevent React comparison issues
+      safeAnnotationColorsLength ?? 0,
+      // Store setters are stable and don't need to be in dependencies
+      // isChatOpen is a primitive value that affects behavior
+      isChatOpen ?? false,
+    ]
+    return deps
+  })())
 
   // Create scroll mode plugin (do NOT wrap in useMemo; keep hook order consistent)
   const scrollModePluginInstance = scrollModePlugin()
@@ -996,11 +994,11 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // Create page navigation plugin (do NOT wrap in useMemo)
   const pageNavigationPluginInstance = pageNavigationPlugin({ enableShortcuts: false }) // Disable shortcuts, we'll handle them ourselves
 
-  // CRITICAL: Use useEffect instead of useMemo to avoid React's comparison function error
-  // React's 'co' function throws when previous dependency array is undefined on first render
-  // Memoize plugins array to prevent infinite re-renders
+  // CRITICAL: Memoize plugins array to prevent infinite re-renders
   // The plugins themselves are stable, but the array reference changes on every render
-  useEffect(() => {
+  // Filter out any undefined plugins to prevent errors
+  // CRITICAL: Ensure all dependencies are always defined to prevent React comparison errors
+  const plugins = useMemo(() => {
     // Ensure all plugins are defined before creating array
     if (!highlightPluginInstance || !scrollModePluginInstance || !zoomPluginInstance || 
         !rotatePluginInstance || !pageNavigationPluginInstance) {
@@ -1011,8 +1009,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         rotatePluginInstance: !!rotatePluginInstance,
         pageNavigationPluginInstance: !!pageNavigationPluginInstance,
       })
-      setPlugins([]) // Return empty array if plugins aren't ready
-      return
+      return [] // Return empty array if plugins aren't ready
     }
     
     const pluginList = [
@@ -1024,18 +1021,23 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       pageNavigationPluginInstance,
     ]
     
-    setPlugins(pluginList)
-  }, [
-    // Only recreate if these dependencies change
-    // CRITICAL: Use nullish coalescing to ensure dependencies are never undefined
-    // This prevents React's comparison function from accessing .length on undefined
-    highlightPluginInstance ?? null,
-    scrollModePluginInstance ?? null,
-    zoomPluginInstance ?? null,
-    rotatePluginInstance ?? null,
-    // searchPluginInstance, // TEMPORARILY DISABLED
-    pageNavigationPluginInstance ?? null,
-  ])
+    return pluginList
+  }, (() => {
+    // CRITICAL: Create dependency array in a function to ensure it's always valid
+    // This prevents React's 'co' function from receiving undefined on first render
+    const deps = [
+      // Only recreate if these dependencies change
+      // CRITICAL: Use nullish coalescing to ensure dependencies are never undefined
+      // This prevents React's comparison function from accessing .length on undefined
+      highlightPluginInstance ?? null,
+      scrollModePluginInstance ?? null,
+      zoomPluginInstance ?? null,
+      rotatePluginInstance ?? null,
+      // searchPluginInstance, // TEMPORARILY DISABLED
+      pageNavigationPluginInstance ?? null,
+    ]
+    return deps
+  })())
 
   // Cache blob URL and Uint8Array to prevent memory leaks and infinite re-renders
   const blobUrlRef = useRef<string | null>(null)
