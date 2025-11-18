@@ -150,11 +150,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     openLibrary()
   }
 
-  const handleBackToLibrary = () => {
-    setCurrentDocument(null)
-    openLibrary()
-  }
-
   const tierLabel = useMemo(() => user?.tier?.toUpperCase() ?? 'STANDARD', [user?.tier])
 
 
@@ -182,6 +177,21 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                 ryzomatic
               </span>
             </div>
+            
+            {/* Navigation: Library */}
+            <nav className="flex items-center">
+              <button
+                onClick={openLibrary}
+                className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]"
+                style={{ 
+                  color: !currentDocument ? 'var(--color-primary)' : 'var(--color-text-primary)',
+                }}
+                aria-label="Open Library"
+              >
+                <Library className="h-4 w-4" />
+                <span>Library</span>
+              </button>
+            </nav>
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-4 sm:flex-nowrap">
@@ -231,24 +241,9 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
               </Tooltip>
             </div>
 
-            {/* Actions Group: Library + New Material */}
+            {/* Actions Group: New Material */}
             {user && (
               <div className="flex items-center gap-2">
-                <Tooltip content="Open Library" position="bottom">
-                  <button
-                    onClick={openLibrary}
-                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]"
-                    style={{
-                      color: 'var(--color-text-primary)',
-                      border: '1px solid var(--color-border)'
-                    }}
-                    aria-label="Open Library"
-                  >
-                    <Library className="h-4 w-4" />
-                    <span>Library</span>
-                  </button>
-                </Tooltip>
-
                 <Tooltip content="Upload new material" position="bottom">
                   <button
                     data-tour="upload-button"
@@ -418,17 +413,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             }}
           >
             <div className="flex min-w-0 items-center gap-3">
-              <button
-                onClick={handleBackToLibrary}
-                className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
-                style={{ color: 'var(--color-text-primary)' }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                aria-label="Back to Library"
-              >
-                <Library className="h-4 w-4" />
-                <span>Library</span>
-              </button>
               <span
                 className="truncate text-sm font-medium"
                 style={{ color: 'var(--color-text-primary)' }}
