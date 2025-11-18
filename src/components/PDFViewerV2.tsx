@@ -1035,13 +1035,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // This prevents React's dependency comparison from receiving undefined
   const documentIdForDeps = document.id ?? ''
   
-  // CRITICAL: Use a stable array reference for useMemo dependencies
-  // React's 'co' function throws if previous dependency array is undefined
-  // By using a ref with a stable array, we ensure React always receives a valid array
-  const documentUrlDepsRef = useRef<[string]>([documentIdForDeps])
-  // Update array content when documentId changes, but keep same array reference
-  documentUrlDepsRef.current[0] = documentIdForDeps
-  
   // Convert document.pdfData to a format react-pdf-viewer can use
   // CRITICAL: Use refs to cache values and prevent infinite re-renders
   // Creating new Uint8Array on every render causes React to see it as a new value
@@ -1105,9 +1098,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       throw new Error('PDF data format is invalid. Please try re-opening the document.')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, documentUrlDepsRef.current) // Use stable array reference to prevent React comparison error
-  // CRITICAL: Using ref.current ensures React always receives a valid array (never undefined)
-  // The array content is updated above, but the reference stays stable
+  }, documentIdForDeps ? [documentIdForDeps] : []) // Always pass a valid array (never undefined)
+  // CRITICAL: Using conditional array ensures React always receives a valid array
+  // Empty array if documentIdForDeps is falsy, otherwise array with the value
   // Note: eslint-disable is needed because we intentionally don't include document.pdfData
   
   // Cleanup blob URL and refs when document changes or component unmounts
