@@ -88,7 +88,7 @@ async function initializeApp() {
   // Render React after PDF.js is initialized
   ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <Sentry.ErrorBoundary fallback={<div>Something went wrong</div>} showDialog>
+    <Sentry.ErrorBoundary fallback={<div>Something went wrong</div>} showDialog={false}>
       <ThemeProvider>
         <AuthProvider>
           <App />
