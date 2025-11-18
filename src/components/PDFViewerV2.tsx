@@ -641,7 +641,16 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       console.error('Error creating highlight:', error)
       alert('Failed to create highlight. Please try again.')
     }
-  }, [normalizedDocumentId, normalizedUserId, currentHighlightColor, currentHighlightColorHex, safeAnnotationColors])
+  }, [
+    // CRITICAL: Remove safeAnnotationColors from deps - access via closure instead
+    // Arrays in dependency arrays cause comparison issues in React's 'co' function
+    normalizedDocumentId, 
+    normalizedUserId, 
+    currentHighlightColor, 
+    currentHighlightColorHex,
+    // Use safeAnnotationColorsLength instead of the array itself
+    safeAnnotationColorsLength
+  ])
 
   // CRITICAL: highlightPlugin() uses React hooks internally, so it MUST be called unconditionally
   // Use useMemo with a guaranteed array dependency to prevent React's 'co' function from receiving undefined
