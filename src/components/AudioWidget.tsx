@@ -41,6 +41,11 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     audioWidgetPosition,
     setAudioWidgetPosition
   } = useAppStore()
+  
+  // CRITICAL: Normalize IDs to prevent React comparison error
+  const normalizedDocumentId = currentDocument?.id ?? ''
+  const normalizedUserId = user?.id ?? ''
+  
   const widgetRef = useRef<HTMLDivElement>(null)
   const widgetSizeRef = useRef({ width: 280, height: 160 })
   const dragOffsetRef = useRef({ x: 0, y: 0 })
@@ -464,7 +469,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       console.log('🔍 AudioWidget: No text available, clearing paragraphs')
       updateTTS({ paragraphs: [], currentParagraphIndex: 0 })
     }
-  }, [currentDocument?.id, currentDocument?.cleanedPageTexts, currentDocument?.pageTexts, pdfViewer.readingMode, updateTTS])
+  }, [normalizedDocumentId, currentDocument?.cleanedPageTexts, currentDocument?.pageTexts, pdfViewer.readingMode, updateTTS])
 
   // Sync store state with TTSManager's actual state periodically
   useEffect(() => {
@@ -737,7 +742,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         loadSavedPosition(currentDocument.id)
       }
     }
-  }, [currentDocument?.id, tts.isPlaying, saveCurrentPosition, loadSavedPosition, updateTTS])
+  }, [normalizedDocumentId, tts.isPlaying, saveCurrentPosition, loadSavedPosition, updateTTS])
 
   // Auto-save position every 5 seconds while playing
   useEffect(() => {
@@ -748,7 +753,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     }, 5000)
     
     return () => clearInterval(interval)
-  }, [tts.isPlaying, currentDocument?.id, saveCurrentPosition])
+  }, [tts.isPlaying, normalizedDocumentId, saveCurrentPosition])
 
   // Handle stop (declared early to avoid circular dependencies)
   const handleStopRef = useRef<() => void>(() => {})
@@ -764,7 +769,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     setCurrentTime(0)
     setDuration(0)
     setIsProcessing(false)
-  }, [updateTTS, currentDocument?.id, tts.isPlaying, saveCurrentPosition])
+  }, [updateTTS, normalizedDocumentId, tts.isPlaying, saveCurrentPosition])
   
   handleStopRef.current = handleStop
 

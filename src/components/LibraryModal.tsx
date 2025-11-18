@@ -36,6 +36,9 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [collectionActionBusyId, setCollectionActionBusyId] = useState<string | null>(null);
   const { /* setCurrentDocument, */ addDocument, user } = useAppStore();
+  
+  // CRITICAL: Normalize user.id to prevent React comparison error
+  const normalizedUserId = user?.id ?? '';
   const viewModes: Array<{ key: 'list' | 'grid' | 'comfortable'; label: string; icon: typeof LayoutList }> = [
     { key: 'list', label: 'List', icon: LayoutList },
     { key: 'grid', label: 'Grid', icon: LayoutGrid },
@@ -89,7 +92,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         console.warn('LibraryModal: failed to initialize libraryOrganizationService user', serviceError);
       }
     }
-  }, [user?.id]);
+  }, [normalizedUserId]);
 
   const fetchCollections = useCallback(async () => {
     if (!user?.id) {
@@ -110,7 +113,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
     } finally {
       setIsLoadingCollections(false);
     }
-  }, [user?.id]);
+  }, [normalizedUserId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -130,7 +133,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       }
       loadData();
     }
-  }, [isOpen, activeTab, refreshTrigger, user?.id]);
+  }, [isOpen, activeTab, refreshTrigger, normalizedUserId]);
 
   const loadData = async () => {
     console.log('LibraryModal: Loading data...');

@@ -15,9 +15,13 @@ export const NotesList: React.FC<NotesListProps> = ({ onNoteSelected, refreshTri
   const [isLoading, setIsLoading] = useState(true);
   const [editingNote, setEditingNote] = useState<NoteWithMetadata | null>(null);
 
+  // CRITICAL: Normalize IDs to prevent React comparison error
+  const normalizedDocumentId = currentDocument?.id ?? ''
+  const normalizedUserId = user?.id ?? ''
+
   useEffect(() => {
     loadNotes();
-  }, [currentDocument?.id, refreshTrigger]);
+  }, [normalizedDocumentId, refreshTrigger]);
 
   const loadNotes = async () => {
     if (!currentDocument || !user) {
