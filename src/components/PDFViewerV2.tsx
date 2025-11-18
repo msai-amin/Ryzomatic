@@ -81,12 +81,15 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     )
   }
 
+  // Safety check: ensure annotationColors is an array
+  const safeAnnotationColors = Array.isArray(annotationColors) ? annotationColors : []
+
   // State declarations (must be before early returns per React hooks rules)
   const [highlights, setHighlights] = useState<HighlightType[]>([])
   // Ref to store highlights for use in plugin render functions (avoids recreating plugin on every highlight change)
   const highlightsRef = useRef<HighlightType[]>([])
-  const [currentHighlightColor, setCurrentHighlightColor] = useState(annotationColors[0]?.id || 'yellow')
-  const [currentHighlightColorHex, setCurrentHighlightColorHex] = useState((annotationColors[0] as any)?.color || '#ffeb3b')
+  const [currentHighlightColor, setCurrentHighlightColor] = useState(safeAnnotationColors[0]?.id || 'yellow')
+  const [currentHighlightColorHex, setCurrentHighlightColorHex] = useState((safeAnnotationColors[0] as any)?.color || '#ffeb3b')
   const [showHighlightColorPopover, setShowHighlightColorPopover] = useState(false)
   const highlightColorButtonRef = useRef<HTMLButtonElement>(null)
   const [numPages, setNumPages] = useState<number>(document?.totalPages || 0)
@@ -659,7 +662,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     renderHighlightContent: (props: RenderHighlightContentProps) => {
       // Render content for editing highlights
       // Safety check: ensure annotationColors is defined and is an array
-      const colors = Array.isArray(annotationColors) ? annotationColors : []
+      const colors = safeAnnotationColors
       const color = colors.find(c => c.id === currentHighlightColor) || colors[0]
       const colorHex = (color as any)?.color || currentHighlightColorHex || '#ffeb3b'
       
@@ -942,6 +945,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     userId,
     // annotationColors is used in renderHighlightContent, but we check if it's an array
     // Include it to ensure plugin updates if colors change
+    // Note: safeAnnotationColors is derived from annotationColors, so we use annotationColors in deps
     annotationColors,
     // Store setters are stable and don't need to be in dependencies
     // isChatOpen is a primitive value that affects behavior
