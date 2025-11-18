@@ -34,6 +34,11 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ onClose }) => {
   // CRITICAL: Normalize document ID to prevent React comparison error
   // React's dependency comparison function accesses .length on nested array properties
   const normalizedDocumentId = currentDocument?.id ?? ''
+  
+  // CRITICAL: Safe destructuring with defaults - guarantees arrays are always arrays
+  // Level 1 Guard: Default currentDocument to {} if null/undefined
+  // Level 2 Guard: Default pageTexts to [] if missing
+  const { pageTexts: safePageTexts = [] } = currentDocument || {}
 
   useEffect(() => {
     if (currentDocument) {
@@ -125,8 +130,9 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ onClose }) => {
       setTyping(true)
 
       let documentContext = ''
-      if (currentDocument.pageTexts && currentDocument.pageTexts.length > 0) {
-        documentContext = currentDocument.pageTexts.join('\n\n')
+      // CRITICAL: Use safe destructured array instead of accessing currentDocument directly
+      if (safePageTexts.length > 0) {
+        documentContext = safePageTexts.join('\n\n')
       } else if (typeof currentDocument.content === 'string') {
         documentContext = currentDocument.content
       }

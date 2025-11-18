@@ -46,16 +46,25 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const normalizedDocumentId = currentDocument?.id ?? ''
   const normalizedUserId = user?.id ?? ''
   
+  // CRITICAL FIX: Safe destructuring with defaults - guarantees arrays are always arrays
+  // Level 1 Guard: Default currentDocument to {} if null/undefined
+  // Level 2 Guard: Default pageTexts and cleanedPageTexts to [] if missing
+  // This ensures React's dependency comparison never accesses .length on undefined
+  const { 
+    pageTexts: safePageTexts = [], 
+    cleanedPageTexts: safeCleanedPageTexts = [] 
+  } = currentDocument || {}
+  
   // CRITICAL FIX: Normalize pageTexts and cleanedPageTexts to always be arrays
   // React's dependency comparison function accesses .length on arrays, so undefined causes errors
   // Use useMemo to create stable references that are always arrays
   const normalizedPageTexts = useMemo(() => {
-    return Array.isArray(currentDocument?.pageTexts) ? currentDocument.pageTexts : []
-  }, [currentDocument?.pageTexts])
+    return Array.isArray(safePageTexts) ? safePageTexts : []
+  }, [safePageTexts])
   
   const normalizedCleanedPageTexts = useMemo(() => {
-    return Array.isArray(currentDocument?.cleanedPageTexts) ? currentDocument.cleanedPageTexts : []
-  }, [currentDocument?.cleanedPageTexts])
+    return Array.isArray(safeCleanedPageTexts) ? safeCleanedPageTexts : []
+  }, [safeCleanedPageTexts])
   
   // CRITICAL: Normalize currentDocument to ensure all array properties are always arrays
   // This prevents React's dependency comparison from accessing .length on undefined
@@ -548,19 +557,20 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       const currentPage = pdfViewer.currentPage || 1
       
       // In reading mode, prioritize cleaned text if available
+      // CRITICAL: Use normalized arrays instead of accessing currentDocument directly
       if (pdfViewer.readingMode && 
-          currentDocument?.cleanedPageTexts && 
-          currentDocument.cleanedPageTexts.length > 0 &&
-          currentPage - 1 < currentDocument.cleanedPageTexts.length) {
-        const cleanedText = currentDocument.cleanedPageTexts[currentPage - 1]
+          normalizedCleanedPageTexts.length > 0 &&
+          currentPage - 1 < normalizedCleanedPageTexts.length) {
+        const cleanedText = normalizedCleanedPageTexts[currentPage - 1]
         if (cleanedText && cleanedText !== null && cleanedText !== undefined && cleanedText.length > 0) {
           return typeof cleanedText === 'string' ? cleanedText : String(cleanedText || '')
         }
       }
       
-      // Fallback to original page text
-      if (currentDocument?.pageTexts && currentDocument.pageTexts.length > 0) {
-        const rawPageText = currentDocument.pageTexts[currentPage - 1]
+    // Fallback to original page text
+    // CRITICAL: Use normalized arrays instead of accessing currentDocument directly
+    if (normalizedPageTexts.length > 0) {
+      const rawPageText = normalizedPageTexts[currentPage - 1]
         if (rawPageText) {
           return typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
         }
@@ -578,11 +588,11 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     
     // In reading mode, prioritize cleaned text if available
     // Check if we have cleaned text for this specific page
+    // CRITICAL: Use normalized arrays instead of accessing currentDocument directly
     if (pdfViewer.readingMode && 
-        currentDocument?.cleanedPageTexts && 
-        currentDocument.cleanedPageTexts.length > 0 &&
-        currentPage - 1 < currentDocument.cleanedPageTexts.length) {
-      const cleanedText = currentDocument.cleanedPageTexts[currentPage - 1]
+        normalizedCleanedPageTexts.length > 0 &&
+        currentPage - 1 < normalizedCleanedPageTexts.length) {
+      const cleanedText = normalizedCleanedPageTexts[currentPage - 1]
       if (cleanedText && cleanedText !== null && cleanedText !== undefined && cleanedText.length > 0) {
         console.log('🔍 AudioWidget: Using cleaned text for page', currentPage)
         return typeof cleanedText === 'string' ? cleanedText : String(cleanedText || '')
@@ -590,8 +600,9 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     }
     
     // Fallback to original page text
-    if (currentDocument?.pageTexts && currentDocument.pageTexts.length > 0) {
-      const rawPageText = currentDocument.pageTexts[currentPage - 1]
+    // CRITICAL: Use normalized arrays instead of accessing currentDocument directly
+    if (normalizedPageTexts.length > 0) {
+      const rawPageText = normalizedPageTexts[currentPage - 1]
       if (rawPageText) {
         console.log('🔍 AudioWidget: Using original text for page', currentPage)
         return typeof rawPageText === 'string' ? rawPageText : String(rawPageText || '')
@@ -605,8 +616,9 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     const currentPage = pdfViewer.currentPage || 1
     
     // In reading mode, prioritize cleaned text if available
-    if (pdfViewer.readingMode && currentDocument?.cleanedPageTexts && currentDocument.cleanedPageTexts.length > 0) {
-      const remainingCleanedPages = currentDocument.cleanedPageTexts.slice(currentPage - 1)
+    // CRITICAL: Use normalized arrays instead of accessing currentDocument directly
+    if (pdfViewer.readingMode && normalizedCleanedPageTexts.length > 0) {
+      const remainingCleanedPages = normalizedCleanedPageTexts.slice(currentPage - 1)
       const cleanedText = remainingCleanedPages
         .map((p, index) => {
           // Use cleaned text if available, fallback to original
@@ -614,7 +626,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             return typeof p === 'string' ? p : String(p || '')
           } else {
             // Fallback to original text for this page
-            const originalPage = currentDocument.pageTexts?.[currentPage - 1 + index]
+            // CRITICAL: Use normalized arrays instead of accessing currentDocument directly
+            const originalPage = normalizedPageTexts[currentPage - 1 + index]
             return originalPage ? (typeof originalPage === 'string' ? originalPage : String(originalPage || '')) : ''
           }
         })
@@ -627,8 +640,9 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     }
     
     // Fallback to original page texts
-    if (currentDocument?.pageTexts && currentDocument.pageTexts.length > 0) {
-      const remainingPages = currentDocument.pageTexts.slice(currentPage - 1)
+    // CRITICAL: Use normalized arrays instead of accessing currentDocument directly
+    if (normalizedPageTexts.length > 0) {
+      const remainingPages = normalizedPageTexts.slice(currentPage - 1)
       return remainingPages
         .map(p => typeof p === 'string' ? p : String(p || ''))
         .filter(p => p.length > 0)

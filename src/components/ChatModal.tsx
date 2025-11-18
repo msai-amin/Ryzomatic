@@ -18,6 +18,11 @@ export const ChatModal: React.FC<ChatModalProps> = ({ onClose }) => {
     user
   } = useAppStore()
   
+  // CRITICAL: Safe destructuring with defaults - guarantees arrays are always arrays
+  // Level 1 Guard: Default currentDocument to {} if null/undefined
+  // Level 2 Guard: Default pageTexts to [] if missing
+  const { pageTexts: safePageTexts = [] } = currentDocument || {}
+  
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -43,8 +48,9 @@ export const ChatModal: React.FC<ChatModalProps> = ({ onClose }) => {
       // Extract text from pageTexts or content
       let documentContext = ''
       if (currentDocument) {
-        if (currentDocument.pageTexts && currentDocument.pageTexts.length > 0) {
-          documentContext = currentDocument.pageTexts.join('\n\n')
+        // CRITICAL: Use safe destructured array instead of accessing currentDocument directly
+        if (safePageTexts.length > 0) {
+          documentContext = safePageTexts.join('\n\n')
         } else if (currentDocument.content && typeof currentDocument.content === 'string') {
           documentContext = currentDocument.content
         }
