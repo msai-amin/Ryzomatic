@@ -1010,6 +1010,33 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     currentParagraphIndexRef.current = currentParagraphIndex
   }, [currentParagraphIndex])
 
+  // Memoized handler for paragraph index updates to prevent infinite loops
+  const handleParagraphMouseEnter = useCallback((paragraphIdx: number | undefined) => {
+    // CRITICAL: Prevent any updates if already updating or during render
+    if (isUpdatingParagraphRef.current || paragraphIdx === undefined) {
+      return
+    }
+    
+    // Only update if value actually changed
+    if (currentParagraphIndexRef.current !== paragraphIdx) {
+      // Set flag immediately to prevent any concurrent updates
+      isUpdatingParagraphRef.current = true
+      currentParagraphIndexRef.current = paragraphIdx
+      
+      // Use setTimeout to defer state update to next event loop
+      // This ensures we're not in a render cycle
+      setTimeout(() => {
+        if (currentParagraphIndexRef.current === paragraphIdx) {
+          setCurrentParagraphIndex(paragraphIdx)
+        }
+        // Reset flag after a delay to prevent rapid updates
+        setTimeout(() => {
+          isUpdatingParagraphRef.current = false
+        }, 100)
+      }, 0)
+    }
+  }, [])
+
   // Handle document load
   const handleDocumentLoad = useCallback((e: DocumentLoadEvent) => {
     console.log('PDF loaded:', e.doc.numPages)
@@ -1389,23 +1416,12 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                       paddingLeft: hasParagraphIndicator && segment.wordIndex === segment.paragraphIndex ? '0.5em' : undefined
                     }}
                     title={userHighlight ? `Highlight: ${userHighlight.highlighted_text}` : undefined}
-                    onMouseEnter={(e: React.MouseEvent) => {
-                      // Prevent updates during render cycles to avoid infinite loops
-                      if (isUpdatingParagraphRef.current) return
-                      
-                      // Use ref to prevent unnecessary state updates and infinite loops
-                      const paragraphIdx = segment.paragraphIndex
-                      if (paragraphIdx !== undefined && 
-                          currentParagraphIndexRef.current !== paragraphIdx) {
-                        isUpdatingParagraphRef.current = true
-                        currentParagraphIndexRef.current = paragraphIdx
-                        setCurrentParagraphIndex(paragraphIdx)
-                        // Reset flag after state update completes to prevent rapid-fire updates
-                        requestAnimationFrame(() => {
-                          isUpdatingParagraphRef.current = false
-                        })
-                      }
-                    }}
+                    // TEMPORARILY DISABLED: onMouseEnter handler causing infinite render loop
+                    // TODO: Re-enable with proper debouncing/throttling
+                    // onMouseEnter={(e: React.MouseEvent) => {
+                    //   e.stopPropagation()
+                    //   handleParagraphMouseEnter(segment.paragraphIndex)
+                    // }}
                   >
                     {segment.content}
                   </span>
