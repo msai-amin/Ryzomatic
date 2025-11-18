@@ -352,14 +352,16 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       const notes = notesData || []
 
       // Create notes file content
-      if (notes.length > 0 || highlights.length > 0) {
+      // Safety check: ensure highlights is an array
+      const safeHighlights = Array.isArray(highlights) ? highlights : []
+      if (notes.length > 0 || safeHighlights.length > 0) {
         let notesContent = `# Notes and Highlights for ${document.name}\n\n`
         notesContent += `Generated on: ${new Date().toLocaleString()}\n\n`
         
         // Add highlights section
-        if (highlights.length > 0) {
+        if (safeHighlights.length > 0) {
           notesContent += `## Highlights\n\n`
-          highlights.forEach((highlight, idx) => {
+          safeHighlights.forEach((highlight, idx) => {
             notesContent += `### Highlight ${idx + 1} (Page ${highlight.page_number})\n`
             notesContent += `**Text:** ${highlight.highlighted_text}\n`
             notesContent += `**Color:** ${highlight.color_hex}\n`
@@ -615,7 +617,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       const pageNumber = firstArea.pageIndex + 1
 
       // Get current highlight color
-      const color = annotationColors.find(c => c.id === currentHighlightColor) || annotationColors[0]
+      const color = safeAnnotationColors.find(c => c.id === currentHighlightColor) || safeAnnotationColors[0]
       const colorHex = (color as any)?.color || currentHighlightColorHex || '#ffeb3b'
       
       // Create highlight using highlight service
@@ -951,7 +953,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     // annotationColors is used in renderHighlightContent, but we check if it's an array
     // Include it to ensure plugin updates if colors change
     // Note: safeAnnotationColors is derived from annotationColors, so we use annotationColors in deps
-    annotationColors,
+    // Use safeAnnotationColors.length to ensure stable reference even if annotationColors is undefined
+    safeAnnotationColors.length,
     // Store setters are stable and don't need to be in dependencies
     // isChatOpen is a primitive value that affects behavior
     isChatOpen,
