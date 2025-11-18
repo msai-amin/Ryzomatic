@@ -979,9 +979,24 @@ class SupabaseStorageService {
       
       if (error) {
         // user_audio table was replaced by tts_audio_cache in migration 020
-        // Return empty array gracefully instead of throwing error
-        if (error.message.includes('user_audio') || error.message.includes('Could not find the table')) {
-          logger.warn('user_audio table not found (replaced by tts_audio_cache), returning empty array', { userId: this.currentUserId });
+        // Check for 404 (table not found) or specific error messages
+        // This prevents 404 errors from blocking Library modal loading
+        const isTableNotFound = 
+          error.code === 'PGRST116' || // PostgREST table not found error code
+          error.message?.includes('user_audio') || 
+          error.message?.includes('Could not find the table') ||
+          (error.message?.includes('relation') && error.message?.includes('does not exist')) ||
+          error.status === 404 ||
+          error.statusCode === 404 ||
+          (error as any)?.hint?.includes('user_audio');
+        
+        if (isTableNotFound) {
+          logger.warn('user_audio table not found (replaced by tts_audio_cache), returning empty array', { 
+            userId: this.currentUserId,
+            errorCode: error.code,
+            errorStatus: error.status || (error as any).statusCode,
+            errorMessage: error.message 
+          });
           return [];
         }
         
