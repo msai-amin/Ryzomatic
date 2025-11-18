@@ -605,7 +605,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     selectedText: string,
     selectionData?: SelectionData
   ) => {
-    if (!document.id || !userId || highlightAreas.length === 0) return
+    if (!document.id || !userId || !highlightAreas || highlightAreas.length === 0) return
 
     try {
       // Get the first highlight area (react-pdf-viewer provides multiple areas for multi-line selections)
