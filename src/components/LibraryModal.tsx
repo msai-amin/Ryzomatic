@@ -741,9 +741,14 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         // Blobs are safer than ArrayBuffers because they can't be detached by workers
         if (workingBook.type === 'pdf' && workingBook.fileData instanceof ArrayBuffer) {
           try {
-            // Check if ArrayBuffer is already detached
-            new Uint8Array(workingBook.fileData, 0, 1);
-            // Not detached - clone it and convert to Blob for safety
+            // CRITICAL: Check if ArrayBuffer is detached by checking byteLength
+            // A detached ArrayBuffer will have byteLength of 0
+            if (workingBook.fileData.byteLength === 0) {
+              console.error('LibraryModal: ArrayBuffer is detached (byteLength = 0)');
+              throw new Error('PDF data is corrupted (detached ArrayBuffer)');
+            }
+            
+            // Clone it and convert to Blob for safety
             const clonedBuffer = workingBook.fileData.slice(0);
             const blob = new Blob([clonedBuffer], { type: 'application/pdf' });
             console.log('LibraryModal: Cloned PDF ArrayBuffer and converted to Blob:', {
@@ -753,8 +758,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
             });
             return blob;
           } catch (error) {
-            // Already detached - this shouldn't happen if cloning in supabaseStorageService worked
-            console.error('LibraryModal: ArrayBuffer is detached, cannot clone:', error);
+            // Already detached or corrupted
+            console.error('LibraryModal: ArrayBuffer is detached or corrupted:', error);
             throw new Error('PDF data is corrupted. Please try re-opening the document.');
           }
         }
