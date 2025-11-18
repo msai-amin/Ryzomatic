@@ -898,7 +898,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         <div>
           {pageHighlights.map((highlight) => {
             // Convert highlight position data to HighlightArea format
-            const highlightAreas = highlight.position_data.highlightAreas || []
+            const highlightAreas = highlight.position_data?.highlightAreas || []
             
             return highlightAreas
               .filter((area) => area.pageIndex === props.pageIndex)
