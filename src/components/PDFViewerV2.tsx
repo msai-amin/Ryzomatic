@@ -658,7 +658,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     },
     renderHighlightContent: (props: RenderHighlightContentProps) => {
       // Render content for editing highlights
-      const color = annotationColors.find(c => c.id === currentHighlightColor) || annotationColors[0]
+      // Safety check: ensure annotationColors is defined and is an array
+      const colors = Array.isArray(annotationColors) ? annotationColors : []
+      const color = colors.find(c => c.id === currentHighlightColor) || colors[0]
       const colorHex = (color as any)?.color || currentHighlightColorHex || '#ffeb3b'
       
       // Calculate position with viewport boundary detection
@@ -878,7 +880,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     },
     renderHighlights: (props: RenderHighlightsProps) => {
       // Render existing highlights - use ref to avoid plugin recreation on highlight changes
-      const pageHighlights = highlightsRef.current.filter((highlight) => highlight.page_number - 1 === props.pageIndex)
+      // Safety check: ensure highlightsRef.current is defined and is an array
+      const highlights = Array.isArray(highlightsRef.current) ? highlightsRef.current : []
+      const pageHighlights = highlights.filter((highlight) => highlight.page_number - 1 === props.pageIndex)
       
       if (pageHighlights.length === 0) {
         return null
@@ -953,14 +957,32 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
   // CRITICAL: Memoize plugins array to prevent infinite re-renders
   // The plugins themselves are stable, but the array reference changes on every render
-  const plugins = useMemo(() => [
-    highlightPluginInstance,
-    scrollModePluginInstance,
-    zoomPluginInstance,
-    rotatePluginInstance,
-    // searchPluginInstance, // TEMPORARILY DISABLED due to "t.get is not a function" error
-    pageNavigationPluginInstance,
-  ], [
+  // Filter out any undefined plugins to prevent errors
+  const plugins = useMemo(() => {
+    // Ensure all plugins are defined before creating array
+    if (!highlightPluginInstance || !scrollModePluginInstance || !zoomPluginInstance || 
+        !rotatePluginInstance || !pageNavigationPluginInstance) {
+      console.warn('⚠️ PDFViewerV2: Some plugins are undefined', {
+        highlightPluginInstance: !!highlightPluginInstance,
+        scrollModePluginInstance: !!scrollModePluginInstance,
+        zoomPluginInstance: !!zoomPluginInstance,
+        rotatePluginInstance: !!rotatePluginInstance,
+        pageNavigationPluginInstance: !!pageNavigationPluginInstance,
+      })
+      return [] // Return empty array if plugins aren't ready
+    }
+    
+    const pluginList = [
+      highlightPluginInstance,
+      scrollModePluginInstance,
+      zoomPluginInstance,
+      rotatePluginInstance,
+      // searchPluginInstance, // TEMPORARILY DISABLED due to "t.get is not a function" error
+      pageNavigationPluginInstance,
+    ]
+    
+    return pluginList
+  }, [
     // Only recreate if these dependencies change
     highlightPluginInstance,
     scrollModePluginInstance,
