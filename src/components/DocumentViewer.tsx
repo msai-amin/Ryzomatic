@@ -21,6 +21,10 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ onUploadClick })
     isChatOpen 
   } = useAppStore()
   
+  // CRITICAL: Normalize document ID to prevent React comparison error
+  // React's dependency comparison function accesses .length on nested array properties
+  const normalizedDocumentId = currentDocument?.id ?? ''
+  
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -68,7 +72,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ onUploadClick })
       storageService.saveNote(note)
       console.log('Note saved from selection')
     }
-  }, [currentDocument])
+  }, [normalizedDocumentId])
 
   if (!currentDocument) {
     return <EmptyState onUploadClick={onUploadClick} />

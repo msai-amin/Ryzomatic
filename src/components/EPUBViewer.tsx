@@ -19,8 +19,22 @@ export const EPUBViewer: React.FC = () => {
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
+  // CRITICAL: Normalize document ID and arrays to prevent React comparison error
+  // React's dependency comparison function accesses .length on nested array properties
+  const normalizedDocumentId = currentDocument?.id ?? ''
+  
+  // Normalize pageTexts to always be an array
+  const normalizedPageTexts = useMemo(() => {
+    return Array.isArray(currentDocument?.pageTexts) ? currentDocument.pageTexts : []
+  }, [currentDocument?.pageTexts])
+  
+  // Normalize metadata.chapters to always be an array
+  const normalizedChapters = useMemo(() => {
+    return Array.isArray(currentDocument?.metadata?.chapters) ? currentDocument.metadata.chapters : []
+  }, [currentDocument?.metadata?.chapters])
+
   // Ensure current page is within EPUB bounds
-  const totalSections = currentDocument?.pageTexts?.length || 0
+  const totalSections = normalizedPageTexts.length
 
   useEffect(() => {
     if (!currentDocument || currentDocument.type !== 'epub') return
@@ -29,22 +43,22 @@ export const EPUBViewer: React.FC = () => {
     if (pdfViewer.currentPage < 1 || pdfViewer.currentPage > totalSections) {
       updatePDFViewer({ currentPage: 1 })
     }
-  }, [currentDocument, pdfViewer.currentPage, totalSections, updatePDFViewer])
+  }, [normalizedDocumentId, pdfViewer.currentPage, totalSections, updatePDFViewer])
 
   const currentPage = useMemo(() => {
     if (!currentDocument || currentDocument.type !== 'epub' || totalSections === 0) return 1
     return Math.min(Math.max(pdfViewer.currentPage, 1), totalSections)
-  }, [currentDocument, pdfViewer.currentPage, totalSections])
+  }, [normalizedDocumentId, pdfViewer.currentPage, totalSections])
 
   const chapterTitle = useMemo(() => {
-    const chapters = (currentDocument?.metadata?.chapters || []) as Array<{ title?: string }>
+    const chapters = normalizedChapters as Array<{ title?: string }>
     return chapters[currentPage - 1]?.title || `Section ${currentPage}`
-  }, [currentDocument, currentPage])
+  }, [normalizedChapters, currentPage])
 
   const currentContent = useMemo(() => {
     if (!currentDocument || currentDocument.type !== 'epub') return ''
-    return currentDocument.pageTexts?.[currentPage - 1] || ''
-  }, [currentDocument, currentPage])
+    return normalizedPageTexts[currentPage - 1] || ''
+  }, [normalizedDocumentId, normalizedPageTexts, currentPage])
 
   const handlePrev = useCallback(() => {
     if (currentPage <= 1) return
@@ -100,7 +114,7 @@ export const EPUBViewer: React.FC = () => {
 
     // Saving notes for EPUB documents is handled via existing note workflows
     setSelectedTextContext(context)
-  }, [currentDocument, setSelectedTextContext])
+  }, [normalizedDocumentId, setSelectedTextContext])
 
   if (!currentDocument || currentDocument.type !== 'epub' || totalSections === 0) {
     return (
@@ -111,8 +125,7 @@ export const EPUBViewer: React.FC = () => {
   }
 
   const progressPercent = Math.round((currentPage / totalSections) * 100)
-  const chapters =
-    (currentDocument.metadata?.chapters as Array<{ title?: string; id?: string }>) || []
+  const chapters = normalizedChapters as Array<{ title?: string; id?: string }>
 
   const themeStyles = (() => {
     switch (typography.theme) {

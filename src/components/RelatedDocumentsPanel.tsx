@@ -26,6 +26,11 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
   onRelationshipCreated
 }) => {
   const { currentDocument, user } = useAppStore();
+  
+  // CRITICAL: Normalize document ID to prevent React comparison error
+  // React's dependency comparison function accesses .length on nested array properties
+  const normalizedDocumentId = currentDocument?.id ?? ''
+  
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
@@ -191,7 +196,7 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
         });
       }
     }
-  }, [currentDocument, user, onRelationshipCreated]);
+  }, [normalizedDocumentId, user, onRelationshipCreated]);
 
   // Drag and drop handlers
   const handleDragEnter = useCallback((e: React.DragEvent) => {

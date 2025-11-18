@@ -72,6 +72,10 @@ export const CustomizableReadingWizard: React.FC = () => {
     return documents.find((doc) => doc.id === customReadingWizard.documentId) || null
   }, [customReadingWizard.documentId, documents])
 
+  // CRITICAL: Normalize document ID to prevent React comparison error
+  // React's dependency comparison function accesses .length on nested array properties
+  const normalizedDocumentId = currentDocument?.id ?? ''
+
   useEffect(() => {
     if (!customReadingWizard.isOpen) {
       setShowUploadModal(false)
@@ -147,7 +151,7 @@ export const CustomizableReadingWizard: React.FC = () => {
     }
   }, [
     advanceCustomReadingWizard,
-    currentDocument,
+    normalizedDocumentId,
     customReadingWizard.documentId,
     customReadingWizard.isOpen,
     customReadingWizard.status,

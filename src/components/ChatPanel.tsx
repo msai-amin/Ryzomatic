@@ -31,11 +31,15 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ onClose }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // CRITICAL: Normalize document ID to prevent React comparison error
+  // React's dependency comparison function accesses .length on nested array properties
+  const normalizedDocumentId = currentDocument?.id ?? ''
+
   useEffect(() => {
     if (currentDocument) {
       inputRef.current?.focus()
     }
-  }, [currentDocument])
+  }, [normalizedDocumentId])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
