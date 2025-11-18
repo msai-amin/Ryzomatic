@@ -90,6 +90,14 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // This prevents React's dependency comparison function from accessing .length on undefined
   const normalizedDocumentId = document.id ?? ''
   const normalizedUserId = userId ?? ''
+  
+  // CRITICAL: Helper to ensure dependency arrays are always valid
+  // React's 'co' function throws if previous dependency array is undefined
+  // This ensures we always pass a valid array reference
+  const ensureDepsArray = <T,>(deps: T[]): T[] => {
+    // Always return a valid array (never undefined or null)
+    return Array.isArray(deps) ? deps : []
+  }
 
   // State declarations (must be before early returns per React hooks rules)
   const [highlights, setHighlights] = useState<HighlightType[]>([])
@@ -947,14 +955,14 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         </div>
       )
     },
-  }), [
+  }), ensureDepsArray([
     // Dependencies that affect the plugin behavior
     // Note: Only include primitive values and stable references
     // highlights is accessed via ref, so we don't need it in dependencies
-    selectionEnabled,
-    currentHighlightColor,
-    currentHighlightColorHex,
-    handleCreateHighlight,
+    selectionEnabled ?? false,
+    currentHighlightColor ?? 'yellow',
+    currentHighlightColorHex ?? '#ffeb3b',
+    handleCreateHighlight ?? (() => {}),
     // CRITICAL: Use normalized values (always defined) to prevent React comparison error
     // React's 'co' function compares dependency arrays and throws if previous array is undefined
     normalizedDocumentId,
@@ -962,11 +970,11 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     // annotationColors is used in renderHighlightContent, but we check if it's an array
     // Include it to ensure plugin updates if colors change
     // Note: Use safeAnnotationColorsLength (number) instead of array to prevent React comparison issues
-    safeAnnotationColorsLength,
+    safeAnnotationColorsLength ?? 0,
     // Store setters are stable and don't need to be in dependencies
     // isChatOpen is a primitive value that affects behavior
-    isChatOpen,
-  ])
+    isChatOpen ?? false,
+  ]))
 
   // Create scroll mode plugin (do NOT wrap in useMemo; keep hook order consistent)
   const scrollModePluginInstance = scrollModePlugin()
@@ -1012,7 +1020,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     ]
     
     return pluginList
-  }, [
+  }, ensureDepsArray([
     // Only recreate if these dependencies change
     // CRITICAL: Use nullish coalescing to ensure dependencies are never undefined
     // This prevents React's comparison function from accessing .length on undefined
@@ -1022,7 +1030,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     rotatePluginInstance ?? null,
     // searchPluginInstance, // TEMPORARILY DISABLED
     pageNavigationPluginInstance ?? null,
-  ])
+  ]))
 
   // Cache blob URL and Uint8Array to prevent memory leaks and infinite re-renders
   const blobUrlRef = useRef<string | null>(null)
@@ -1095,8 +1103,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       console.error('❌ PDFViewerV2: Failed to convert pdfData to Uint8Array:', error)
       throw new Error('PDF data format is invalid. Please try re-opening the document.')
     }
-  }, [documentIdForDeps]) // Only depend on document.id, not pdfData (which might change reference)
-  // CRITICAL: Use normalized documentIdForDeps (always a string) to prevent React comparison error
+  }, ensureDepsArray([documentIdForDeps])) // Only depend on document.id, not pdfData (which might change reference)
+  // CRITICAL: Use normalized documentIdForDeps (always a string) and ensureDepsArray to prevent React comparison error
   
   // Cleanup blob URL and refs when document changes or component unmounts
   useEffect(() => {
