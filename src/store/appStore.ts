@@ -698,6 +698,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Add to recently viewed documents
       get().addToRecentlyViewed(sanitizedDocument);
     } else {
+      // CRITICAL: When setting to null, ensure we're not leaving any components with stale undefined arrays
+      // This prevents race conditions during state transitions
       set({ currentDocument: document });
     }
   },
