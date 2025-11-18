@@ -668,32 +668,11 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     }
   }, [normalizedDocumentId, normalizedUserId, currentHighlightColor, currentHighlightColorHex, safeAnnotationColors])
 
-  // CRITICAL: Use refs to manually track dependencies and bypass React's comparison function
-  // React's 'co' function throws when previous dependency array is undefined on first render
-  // This approach completely bypasses React's dependency comparison
-  const highlightPluginInstanceRef = useRef<any>(null)
-  const highlightPluginDepsRef = useRef<any[]>([])
-  
-  // Create highlight plugin - MUST be stable to prevent infinite re-renders
-  // CRITICAL: highlightPlugin() uses React hooks internally, so it MUST be called at component level (not in useEffect)
-  // Manually check if dependencies changed and recreate plugin only when needed
-  const currentDeps = [
-    selectionEnabled ?? false,
-    currentHighlightColor ?? 'yellow',
-    currentHighlightColorHex ?? '#ffeb3b',
-    handleCreateHighlight ?? (() => {}),
-    normalizedDocumentId,
-    normalizedUserId,
-    safeAnnotationColorsLength ?? 0,
-    isChatOpen ?? false,
-  ]
-  
-  // Check if dependencies changed (shallow comparison)
-  const depsChanged = highlightPluginDepsRef.current.length !== currentDeps.length ||
-    highlightPluginDepsRef.current.some((dep, i) => dep !== currentDeps[i])
-  
-  if (depsChanged || !highlightPluginInstanceRef.current) {
-    highlightPluginInstanceRef.current = highlightPlugin({
+  // CRITICAL: highlightPlugin() uses React hooks internally, so it MUST be called unconditionally
+  // Use useMemo with a guaranteed array dependency to prevent React's 'co' function from receiving undefined
+  // All dependencies are normalized to ensure they're never undefined
+  const highlightPluginInstance = useMemo(() => {
+    return highlightPlugin({
     renderHighlightTarget: (props: RenderHighlightTargetProps) => {
       if (!selectionEnabled) {
         return null
@@ -1010,26 +989,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // Create page navigation plugin (do NOT wrap in useMemo)
   const pageNavigationPluginInstance = pageNavigationPlugin({ enableShortcuts: false }) // Disable shortcuts, we'll handle them ourselves
 
-  // CRITICAL: Use refs to manually track dependencies and bypass React's comparison function
-  // React's 'co' function throws when previous dependency array is undefined on first render
-  // This approach completely bypasses React's dependency comparison
-  const pluginsRef = useRef<any[]>([])
-  const pluginsDepsRef = useRef<any[]>([])
-  
-  // Manually check if plugin dependencies changed and recreate array only when needed
-  const currentPluginDeps = [
-    highlightPluginInstance ?? null,
-    scrollModePluginInstance ?? null,
-    zoomPluginInstance ?? null,
-    rotatePluginInstance ?? null,
-    pageNavigationPluginInstance ?? null,
-  ]
-  
-  // Check if dependencies changed (shallow comparison)
-  const pluginDepsChanged = pluginsDepsRef.current.length !== currentPluginDeps.length ||
-    pluginsDepsRef.current.some((dep, i) => dep !== currentPluginDeps[i])
-  
-  if (pluginDepsChanged || pluginsRef.current.length === 0) {
+  // CRITICAL: Use useMemo with a guaranteed array dependency to prevent React's 'co' function from receiving undefined
+  // All plugin instances are normalized to ensure they're never undefined in the dependency array
+  const plugins = useMemo(() => {
     // Ensure all plugins are defined before creating array
     if (!highlightPluginInstance || !scrollModePluginInstance || !zoomPluginInstance || 
         !rotatePluginInstance || !pageNavigationPluginInstance) {
@@ -1040,21 +1002,25 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         rotatePluginInstance: !!rotatePluginInstance,
         pageNavigationPluginInstance: !!pageNavigationPluginInstance,
       })
-      pluginsRef.current = [] // Return empty array if plugins aren't ready
-    } else {
-      pluginsRef.current = [
-        highlightPluginInstance,
-        scrollModePluginInstance,
-        zoomPluginInstance,
-        rotatePluginInstance,
-        // searchPluginInstance, // TEMPORARILY DISABLED due to "t.get is not a function" error
-        pageNavigationPluginInstance,
-      ]
+      return [] // Return empty array if plugins aren't ready
     }
-    pluginsDepsRef.current = currentPluginDeps
-  }
-  
-  const plugins = pluginsRef.current
+    
+    return [
+      highlightPluginInstance,
+      scrollModePluginInstance,
+      zoomPluginInstance,
+      rotatePluginInstance,
+      // searchPluginInstance, // TEMPORARILY DISABLED due to "t.get is not a function" error
+      pageNavigationPluginInstance,
+    ]
+  }, [
+    // CRITICAL: All dependencies must be defined to prevent React's 'co' function error
+    highlightPluginInstance,
+    scrollModePluginInstance,
+    zoomPluginInstance,
+    rotatePluginInstance,
+    pageNavigationPluginInstance,
+  ])
 
   // Cache blob URL and Uint8Array to prevent memory leaks and infinite re-renders
   const blobUrlRef = useRef<string | null>(null)
