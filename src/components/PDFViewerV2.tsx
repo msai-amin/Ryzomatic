@@ -81,6 +81,24 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // This prevents React's dependency comparison function from accessing .length on undefined
   const normalizedDocumentId = document?.id ?? ''
   const normalizedUserId = userId ?? ''
+  
+  // CRITICAL: Safe destructuring with defaults - guarantees arrays are always arrays
+  // Level 1 Guard: Default document to {} if null/undefined
+  // Level 2 Guard: Default pageTexts and cleanedPageTexts to [] if missing
+  // This ensures React's dependency comparison never accesses .length on undefined
+  const { 
+    pageTexts: safePageTexts = [], 
+    cleanedPageTexts: safeCleanedPageTexts = [] 
+  } = document || {}
+  
+  // Normalize arrays to ensure they're always arrays (double safety)
+  const normalizedPageTexts = useMemo(() => {
+    return Array.isArray(safePageTexts) ? safePageTexts : []
+  }, [safePageTexts])
+  
+  const normalizedCleanedPageTexts = useMemo(() => {
+    return Array.isArray(safeCleanedPageTexts) ? safeCleanedPageTexts : []
+  }, [safeCleanedPageTexts])
 
   // State declarations (MUST be before early returns per React hooks rules)
   const [highlights, setHighlights] = useState<HighlightType[]>([])
@@ -402,7 +420,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
   // Handle context menu actions
   const handleClarification = useCallback(() => {
-    const pageText = document.pageTexts?.[pdfViewer.currentPage - 1]
+    // CRITICAL: Use normalized arrays instead of accessing document directly
+    const pageText = normalizedPageTexts[pdfViewer.currentPage - 1]
     const context = getPDFTextSelectionContext(pdfViewer.currentPage, pageText)
     if (context) {
       setSelectedTextContext(context)
@@ -428,7 +447,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   }, [pdfViewer.currentPage, normalizedDocumentId, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
   
   const handleSaveNote = useCallback(async () => {
-    const pageText = document.pageTexts?.[pdfViewer.currentPage - 1]
+    // CRITICAL: Use normalized arrays instead of accessing document directly
+    const pageText = normalizedPageTexts[pdfViewer.currentPage - 1]
     const context = getPDFTextSelectionContext(pdfViewer.currentPage, pageText)
     if (context && document.id && userId) {
       try {
@@ -1315,7 +1335,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // Render reading mode
   const renderReadingMode = () => {
     // Safety check: ensure pageTexts exists
-    if (!document.pageTexts || !Array.isArray(document.pageTexts)) {
+    // CRITICAL: Use normalized arrays instead of accessing document directly
+    if (normalizedPageTexts.length === 0) {
       return (
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
@@ -1407,7 +1428,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     // Render page content
     const renderPageContent = (pageNum: number) => {
       // Get page text
-      const rawPageText = document.pageTexts?.[pageNum - 1]
+      // CRITICAL: Use normalized arrays instead of accessing document directly
+      const rawPageText = normalizedPageTexts[pageNum - 1]
       
       // Sanitize page text
       let pageText: string

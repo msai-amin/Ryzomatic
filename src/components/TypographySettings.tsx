@@ -11,6 +11,12 @@ interface TypographySettingsProps {
 
 export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose }) => {
   const { typography, updateTypography, currentDocument, pdfViewer, user } = useAppStore()
+  
+  // CRITICAL: Safe destructuring with defaults - guarantees arrays are always arrays
+  // Level 1 Guard: Default currentDocument to {} if null/undefined
+  // Level 2 Guard: Default cleanedPageTexts to [] if missing
+  const { cleanedPageTexts: safeCleanedPageTexts = [] } = currentDocument || {}
+  
   const [showTextCleanup, setShowTextCleanup] = useState(false)
   const [isTextCleaning, setIsTextCleaning] = useState(false)
 
@@ -306,7 +312,7 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
                 preferences,
                 pageNumbers: applyToAllPages ? undefined : [pdfViewer.currentPage],
                 userId: user?.id || undefined,
-                existingCleaned: currentDocument.cleanedPageTexts ?? null
+                existingCleaned: Array.isArray(safeCleanedPageTexts) && safeCleanedPageTexts.length > 0 ? safeCleanedPageTexts : null
               })
               setShowTextCleanup(false)
             } catch (error) {
