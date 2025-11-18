@@ -68,13 +68,29 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // Get document from store
   const document = currentDocument
 
-  // Early return if no document - prevents infinite loops
+  // CRITICAL: Early return if no document - prevents infinite loops
+  // Also prevents React's comparison function from receiving undefined dependencies
   if (!document || !document.pdfData) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <p className="text-lg mb-2" style={{ color: 'var(--color-text-secondary)' }}>
             No document loaded
+          </p>
+        </div>
+      </div>
+    )
+  }
+  
+  // CRITICAL: Early return if document.id is undefined
+  // React's 'co' comparison function throws when previous dependency array is undefined
+  // This ensures all dependencies are defined before any hooks are called
+  if (!document.id) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <p className="text-lg mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+            Loading document...
           </p>
         </div>
       </div>
@@ -1116,6 +1132,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const documentUrl = processDocumentUrl()
   
   // Cleanup blob URL and refs when document changes or component unmounts
+  // CRITICAL: Use normalized documentId in dependency array to prevent React comparison error
   useEffect(() => {
     return () => {
       if (blobUrlRef.current) {
@@ -1128,7 +1145,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         documentIdRef.current = null
       }
     }
-  }, [document.id])
+  }, [normalizedDocumentId])
 
   // Sync ref with state when currentParagraphIndex changes
   useEffect(() => {
