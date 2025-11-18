@@ -934,6 +934,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     handleCreateHighlight,
     document.id,
     userId,
+    // annotationColors is used in renderHighlightContent, but we check if it's an array
+    // Include it to ensure plugin updates if colors change
+    annotationColors,
     // Store setters are stable and don't need to be in dependencies
     // isChatOpen is a primitive value that affects behavior
     isChatOpen,
