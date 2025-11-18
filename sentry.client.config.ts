@@ -25,6 +25,10 @@ const initSentry = () => {
     tracesSampleRate: import.meta.env.PROD ? 0.1 : 1.0,
     replaysSessionSampleRate: import.meta.env.PROD ? 0.1 : 1.0,
     replaysOnErrorSampleRate: 1.0,
+    // CRITICAL: Disable error page embed to prevent CORS errors
+    // The error page embed tries to load from Sentry's servers and causes CORS issues
+    // Error reporting still works perfectly without it
+    showReportDialog: false,
     beforeSend(event, hint) {
       // Filter out sensitive information
       if (event.request?.headers) {
