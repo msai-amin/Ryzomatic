@@ -1245,6 +1245,19 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
   // Render reading mode
   const renderReadingMode = () => {
+    // Safety check: ensure pageTexts exists
+    if (!document.pageTexts || !Array.isArray(document.pageTexts)) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <p className="text-lg mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+              Page text not available. Please wait for the document to finish loading.
+            </p>
+          </div>
+        </div>
+      )
+    }
+
     // Get theme-based styles
     const getThemeStyles = () => {
       switch (typography.theme) {
@@ -1352,6 +1365,15 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       }
 
       const segments = parseTextWithBreaks(pageText)
+      // Safety check: ensure segments is an array
+      if (!Array.isArray(segments)) {
+        console.error('PDFViewerV2: parseTextWithBreaks returned non-array:', segments)
+        return (
+          <div className={`text-center py-8 ${themeStyles.text} opacity-50`}>
+            Error processing page {pageNum} text.
+          </div>
+        )
+      }
       const totalWords = segments.filter(s => s.type === 'word').length
       const wordsRead = tts.currentWordIndex !== null ? tts.currentWordIndex + 1 : 0
       
