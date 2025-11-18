@@ -82,7 +82,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   }
 
   // Safety check: ensure annotationColors is an array
+  // CRITICAL: This must be defined before any useMemo hooks to prevent undefined.length errors
   const safeAnnotationColors = Array.isArray(annotationColors) ? annotationColors : []
+  const safeAnnotationColorsLength = safeAnnotationColors.length
 
   // State declarations (must be before early returns per React hooks rules)
   const [highlights, setHighlights] = useState<HighlightType[]>([])
@@ -948,13 +950,13 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     currentHighlightColor,
     currentHighlightColorHex,
     handleCreateHighlight,
-    document.id,
-    userId,
+    // Use nullish coalescing to ensure these are never undefined (React comparison issue)
+    document.id ?? '',
+    userId ?? '',
     // annotationColors is used in renderHighlightContent, but we check if it's an array
     // Include it to ensure plugin updates if colors change
-    // Note: safeAnnotationColors is derived from annotationColors, so we use annotationColors in deps
-    // Use safeAnnotationColors.length to ensure stable reference even if annotationColors is undefined
-    safeAnnotationColors.length,
+    // Note: Use safeAnnotationColorsLength (number) instead of array to prevent React comparison issues
+    safeAnnotationColorsLength,
     // Store setters are stable and don't need to be in dependencies
     // isChatOpen is a primitive value that affects behavior
     isChatOpen,
