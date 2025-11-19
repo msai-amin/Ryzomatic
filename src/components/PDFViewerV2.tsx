@@ -533,8 +533,18 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
   // Sync highlights ref with state
   // CRITICAL: Use safeHighlights which is already declared above
+  // CRITICAL: safeHighlights is guaranteed to be an array (never undefined) by useMemo above
   useEffect(() => {
-    highlightsRef.current = safeHighlights
+    // Double-check that safeHighlights is an array before using it
+    if (Array.isArray(safeHighlights)) {
+      highlightsRef.current = safeHighlights
+    } else {
+      console.warn('PDFViewerV2: safeHighlights is not an array, defaulting to empty array', {
+        safeHighlights,
+        type: typeof safeHighlights
+      })
+      highlightsRef.current = []
+    }
   }, [safeHighlights])
 
   // Load highlights when document loads
