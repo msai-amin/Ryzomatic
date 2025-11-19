@@ -81,11 +81,18 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   }, [annotationColors])
   
   // CRITICAL: Ensure length is always a number, never undefined
-  // Use useMemo to create a stable reference that's always a number
-  // This prevents React's comparison function from receiving undefined during state transitions
-  const safeAnnotationColorsLength = useMemo(() => {
+  // CRITICAL FIX: Initialize with a default value BEFORE useMemo to prevent React's 'co' function
+  // from receiving undefined during first render. React's comparison function receives undefined
+  // for the previous dependency array on first render, and if any value in the current array is
+  // also undefined, it tries to access .length on undefined, causing the crash.
+  // By ensuring safeAnnotationColorsLength is ALWAYS a number (even before useMemo runs),
+  // we prevent this race condition.
+  let safeAnnotationColorsLength: number = 0 // Initialize to 0 to ensure it's always a number
+  safeAnnotationColorsLength = useMemo(() => {
     const length = safeAnnotationColors?.length ?? 0
-    return typeof length === 'number' && !isNaN(length) ? length : 0
+    const result = typeof length === 'number' && !isNaN(length) ? length : 0
+    // CRITICAL: Double-check result is a number before returning
+    return typeof result === 'number' ? result : 0
   }, [safeAnnotationColors])
 
   // CRITICAL: Normalize all dependencies to ensure they're never undefined
@@ -1047,7 +1054,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     handleCreateHighlight || (() => {}), // Fallback to no-op function if somehow undefined
     normalizedDocumentId || '',
     normalizedUserId || '',
-    typeof safeAnnotationColorsLength === 'number' ? safeAnnotationColorsLength : 0, // Double-check it's a number
+    safeAnnotationColorsLength, // Always a number (initialized above, guaranteed by useMemo)
     isChatOpen === true ? true : false,
   ])
 
