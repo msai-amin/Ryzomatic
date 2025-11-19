@@ -291,7 +291,9 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
-          zIndex: 50
+          zIndex: 50,
+          willChange: 'width',
+          overflow: 'hidden'
         }}
       >
         <div
@@ -314,12 +316,6 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
 
           {isOpen && (
             <div className="flex items-center gap-3">
-              <span
-                className="text-sm font-semibold uppercase tracking-wide"
-                style={{ color: 'var(--color-text-secondary)' }}
-              >
-                Navigation
-              </span>
               <button
                 onClick={() => setShowPomodoroDashboard(true)}
                 className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
@@ -336,9 +332,18 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          {isOpen ? (
-            <div className="px-4 pb-6" style={{ paddingTop: '8px' }}>
+        <div className="flex-1 overflow-hidden relative">
+          <div 
+            className="absolute inset-0 overflow-y-auto transition-opacity duration-300 ease-in-out"
+            style={{
+              opacity: isOpen ? 1 : 0,
+              pointerEvents: isOpen ? 'auto' : 'none',
+              transform: isOpen ? 'translateX(0)' : 'translateX(-10px)',
+              transition: 'opacity 300ms ease-in-out, transform 300ms ease-in-out'
+            }}
+          >
+            {isOpen && (
+              <div className="px-4 pb-6" style={{ paddingTop: '8px' }}>
 
               {/* Recently Viewed Section */}
               <div className="mb-6">
@@ -710,28 +715,36 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
                   {sectionsExpanded.achievements && <AchievementPanel userId={user.id} />}
                 </div>
               )}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-4 py-6">
-              {railItems.map((item) => (
-                <Tooltip key={item.id} content={item.label} position="right">
-                  <button
-                onClick={() => handleRailItemClick(item)}
-                    className="p-2 rounded-lg transition-colors"
-                    style={{
-                      backgroundColor: 'var(--color-surface)',
-                      color: 'var(--color-text-secondary)',
-                      border: '1px solid var(--color-border)'
-                    }}
-                    aria-label={item.label}
-                    title={item.label}
-                  >
-                    <item.icon className="w-5 h-5" />
-                  </button>
-                </Tooltip>
-              ))}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
+          <div 
+            className="absolute inset-0 flex flex-col items-center gap-4 py-6 transition-opacity duration-300 ease-in-out"
+            style={{
+              opacity: isOpen ? 0 : 1,
+              pointerEvents: isOpen ? 'none' : 'auto',
+              transform: isOpen ? 'translateX(10px)' : 'translateX(0)',
+              transition: 'opacity 300ms ease-in-out, transform 300ms ease-in-out'
+            }}
+          >
+            {railItems.map((item) => (
+              <Tooltip key={item.id} content={item.label} position="right">
+                <button
+                  onClick={() => handleRailItemClick(item)}
+                  className="p-2 rounded-lg transition-colors"
+                  style={{
+                    backgroundColor: 'var(--color-surface)',
+                    color: 'var(--color-text-secondary)',
+                    border: '1px solid var(--color-border)'
+                  }}
+                  aria-label={item.label}
+                  title={item.label}
+                >
+                  <item.icon className="w-5 h-5" />
+                </button>
+              </Tooltip>
+            ))}
+          </div>
         </div>
       </aside>
 
