@@ -132,6 +132,15 @@ export default defineConfig(({ mode }) => ({
       'Cross-Origin-Opener-Policy': 'unsafe-none',
     }
   },
+  preview: {
+    port: 3001,
+    host: 'localhost',
+    strictPort: true, // Don't try other ports if 3001 is busy
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'unsafe-none',
+      'Cross-Origin-Opener-Policy': 'unsafe-none',
+    }
+  },
   // Configure PDF.js worker
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
