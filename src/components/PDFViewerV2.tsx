@@ -220,8 +220,16 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const [highlights, setHighlights] = useState<HighlightType[]>([])
   // Ref to store highlights for use in plugin render functions (avoids recreating plugin on every highlight change)
   const highlightsRef = useRef<HighlightType[]>([])
-  const [currentHighlightColor, setCurrentHighlightColor] = useState(safeAnnotationColors[0]?.id || 'yellow')
-  const [currentHighlightColorHex, setCurrentHighlightColorHex] = useState((safeAnnotationColors[0] as any)?.color || '#ffeb3b')
+  // CRITICAL: Ensure safeAnnotationColors is always an array before accessing [0]
+  // This prevents undefined access during initial render when useMemo hasn't run yet
+  const initialColor = Array.isArray(safeAnnotationColors) && safeAnnotationColors.length > 0 
+    ? safeAnnotationColors[0]?.id || 'yellow'
+    : 'yellow'
+  const initialColorHex = Array.isArray(safeAnnotationColors) && safeAnnotationColors.length > 0
+    ? (safeAnnotationColors[0] as any)?.color || '#ffeb3b'
+    : '#ffeb3b'
+  const [currentHighlightColor, setCurrentHighlightColor] = useState(initialColor)
+  const [currentHighlightColorHex, setCurrentHighlightColorHex] = useState(initialColorHex)
   const [showHighlightColorPopover, setShowHighlightColorPopover] = useState(false)
   const highlightColorButtonRef = useRef<HTMLButtonElement>(null)
   const [numPages, setNumPages] = useState<number>(document?.totalPages || 0)
@@ -246,6 +254,21 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const [selectionEnabled, setSelectionEnabled] = useState(true)
+
+  // CRITICAL: Update color state when safeAnnotationColors changes
+  // This ensures colors are updated if they're loaded asynchronously
+  useEffect(() => {
+    if (Array.isArray(safeAnnotationColors) && safeAnnotationColors.length > 0) {
+      const firstColor = safeAnnotationColors[0]
+      if (firstColor?.id && firstColor.id !== currentHighlightColor) {
+        setCurrentHighlightColor(firstColor.id)
+      }
+      const colorHex = (firstColor as any)?.color || '#ffeb3b'
+      if (colorHex !== currentHighlightColorHex) {
+        setCurrentHighlightColorHex(colorHex)
+      }
+    }
+  }, [safeAnnotationColorsLength, currentHighlightColor, currentHighlightColorHex]) // Use length (number) instead of array
 
   // Log component mount
   console.log('🔍 PDFViewerV2: Component rendering', {
