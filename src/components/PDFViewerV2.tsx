@@ -157,13 +157,17 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // CRITICAL: Use array lengths (primitives) instead of arrays in dependency arrays
   // React's 'co' function crashes when arrays are used in dependency arrays and
   // the previous dependency array is undefined. Use primitive numbers (lengths) instead.
+  // CRITICAL: Ensure length is always a number, never undefined
+  const pageTextsLengthPrimitive = (Array.isArray(safePageTexts) ? safePageTexts.length : 0) || 0
+  const cleanedPageTextsLengthPrimitive = (Array.isArray(safeCleanedPageTexts) ? safeCleanedPageTexts.length : 0) || 0
+  
   const pageTextsLength = useMemo(() => {
-    return Array.isArray(safePageTexts) ? safePageTexts.length : 0
-  }, [safePageTexts?.length ?? 0]) // Use length (number) instead of array
+    return typeof pageTextsLengthPrimitive === 'number' ? pageTextsLengthPrimitive : 0
+  }, [pageTextsLengthPrimitive]) // Use primitive number, guaranteed to be defined
   
   const cleanedPageTextsLength = useMemo(() => {
-    return Array.isArray(safeCleanedPageTexts) ? safeCleanedPageTexts.length : 0
-  }, [safeCleanedPageTexts?.length ?? 0]) // Use length (number) instead of array
+    return typeof cleanedPageTextsLengthPrimitive === 'number' ? cleanedPageTextsLengthPrimitive : 0
+  }, [cleanedPageTextsLengthPrimitive]) // Use primitive number, guaranteed to be defined
   
   // Normalize arrays to ensure they're always arrays (double safety)
   // CRITICAL: Access arrays from closure, use primitive lengths in dependency arrays
