@@ -538,7 +538,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       }
     }
     setContextMenu(null)
-  }, [normalizedDocumentId, normalizedUserId, normalizedCurrentPage, pageTextsLength, document?.id, userId]) // Use length (number) instead of array
+  }, [normalizedDocumentId, normalizedUserId, normalizedCurrentPage, pageTextsLength, userId]) // Use length (number) instead of array - document?.id is same as normalizedDocumentId
 
   // Sync highlights ref with state
   // CRITICAL: Use array length instead of array reference to prevent React comparison issues
