@@ -80,11 +80,23 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     return Array.isArray(annotationColors) ? annotationColors : []
   }, [annotationColors])
   
+  // CRITICAL: Create a stable primitive value for dependency arrays
+  // React's 'co' function receives undefined for previous dependency array on first render.
+  // Using arrays in dependency arrays causes React to compare array references, and if the
+  // previous dependency array is undefined, accessing .length on it crashes.
+  // Solution: Use a primitive (string hash or length) instead of the array itself.
+  // We'll use a combination of length and a simple hash of the first few color IDs.
+  const annotationColorsHash = useMemo(() => {
+    if (!Array.isArray(annotationColors) || annotationColors.length === 0) {
+      return '0' // Return stable string for empty/undefined
+    }
+    // Create a simple hash from length and first color ID to detect changes
+    const firstColorId = annotationColors[0]?.id || ''
+    return `${annotationColors.length}-${firstColorId}`
+  }, [annotationColors])
+  
   // CRITICAL: Ensure length is always a number, never undefined
-  // CRITICAL FIX: React's 'co' function receives undefined for previous dependency array on first render.
-  // If any value in the current dependency array is also undefined, React tries to access .length
-  // on undefined, causing crash. By ensuring the useMemo ALWAYS returns a number (never undefined),
-  // we prevent this race condition. The useMemo is guaranteed to return a number on first render.
+  // Use annotationColorsHash (string) instead of safeAnnotationColors (array) in dependency
   const safeAnnotationColorsLength = useMemo(() => {
     // CRITICAL: Ensure we always return a number, never undefined
     const length = safeAnnotationColors?.length ?? 0
@@ -99,7 +111,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       return 0
     }
     return result
-  }, [safeAnnotationColors])
+  }, [annotationColorsHash]) // Use string hash instead of array
 
   // CRITICAL: Normalize all dependencies to ensure they're never undefined
   // This prevents React's dependency comparison function from accessing .length on undefined
