@@ -62,14 +62,16 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     isChatOpen,
   } = useAppStore()
 
-  const themeContext = useTheme()
-  // CRITICAL: Ensure annotationColors is always defined, even if useTheme returns undefined context
-  // This prevents React's 'co' function from receiving undefined during first render
-  // CRITICAL FIX: Enforce array at source - ensure annotationColors is never undefined
-  // This addresses Issue 7040313956: Dependency Array Malformation
-  const annotationColors = Array.isArray(themeContext?.annotationColors) 
-    ? themeContext.annotationColors 
-    : []
+  // 1. Get values from the (now safe) hook
+  const { annotationColors } = useTheme()
+
+  // 2. DEFENSIVE CODING:
+  // Create a guaranteed array. Even if the hook fails, this falls back to [].
+  const safeAnnotationColors = Array.isArray(annotationColors) ? annotationColors : []
+  
+  // 3. Derive the length safely (0 if empty)
+  const safeAnnotationColorsLength = safeAnnotationColors.length
+
   const userId = user?.id ?? null
 
   // Get document from store
@@ -78,77 +80,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // CRITICAL: ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   // This is required by React's Rules of Hooks - hooks must be called in the same order every render
   // Early returns cause hooks to be skipped, which breaks React's internal dependency tracking
-
-  // Safety check: ensure annotationColors is an array
-  // CRITICAL: Use useMemo to create a stable array reference
-  // This prevents React's comparison function from receiving different array references
-  // which could cause undefined.length errors during dependency comparison
-  // CRITICAL: annotationColors is already guaranteed to be an array (defaulted above)
-  // CRITICAL: Calculate annotationColors length as primitive BEFORE useMemo
-  // This ensures we never use the array itself in a dependency array
-  const annotationColorsLengthPrimitive = (Array.isArray(annotationColors) ? annotationColors.length : 0) || 0
-  
-  const safeAnnotationColors = useMemo(() => {
-    // Double-check that annotationColors is an array (defense in depth)
-    if (!Array.isArray(annotationColors)) {
-      console.warn('PDFViewerV2: annotationColors is not an array, defaulting to empty array', {
-        annotationColors,
-        type: typeof annotationColors,
-        isArray: Array.isArray(annotationColors)
-      })
-      return []
-    }
-    return annotationColors
-  }, [annotationColorsLengthPrimitive]) // CRITICAL: Use length (number) instead of array
-  
-  // CRITICAL: Create a stable primitive value for dependency arrays
-  // React's 'co' function receives undefined for previous dependency array on first render.
-  // Using arrays in dependency arrays causes React to compare array references, and if the
-  // previous dependency array is undefined, accessing .length on it crashes.
-  // Solution: Use a primitive (string hash or length) instead of the array itself.
-  // We'll use a combination of length and a simple hash of the first few color IDs.
-  // CRITICAL: Calculate length primitive using annotationColors (not safeAnnotationColors array)
-  // Use annotationColors.length (primitive) to avoid array in dependency array
-  // annotationColors is guaranteed to be an array (defaulted with ?? [] above)
-  const safeAnnotationColorsLengthPrimitive = useMemo(() => {
-    // Access safeAnnotationColors from closure, but use annotationColors.length in dependency
-    const length = (safeAnnotationColors?.length ?? 0) || 0
-    return typeof length === 'number' ? length : 0
-  }, [annotationColors?.length ?? 0]) // Use length (number) instead of array
-  
-  const annotationColorsHash = useMemo(() => {
-    // safeAnnotationColors is always an array (guaranteed by useMemo above)
-    // Use the length primitive to avoid array reference in dependency
-    if (safeAnnotationColorsLengthPrimitive === 0 || !safeAnnotationColors || safeAnnotationColors.length === 0) {
-      return '0' // Return stable string for empty array
-    }
-    // Create a simple hash from length and first color ID to detect changes
-    const firstColorId = safeAnnotationColors[0]?.id || ''
-    return `${safeAnnotationColorsLengthPrimitive}-${firstColorId}`
-  }, [safeAnnotationColorsLengthPrimitive]) // Use number instead of array
-  
-  // CRITICAL: Ensure length is always a number, never undefined
-  // Use annotationColorsHash (string) instead of safeAnnotationColors (array) in dependency
-  // CRITICAL FIX: Add explicit fallback to prevent undefined.length errors
-  // This addresses the root cause: useTheme() may return undefined during initial render
-  const safeAnnotationColorsLength = useMemo(() => {
-    // CRITICAL: safeAnnotationColors is guaranteed to be an array, but add extra safety
-    const length = (safeAnnotationColors?.length ?? 0) || 0
-    // CRITICAL: Ensure result is always a number, never undefined or NaN
-    const result = typeof length === 'number' && !isNaN(length) && length >= 0 ? length : 0
-    // CRITICAL: Final safety check - guarantee result is always a number
-    if (typeof result !== 'number' || isNaN(result)) {
-      console.warn('PDFViewerV2: safeAnnotationColorsLength calculation failed, defaulting to 0', {
-        length,
-        result,
-        safeAnnotationColorsLength: safeAnnotationColors?.length,
-        safeAnnotationColorsType: typeof safeAnnotationColors,
-        isArray: Array.isArray(safeAnnotationColors)
-      })
-      return 0
-    }
-    return result
-  }, [annotationColorsHash]) // Use string hash instead of array
 
   // CRITICAL: Normalize all dependencies to ensure they're never undefined
   // This prevents React's dependency comparison function from accessing .length on undefined

@@ -381,7 +381,7 @@ export const useTheme = (): ThemeContextType => {
   if (context === undefined) {
     // Log a warning for developers, but keep the app alive for the user
     // This prevents the "Cannot read properties of undefined (reading 'length')" crash
-    console.warn('useTheme was used outside of ThemeProvider. Returning safe defaults.');
+    console.warn('⚠️ useTheme called outside provider. Returning safe defaults to prevent crash.');
     return safeDefaultContext;
   }
   return context;
