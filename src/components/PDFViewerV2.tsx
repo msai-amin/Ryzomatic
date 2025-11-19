@@ -532,10 +532,17 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   }, [normalizedDocumentId, normalizedUserId, normalizedCurrentPage])
 
   // Sync highlights ref with state
-  // CRITICAL: Use safeHighlights which is already declared above
-  // CRITICAL: safeHighlights is guaranteed to be an array (never undefined) by useMemo above
+  // CRITICAL: Use array length instead of array reference to prevent React comparison issues
+  // React's 'co' function can receive undefined for previous dependency array on first render.
+  // Using array.length (a number) instead of the array itself ensures React always receives
+  // a primitive value for comparison, preventing 'Cannot read properties of undefined' errors.
+  const safeHighlightsLength = useMemo(() => {
+    return Array.isArray(safeHighlights) ? safeHighlights.length : 0
+  }, [safeHighlights])
+  
   useEffect(() => {
-    // Double-check that safeHighlights is an array before using it
+    // CRITICAL: Always use safeHighlights from closure, not from dependency array
+    // This prevents React's comparison function from receiving undefined
     if (Array.isArray(safeHighlights)) {
       highlightsRef.current = safeHighlights
     } else {
@@ -545,7 +552,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       })
       highlightsRef.current = []
     }
-  }, [safeHighlights])
+  }, [safeHighlightsLength]) // Use length (number) instead of array reference
 
   // Load highlights when document loads
   // CRITICAL: Use normalizedDocumentId instead of document.id to prevent undefined access
