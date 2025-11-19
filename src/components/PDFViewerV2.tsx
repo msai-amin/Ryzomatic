@@ -62,7 +62,10 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     isChatOpen,
   } = useAppStore()
 
-  const { annotationColors } = useTheme()
+  const themeContext = useTheme()
+  // CRITICAL: Ensure annotationColors is always defined, even if useTheme returns undefined context
+  // This prevents React's 'co' function from receiving undefined during first render
+  const annotationColors = themeContext?.annotationColors ?? []
   const userId = user?.id ?? null
 
   // Get document from store
@@ -76,8 +79,18 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // CRITICAL: Use useMemo to create a stable array reference
   // This prevents React's comparison function from receiving different array references
   // which could cause undefined.length errors during dependency comparison
+  // CRITICAL: annotationColors is already guaranteed to be an array (defaulted above)
   const safeAnnotationColors = useMemo(() => {
-    return Array.isArray(annotationColors) ? annotationColors : []
+    // Double-check that annotationColors is an array (defense in depth)
+    if (!Array.isArray(annotationColors)) {
+      console.warn('PDFViewerV2: annotationColors is not an array, defaulting to empty array', {
+        annotationColors,
+        type: typeof annotationColors,
+        isArray: Array.isArray(annotationColors)
+      })
+      return []
+    }
+    return annotationColors
   }, [annotationColors])
   
   // CRITICAL: Create a stable primitive value for dependency arrays
@@ -86,27 +99,34 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // previous dependency array is undefined, accessing .length on it crashes.
   // Solution: Use a primitive (string hash or length) instead of the array itself.
   // We'll use a combination of length and a simple hash of the first few color IDs.
+  // CRITICAL: safeAnnotationColors is guaranteed to be an array (from useMemo above)
   const annotationColorsHash = useMemo(() => {
-    if (!Array.isArray(annotationColors) || annotationColors.length === 0) {
-      return '0' // Return stable string for empty/undefined
+    // safeAnnotationColors is always an array (guaranteed by useMemo above)
+    if (!safeAnnotationColors || safeAnnotationColors.length === 0) {
+      return '0' // Return stable string for empty array
     }
     // Create a simple hash from length and first color ID to detect changes
-    const firstColorId = annotationColors[0]?.id || ''
-    return `${annotationColors.length}-${firstColorId}`
-  }, [annotationColors])
+    const firstColorId = safeAnnotationColors[0]?.id || ''
+    return `${safeAnnotationColors.length}-${firstColorId}`
+  }, [safeAnnotationColors])
   
   // CRITICAL: Ensure length is always a number, never undefined
   // Use annotationColorsHash (string) instead of safeAnnotationColors (array) in dependency
+  // CRITICAL FIX: Add explicit fallback to prevent undefined.length errors
+  // This addresses the root cause: useTheme() may return undefined during initial render
   const safeAnnotationColorsLength = useMemo(() => {
-    // CRITICAL: Ensure we always return a number, never undefined
-    const length = safeAnnotationColors?.length ?? 0
+    // CRITICAL: safeAnnotationColors is guaranteed to be an array, but add extra safety
+    const length = (safeAnnotationColors?.length ?? 0) || 0
+    // CRITICAL: Ensure result is always a number, never undefined or NaN
     const result = typeof length === 'number' && !isNaN(length) && length >= 0 ? length : 0
     // CRITICAL: Final safety check - guarantee result is always a number
     if (typeof result !== 'number' || isNaN(result)) {
       console.warn('PDFViewerV2: safeAnnotationColorsLength calculation failed, defaulting to 0', {
         length,
         result,
-        safeAnnotationColorsLength: safeAnnotationColors?.length
+        safeAnnotationColorsLength: safeAnnotationColors?.length,
+        safeAnnotationColorsType: typeof safeAnnotationColors,
+        isArray: Array.isArray(safeAnnotationColors)
       })
       return 0
     }
