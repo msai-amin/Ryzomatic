@@ -469,9 +469,13 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
   // CRITICAL: Normalize highlights to ensure it's always an array
   // MUST be declared before handleDownload which uses it
+  // CRITICAL: Use highlights.length (number) instead of highlights (array) in dependency
+  // This prevents React's 'co' function from receiving undefined when comparing arrays
+  const highlightsLengthPrimitive = (Array.isArray(highlights) ? highlights.length : 0) || 0
+  
   const safeHighlights = useMemo(() => {
     return Array.isArray(highlights) ? highlights : []
-  }, [highlights])
+  }, [highlightsLengthPrimitive]) // Use length (number) instead of array
 
   // Handle download
   const handleDownload = useCallback(async () => {
@@ -593,9 +597,11 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // React's 'co' function can receive undefined for previous dependency array on first render.
   // Using array.length (a number) instead of the array itself ensures React always receives
   // a primitive value for comparison, preventing 'Cannot read properties of undefined' errors.
+  // CRITICAL: safeHighlights is already normalized above, but use length primitive in dependency
+  // This ensures React's comparison function never receives arrays, only primitives
   const safeHighlightsLength = useMemo(() => {
     return Array.isArray(safeHighlights) ? safeHighlights.length : 0
-  }, [safeHighlights])
+  }, [highlightsLengthPrimitive]) // Use length (number) instead of array
   
   useEffect(() => {
     // CRITICAL: Always use safeHighlights from closure, not from dependency array
