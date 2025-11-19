@@ -539,7 +539,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       console.error('Error downloading PDF:', error)
       alert('Failed to download PDF. Please try again.')
     }
-  }, [user, normalizedDocumentId, safeHighlights])
+  }, [user, normalizedDocumentId, highlightsLengthPrimitive]) // Use length (number) instead of array
 
   // Handle context menu actions
   const handleClarification = useCallback(() => {
