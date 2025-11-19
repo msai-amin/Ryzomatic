@@ -76,7 +76,12 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // CRITICAL: This must be defined before any useMemo hooks to prevent undefined.length errors
   const safeAnnotationColors = Array.isArray(annotationColors) ? annotationColors : []
   // CRITICAL: Ensure length is always a number, never undefined
-  const safeAnnotationColorsLength = (safeAnnotationColors?.length ?? 0) || 0
+  // Use useMemo to create a stable reference that's always a number
+  // This prevents React's comparison function from receiving undefined during state transitions
+  const safeAnnotationColorsLength = useMemo(() => {
+    const length = safeAnnotationColors?.length ?? 0
+    return typeof length === 'number' && !isNaN(length) ? length : 0
+  }, [safeAnnotationColors])
 
   // CRITICAL: Normalize all dependencies to ensure they're never undefined
   // This prevents React's dependency comparison function from accessing .length on undefined
