@@ -1117,6 +1117,15 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
   // CRITICAL: Use useMemo with a guaranteed array dependency to prevent React's 'co' function from receiving undefined
   // All plugin instances are normalized to ensure they're never undefined in the dependency array
+  // CRITICAL: Create stable primitive identifiers for plugins to use in dependency array
+  // This prevents React from comparing undefined plugin instances
+  const highlightPluginId = highlightPluginInstance ? 'highlight' : ''
+  const scrollModePluginId = scrollModePluginInstance ? 'scroll' : ''
+  const zoomPluginId = zoomPluginInstance ? 'zoom' : ''
+  const rotatePluginId = rotatePluginInstance ? 'rotate' : ''
+  const pageNavPluginId = pageNavigationPluginInstance ? 'pagenav' : ''
+  const pluginsHash = `${highlightPluginId}-${scrollModePluginId}-${zoomPluginId}-${rotatePluginId}-${pageNavPluginId}`
+  
   const plugins = useMemo(() => {
     // Ensure all plugins are defined before creating array
     if (!highlightPluginInstance || !scrollModePluginInstance || !zoomPluginInstance || 
@@ -1140,12 +1149,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       pageNavigationPluginInstance,
     ]
   }, [
-    // CRITICAL: All dependencies must be defined to prevent React's 'co' function error
-    highlightPluginInstance,
-    scrollModePluginInstance,
-    zoomPluginInstance,
-    rotatePluginInstance,
-    pageNavigationPluginInstance,
+    // CRITICAL: Use string hash instead of plugin instances to prevent undefined comparison
+    // React's 'co' function crashes when comparing undefined objects
+    pluginsHash,
   ])
 
   // Cache blob URL and Uint8Array to prevent memory leaks and infinite re-renders
