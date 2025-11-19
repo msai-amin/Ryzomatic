@@ -34,17 +34,24 @@ export const EPUBViewer: React.FC = () => {
   
   const { chapters: safeChapters = [] } = safeMetadata || {}
   
+  // CRITICAL: Use array lengths (primitives) instead of arrays in dependency arrays
+  // React's 'co' function crashes when arrays are used in dependency arrays and
+  // the previous dependency array is undefined. Use primitive numbers (lengths) instead.
+  // CRITICAL: Ensure length is always a number, never undefined
+  const pageTextsLengthPrimitive = (Array.isArray(safePageTexts) ? safePageTexts.length : 0) || 0
+  const chaptersLengthPrimitive = (Array.isArray(safeChapters) ? safeChapters.length : 0) || 0
+  
   // Normalize pageTexts to always be an array
-  // CRITICAL: Use safe destructured values in dependency array, not optional chaining
+  // CRITICAL: Use length primitives in dependency arrays, not arrays themselves
   const normalizedPageTexts = useMemo(() => {
     return Array.isArray(safePageTexts) ? safePageTexts : []
-  }, [safePageTexts])
+  }, [pageTextsLengthPrimitive]) // Use length (number) instead of array
   
   // Normalize metadata.chapters to always be an array
-  // CRITICAL: Use safe destructured values in dependency array, not optional chaining
+  // CRITICAL: Use length primitives in dependency arrays, not arrays themselves
   const normalizedChapters = useMemo(() => {
     return Array.isArray(safeChapters) ? safeChapters : []
-  }, [safeChapters])
+  }, [chaptersLengthPrimitive]) // Use length (number) instead of array
 
   // Ensure current page is within EPUB bounds
   const totalSections = normalizedPageTexts.length
@@ -66,12 +73,12 @@ export const EPUBViewer: React.FC = () => {
   const chapterTitle = useMemo(() => {
     const chapters = normalizedChapters as Array<{ title?: string }>
     return chapters[currentPage - 1]?.title || `Section ${currentPage}`
-  }, [normalizedChapters, currentPage])
+  }, [chaptersLengthPrimitive, currentPage]) // Use length (number) instead of array
 
   const currentContent = useMemo(() => {
     if (!currentDocument || currentDocument.type !== 'epub') return ''
     return normalizedPageTexts[currentPage - 1] || ''
-  }, [normalizedDocumentId, normalizedPageTexts, currentPage])
+  }, [normalizedDocumentId, pageTextsLengthPrimitive, currentPage]) // Use length (number) instead of array
 
   const handlePrev = useCallback(() => {
     if (currentPage <= 1) return

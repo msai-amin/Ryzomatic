@@ -55,20 +55,29 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     cleanedPageTexts: safeCleanedPageTexts = [] 
   } = currentDocument || {}
   
+  // CRITICAL: Use array lengths (primitives) instead of arrays in dependency arrays
+  // React's 'co' function crashes when arrays are used in dependency arrays and
+  // the previous dependency array is undefined. Use primitive numbers (lengths) instead.
+  // CRITICAL: Ensure length is always a number, never undefined
+  const pageTextsLengthPrimitive = (Array.isArray(safePageTexts) ? safePageTexts.length : 0) || 0
+  const cleanedPageTextsLengthPrimitive = (Array.isArray(safeCleanedPageTexts) ? safeCleanedPageTexts.length : 0) || 0
+  
   // CRITICAL FIX: Normalize pageTexts and cleanedPageTexts to always be arrays
   // React's dependency comparison function accesses .length on arrays, so undefined causes errors
   // Use useMemo to create stable references that are always arrays
+  // CRITICAL: Use length primitives in dependency arrays, not arrays themselves
   const normalizedPageTexts = useMemo(() => {
     return Array.isArray(safePageTexts) ? safePageTexts : []
-  }, [safePageTexts])
+  }, [pageTextsLengthPrimitive]) // Use length (number) instead of array
   
   const normalizedCleanedPageTexts = useMemo(() => {
     return Array.isArray(safeCleanedPageTexts) ? safeCleanedPageTexts : []
-  }, [safeCleanedPageTexts])
+  }, [cleanedPageTextsLengthPrimitive]) // Use length (number) instead of array
   
   // CRITICAL: Normalize currentDocument to ensure all array properties are always arrays
   // This prevents React's dependency comparison from accessing .length on undefined
   // We create a normalized version that's safe to use in dependency arrays
+  // CRITICAL: Use length primitives instead of arrays in dependency array
   const normalizedDocument = useMemo(() => {
     if (!currentDocument) return null
     return {
@@ -76,7 +85,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       pageTexts: normalizedPageTexts,
       cleanedPageTexts: normalizedCleanedPageTexts
     }
-  }, [currentDocument, normalizedPageTexts, normalizedCleanedPageTexts])
+  }, [currentDocument, pageTextsLengthPrimitive, cleanedPageTextsLengthPrimitive]) // Use length (number) instead of arrays
   
   const widgetRef = useRef<HTMLDivElement>(null)
   const widgetSizeRef = useRef({ width: 280, height: 160 })
@@ -503,7 +512,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       console.log('🔍 AudioWidget: No text available, clearing paragraphs')
       updateTTS({ paragraphs: [], currentParagraphIndex: 0 })
     }
-  }, [normalizedDocumentId, normalizedCleanedPageTexts, normalizedPageTexts, pdfViewer.readingMode, updateTTS])
+  }, [normalizedDocumentId, cleanedPageTextsLengthPrimitive, pageTextsLengthPrimitive, pdfViewer.readingMode, updateTTS]) // Use length (number) instead of arrays
 
   // Sync store state with TTSManager's actual state periodically
   useEffect(() => {
@@ -609,7 +618,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       }
     }
     return ''
-  }, [normalizedDocumentId, pdfViewer.currentPage, pdfViewer.readingMode, normalizedPageTexts, normalizedCleanedPageTexts])
+  }, [normalizedDocumentId, pdfViewer.currentPage, pdfViewer.readingMode, pageTextsLengthPrimitive, cleanedPageTextsLengthPrimitive]) // Use length (number) instead of arrays
 
   // Get all remaining text (for continue to end mode)
   const getAllRemainingText = useCallback((): string => {
@@ -649,7 +658,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         .join('\n\n')
     }
     return ''
-  }, [normalizedDocumentId, pdfViewer.currentPage, pdfViewer.readingMode, normalizedPageTexts, normalizedCleanedPageTexts])
+  }, [normalizedDocumentId, pdfViewer.currentPage, pdfViewer.readingMode, pageTextsLengthPrimitive, cleanedPageTextsLengthPrimitive]) // Use length (number) instead of arrays
 
   // Get text based on playback mode
   const getTextForPlaybackMode = useCallback((mode: 'paragraph' | 'page' | 'continue'): string => {
