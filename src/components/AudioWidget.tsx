@@ -374,7 +374,9 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
   // Extract paragraphs from current document
   useEffect(() => {
-    if (!currentDocument) {
+    // CRITICAL: Early return if currentDocument is null/undefined to prevent crashes
+    // This prevents accessing properties on null during state transitions
+    if (!currentDocument || !currentDocument.id) {
       // Clear paragraphs if no document
       updateTTS({ paragraphs: [], currentParagraphIndex: 0 })
       return
