@@ -991,14 +991,15 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     // This prevents React's 'co' function from receiving undefined dependency arrays
     // CRITICAL: All values are normalized above - no nullish coalescing needed here
     // Removing ?? operators ensures React's comparison function never receives undefined
-    selectionEnabled ? true : false,
+    // CRITICAL: Ensure handleCreateHighlight is always defined (useCallback always returns a function)
+    selectionEnabled === true ? true : false,
     currentHighlightColor || 'yellow',
     currentHighlightColorHex || '#ffeb3b',
-    handleCreateHighlight,
-    normalizedDocumentId,
-    normalizedUserId,
-    safeAnnotationColorsLength, // Already normalized to always be a number (never undefined)
-    isChatOpen ? true : false,
+    handleCreateHighlight || (() => {}), // Fallback to no-op function if somehow undefined
+    normalizedDocumentId || '',
+    normalizedUserId || '',
+    typeof safeAnnotationColorsLength === 'number' ? safeAnnotationColorsLength : 0, // Double-check it's a number
+    isChatOpen === true ? true : false,
   ])
 
   // Create scroll mode plugin (do NOT wrap in useMemo; keep hook order consistent)
