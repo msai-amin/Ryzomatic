@@ -65,7 +65,11 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const themeContext = useTheme()
   // CRITICAL: Ensure annotationColors is always defined, even if useTheme returns undefined context
   // This prevents React's 'co' function from receiving undefined during first render
-  const annotationColors = themeContext?.annotationColors ?? []
+  // CRITICAL FIX: Enforce array at source - ensure annotationColors is never undefined
+  // This addresses Issue 7040313956: Dependency Array Malformation
+  const annotationColors = Array.isArray(themeContext?.annotationColors) 
+    ? themeContext.annotationColors 
+    : []
   const userId = user?.id ?? null
 
   // Get document from store
