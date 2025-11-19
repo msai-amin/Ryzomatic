@@ -396,7 +396,13 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       setContextMenu({ x: e.clientX, y: e.clientY })
     }
   }, [])
-  
+
+  // CRITICAL: Normalize highlights to ensure it's always an array
+  // MUST be declared before handleDownload which uses it
+  const safeHighlights = useMemo(() => {
+    return Array.isArray(highlights) ? highlights : []
+  }, [highlights])
+
   // Handle download
   const handleDownload = useCallback(async () => {
     if (!user || !document) return
@@ -514,12 +520,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   }, [normalizedDocumentId, normalizedUserId, normalizedCurrentPage])
 
   // Sync highlights ref with state
-  // CRITICAL: Normalize highlights to ensure it's always an array
-  // MUST be declared before handleDownload which uses it
-  const safeHighlights = useMemo(() => {
-    return Array.isArray(highlights) ? highlights : []
-  }, [highlights])
-  
+  // CRITICAL: Use safeHighlights which is already declared above
   useEffect(() => {
     highlightsRef.current = safeHighlights
   }, [safeHighlights])
