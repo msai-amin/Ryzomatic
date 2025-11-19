@@ -380,19 +380,21 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       return
     }
     
+    // CRITICAL: Use optional chaining to prevent crashes if currentDocument becomes null
     console.log('🔍 AudioWidget: Processing document', {
-      documentId: currentDocument.id,
-      hasPageTexts: !!currentDocument.pageTexts,
-      pageTextsLength: currentDocument.pageTexts?.length || 0,
-      hasCleanedPageTexts: !!currentDocument.cleanedPageTexts,
-      cleanedPageTextsLength: currentDocument.cleanedPageTexts?.length || 0,
+      documentId: currentDocument?.id || 'null',
+      hasPageTexts: !!currentDocument?.pageTexts,
+      pageTextsLength: currentDocument?.pageTexts?.length || 0,
+      hasCleanedPageTexts: !!currentDocument?.cleanedPageTexts,
+      cleanedPageTextsLength: currentDocument?.cleanedPageTexts?.length || 0,
       readingMode: pdfViewer.readingMode,
       previousDocumentId: previousDocumentIdRef.current
     });
     
     // CRITICAL: Ensure we're processing the current document, not a stale one
     // If document ID changed but paragraphs extraction hasn't reset yet, wait
-    const currentDocId = currentDocument.id
+    // CRITICAL: Use optional chaining to prevent crashes if currentDocument becomes null
+    const currentDocId = currentDocument?.id
     if (previousDocumentIdRef.current && previousDocumentIdRef.current !== currentDocId) {
       console.log('🔍 AudioWidget: Document ID changed, waiting for reset')
       // The document change useEffect will reset paragraphs, so return early here
@@ -422,14 +424,15 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     const sourceTexts = useCleanedText ? normalizedCleanedPageTexts : normalizedPageTexts
     const sourceType = useCleanedText ? 'cleanedPageTexts' : 'pageTexts'
     
+    // CRITICAL: Use optional chaining to prevent crashes if currentDocument becomes null
     console.log('🔍 AudioWidget: Text source decision', {
       readingMode: pdfViewer.readingMode,
-      hasCleanedPageTexts: !!currentDocument.cleanedPageTexts,
-      cleanedPageTextsLength: currentDocument.cleanedPageTexts?.length || 0,
-      hasNonNullCleanedText: currentDocument.cleanedPageTexts?.some(text => text !== null && text !== undefined && text.length > 0) || false,
+      hasCleanedPageTexts: !!currentDocument?.cleanedPageTexts,
+      cleanedPageTextsLength: currentDocument?.cleanedPageTexts?.length || 0,
+      hasNonNullCleanedText: currentDocument?.cleanedPageTexts?.some(text => text !== null && text !== undefined && text.length > 0) || false,
       useCleanedText,
       sourceType,
-      documentId: currentDocument.id
+      documentId: currentDocument?.id || 'null'
     })
     
     // Priority: cleanedPageTexts (in reading mode) > pageTexts (for PDFs) > string content (for text files)
@@ -456,9 +459,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       
       text = safePageTexts.join('\n\n')
       console.log('🔍 AudioWidget: Joined text', { textType: typeof text, textLength: text.length, sourceType });
-    } else if (currentDocument.content && typeof currentDocument.content === 'string') {
+    } else if (currentDocument?.content && typeof currentDocument.content === 'string') {
       // Fallback to string content only if pageTexts is not available
       // Check that it's actually a valid string (not "[object ArrayBuffer]")
+      // CRITICAL: Use optional chaining to prevent crashes if currentDocument becomes null
       const contentStr = String(currentDocument.content);
       if (contentStr && !contentStr.startsWith('[object ') && contentStr.length > 10) {
         console.log('🔍 AudioWidget: Using string content (no pageTexts available)', {
@@ -506,7 +510,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       });
       
       updateTTS({ paragraphs, currentParagraphIndex: 0 })
-      console.log('🔍 AudioWidget: Paragraphs updated for document', currentDocument.id, 'from', sourceType)
+      // CRITICAL: Use optional chaining to prevent crashes if currentDocument becomes null
+      console.log('🔍 AudioWidget: Paragraphs updated for document', currentDocument?.id || 'null', 'from', sourceType)
     } else {
       // No text available - clear paragraphs
       console.log('🔍 AudioWidget: No text available, clearing paragraphs')
