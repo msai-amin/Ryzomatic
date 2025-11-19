@@ -8,12 +8,188 @@ import { googleAuthService } from '../services/googleAuthService';
 import { simpleGoogleAuth } from '../services/simpleGoogleAuth';
 import { libraryOrganizationService, Collection } from '../services/libraryOrganizationService';
 import { CollectionTree } from './library/CollectionTree';
+import { supabase } from '../../lib/supabase';
 
 interface LibraryModalProps {
   isOpen: boolean;
   onClose: () => void;
   refreshTrigger?: number; // Add refresh trigger
 }
+
+interface ConfirmDialogProps {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  confirmTone?: 'danger' | 'primary';
+  loading?: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
+  open,
+  title,
+  description,
+  confirmLabel,
+  confirmTone = 'primary',
+  loading = false,
+  onCancel,
+  onConfirm
+}) => {
+  if (!open) {
+    return null;
+  }
+
+  const confirmStyle =
+    confirmTone === 'danger'
+      ? {
+          backgroundColor: '#ef4444',
+          color: '#ffffff',
+          hover: '#dc2626'
+        }
+      : {
+          backgroundColor: '#2563eb',
+          color: '#ffffff',
+          hover: '#1d4ed8'
+        };
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/45 backdrop-blur-sm px-4">
+      <div
+        className="w-full max-w-md rounded-xl border shadow-xl bg-white dark:bg-slate-900"
+        style={{ borderColor: 'var(--color-border)' }}
+      >
+        <div className="p-5 border-b" style={{ borderColor: 'var(--color-border)' }}>
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            {title}
+          </h2>
+        </div>
+        <div className="p-5">
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+            {description}
+          </p>
+        </div>
+        <div className="flex justify-end gap-2 p-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 text-sm rounded-md border"
+            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+            disabled={loading}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="px-4 py-2 text-sm rounded-md transition-colors disabled:opacity-60"
+            style={{
+              backgroundColor: confirmStyle.backgroundColor,
+              color: confirmStyle.color
+            }}
+            disabled={loading}
+            onMouseEnter={(event) => {
+              if (!loading) {
+                event.currentTarget.style.backgroundColor = confirmStyle.hover;
+              }
+            }}
+            onMouseLeave={(event) => {
+              event.currentTarget.style.backgroundColor = confirmStyle.backgroundColor;
+            }}
+          >
+            {loading ? 'Please wait…' : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface MessageDialogProps {
+  open: boolean;
+  type: 'success' | 'error' | 'info';
+  title: string;
+  message: string;
+  onClose: () => void;
+}
+
+const MessageDialog: React.FC<MessageDialogProps> = ({
+  open,
+  type,
+  title,
+  message,
+  onClose
+}) => {
+  if (!open) {
+    return null;
+  }
+
+  const typeStyles = {
+    success: {
+      backgroundColor: 'rgba(34, 197, 94, 0.12)',
+      borderColor: 'rgba(34, 197, 94, 0.35)',
+      textColor: '#166534',
+      iconColor: '#22c55e'
+    },
+    error: {
+      backgroundColor: 'rgba(239, 68, 68, 0.12)',
+      borderColor: 'rgba(239, 68, 68, 0.35)',
+      textColor: '#b91c1c',
+      iconColor: '#ef4444'
+    },
+    info: {
+      backgroundColor: 'rgba(59, 130, 246, 0.12)',
+      borderColor: 'rgba(59, 130, 246, 0.35)',
+      textColor: '#1d4ed8',
+      iconColor: '#3b82f6'
+    }
+  };
+
+  const style = typeStyles[type];
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/45 backdrop-blur-sm px-4">
+      <div
+        className="w-full max-w-md rounded-xl border shadow-xl"
+        style={{ 
+          backgroundColor: 'var(--color-surface)',
+          borderColor: style.borderColor
+        }}
+      >
+        <div className="p-5 border-b" style={{ borderColor: style.borderColor }}>
+          <h2 className="text-lg font-semibold" style={{ color: style.textColor }}>
+            {title}
+          </h2>
+        </div>
+        <div className="p-5">
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+            {message}
+          </p>
+        </div>
+        <div className="flex justify-end gap-2 p-4 border-t" style={{ borderColor: style.borderColor }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-sm rounded-md transition-colors"
+            style={{
+              backgroundColor: style.iconColor,
+              color: '#ffffff'
+            }}
+            onMouseEnter={(event) => {
+              event.currentTarget.style.opacity = '0.9';
+            }}
+            onMouseLeave={(event) => {
+              event.currentTarget.style.opacity = '1';
+            }}
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalProps) {
   const [activeTab, setActiveTab] = useState<'documents' | 'notes' | 'audio'>('documents');
@@ -35,6 +211,9 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
   const [isCreatingCollection, setIsCreatingCollection] = useState(false);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [collectionActionBusyId, setCollectionActionBusyId] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ bookId: string; isInTrash: boolean } | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [messageDialog, setMessageDialog] = useState<{ type: 'success' | 'error' | 'info'; title: string; message: string } | null>(null);
   const { /* setCurrentDocument, */ addDocument, user } = useAppStore();
   
   // CRITICAL: Normalize user.id to prevent React comparison error
@@ -160,8 +339,57 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         }))
       });
       
+      // Get Trash collection ID to filter out trash books
+      const { data: trashCollection } = await supabase
+        .from('user_collections')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('name', 'Trash')
+        .maybeSingle();
+      
+      const trashCollectionId = trashCollection?.id;
+      const isViewingTrash = selectedCollectionId === trashCollectionId;
+      
+      // Filter books based on whether we're viewing Trash or not
+      let filteredBooks = supabaseBooks;
+      if (trashCollectionId) {
+        // Get all book_collections for these books
+        const bookIds = supabaseBooks.map(b => b.id);
+        if (bookIds.length > 0) {
+          const { data: bookCollections } = await supabase
+            .from('book_collections')
+            .select('book_id, collection_id')
+            .in('book_id', bookIds);
+          
+          // Create a set of book IDs that are in Trash
+          const booksInTrash = new Set(
+            (bookCollections || [])
+              .filter(bc => bc.collection_id === trashCollectionId)
+              .map(bc => bc.book_id)
+          );
+          
+          if (isViewingTrash) {
+            // When viewing Trash, only show books that are in Trash
+            filteredBooks = supabaseBooks.filter(book => booksInTrash.has(book.id));
+            console.log('LibraryModal: Showing trash books only:', {
+              total: supabaseBooks.length,
+              inTrash: booksInTrash.size,
+              filtered: filteredBooks.length
+            });
+          } else {
+            // When not viewing Trash, filter out books that are in Trash
+            filteredBooks = supabaseBooks.filter(book => !booksInTrash.has(book.id));
+            console.log('LibraryModal: Filtered out trash books:', {
+              total: supabaseBooks.length,
+              inTrash: booksInTrash.size,
+              filtered: filteredBooks.length
+            });
+          }
+        }
+      }
+      
       setIsSupabaseData(true);
-      const normalizedBooks = (supabaseBooks as EnhancedSavedBook[]).map(normalizeBook);
+      const normalizedBooks = (filteredBooks as EnhancedSavedBook[]).map(normalizeBook);
       setBooks(normalizedBooks);
       
       // Load notes and audio from Supabase
@@ -801,53 +1029,162 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       onClose();
     } catch (error) {
       console.error('Failed to open book:', error);
-      alert('Failed to open book. Please try again.');
+      setMessageDialog({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to open book. Please try again.'
+      });
     }
   };
 
+  // Check if book is in Trash collection
+  const checkIfBookInTrash = useCallback(async (bookId: string): Promise<boolean> => {
+    if (!user?.id) {
+      return false;
+    }
+
+    try {
+      // Get Trash collection ID
+      const { data: trashCollection } = await supabase
+        .from('user_collections')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('name', 'Trash')
+        .maybeSingle();
+      
+      if (!trashCollection?.id) {
+        return false;
+      }
+
+      // Check if book is in Trash collection
+      const { data: bookCollection, error } = await supabase
+        .from('book_collections')
+        .select('collection_id')
+        .eq('book_id', bookId)
+        .eq('collection_id', trashCollection.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking if book is in Trash:', error);
+        return false;
+      }
+
+      return !!bookCollection;
+    } catch (error) {
+      console.error('Error checking if book is in Trash:', error);
+      return false;
+    }
+  }, [user?.id]);
+
   const handleDeleteBook = async (id: string) => {
     console.log('handleDeleteBook called with id:', id);
-    const confirmed = window.confirm('Are you sure you want to move this book to trash?');
-    console.log('Confirmation result:', confirmed);
     
-    if (confirmed) {
-      try {
-        console.log('Starting deletion process for book:', id);
-        
-        // Move to trash in Supabase (primary storage)
-        await supabaseStorageService.deleteBook(id);
-        console.log('Book moved to trash in Supabase:', id);
+    try {
+      // Check if book is in Trash
+      const isInTrash = await checkIfBookInTrash(id);
+      console.log('Book is in Trash:', isInTrash);
+      
+      // Show appropriate confirmation dialog
+      setConfirmDialog({ bookId: id, isInTrash });
+    } catch (error) {
+      console.error('Error checking trash status:', error);
+      setMessageDialog({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to check book status. Please try again.'
+      });
+    }
+  };
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!confirmDialog) {
+      return;
+    }
+
+    const { bookId, isInTrash } = confirmDialog;
+    setConfirmBusy(true);
+
+    try {
+      console.log('Starting deletion process for book:', bookId, 'isInTrash:', isInTrash);
+      
+      if (isInTrash) {
+        // Permanently delete if in Trash
+        await supabaseStorageService.permanentlyDeleteBook(bookId);
+        console.log('Book permanently deleted:', bookId);
+        setMessageDialog({
+          type: 'success',
+          title: 'Deleted',
+          message: 'File permanently deleted.'
+        });
+      } else {
+        // Move to Trash if not in Trash
+        await supabaseStorageService.deleteBook(bookId);
+        console.log('Book moved to trash:', bookId);
         
         // Also delete from localStorage as backup
         try {
-          storageService.deleteBook(id);
-          console.log('Book deleted from localStorage:', id);
+          storageService.deleteBook(bookId);
+          console.log('Book deleted from localStorage:', bookId);
         } catch (localError) {
           console.warn('Failed to delete from localStorage (non-critical):', localError);
         }
         
-        // Reload the library
-        console.log('Reloading library data...');
-        await loadData();
-        console.log('Library data reloaded successfully');
-        
-        alert('File removed to trash');
-      } catch (error) {
-        console.error('Error deleting book:', error);
-        console.error('Error details:', {
-          message: error.message,
-          stack: error.stack,
-          name: error.name
+        setMessageDialog({
+          type: 'success',
+          title: 'Moved to Trash',
+          message: 'File moved to trash. You can restore it later from the Trash folder.'
         });
-        alert(`Failed to move book to trash: ${error.message || 'Unknown error'}`);
       }
+      
+      // Reload the library
+      console.log('Reloading library data...');
+      await loadData();
+      console.log('Library data reloaded successfully');
+      
+      setConfirmDialog(null);
+    } catch (error: any) {
+      console.error('Error deleting book:', error);
+      console.error('Error details:', {
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name
+      });
+      setMessageDialog({
+        type: 'error',
+        title: 'Error',
+        message: `Failed to ${isInTrash ? 'permanently delete' : 'move to trash'}: ${error?.message || 'Unknown error'}`
+      });
+      setConfirmDialog(null);
+    } finally {
+      setConfirmBusy(false);
     }
-  };
+  }, [confirmDialog, loadData]);
+
+  const handleCancelDelete = useCallback(() => {
+    if (!confirmBusy) {
+      setConfirmDialog(null);
+    }
+  }, [confirmBusy]);
 
   const handleDeleteAudio = async (id: string) => {
-    if (confirm('Delete this audio file?')) {
-      await storageService.deleteAudio(id);
-      loadData();
+    // For now, use a simple confirmation - can be enhanced later with custom dialog
+    const confirmed = window.confirm('Delete this audio file?');
+    if (confirmed) {
+      try {
+        await storageService.deleteAudio(id);
+        loadData();
+        setMessageDialog({
+          type: 'success',
+          title: 'Deleted',
+          message: 'Audio file deleted successfully.'
+        });
+      } catch (error: any) {
+        setMessageDialog({
+          type: 'error',
+          title: 'Error',
+          message: `Failed to delete audio file: ${error?.message || 'Unknown error'}`
+        });
+      }
     }
   };
 
@@ -871,9 +1208,17 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
           const data = event.target?.result as string;
           storageService.importData(data);
           loadData();
-          alert('Data imported successfully!');
+          setMessageDialog({
+            type: 'success',
+            title: 'Success',
+            message: 'Data imported successfully!'
+          });
         } catch (error) {
-          alert('Failed to import data. Please check the file format.');
+          setMessageDialog({
+            type: 'error',
+            title: 'Error',
+            message: 'Failed to import data. Please check the file format.'
+          });
         }
       };
       reader.readAsText(file);
@@ -1025,22 +1370,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                     </p>
                   </div>
 
-                <div className="flex flex-wrap items-center gap-3">
-                  <div
-                    className="flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium"
-                    style={{
-                      backgroundColor: 'rgba(148,163,184,0.12)',
-                      color: 'var(--color-text-secondary)',
-                      border: '1px solid rgba(148,163,184,0.16)'
-                    }}
-                  >
-                    <span
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: isSupabaseData ? '#34d399' : '#fbbf24' }}
-                    ></span>
-                    <span>{isSupabaseData ? 'Supabase Sync' : 'Local Workspace'}</span>
-                  </div>
-                  {syncStatus.lastSync && (
+                {syncStatus.lastSync && (
+                  <div className="flex flex-wrap items-center gap-3">
                     <div
                       className="rounded-full px-3 py-1 text-xs"
                       style={{
@@ -1051,8 +1382,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                     >
                       Last sync · {syncStatus.lastSync.toLocaleString()}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-3 text-xs md:text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
@@ -1881,8 +2212,37 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       </div>
     </div>
   </div>
-          </div>
         </div>
+      </div>
+
+      {/* Confirm Delete Dialog */}
+      {confirmDialog && (
+        <ConfirmDialog
+          open={!!confirmDialog}
+          title={confirmDialog.isInTrash ? 'Permanently Delete File?' : 'Move to Trash?'}
+          description={
+            confirmDialog.isInTrash
+              ? 'This will permanently delete the file. This action cannot be undone.'
+              : 'The file will be moved to Trash. You can restore it later from the Trash folder.'
+          }
+          confirmLabel={confirmDialog.isInTrash ? 'Delete Permanently' : 'Move to Trash'}
+          confirmTone="danger"
+          loading={confirmBusy}
+          onCancel={handleCancelDelete}
+          onConfirm={handleConfirmDelete}
+        />
+      )}
+
+      {/* Message Dialog */}
+      {messageDialog && (
+        <MessageDialog
+          open={!!messageDialog}
+          type={messageDialog.type}
+          title={messageDialog.title}
+          message={messageDialog.message}
+          onClose={() => setMessageDialog(null)}
+        />
+      )}
     </div>,
     modalRoot
   );
