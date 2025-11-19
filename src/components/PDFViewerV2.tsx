@@ -178,7 +178,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
   // CRITICAL: Update color state when safeAnnotationColors changes
   // This ensures colors are updated if they're loaded asynchronously
+  // CRITICAL: Access safeAnnotationColors from closure, use safeAnnotationColorsLength (primitive) in dependency array
   useEffect(() => {
+    // Access safeAnnotationColors from closure - it's guaranteed to be an array
     if (Array.isArray(safeAnnotationColors) && safeAnnotationColors.length > 0) {
       const firstColor = safeAnnotationColors[0]
       if (firstColor?.id && firstColor.id !== currentHighlightColor) {
@@ -189,7 +191,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         setCurrentHighlightColorHex(colorHex)
       }
     }
-  }, [safeAnnotationColorsLength, currentHighlightColor, currentHighlightColorHex]) // Use length (number) instead of array
+  }, [safeAnnotationColorsLength, currentHighlightColor, currentHighlightColorHex]) // Use length (number) instead of array - safeAnnotationColors accessed from closure
 
   // Log component mount
   console.log('🔍 PDFViewerV2: Component rendering', {
