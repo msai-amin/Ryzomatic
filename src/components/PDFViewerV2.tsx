@@ -93,6 +93,37 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const normalizedDocumentId = document?.id ?? ''
   const normalizedUserId = userId ?? ''
   
+  // CRITICAL: Normalize nested object properties to prevent React comparison errors
+  // React's comparison function can access .length on nested properties if they're arrays
+  // Normalize all nested properties to primitives before using in dependency arrays
+  const normalizedCurrentPage = useMemo(() => {
+    return typeof pdfViewer?.currentPage === 'number' ? pdfViewer.currentPage : 1
+  }, [pdfViewer?.currentPage])
+  
+  const normalizedZoom = useMemo(() => {
+    return typeof pdfViewer?.zoom === 'number' ? pdfViewer.zoom : 1
+  }, [pdfViewer?.zoom])
+  
+  const normalizedReadingMode = useMemo(() => {
+    return pdfViewer?.readingMode === true ? true : false
+  }, [pdfViewer?.readingMode])
+  
+  const normalizedTextAlign = useMemo(() => {
+    return typography?.textAlign || 'left'
+  }, [typography?.textAlign])
+  
+  const normalizedFocusMode = useMemo(() => {
+    return typography?.focusMode === true ? true : false
+  }, [typography?.focusMode])
+  
+  const normalizedReadingGuide = useMemo(() => {
+    return typography?.readingGuide === true ? true : false
+  }, [typography?.readingGuide])
+  
+  const normalizedNumPages = useMemo(() => {
+    return typeof numPages === 'number' && numPages > 0 ? numPages : 0
+  }, [numPages])
+  
   // CRITICAL: Safe destructuring with defaults - guarantees arrays are always arrays
   // Level 1 Guard: Default document to {} if null/undefined
   // Level 2 Guard: Default pageTexts and cleanedPageTexts to [] if missing
@@ -427,7 +458,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       console.error('Error downloading PDF:', error)
       alert('Failed to download PDF. Please try again.')
     }
-  }, [user, normalizedDocumentId, highlights])
+  }, [user, normalizedDocumentId, safeHighlights])
 
   // Handle context menu actions
   const handleClarification = useCallback(() => {
@@ -481,9 +512,14 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   }, [normalizedDocumentId, normalizedUserId, pdfViewer.currentPage])
 
   // Sync highlights ref with state
-  useEffect(() => {
-    highlightsRef.current = highlights
+  // CRITICAL: Normalize highlights to ensure it's always an array
+  const safeHighlights = useMemo(() => {
+    return Array.isArray(highlights) ? highlights : []
   }, [highlights])
+  
+  useEffect(() => {
+    highlightsRef.current = safeHighlights
+  }, [safeHighlights])
 
   // Load highlights when document loads
   useEffect(() => {
@@ -1246,22 +1282,22 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       
       switch (e.key) {
         case 'ArrowLeft':
-          if (pdfViewer.currentPage > 1) {
-            updatePDFViewer({ currentPage: pdfViewer.currentPage - 1 })
-            pageNavigationPluginInstance.jumpToPage(pdfViewer.currentPage - 2) // Convert to 0-based
+          if (normalizedCurrentPage > 1) {
+            updatePDFViewer({ currentPage: normalizedCurrentPage - 1 })
+            pageNavigationPluginInstance.jumpToPage(normalizedCurrentPage - 2) // Convert to 0-based
           }
           break
         case 'ArrowRight':
-          if (numPages && pdfViewer.currentPage < numPages) {
-            updatePDFViewer({ currentPage: pdfViewer.currentPage + 1 })
-            pageNavigationPluginInstance.jumpToPage(pdfViewer.currentPage) // Convert to 0-based
+          if (normalizedNumPages > 0 && normalizedCurrentPage < normalizedNumPages) {
+            updatePDFViewer({ currentPage: normalizedCurrentPage + 1 })
+            pageNavigationPluginInstance.jumpToPage(normalizedCurrentPage) // Convert to 0-based
           }
           break
         case '+':
         case '=':
           if (!e.shiftKey) {
             e.preventDefault()
-            const newZoom = Math.min(pdfViewer.zoom + 0.1, 3)
+            const newZoom = Math.min(normalizedZoom + 0.1, 3)
             updatePDFViewer({ zoom: newZoom })
             zoomPluginInstance.zoomTo(newZoom)
           }
@@ -1270,7 +1306,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         case '_':
           if (!e.shiftKey) {
             e.preventDefault()
-            const newZoom = Math.max(pdfViewer.zoom - 0.1, 0.5)
+            const newZoom = Math.max(normalizedZoom - 0.1, 0.5)
             updatePDFViewer({ zoom: newZoom })
             zoomPluginInstance.zoomTo(newZoom)
           }
@@ -1293,29 +1329,29 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           break
         case 'j':
         case 'J':
-          if (pdfViewer.readingMode && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+          if (normalizedReadingMode && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
             e.preventDefault()
-            updateTypography({ textAlign: typography.textAlign === 'justify' ? 'left' : 'justify' })
+            updateTypography({ textAlign: normalizedTextAlign === 'justify' ? 'left' : 'justify' })
           }
           break
         case 'f':
         case 'F':
-          if (pdfViewer.readingMode && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+          if (normalizedReadingMode && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
             e.preventDefault()
-            updateTypography({ focusMode: !typography.focusMode })
+            updateTypography({ focusMode: !normalizedFocusMode })
           }
           break
         case 'g':
         case 'G':
-          if (pdfViewer.readingMode && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+          if (normalizedReadingMode && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
             e.preventDefault()
-            updateTypography({ readingGuide: !typography.readingGuide })
+            updateTypography({ readingGuide: !normalizedReadingGuide })
           }
           break
         case 'Escape':
           if (contextMenu) {
             setContextMenu(null)
-          } else if (pdfViewer.readingMode) {
+          } else if (normalizedReadingMode) {
             e.preventDefault()
             updatePDFViewer({ readingMode: false })
           }
@@ -1330,17 +1366,19 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       window.removeEventListener('keydown', handleKeyPress)
     }
   }, [
-    pdfViewer.currentPage,
-    pdfViewer.zoom,
-    pdfViewer.readingMode,
-    numPages,
-    typography.textAlign,
-    typography.focusMode,
-    typography.readingGuide,
+    // CRITICAL: Use normalized primitive values instead of nested object properties
+    // This prevents React's comparison function from accessing .length on undefined
+    normalizedCurrentPage,
+    normalizedZoom,
+    normalizedReadingMode,
+    normalizedNumPages,
+    normalizedTextAlign,
+    normalizedFocusMode,
+    normalizedReadingGuide,
     updatePDFViewer,
     updateTypography,
     toggleReadingMode,
-    contextMenu,
+    contextMenu ? true : false, // Normalize contextMenu to boolean
     pageNavigationPluginInstance,
     zoomPluginInstance,
     rotatePluginInstance,
