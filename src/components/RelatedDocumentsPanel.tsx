@@ -86,7 +86,8 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
 
   // Handle file upload and relationship creation
   const handleFileUpload = useCallback(async (file: File) => {
-    if (!currentDocument || !user) {
+    // CRITICAL: Use normalizedDocumentId instead of currentDocument to prevent undefined in dependency array
+    if (!normalizedDocumentId || !user) {
       alert('Please open a document first');
       return;
     }
@@ -148,7 +149,7 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
             'Authorization': `Bearer ${authToken}`
           },
           body: JSON.stringify({
-            sourceDocumentId: currentDocument.id,
+            sourceDocumentId: normalizedDocumentId,
             relatedDocumentId: documentId,
             userId: user.id
           }),
@@ -226,7 +227,8 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
     e.stopPropagation();
     setIsDragging(false);
 
-    if (!currentDocument || !user) {
+    // CRITICAL: Use normalizedDocumentId instead of currentDocument to prevent undefined in dependency array
+    if (!normalizedDocumentId || !user) {
       alert('Please open a document first');
       return;
     }
@@ -243,7 +245,7 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
     for (const file of compatibleFiles) {
       await handleFileUpload(file);
     }
-  }, [currentDocument, user, handleFileUpload]);
+  }, [normalizedDocumentId, user, handleFileUpload]);
 
   if (isLoading) {
     return (
