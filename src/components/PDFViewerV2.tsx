@@ -120,10 +120,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     return typography?.readingGuide === true ? true : false
   }, [typography?.readingGuide])
   
-  const normalizedNumPages = useMemo(() => {
-    return typeof numPages === 'number' && numPages > 0 ? numPages : 0
-  }, [numPages])
-  
   // CRITICAL: Safe destructuring with defaults - guarantees arrays are always arrays
   // Level 1 Guard: Default document to {} if null/undefined
   // Level 2 Guard: Default pageTexts and cleanedPageTexts to [] if missing
@@ -151,6 +147,12 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const [showHighlightColorPopover, setShowHighlightColorPopover] = useState(false)
   const highlightColorButtonRef = useRef<HTMLButtonElement>(null)
   const [numPages, setNumPages] = useState<number>(document?.totalPages || 0)
+  
+  // CRITICAL: Normalize numPages after it's declared
+  const normalizedNumPages = useMemo(() => {
+    return typeof numPages === 'number' && numPages > 0 ? numPages : 0
+  }, [numPages])
+  
   const [currentParagraphIndex, setCurrentParagraphIndex] = useState<number | null>(null)
   
   const currentParagraphIndexRef = useRef<number | null>(null)
@@ -509,10 +511,11 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       }
     }
     setContextMenu(null)
-  }, [normalizedDocumentId, normalizedUserId, pdfViewer.currentPage])
+  }, [normalizedDocumentId, normalizedUserId, normalizedCurrentPage])
 
   // Sync highlights ref with state
   // CRITICAL: Normalize highlights to ensure it's always an array
+  // MUST be declared before handleDownload which uses it
   const safeHighlights = useMemo(() => {
     return Array.isArray(highlights) ? highlights : []
   }, [highlights])
