@@ -154,14 +154,36 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     cleanedPageTexts: safeCleanedPageTexts = [] 
   } = document || {}
   
+  // CRITICAL: Create primitive hashes for arrays to use in dependency arrays
+  // React's 'co' function crashes when arrays are used in dependency arrays and
+  // the previous dependency array is undefined. Use string hashes instead.
+  const pageTextsHash = useMemo(() => {
+    if (!Array.isArray(safePageTexts) || safePageTexts.length === 0) {
+      return '0' // Return stable string for empty/undefined
+    }
+    // Create hash from length and first text snippet
+    const firstText = safePageTexts[0]?.substring(0, 10) || ''
+    return `${safePageTexts.length}-${firstText.length}`
+  }, [safePageTexts])
+  
+  const cleanedPageTextsHash = useMemo(() => {
+    if (!Array.isArray(safeCleanedPageTexts) || safeCleanedPageTexts.length === 0) {
+      return '0' // Return stable string for empty/undefined
+    }
+    // Create hash from length and first text snippet
+    const firstText = safeCleanedPageTexts[0]?.substring(0, 10) || ''
+    return `${safeCleanedPageTexts.length}-${firstText.length}`
+  }, [safeCleanedPageTexts])
+  
   // Normalize arrays to ensure they're always arrays (double safety)
+  // CRITICAL: Use string hashes instead of arrays in dependency arrays
   const normalizedPageTexts = useMemo(() => {
     return Array.isArray(safePageTexts) ? safePageTexts : []
-  }, [safePageTexts])
+  }, [pageTextsHash]) // Use string hash instead of array
   
   const normalizedCleanedPageTexts = useMemo(() => {
     return Array.isArray(safeCleanedPageTexts) ? safeCleanedPageTexts : []
-  }, [safeCleanedPageTexts])
+  }, [cleanedPageTextsHash]) // Use string hash instead of array
 
   // State declarations (MUST be before early returns per React hooks rules)
   const [highlights, setHighlights] = useState<HighlightType[]>([])
