@@ -518,15 +518,15 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   }, [normalizedCurrentPage, normalizedPageTexts, normalizedDocumentId, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
   
   const handleSaveNote = useCallback(async () => {
-    // CRITICAL: Use normalized arrays instead of accessing document directly
-    const pageText = normalizedPageTexts[pdfViewer.currentPage - 1]
-    const context = getPDFTextSelectionContext(pdfViewer.currentPage, pageText)
+    // CRITICAL: Use normalized arrays and normalized current page
+    const pageText = normalizedPageTexts[normalizedCurrentPage - 1]
+    const context = getPDFTextSelectionContext(normalizedCurrentPage, pageText)
     if (context && document.id && userId) {
       try {
         await notesService.createNote(
           userId,
           document.id,
-          pdfViewer.currentPage,
+          normalizedCurrentPage,
           context.selectedText,
           'freeform',
           undefined,
@@ -538,7 +538,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       }
     }
     setContextMenu(null)
-  }, [normalizedDocumentId, normalizedUserId, normalizedCurrentPage])
+  }, [normalizedDocumentId, normalizedUserId, normalizedCurrentPage, normalizedPageTexts, document?.id, userId])
 
   // Sync highlights ref with state
   // CRITICAL: Use array length instead of array reference to prevent React comparison issues
