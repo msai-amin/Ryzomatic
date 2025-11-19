@@ -345,12 +345,15 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
 // CRITICAL: Safe default context to prevent crashes during initialization
 // This prevents "Cannot read properties of undefined" errors when components
 // use useTheme before ThemeProvider is fully initialized
+// This addresses the race condition where PDFViewerV2 renders before ThemeProvider context is ready
+// CRITICAL: defaultAnnotationColors is imported from theme1-config.ts and is guaranteed to be an array
+// Using an array (even if empty) ensures .length checks never crash
 const safeDefaultContext: ThemeContextType = {
   currentTheme: theme1Config,
   setTheme: () => {
     console.warn('useTheme: setTheme called outside ThemeProvider, using default theme');
   },
-  annotationColors: defaultAnnotationColors,
+  annotationColors: Array.isArray(defaultAnnotationColors) ? defaultAnnotationColors : [],
   updateAnnotationColor: () => {
     console.warn('useTheme: updateAnnotationColor called outside ThemeProvider');
   },
@@ -374,8 +377,11 @@ export const useTheme = (): ThemeContextType => {
   // CRITICAL: Return safe default instead of throwing error
   // This prevents components from crashing during initialization or if ThemeProvider is missing
   // The safe default ensures all properties are always defined, preventing undefined.length errors
+  // This addresses the race condition where PDFViewerV2 renders before ThemeProvider context is ready
   if (context === undefined) {
-    console.warn('useTheme: Used outside ThemeProvider, returning safe defaults');
+    // Log a warning for developers, but keep the app alive for the user
+    // This prevents the "Cannot read properties of undefined (reading 'length')" crash
+    console.warn('useTheme was used outside of ThemeProvider. Returning safe defaults.');
     return safeDefaultContext;
   }
   return context;
