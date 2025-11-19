@@ -86,41 +86,15 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const normalizedDocumentId = document?.id ?? ''
   const normalizedUserId = userId ?? ''
   
-  // CRITICAL: Normalize nested object properties to prevent React comparison errors
-  // React's comparison function can access .length on nested properties if they're arrays
-  // Normalize all nested properties to primitives before using in dependency arrays
-  // CRITICAL: Extract values FIRST, then use primitives in dependency arrays
-  // Never use optional chaining directly in dependency arrays - it can be undefined
-  const pdfViewerCurrentPage = pdfViewer?.currentPage ?? 1
-  const pdfViewerZoom = pdfViewer?.zoom ?? 1
-  const pdfViewerReadingMode = pdfViewer?.readingMode === true ? true : false
-  const typographyTextAlign = typography?.textAlign || 'left'
-  const typographyFocusMode = typography?.focusMode === true ? true : false
-  const typographyReadingGuide = typography?.readingGuide === true ? true : false
-  
-  const normalizedCurrentPage = useMemo(() => {
-    return typeof pdfViewerCurrentPage === 'number' ? pdfViewerCurrentPage : 1
-  }, [pdfViewerCurrentPage]) // Use primitive, never undefined
-  
-  const normalizedZoom = useMemo(() => {
-    return typeof pdfViewerZoom === 'number' ? pdfViewerZoom : 1
-  }, [pdfViewerZoom]) // Use primitive, never undefined
-  
-  const normalizedReadingMode = useMemo(() => {
-    return pdfViewerReadingMode === true ? true : false
-  }, [pdfViewerReadingMode]) // Use primitive boolean, never undefined
-  
-  const normalizedTextAlign = useMemo(() => {
-    return typographyTextAlign || 'left'
-  }, [typographyTextAlign]) // Use primitive string, never undefined
-  
-  const normalizedFocusMode = useMemo(() => {
-    return typographyFocusMode === true ? true : false
-  }, [typographyFocusMode]) // Use primitive boolean, never undefined
-  
-  const normalizedReadingGuide = useMemo(() => {
-    return typographyReadingGuide === true ? true : false
-  }, [typographyReadingGuide]) // Use primitive boolean, never undefined
+  // CRITICAL: Extract all values to stable primitives FIRST
+  // These are guaranteed to never be undefined due to ?? and || defaults
+  // Use these directly in dependency arrays - NO intermediate useMemo needed
+  const normalizedCurrentPage = (pdfViewer?.currentPage ?? 1) || 1
+  const normalizedZoom = (pdfViewer?.zoom ?? 1) || 1
+  const normalizedReadingMode = pdfViewer?.readingMode === true ? true : false
+  const normalizedTextAlign = typography?.textAlign || 'left'
+  const normalizedFocusMode = typography?.focusMode === true ? true : false
+  const normalizedReadingGuide = typography?.readingGuide === true ? true : false
   
   // CRITICAL: Safe destructuring with defaults - guarantees arrays are always arrays
   // Level 1 Guard: Default document to {} if null/undefined
