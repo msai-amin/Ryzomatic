@@ -774,22 +774,17 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     safeAnnotationColorsLength
   ])
 
-  // CRITICAL: highlightPlugin() uses React hooks internally, so it MUST be called unconditionally
-  // Use useMemo with a guaranteed array dependency to prevent React's 'co' function from receiving undefined
-  // All dependencies are normalized to ensure they're never undefined
+  // CRITICAL: highlightPlugin() uses React hooks internally, so it MUST be called unconditionally at the top level
+  // DO NOT wrap it in useMemo - calling hooks inside useMemo violates React's Rules of Hooks
+  // The plugin will handle its own reactivity internally
   // CRITICAL: Ensure handleCreateHighlight is defined before using it
-  const highlightPluginInstance = useMemo(() => {
-    // Safety check: ensure all required dependencies are defined
-    if (!handleCreateHighlight) {
-      console.error('PDFViewerV2: handleCreateHighlight is undefined, cannot create highlight plugin')
-      // Return a minimal plugin instance to prevent crashes
-      return highlightPlugin({
-        renderHighlightTarget: () => null,
-        renderHighlightContent: () => null,
-        renderHighlights: () => null,
-      })
-    }
-    return highlightPlugin({
+  // Safety check: ensure all required dependencies are defined
+  if (!handleCreateHighlight) {
+    console.error('PDFViewerV2: handleCreateHighlight is undefined, cannot create highlight plugin')
+  }
+  // CRITICAL: Call highlightPlugin() directly at the top level, not inside useMemo
+  // This ensures React's Rules of Hooks are not violated
+  const highlightPluginInstance = highlightPlugin({
     renderHighlightTarget: (props: RenderHighlightTargetProps) => {
       if (!selectionEnabled) {
         return null
@@ -1084,20 +1079,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         </div>
       )
     },
-    })
-  }, [
-    // CRITICAL: All dependencies must be defined primitives - NO || operators, NO optional chaining
-    // Extract all values to primitives FIRST, then use in dependency array
-    // This ensures React's 'co' function NEVER receives undefined
-    selectionEnabled === true ? true : false,
-    currentHighlightColor ? currentHighlightColor : 'yellow',
-    currentHighlightColorHex ? currentHighlightColorHex : '#ffeb3b',
-    handleCreateHighlight, // useCallback always returns a function, never undefined
-    normalizedDocumentId,
-    normalizedUserId,
-    safeAnnotationColorsLength, // Always a number (memoized above)
-    isChatOpen === true ? true : false,
-  ])
+  })
 
   // Create scroll mode plugin (do NOT wrap in useMemo; keep hook order consistent)
   const scrollModePluginInstance = scrollModePlugin()
@@ -1119,12 +1101,63 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // All plugin instances are normalized to ensure they're never undefined in the dependency array
   // CRITICAL: Create stable primitive identifiers for plugins to use in dependency array
   // This prevents React from comparing undefined plugin instances
-  const highlightPluginId = highlightPluginInstance ? 'highlight' : ''
-  const scrollModePluginId = scrollModePluginInstance ? 'scroll' : ''
-  const zoomPluginId = zoomPluginInstance ? 'zoom' : ''
-  const rotatePluginId = rotatePluginInstance ? 'rotate' : ''
-  const pageNavPluginId = pageNavigationPluginInstance ? 'pagenav' : ''
-  const pluginsHash = `${highlightPluginId}-${scrollModePluginId}-${zoomPluginId}-${rotatePluginId}-${pageNavPluginId}`
+  // CRITICAL: Always use a non-empty default to prevent dependency array size changes
+  // CRITICAL: Normalize plugin instances FIRST to ensure they're never undefined (use null as placeholder)
+  // CRITICAL: This ensures the dependency array always has exactly 5 items, never changing size
+  // CRITICAL: Extract values BEFORE useMemo to ensure they're always defined
+  const safeHighlightPlugin = highlightPluginInstance ?? null
+  const safeScrollModePlugin = scrollModePluginInstance ?? null
+  const safeZoomPlugin = zoomPluginInstance ?? null
+  const safeRotatePlugin = rotatePluginInstance ?? null
+  const safePageNavPlugin = pageNavigationPluginInstance ?? null
+  
+  // CRITICAL: Create a stable array structure that ALWAYS has exactly 5 items
+  // CRITICAL: This array is created outside useMemo to ensure it's always defined
+  // CRITICAL: The array structure never changes - only the values inside change
+  const pluginDependenciesArray = [
+    safeHighlightPlugin,
+    safeScrollModePlugin,
+    safeZoomPlugin,
+    safeRotatePlugin,
+    safePageNavPlugin,
+  ]
+  
+  // CRITICAL: Memoize plugin string IDs to ensure they're always defined and stable
+  // CRITICAL: This ensures the dependency array always has exactly 5 items, never changing size
+  // CRITICAL: Use individual normalized values directly in dependency array (not array indexing)
+  // This ensures React always sees exactly 5 items, even on first render
+  const pluginIds = useMemo(() => {
+    // CRITICAL: Always return exactly 5 strings - never change the structure
+    return {
+      highlight: safeHighlightPlugin ? 'highlight' : 'no-highlight',
+      scrollMode: safeScrollModePlugin ? 'scroll' : 'no-scroll',
+      zoom: safeZoomPlugin ? 'zoom' : 'no-zoom',
+      rotate: safeRotatePlugin ? 'rotate' : 'no-rotate',
+      pageNav: safePageNavPlugin ? 'pagenav' : 'no-pagenav',
+    }
+  }, [
+    // CRITICAL: Use normalized plugin instances directly - always exactly 5 items
+    // CRITICAL: These are always defined (null if undefined) due to ?? null normalization above
+    // This ensures the dependency array size never changes, preventing React comparison errors
+    safeHighlightPlugin,
+    safeScrollModePlugin,
+    safeZoomPlugin,
+    safeRotatePlugin,
+    safePageNavPlugin,
+  ])
+  
+  // CRITICAL: Create a string hash directly from plugin string IDs to ensure stable dependency array
+  const pluginsHash = useMemo(() => {
+    // CRITICAL: Always create a stable hash string - never empty to prevent dependency array size changes
+    // CRITICAL: Ensure pluginsHash is always a non-empty string, never undefined
+    const hash = `${pluginIds.highlight}-${pluginIds.scrollMode}-${pluginIds.zoom}-${pluginIds.rotate}-${pluginIds.pageNav}`
+    // Double-check: ensure hash is never empty or undefined
+    return hash && hash.length > 0 ? hash : 'plugins-initializing'
+  }, [
+    // CRITICAL: Dependency array MUST always have exactly 1 item (the pluginIds object) - never change size
+    // Use the memoized pluginIds object to ensure array size is always consistent
+    pluginIds,
+  ])
   
   const plugins = useMemo(() => {
     // Ensure all plugins are defined before creating array
@@ -1151,6 +1184,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   }, [
     // CRITICAL: Use string hash instead of plugin instances to prevent undefined comparison
     // React's 'co' function crashes when comparing undefined objects
+    // CRITICAL: pluginsHash is always a non-empty string, preventing dependency array size changes
     pluginsHash,
   ])
 
@@ -1230,6 +1264,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   
   // Cleanup blob URL and refs when document changes or component unmounts
   // CRITICAL: Use normalized documentId in dependency array to prevent React comparison error
+  // CRITICAL: normalizedDocumentId is always a string (never undefined) due to ?? '' fallback
+  // CRITICAL: Ensure dependency array is always an array with a defined value
+  const safeNormalizedDocumentId = normalizedDocumentId || ''
   useEffect(() => {
     return () => {
       if (blobUrlRef.current) {
@@ -1237,13 +1274,13 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         blobUrlRef.current = null
       }
       // Clear Uint8Array ref when document changes
-      // CRITICAL: Use normalizedDocumentId instead of document.id to prevent undefined access
-      if (documentIdRef.current !== normalizedDocumentId) {
+      // CRITICAL: Use safeNormalizedDocumentId instead of document.id to prevent undefined access
+      if (documentIdRef.current !== safeNormalizedDocumentId) {
         uint8ArrayRef.current = null
         documentIdRef.current = null
       }
     }
-  }, [normalizedDocumentId])
+  }, [safeNormalizedDocumentId]) // safeNormalizedDocumentId is always a string, never undefined
 
   // Sync ref with state when currentParagraphIndex changes
   // CRITICAL: Normalize currentParagraphIndex to prevent undefined in dependency array
