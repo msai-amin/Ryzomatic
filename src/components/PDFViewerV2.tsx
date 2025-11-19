@@ -538,12 +538,13 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   }, [safeHighlights])
 
   // Load highlights when document loads
+  // CRITICAL: Use normalizedDocumentId instead of document.id to prevent undefined access
   useEffect(() => {
     const loadHighlights = async () => {
-      if (!document.id) return
+      if (!normalizedDocumentId) return
 
       try {
-        const bookHighlights = await highlightService.getHighlights(document.id, {
+        const bookHighlights = await highlightService.getHighlights(normalizedDocumentId, {
           includeOrphaned: true
         })
         // Don't wipe out existing local highlights if backend returns empty (e.g., local dev/no API)
@@ -563,14 +564,15 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   }, [normalizedDocumentId])
 
   // Poll for OCR status updates
+  // CRITICAL: Use normalizedDocumentId instead of document?.id to prevent undefined access
   useEffect(() => {
-    if (!document?.id) return
+    if (!normalizedDocumentId) return
     
     if (ocrStatus === 'processing' || ocrStatus === 'pending') {
       // Start polling for status updates
       pollingIntervalRef.current = setInterval(async () => {
         try {
-          const response = await fetch(`/api/documents?action=ocr-status&documentId=${document.id}`)
+          const response = await fetch(`/api/documents?action=ocr-status&documentId=${normalizedDocumentId}`)
           
           if (response.ok) {
             const data = await response.json()
@@ -668,8 +670,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   }, [])
 
   // Recalculate size when document changes (e.g., after upload)
+  // CRITICAL: Use normalizedDocumentId instead of document?.id to prevent undefined access
   useEffect(() => {
-    if (!document?.id) return
+    if (!normalizedDocumentId) return
 
     // Small delay to ensure DOM has updated and container has proper size
     const timeoutId = setTimeout(() => {
@@ -1205,9 +1208,14 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   }, [normalizedDocumentId])
 
   // Sync ref with state when currentParagraphIndex changes
-  useEffect(() => {
-    currentParagraphIndexRef.current = currentParagraphIndex
+  // CRITICAL: Normalize currentParagraphIndex to prevent undefined in dependency array
+  const normalizedCurrentParagraphIndex = useMemo(() => {
+    return currentParagraphIndex !== null && currentParagraphIndex !== undefined ? currentParagraphIndex : null
   }, [currentParagraphIndex])
+  
+  useEffect(() => {
+    currentParagraphIndexRef.current = normalizedCurrentParagraphIndex
+  }, [normalizedCurrentParagraphIndex])
 
   // Memoized handler for paragraph index updates to prevent infinite loops
   const handleParagraphMouseEnter = useCallback((paragraphIdx: number | undefined) => {
