@@ -99,8 +99,10 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // previous dependency array is undefined, accessing .length on it crashes.
   // Solution: Use a primitive (string hash or length) instead of the array itself.
   // We'll use a combination of length and a simple hash of the first few color IDs.
-  // CRITICAL: Use safeAnnotationColors.length (number) instead of safeAnnotationColors (array)
-  const safeAnnotationColorsLengthPrimitive = (safeAnnotationColors?.length ?? 0) || 0
+  // CRITICAL: Calculate length primitive AFTER safeAnnotationColors is defined
+  const safeAnnotationColorsLengthPrimitive = useMemo(() => {
+    return (safeAnnotationColors?.length ?? 0) || 0
+  }, [safeAnnotationColors])
   
   const annotationColorsHash = useMemo(() => {
     // safeAnnotationColors is always an array (guaranteed by useMemo above)
