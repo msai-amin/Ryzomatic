@@ -69,8 +69,14 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // Create a guaranteed array. Even if the hook fails, this falls back to [].
   const safeAnnotationColors = Array.isArray(annotationColors) ? annotationColors : []
   
-  // 3. Derive the length safely (0 if empty)
-  const safeAnnotationColorsLength = safeAnnotationColors.length
+  // 3. Derive the length safely (0 if empty) - MUST be a primitive number, never undefined
+  // CRITICAL: Calculate as primitive immediately to ensure it's always a number
+  const safeAnnotationColorsLengthPrimitive = (Array.isArray(safeAnnotationColors) ? safeAnnotationColors.length : 0) || 0
+  
+  // CRITICAL: Wrap in useMemo to create stable reference for dependency arrays
+  const safeAnnotationColorsLength = useMemo(() => {
+    return typeof safeAnnotationColorsLengthPrimitive === 'number' ? safeAnnotationColorsLengthPrimitive : 0
+  }, [safeAnnotationColorsLengthPrimitive])
 
   const userId = user?.id ?? null
 
