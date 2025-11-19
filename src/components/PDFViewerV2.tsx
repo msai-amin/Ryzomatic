@@ -84,6 +84,10 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // This prevents React's comparison function from receiving different array references
   // which could cause undefined.length errors during dependency comparison
   // CRITICAL: annotationColors is already guaranteed to be an array (defaulted above)
+  // CRITICAL: Calculate annotationColors length as primitive BEFORE useMemo
+  // This ensures we never use the array itself in a dependency array
+  const annotationColorsLengthPrimitive = (Array.isArray(annotationColors) ? annotationColors.length : 0) || 0
+  
   const safeAnnotationColors = useMemo(() => {
     // Double-check that annotationColors is an array (defense in depth)
     if (!Array.isArray(annotationColors)) {
@@ -95,7 +99,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       return []
     }
     return annotationColors
-  }, [annotationColors])
+  }, [annotationColorsLengthPrimitive]) // CRITICAL: Use length (number) instead of array
   
   // CRITICAL: Create a stable primitive value for dependency arrays
   // React's 'co' function receives undefined for previous dependency array on first render.
