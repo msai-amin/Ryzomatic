@@ -92,6 +92,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const normalizedCurrentPage = (pdfViewer?.currentPage ?? 1) || 1
   const normalizedZoom = (pdfViewer?.zoom ?? 1) || 1
   const normalizedReadingMode = pdfViewer?.readingMode === true ? true : false
+  const normalizedDarkMode = pdfViewer?.darkMode === true ? true : false
   const normalizedTextAlign = typography?.textAlign || 'left'
   const normalizedFocusMode = typography?.focusMode === true ? true : false
   const normalizedReadingGuide = typography?.readingGuide === true ? true : false
@@ -401,10 +402,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
   // Toggle dark mode
   const toggleDarkMode = useCallback(() => {
-    // CRITICAL: Use normalized value or fallback to false
-    const currentDarkMode = pdfViewer?.darkMode ?? false
-    updatePDFViewer({ darkMode: !currentDarkMode })
-  }, [pdfViewer?.darkMode, updatePDFViewer])
+    updatePDFViewer({ darkMode: !normalizedDarkMode })
+  }, [normalizedDarkMode, updatePDFViewer])
   
   // Handle context menu
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
