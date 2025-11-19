@@ -1084,20 +1084,16 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     },
     })
   }, [
-    // CRITICAL: All dependencies must be defined and normalized to prevent React's 'co' function error
-    // Use primitive values instead of array references to avoid comparison issues
-    // NOTE: safeAnnotationColors is accessed inside the callback (closure), not in deps
-    // This prevents React's 'co' function from receiving undefined dependency arrays
-    // CRITICAL: All values are normalized above - no nullish coalescing needed here
-    // Removing ?? operators ensures React's comparison function never receives undefined
-    // CRITICAL: Ensure handleCreateHighlight is always defined (useCallback always returns a function)
+    // CRITICAL: All dependencies must be defined primitives - NO || operators, NO optional chaining
+    // Extract all values to primitives FIRST, then use in dependency array
+    // This ensures React's 'co' function NEVER receives undefined
     selectionEnabled === true ? true : false,
-    currentHighlightColor || 'yellow',
-    currentHighlightColorHex || '#ffeb3b',
-    handleCreateHighlight || (() => {}), // Fallback to no-op function if somehow undefined
-    normalizedDocumentId || '',
-    normalizedUserId || '',
-    safeAnnotationColorsLength, // Always a number (initialized above, guaranteed by useMemo)
+    currentHighlightColor ? currentHighlightColor : 'yellow',
+    currentHighlightColorHex ? currentHighlightColorHex : '#ffeb3b',
+    handleCreateHighlight, // useCallback always returns a function, never undefined
+    normalizedDocumentId,
+    normalizedUserId,
+    safeAnnotationColorsLength, // Always a number (memoized above)
     isChatOpen === true ? true : false,
   ])
 
