@@ -81,18 +81,24 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   }, [annotationColors])
   
   // CRITICAL: Ensure length is always a number, never undefined
-  // CRITICAL FIX: Initialize with a default value BEFORE useMemo to prevent React's 'co' function
-  // from receiving undefined during first render. React's comparison function receives undefined
-  // for the previous dependency array on first render, and if any value in the current array is
-  // also undefined, it tries to access .length on undefined, causing the crash.
-  // By ensuring safeAnnotationColorsLength is ALWAYS a number (even before useMemo runs),
-  // we prevent this race condition.
-  let safeAnnotationColorsLength: number = 0 // Initialize to 0 to ensure it's always a number
-  safeAnnotationColorsLength = useMemo(() => {
+  // CRITICAL FIX: React's 'co' function receives undefined for previous dependency array on first render.
+  // If any value in the current dependency array is also undefined, React tries to access .length
+  // on undefined, causing crash. By ensuring the useMemo ALWAYS returns a number (never undefined),
+  // we prevent this race condition. The useMemo is guaranteed to return a number on first render.
+  const safeAnnotationColorsLength = useMemo(() => {
+    // CRITICAL: Ensure we always return a number, never undefined
     const length = safeAnnotationColors?.length ?? 0
-    const result = typeof length === 'number' && !isNaN(length) ? length : 0
-    // CRITICAL: Double-check result is a number before returning
-    return typeof result === 'number' ? result : 0
+    const result = typeof length === 'number' && !isNaN(length) && length >= 0 ? length : 0
+    // CRITICAL: Final safety check - guarantee result is always a number
+    if (typeof result !== 'number' || isNaN(result)) {
+      console.warn('PDFViewerV2: safeAnnotationColorsLength calculation failed, defaulting to 0', {
+        length,
+        result,
+        safeAnnotationColorsLength: safeAnnotationColors?.length
+      })
+      return 0
+    }
+    return result
   }, [safeAnnotationColors])
 
   // CRITICAL: Normalize all dependencies to ensure they're never undefined
