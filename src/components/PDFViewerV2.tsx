@@ -396,13 +396,15 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   
   // Toggle reading mode
   const toggleReadingMode = useCallback(() => {
-    updatePDFViewer({ readingMode: !pdfViewer.readingMode })
-  }, [pdfViewer.readingMode, updatePDFViewer])
+    updatePDFViewer({ readingMode: !normalizedReadingMode })
+  }, [normalizedReadingMode, updatePDFViewer])
 
   // Toggle dark mode
   const toggleDarkMode = useCallback(() => {
-    updatePDFViewer({ darkMode: !pdfViewer.darkMode })
-  }, [pdfViewer.darkMode, updatePDFViewer])
+    // CRITICAL: Use normalized value or fallback to false
+    const currentDarkMode = pdfViewer?.darkMode ?? false
+    updatePDFViewer({ darkMode: !currentDarkMode })
+  }, [pdfViewer?.darkMode, updatePDFViewer])
   
   // Handle context menu
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -488,9 +490,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
   // Handle context menu actions
   const handleClarification = useCallback(() => {
-    // CRITICAL: Use normalized arrays instead of accessing document directly
-    const pageText = normalizedPageTexts[pdfViewer.currentPage - 1]
-    const context = getPDFTextSelectionContext(pdfViewer.currentPage, pageText)
+    // CRITICAL: Use normalized arrays and normalized current page
+    const pageText = normalizedPageTexts[normalizedCurrentPage - 1]
+    const context = getPDFTextSelectionContext(normalizedCurrentPage, pageText)
     if (context) {
       setSelectedTextContext(context)
       setChatMode('clarification')
@@ -499,11 +501,12 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       }
     }
     setContextMenu(null)
-  }, [pdfViewer.currentPage, normalizedDocumentId, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
+  }, [normalizedCurrentPage, normalizedPageTexts, normalizedDocumentId, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
   
   const handleFurtherReading = useCallback(() => {
-    const pageText = document?.pageTexts?.[pdfViewer.currentPage - 1]
-    const context = getPDFTextSelectionContext(pdfViewer.currentPage, pageText)
+    // CRITICAL: Use normalized arrays and normalized current page
+    const pageText = normalizedPageTexts[normalizedCurrentPage - 1]
+    const context = getPDFTextSelectionContext(normalizedCurrentPage, pageText)
     if (context) {
       setSelectedTextContext(context)
       setChatMode('further-reading')
@@ -512,7 +515,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       }
     }
     setContextMenu(null)
-  }, [pdfViewer.currentPage, normalizedDocumentId, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
+  }, [normalizedCurrentPage, normalizedPageTexts, normalizedDocumentId, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
   
   const handleSaveNote = useCallback(async () => {
     // CRITICAL: Use normalized arrays instead of accessing document directly
