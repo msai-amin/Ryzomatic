@@ -73,8 +73,13 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // Early returns cause hooks to be skipped, which breaks React's internal dependency tracking
 
   // Safety check: ensure annotationColors is an array
-  // CRITICAL: This must be defined before any useMemo hooks to prevent undefined.length errors
-  const safeAnnotationColors = Array.isArray(annotationColors) ? annotationColors : []
+  // CRITICAL: Use useMemo to create a stable array reference
+  // This prevents React's comparison function from receiving different array references
+  // which could cause undefined.length errors during dependency comparison
+  const safeAnnotationColors = useMemo(() => {
+    return Array.isArray(annotationColors) ? annotationColors : []
+  }, [annotationColors])
+  
   // CRITICAL: Ensure length is always a number, never undefined
   // Use useMemo to create a stable reference that's always a number
   // This prevents React's comparison function from receiving undefined during state transitions
