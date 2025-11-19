@@ -488,8 +488,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   }, [user, normalizedDocumentId, highlightsLengthPrimitive]) // Use length (number) instead of array
 
   // Handle context menu actions
+  // CRITICAL: Access normalizedPageTexts from closure, use pageTextsLength (primitive) in dependency array
   const handleClarification = useCallback(() => {
-    // CRITICAL: Use normalized arrays and normalized current page
+    // Access normalizedPageTexts from closure - it's guaranteed to be an array
     const pageText = normalizedPageTexts[normalizedCurrentPage - 1]
     const context = getPDFTextSelectionContext(normalizedCurrentPage, pageText)
     if (context) {
@@ -500,10 +501,10 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       }
     }
     setContextMenu(null)
-  }, [normalizedCurrentPage, normalizedPageTexts, normalizedDocumentId, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
+  }, [normalizedCurrentPage, pageTextsLength, normalizedDocumentId, setSelectedTextContext, setChatMode, toggleChat, isChatOpen]) // Use length (number) instead of array
   
   const handleFurtherReading = useCallback(() => {
-    // CRITICAL: Use normalized arrays and normalized current page
+    // Access normalizedPageTexts from closure - it's guaranteed to be an array
     const pageText = normalizedPageTexts[normalizedCurrentPage - 1]
     const context = getPDFTextSelectionContext(normalizedCurrentPage, pageText)
     if (context) {
@@ -514,10 +515,10 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       }
     }
     setContextMenu(null)
-  }, [normalizedCurrentPage, normalizedPageTexts, normalizedDocumentId, setSelectedTextContext, setChatMode, toggleChat, isChatOpen])
+  }, [normalizedCurrentPage, pageTextsLength, normalizedDocumentId, setSelectedTextContext, setChatMode, toggleChat, isChatOpen]) // Use length (number) instead of array
   
   const handleSaveNote = useCallback(async () => {
-    // CRITICAL: Use normalized arrays and normalized current page
+    // Access normalizedPageTexts from closure - it's guaranteed to be an array
     const pageText = normalizedPageTexts[normalizedCurrentPage - 1]
     const context = getPDFTextSelectionContext(normalizedCurrentPage, pageText)
     if (context && document.id && userId) {
@@ -537,7 +538,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       }
     }
     setContextMenu(null)
-  }, [normalizedDocumentId, normalizedUserId, normalizedCurrentPage, normalizedPageTexts, document?.id, userId])
+  }, [normalizedDocumentId, normalizedUserId, normalizedCurrentPage, pageTextsLength, document?.id, userId]) // Use length (number) instead of array
 
   // Sync highlights ref with state
   // CRITICAL: Use array length instead of array reference to prevent React comparison issues
