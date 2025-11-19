@@ -419,8 +419,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       const notes = notesData || []
 
       // Create notes file content
-      // Safety check: ensure highlights is an array
-      const safeHighlights = Array.isArray(highlights) ? highlights : []
+      // CRITICAL: Use safeHighlights which is already declared above
       if (notes.length > 0 || safeHighlights.length > 0) {
         let notesContent = `# Notes and Highlights for ${document.name}\n\n`
         notesContent += `Generated on: ${new Date().toLocaleString()}\n\n`
