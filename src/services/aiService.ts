@@ -78,7 +78,7 @@ export const __setGeminiClientForTests = (client: any) => {
 const getGeminiModel = (tier: 'free' | 'pro' | 'premium' | 'enterprise' = 'free') => {
   if (!geminiClient) return null;
   
-  const modelName = tier === 'free' ? 'gemini-2.5-flash-lite' : 'gemini-2.5-pro';
+  const modelName = 'gemini-2.5-flash';
   return geminiClient.getGenerativeModel({ model: modelName });
 };
 

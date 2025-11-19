@@ -147,7 +147,7 @@ const LandingPage: React.FC = () => {
       features: [
         "Unlimited documents",
         "300 AI chats per month",
-        "Gemini-2.5-Pro AI",
+        "Gemini-2.5-Flash AI",
         "50GB storage",
         "Export features",
         "Team collaboration (3 users)",

@@ -185,7 +185,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const responseTime = Date.now() - startTime;
-    const model = profile.tier === 'free' ? 'gemini-2.5-flash-lite' : 'gemini-2.5-pro';
+    const model = 'gemini-2.5-flash';
 
     // Save conversation and messages
     let finalConversationId = conversationId;

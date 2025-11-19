@@ -63,8 +63,7 @@ export class CostTracker {
    */
   private estimateCost(model: string, tokens: number): number {
     const costPer1000Tokens: Record<string, number> = {
-      'gemini-2.5-flash-lite': 0, // Free
-      'gemini-2.5-pro': 0.000125, // $0.125 per 1M tokens
+      'gemini-2.5-flash': 0, // Free
       'gpt-4o-mini': 0.00015, // $0.15 per 1M tokens
       'gpt-4': 0.03, // $30 per 1M tokens
     };

@@ -119,7 +119,7 @@ async function extractFrameworksWithGemini(text: string): Promise<TheoreticalFra
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const prompt = `Analyze the following academic text and identify all theoretical frameworks, methodologies, and conceptual approaches mentioned or implied.
 

@@ -343,7 +343,7 @@ class TTSManager {
     // Always assign a model field - the API will tell us if it's not needed
     // This ensures voices like "Achird" that the API treats as Studio voices work
     if (!voiceWithModel.model) {
-      voiceWithModel.model = 'gemini-1.0-pro';
+      voiceWithModel.model = 'gemini-2.5-flash';
     }
     
     return voiceWithModel;

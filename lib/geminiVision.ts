@@ -46,7 +46,7 @@ export async function extractPageWithVision(
   try {
     // Call Gemini Vision API
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.5-flash-lite' // Using 2.5 flash lite for cost-effective vision
+      model: 'gemini-2.5-flash' // Using 2.5 flash for cost-effective vision
     })
 
     const prompt = `Extract all text from this PDF page image. Preserve the layout, paragraphs, and reading order (top-to-bottom, left-to-right). 
@@ -88,7 +88,7 @@ Return ONLY the extracted text without any commentary or explanations.`
         tokensUsed,
         processingTime,
         imageSize,
-        model: 'gemini-2.5-flash-lite'
+        model: 'gemini-2.5-flash'
       }
     }
   } catch (error) {
@@ -102,7 +102,7 @@ Return ONLY the extracted text without any commentary or explanations.`
         tokensUsed: 0,
         processingTime,
         imageSize: 0,
-        model: 'gemini-2.5-flash-lite'
+        model: 'gemini-2.5-flash'
       },
       error: error instanceof Error ? error.message : 'Unknown vision extraction error'
     }

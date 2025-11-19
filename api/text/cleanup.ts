@@ -170,12 +170,12 @@ ${text}`;
         });
       }
 
-      // Use Gemini service with free tier (gemini-2.5-flash-lite)
+      // Use Gemini service with free tier (gemini-2.5-flash)
       let response: string;
       try {
         response = await geminiService.chat({
           message: ttsPrompt,
-          tier: 'free', // Uses gemini-2.5-flash-lite
+          tier: 'free', // Uses gemini-2.5-flash
         });
       } catch (geminiError: any) {
         console.error('Gemini API error in TTS optimization:', geminiError);
@@ -281,12 +281,12 @@ ${text}`;
       });
     }
 
-    // Use Gemini service with free tier (gemini-2.5-flash-lite)
+    // Use Gemini service with free tier (gemini-2.5-flash)
     let response: string;
     try {
       response = await geminiService.chat({
         message: prompt,
-        tier: 'free', // Uses gemini-2.5-flash-lite
+        tier: 'free', // Uses gemini-2.5-flash
       });
     } catch (geminiError: any) {
       console.error('Gemini API error:', geminiError);

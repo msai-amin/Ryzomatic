@@ -6,22 +6,22 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 // Model configuration based on tier
 const MODEL_CONFIG = {
   free: {
-    model: 'gemini-2.5-flash-lite',
+    model: 'gemini-2.5-flash',
     maxOutputTokens: 2048,
     temperature: 0.7,
   },
   pro: {
-    model: 'gemini-2.5-pro',
+    model: 'gemini-2.5-flash',
     maxOutputTokens: 4096,
     temperature: 0.7,
   },
   premium: {
-    model: 'gemini-2.5-pro',
+    model: 'gemini-2.5-flash',
     maxOutputTokens: 8192,
     temperature: 0.7,
   },
   enterprise: {
-    model: 'gemini-2.5-pro',
+    model: 'gemini-2.5-flash',
     maxOutputTokens: 8192,
     temperature: 0.7,
   },
@@ -375,7 +375,7 @@ ${content.substring(0, 5000)}`;
   }
 
   /**
-   * Perform OCR on a PDF document using Gemini vision (e.g., gemini-2.5-flash-lite)
+   * Perform OCR on a PDF document using Gemini vision (e.g., gemini-2.5-flash)
    */
   async ocrDocument(
     pdfBuffer: Buffer,

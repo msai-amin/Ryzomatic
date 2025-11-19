@@ -55,7 +55,7 @@ export const aiConfig: AIEngineSettings = {
     quantum: {
       name: 'Quantum Parse Engine',
       provider: 'google',
-      modelId: 'gemini-pro',
+      modelId: 'gemini-2.5-flash',
       maxTokens: 3000,
       temperature: 0.5,
       timeout: 25000,

@@ -55,7 +55,7 @@ class AIEngineCore {
     this.config = {
   models: {
     neural: 'gpt-4o-mini',
-    quantum: 'gemini-pro',
+    quantum: 'gemini-2.5-flash',
     synapse: 'gpt-4o-mini',
   },
       settings: {
