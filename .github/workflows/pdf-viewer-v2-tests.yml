@@ -1,0 +1,244 @@
+name: PDF Viewer V2 Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/components/PDFViewerV2.tsx'
+      - 'src/services/highlightService.ts'
+      - 'src/utils/pdfHighlightGeometry.ts'
+      - 'src/utils/highlightCoordinates.ts'
+      - 'tests/**'
+      - '.github/workflows/pdf-viewer-v2-tests.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/components/PDFViewerV2.tsx'
+      - 'src/services/highlightService.ts'
+      - 'src/utils/pdfHighlightGeometry.ts'
+      - 'src/utils/highlightCoordinates.ts'
+      - 'tests/**'
+      - '.github/workflows/pdf-viewer-v2-tests.yml'
+  workflow_dispatch:
+
+jobs:
+  unit-tests:
+    name: Unit Tests - Highlighting & PDF Utils
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests for highlighting utilities
+        run: npm run test -- tests/utils/pdfHighlightGeometry.test.ts tests/utils/highlightCoordinates.test.ts --coverage
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        if: always()
+        with:
+          files: ./coverage/coverage-final.json
+          flags: unit-tests
+          name: unit-tests-coverage
+
+  e2e-tests:
+    name: E2E Tests - PDF Viewer V2
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Build application
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder_key' }}
+
+      - name: Start preview server
+        run: |
+          npm run preview &
+          sleep 10
+        env:
+          PORT: 3001
+
+      - name: Wait for server to be ready
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:3001; do sleep 2; done'
+
+      - name: Run E2E tests for PDF Viewer V2
+        run: npx playwright test tests/e2e/pdf-viewer-v2/ --project=${{ matrix.browser }} --reporter=html,json,junit
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: http://localhost:3001
+          CI: true
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.browser }}
+          path: playwright-report/results.json
+          retention-days: 7
+
+  e2e-highlighting:
+    name: E2E Tests - Highlighting Features
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build application
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder_key' }}
+
+      - name: Start preview server
+        run: |
+          npm run preview &
+          sleep 10
+        env:
+          PORT: 3001
+
+      - name: Wait for server to be ready
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:3001; do sleep 2; done'
+
+      - name: Run highlighting E2E tests
+        run: npx playwright test tests/e2e/pdf-viewer-v2/highlighting.spec.ts --reporter=html,json,junit
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: http://localhost:3001
+          CI: true
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-highlighting
+          path: playwright-report/
+          retention-days: 30
+
+  e2e-features:
+    name: E2E Tests - PDF Viewer Features
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build application
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder_key' }}
+
+      - name: Start preview server
+        run: |
+          npm run preview &
+          sleep 10
+        env:
+          PORT: 3001
+
+      - name: Wait for server to be ready
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:3001; do sleep 2; done'
+
+      - name: Run PDF Viewer features E2E tests
+        run: npx playwright test tests/e2e/pdf-viewer-v2/features.spec.ts --reporter=html,json,junit
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: http://localhost:3001
+          CI: true
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-features
+          path: playwright-report/
+          retention-days: 30
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [unit-tests, e2e-tests, e2e-highlighting, e2e-features]
+    if: always()
+    
+    steps:
+      - name: Check test results
+        run: |
+          echo "## PDF Viewer V2 Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Unit Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ needs.unit-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### E2E Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ needs.e2e-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Highlighting Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ needs.e2e-highlighting.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Features Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ needs.e2e-features.result }}" >> $GITHUB_STEP_SUMMARY
+

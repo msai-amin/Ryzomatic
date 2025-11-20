@@ -9,6 +9,15 @@ import { simpleGoogleAuth } from '../services/simpleGoogleAuth';
 import { libraryOrganizationService, Collection } from '../services/libraryOrganizationService';
 import { CollectionTree } from './library/CollectionTree';
 import { supabase } from '../../lib/supabase';
+import { notesService } from '../services/notesService';
+
+// Enhanced SavedBook type that includes both camelCase and snake_case properties
+// This type extends SavedBook with additional properties from Supabase
+export type EnhancedSavedBook = SavedBook & {
+  is_favorite?: boolean;
+  file_size?: number;
+  [key: string]: any; // Allow additional properties from Supabase
+};
 
 interface LibraryModalProps {
   isOpen: boolean;
@@ -745,6 +754,37 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       setRenameBusyIds(prev => prev.filter(id => id !== book.id));
     }
   };
+
+  const handleDeleteNote = useCallback(async (noteId: string) => {
+    try {
+      const { error } = await notesService.deleteNote(noteId);
+      if (error) {
+        console.error('LibraryModal: Error deleting note:', error);
+        setMessageDialog({
+          type: 'error',
+          title: 'Error',
+          message: 'Failed to delete note. Please try again.'
+        });
+        return;
+      }
+
+      // Remove note from local state
+      setNotes(prev => prev.filter(note => note.id !== noteId));
+      
+      setMessageDialog({
+        type: 'success',
+        title: 'Success',
+        message: 'Note deleted successfully.'
+      });
+    } catch (error) {
+      console.error('LibraryModal: Exception deleting note:', error);
+      setMessageDialog({
+        type: 'error',
+        title: 'Error',
+        message: 'An unexpected error occurred while deleting the note.'
+      });
+    }
+  }, []);
 
   const handleToggleFavorite = async (book: EnhancedSavedBook) => {
     if (favoriteBusyIds.includes(book.id)) return;
