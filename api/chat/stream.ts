@@ -124,8 +124,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const tier = profile_tier?.tier || 'free';
       
-      // For pro+ tiers, use intelligent context builder
-      if (['pro', 'premium', 'enterprise'].includes(tier)) {
+      // For custom tier, use intelligent context builder
+      if (tier === 'custom') {
         try {
           const shouldUseMemory = contextBuilder.shouldUseMemoryContext(message);
           

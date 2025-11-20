@@ -75,7 +75,7 @@ export const __setGeminiClientForTests = (client: any) => {
 };
 
 // Helper function to get the appropriate Gemini model based on tier
-const getGeminiModel = (tier: 'free' | 'pro' | 'premium' | 'enterprise' = 'free') => {
+const getGeminiModel = (tier: 'free' | 'custom' = 'free') => {
   if (!geminiClient) return null;
   
   const modelName = 'gemini-2.5-flash';
@@ -107,7 +107,7 @@ const loadSystemPrompt = async (): Promise<string | null> => {
 export const sendMessageToAI = async (
   message: string, 
   documentContent?: string, 
-  tier: 'free' | 'pro' | 'premium' | 'enterprise' = 'free',
+  tier: 'free' | 'custom' = 'free',
   mode: 'general' | 'study' | 'notes' = 'general'
 ): Promise<string> => {
   const context = {
@@ -423,7 +423,7 @@ export const askForClarification = async (
   selectedText: string,
   context: string,
   documentContent?: string,
-  tier: 'free' | 'pro' | 'premium' | 'enterprise' = 'free'
+  tier: 'free' | 'custom' = 'free'
 ): Promise<string> => {
   const logContext = {
     component: 'AIService',
@@ -519,7 +519,7 @@ export const getFurtherReading = async (
   selectedText: string,
   context: string,
   documentContent?: string,
-  tier: 'free' | 'pro' | 'premium' | 'enterprise' = 'free'
+  tier: 'free' | 'custom' = 'free'
 ): Promise<string> => {
   const logContext = {
     component: 'AIService',

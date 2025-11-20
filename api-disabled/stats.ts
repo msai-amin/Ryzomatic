@@ -9,21 +9,11 @@ const supabase = createClient(
 // Tier limits
 const TIER_LIMITS = {
   free: {
-    aiQueries: 100,
-    documents: 10,
-    creditsPerMonth: 100,
+    aiQueries: 200,
+    documents: 50,
+    creditsPerMonth: 200,
   },
-  pro: {
-    aiQueries: 1000,
-    documents: 100,
-    creditsPerMonth: 1000,
-  },
-  premium: {
-    aiQueries: 5000,
-    documents: 1000,
-    creditsPerMonth: 5000,
-  },
-  enterprise: {
+  custom: {
     aiQueries: Infinity,
     documents: Infinity,
     creditsPerMonth: Infinity,

@@ -173,7 +173,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ isOpen, onClos
                   color: 'var(--color-text-inverse)',
                 }}
               >
-                Upgrade Plan
+                {user?.tier === 'free' ? 'Contact Us for Custom Plan' : 'Manage Plan'}
               </button>
               <button
                 onClick={() => setShowCancelModal(true)}
@@ -580,7 +580,9 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ isOpen, onClos
               <h3 className="text-lg font-semibold">Payment Integration Coming Soon!</h3>
             </div>
             <p className="text-gray-600 dark:text-gray-300 mb-6">
-              We're working on integrating payment processing. You'll be able to upgrade your plan soon!
+              {user?.tier === 'free' 
+                ? 'Contact us for a custom plan with unlimited features and priority support!'
+                : 'Manage your custom plan settings and contact your account manager.'}
             </p>
             <button
               onClick={() => setShowUpgradeModal(false)}

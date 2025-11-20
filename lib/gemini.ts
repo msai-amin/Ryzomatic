@@ -7,20 +7,10 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const MODEL_CONFIG = {
   free: {
     model: 'gemini-2.5-flash',
-    maxOutputTokens: 2048,
-    temperature: 0.7,
-  },
-  pro: {
-    model: 'gemini-2.5-flash',
     maxOutputTokens: 4096,
     temperature: 0.7,
   },
-  premium: {
-    model: 'gemini-2.5-flash',
-    maxOutputTokens: 8192,
-    temperature: 0.7,
-  },
-  enterprise: {
+  custom: {
     model: 'gemini-2.5-flash',
     maxOutputTokens: 8192,
     temperature: 0.7,

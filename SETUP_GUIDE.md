@@ -281,31 +281,19 @@ Your app will be live at: `https://smart-reader-xxxx.vercel.app`
 2. Complete account setup
 3. Get API keys from "Developers" → "API keys"
 
-### Create Products
+### Custom Plans (Contact-Based)
 
-1. Go to "Products" → "Add Product"
-2. Create two products:
+The application uses a 2-tier pricing model:
+- **Free Tier**: Generous limits with full feature access (50 docs, 200 AI chats, 50 OCR/month)
+- **Custom Tier**: Contact-based enterprise/custom plans with unlimited or custom limits
 
-**Pro Tier:**
-- Name: Smart Reader Pro
-- Price: $9.99/month
-- Recurring: Monthly
-- Copy Price ID
+For custom plans, users contact you directly via email. No Stripe integration is required for basic setup.
 
-**Premium Tier:**
-- Name: Smart Reader Premium
-- Price: $29.99/month
-- Recurring: Monthly
-- Copy Price ID
-
-### Add Stripe Keys to Vercel
-
-```bash
-vercel env add STRIPE_SECRET_KEY
-vercel env add STRIPE_PUBLISHABLE_KEY
-vercel env add STRIPE_PRICE_ID_PRO
-vercel env add STRIPE_PRICE_ID_PREMIUM
-```
+**Optional: Future Stripe Integration**
+If you want to add automated billing for custom plans:
+1. Set up Stripe products for custom pricing
+2. Add environment variables for Stripe keys
+3. Implement custom checkout flow
 
 ---
 
@@ -369,7 +357,7 @@ curl -X POST https://your-app.vercel.app/api/chat/stream \
 
 **Gemini (free tier limits):**
 - Flash: 15 RPM (1,500 requests/day)
-- Pro: 2 RPM (50 requests/day)
+- Custom plans: Higher limits based on agreement
 
 **Supabase (free tier):**
 - 500MB database

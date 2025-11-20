@@ -542,7 +542,7 @@ export const useAppStore = create<AppState>((set, get) => ({
               email: user.email || '',
               full_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
               tier: 'free',
-              credits: 100
+              credits: 200
             });
             console.log('Profile created successfully');
           } catch (createError) {
@@ -553,7 +553,7 @@ export const useAppStore = create<AppState>((set, get) => ({
               email: user.email || '',
               full_name: user.user_metadata?.full_name || user.user_metadata?.name,
               tier: 'free',
-              credits: 100
+              credits: 200
             } as AuthUser;
           }
         }

@@ -231,7 +231,7 @@ class NotesService {
     noteType: 'cornell' | 'outline' | 'mindmap' | 'chart' | 'boxing',
     userGoal: string,
     userId: string,
-    tier: 'free' | 'pro' | 'premium' | 'enterprise' = 'free'
+    tier: 'free' | 'custom' = 'free'
   ): Promise<{ data: string | null; error: Error | null }> {
     try {
       console.log('NotesService: Generating AI note with type:', noteType);

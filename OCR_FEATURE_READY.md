@@ -63,12 +63,10 @@
 
 ## 🎯 Tier Limits
 
-| Tier       | OCR/Month | Credits/OCR | Max Pages | Status        |
-|------------|-----------|-------------|-----------|---------------|
-| Free       | 5         | 1           | 20        | ✅ Configured |
-| Pro        | 100       | 1           | 50        | ✅ Configured |
-| Premium    | 500       | 1           | 100       | ✅ Configured |
-| Enterprise | Unlimited | 0 (Free)    | Unlimited | ✅ Configured |
+| Tier   | OCR/Month | Credits/OCR | Max Pages | Status        |
+|--------|-----------|-------------|-----------|---------------|
+| Free   | 50        | 1           | 50        | ✅ Configured |
+| Custom | Unlimited | 0 (Free)    | Unlimited | ✅ Configured |
 
 ## 🔄 Complete User Flow
 
@@ -82,7 +80,7 @@ User uploads PDF → PDF.js extracts text → Detects < 100 chars → needsOCR =
 Shows dialog:
 - "Scanned Document Detected"
 - "OCR Cost: 1 credit"
-- "You have 5 OCR credits remaining (Free tier)"
+- "You have 50 OCR credits remaining (Free tier)"
 - [Use OCR] [Skip OCR] buttons
 ```
 

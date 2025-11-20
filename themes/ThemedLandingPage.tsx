@@ -19,47 +19,37 @@ const ThemedLandingPage: React.FC = () => {
 
   const pricingTiers: PricingTier[] = [
     {
-      name: "EXPLORER",
+      name: "FREE",
       price: "Free",
       period: "forever",
       color: "var(--color-accent-1)",
       features: [
-        "5 documents per month",
-        "20 AI chats per month",
-        "Basic PDF viewing",
-        "1GB storage",
+        "50 documents per month",
+        "200 AI chats per month",
+        "50 OCR processing per month",
+        "100 vision extraction pages per month",
+        "10GB storage",
+        "All features enabled",
+        "Highlights, notes, TTS, Pomodoro",
+        "Document relationships",
         "Community support"
       ]
     },
     {
-      name: "SCHOLAR",
-      price: activePricing === 'monthly' ? "$4.99" : "$3.99",
-      period: activePricing === 'monthly' ? "month" : "month (billed yearly)",
+      name: "CUSTOM",
+      price: "Contact Us",
+      period: "Custom plans",
       color: "var(--color-primary)",
       popular: true,
       features: [
-        "25 documents per month",
-        "100 AI chats per month",
-        "OCR processing",
-        "10GB storage",
+        "Unlimited or custom limits",
         "Priority support",
-        "Advanced highlighting",
-        "Pomodoro tracking"
-      ]
-    },
-    {
-      name: "ACADEMIC",
-      price: activePricing === 'monthly' ? "$9.99" : "$7.99",
-      period: activePricing === 'monthly' ? "month" : "month (billed yearly)",
-      color: "var(--color-accent-2)",
-      features: [
-        "Unlimited documents",
-        "300 AI chats per month",
-        "Gemini-2.5-Flash AI",
-        "50GB storage",
-        "Export features",
-        "Team collaboration (3 users)",
-        "Priority support"
+        "Custom integrations",
+        "Team features",
+        "SLA guarantees",
+        "No credit restrictions",
+        "Dedicated account manager",
+        "Custom pricing"
       ]
     }
   ]
@@ -389,8 +379,15 @@ const ThemedLandingPage: React.FC = () => {
                     borderColor: 'var(--color-primary)',
                     borderWidth: '2px',
                   }}
+                  onClick={() => {
+                    if (tier.name === 'CUSTOM') {
+                      window.location.href = 'mailto:support@smartreader.com?subject=Custom Plan Inquiry';
+                    } else {
+                      window.location.href = '/?auth=true';
+                    }
+                  }}
                 >
-                  {tier.name === 'INSTITUTION' ? 'Contact Sales' : 'Get Started'}
+                  {tier.name === 'CUSTOM' ? 'Contact Us' : 'Get Started'}
                 </button>
               </div>
             ))}

@@ -57,12 +57,10 @@ export async function getVisionUsageStats(userId: string): Promise<VisionUsageSt
 
     // Determine monthly limit based on tier
     const limits: Record<string, number> = {
-      free: 20,
-      pro: 200,
-      premium: 1000,
-      enterprise: -1 // unlimited
+      free: 100, // 100 pages/month for free tier
+      custom: -1 // unlimited for custom tier
     }
-    const monthlyLimit = limits[tier] || 20
+    const monthlyLimit = limits[tier] || 100
 
     // Calculate next reset date (1 month from last reset)
     const nextResetDate = new Date(lastResetDate)
@@ -200,8 +198,8 @@ export async function canPerformVisionExtraction(
       }
     }
 
-    // Check credits (enterprise tier doesn't need credits)
-    if (profile.tier !== 'enterprise') {
+    // Check credits (custom tier doesn't need credits)
+    if (profile.tier !== 'custom') {
       const creditsNeeded = pageCount * 0.1
       if (profile.credits < creditsNeeded) {
         return {

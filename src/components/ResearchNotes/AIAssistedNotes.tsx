@@ -41,7 +41,7 @@ export const AIAssistedNotes: React.FC<AIAssistedNotesProps> = ({ onNotesGenerat
         selectedNoteType,
         userGoal || 'General study and comprehension',
         user.id,
-        (user.tier || 'free') as 'free' | 'pro' | 'premium' | 'enterprise'
+        (user.tier || 'free') as 'free' | 'custom'
       );
 
       if (error) {

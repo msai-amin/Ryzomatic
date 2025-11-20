@@ -87,7 +87,7 @@ export interface AuthUser {
   id: string;
   email: string;
   full_name?: string;
-  tier: 'free' | 'pro' | 'premium' | 'enterprise';
+  tier: 'free' | 'custom';
   credits: number;
 }
 

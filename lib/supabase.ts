@@ -8,7 +8,7 @@ export interface Profile {
   id: string;
   email: string;
   full_name?: string;
-  tier: 'free' | 'pro' | 'premium' | 'enterprise';
+  tier: 'free' | 'custom';
   credits: number;
   stripe_customer_id?: string;
   stripe_subscription_id?: string;

@@ -32,9 +32,9 @@ export const OCRConsentDialog: React.FC<OCRConsentDialogProps> = ({
   const tierConfig = OCR_LIMITS[userTier as keyof typeof OCR_LIMITS] || OCR_LIMITS.free;
   const ocrLimit = tierConfig.monthlyOCR;
   const ocrsRemaining = ocrLimit - remainingOCRs;
-  const isEnterprise = userTier === 'enterprise';
-  const canAfford = isEnterprise || userCredits >= estimatedCredits;
-  const hasOCRsLeft = isEnterprise || ocrsRemaining > 0;
+  const isCustom = userTier === 'custom';
+  const canAfford = isCustom || userCredits >= estimatedCredits;
+  const hasOCRsLeft = isCustom || ocrsRemaining > 0;
 
   const handleApprove = () => {
     if (dontAskAgain) {
@@ -107,13 +107,13 @@ export const OCRConsentDialog: React.FC<OCRConsentDialogProps> = ({
             <div className="flex justify-between text-sm">
               <span style={{ color: 'var(--color-text-secondary)' }}>OCR Cost:</span>
               <span className="font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                {isEnterprise ? 'Free (Enterprise)' : `${estimatedCredits} ${estimatedCredits === 1 ? 'credit' : 'credits'}`}
+                {isCustom ? 'Free (Custom Plan)' : `${estimatedCredits} ${estimatedCredits === 1 ? 'credit' : 'credits'}`}
               </span>
             </div>
           </div>
 
           {/* Tier-Specific Info */}
-          {!isEnterprise && (
+          {!isCustom && (
             <div 
               className="p-3 rounded-lg space-y-2"
               style={{ 
@@ -154,7 +154,7 @@ export const OCRConsentDialog: React.FC<OCRConsentDialogProps> = ({
                   Running low on OCR credits?
                 </p>
                 <p className="text-xs text-blue-700 mt-1">
-                  Upgrade to Pro for 100 OCR extractions per month
+                  Contact us for a custom plan with unlimited OCR extractions
                 </p>
               </div>
             </div>
@@ -214,7 +214,7 @@ export const OCRConsentDialog: React.FC<OCRConsentDialogProps> = ({
               color: 'var(--color-text-inverse)',
             }}
           >
-            {isEnterprise ? 'Process with OCR' : `Use OCR (${estimatedCredits} credit${estimatedCredits === 1 ? '' : 's'})`}
+            {isCustom ? 'Process with OCR' : `Use OCR (${estimatedCredits} credit${estimatedCredits === 1 ? '' : 's'})`}
           </button>
           <button
             onClick={onDecline}

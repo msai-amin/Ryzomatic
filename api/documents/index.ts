@@ -39,10 +39,8 @@ const s3Client = new S3Client({
 
 // Tier limits
 const TIER_LIMITS = {
-  free: { documents: 10, maxFileSize: 10 * 1024 * 1024 },
-  pro: { documents: 100, maxFileSize: 50 * 1024 * 1024 },
-  premium: { documents: 1000, maxFileSize: 100 * 1024 * 1024 },
-  enterprise: { documents: Infinity, maxFileSize: 500 * 1024 * 1024 },
+  free: { documents: 50, maxFileSize: 50 * 1024 * 1024 },
+  custom: { documents: Infinity, maxFileSize: 500 * 1024 * 1024 },
 };
 
 /**
@@ -354,7 +352,7 @@ async function handleOCRProcess(req: VercelRequest, res: VercelResponse) {
     // Calculate credit cost
     const creditsNeeded = GPT5NanoService.calculateOCRCredits(pageCount, profile.tier);
 
-    if (profile.tier !== 'enterprise' && profile.credits < creditsNeeded) {
+    if (profile.tier !== 'custom' && profile.credits < creditsNeeded) {
       return res.status(403).json({ 
         error: 'Insufficient credits',
         required: creditsNeeded,
@@ -444,7 +442,7 @@ async function handleOCRProcess(req: VercelRequest, res: VercelResponse) {
       .eq('id', documentId);
 
     // Deduct credits
-    if (profile.tier !== 'enterprise') {
+    if (profile.tier !== 'custom') {
       await supabase
         .from('profiles')
         .update({ 
@@ -481,7 +479,7 @@ async function handleOCRProcess(req: VercelRequest, res: VercelResponse) {
       pageTexts: ocrResult.pageTexts,
       metadata: {
         ...ocrResult.metadata,
-        creditsRemaining: profile.tier === 'enterprise' 
+        creditsRemaining: profile.tier === 'custom' 
           ? 'unlimited' 
           : profile.credits - creditsNeeded,
         ocrCountRemaining: OCR_LIMITS[profile.tier as keyof typeof OCR_LIMITS].monthlyOCR 

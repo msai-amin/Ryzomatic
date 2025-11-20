@@ -114,44 +114,35 @@ const LandingPage: React.FC = () => {
 
   const pricingTiers: PricingTier[] = [
     {
-      name: "Explorer",
+      name: "Free",
       price: "Free",
       period: "forever",
       features: [
-        "5 documents per month",
-        "20 AI chats per month",
-        "Basic PDF viewing",
-        "1GB storage",
+        "50 documents per month",
+        "200 AI chats per month",
+        "50 OCR processing per month",
+        "100 vision extraction pages per month",
+        "10GB storage",
+        "All features enabled",
+        "Highlights, notes, TTS, Pomodoro",
+        "Document relationships",
         "Community support"
       ]
     },
     {
-      name: "Scholar",
-      price: "$4.99",
-      period: "month, billed annually",
+      name: "Custom",
+      price: "Contact Us",
+      period: "Custom plans",
       popular: true,
       features: [
-        "25 documents per month",
-        "100 AI chats per month",
-        "OCR processing",
-        "10GB storage",
+        "Unlimited or custom limits",
         "Priority support",
-        "Advanced highlighting",
-        "Pomodoro tracking"
-      ]
-    },
-    {
-      name: "Academic",
-      price: "$9.99",
-      period: "month, billed annually",
-      features: [
-        "Unlimited documents",
-        "300 AI chats per month",
-        "Gemini-2.5-Flash AI",
-        "50GB storage",
-        "Export features",
-        "Team collaboration (3 users)",
-        "Priority support"
+        "Custom integrations",
+        "Team features",
+        "SLA guarantees",
+        "No credit restrictions",
+        "Dedicated account manager",
+        "Custom pricing"
       ]
     }
   ];
@@ -449,14 +440,14 @@ const LandingPage: React.FC = () => {
                 
                 <div className="pt-8">
                   <button
-                    onClick={tier.name === 'Academic' ? () => window.location.href = 'mailto:info@thevstyle.ca' : handleGetStarted}
+                    onClick={tier.name === 'Custom' ? () => window.location.href = 'mailto:support@smartreader.com?subject=Custom Plan Inquiry' : handleGetStarted}
                     className={`w-full rounded-full px-4 py-3 text-sm font-semibold transition ${
                       tier.popular
                         ? 'bg-slate-800 text-white shadow-lg shadow-slate-800/20 hover:bg-slate-700'
                         : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    {tier.name === 'Explorer' ? 'Get Started Free' : tier.name === 'Academic' ? 'Contact Sales' : `Choose ${tier.name}`}
+                    {tier.name === 'Free' ? 'Get Started Free' : tier.name === 'Custom' ? 'Contact Us' : `Choose ${tier.name}`}
                   </button>
                 </div>
               </div>
