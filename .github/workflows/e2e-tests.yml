@@ -1,0 +1,339 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'tests/e2e/**'
+      - '.github/workflows/e2e-tests.yml'
+      - 'playwright.config.ts'
+      - 'package.json'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'tests/e2e/**'
+      - '.github/workflows/e2e-tests.yml'
+      - 'playwright.config.ts'
+      - 'package.json'
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Test suite to run (all, auth, documents, pdf-viewer)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - auth
+          - documents
+          - pdf-viewer
+      browser:
+        description: 'Browser to test (chromium, firefox, webkit, all)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - chromium
+          - firefox
+          - webkit
+
+jobs:
+  e2e-tests:
+    name: E2E Tests - ${{ matrix.browser }} - ${{ matrix.suite }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+        suite: [auth, documents, pdf-viewer]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Build application
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder_key' }}
+          NODE_ENV: production
+
+      - name: Start preview server
+        run: |
+          npm run preview &
+          echo $! > server.pid
+          sleep 15
+        env:
+          PORT: 3001
+
+      - name: Wait for server to be ready
+        run: |
+          timeout 120 bash -c 'until curl -f http://localhost:3001 > /dev/null 2>&1; do sleep 3; done' || exit 1
+          echo "Server is ready!"
+
+      - name: Run E2E tests
+        id: test
+        run: |
+          case "${{ matrix.suite }}" in
+            auth)
+              npx playwright test tests/e2e/auth/ --project=${{ matrix.browser }} --reporter=html,json,junit,list
+              ;;
+            documents)
+              npx playwright test tests/e2e/documents/ --project=${{ matrix.browser }} --reporter=html,json,junit,list
+              ;;
+            pdf-viewer)
+              npx playwright test tests/e2e/pdf-viewer-v2/ --project=${{ matrix.browser }} --reporter=html,json,junit,list
+              ;;
+            *)
+              echo "Unknown test suite: ${{ matrix.suite }}"
+              exit 1
+              ;;
+          esac
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: http://localhost:3001
+          CI: true
+          NODE_ENV: test
+        continue-on-error: true
+
+      - name: Stop preview server
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            kill $(cat server.pid) || true
+            rm server.pid
+          fi
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-${{ matrix.suite }}-${{ matrix.browser }}
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Upload test results JSON
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.suite }}-${{ matrix.browser }}
+          path: playwright-report/results.json
+          retention-days: 7
+
+      - name: Upload test results XML
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-xml-${{ matrix.suite }}-${{ matrix.browser }}
+          path: playwright-report/results.xml
+          retention-days: 7
+
+      - name: Upload screenshots and videos
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-artifacts-${{ matrix.suite }}-${{ matrix.browser }}
+          path: test-results/
+          retention-days: 7
+
+  e2e-mobile:
+    name: E2E Tests - Mobile
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        device: ['Mobile Chrome', 'Mobile Safari']
+        suite: ['auth', 'documents']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Build application
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder_key' }}
+          NODE_ENV: production
+
+      - name: Start preview server
+        run: |
+          npm run preview &
+          echo $! > server.pid
+          sleep 15
+        env:
+          PORT: 3001
+
+      - name: Wait for server to be ready
+        run: |
+          timeout 120 bash -c 'until curl -f http://localhost:3001 > /dev/null 2>&1; do sleep 3; done' || exit 1
+          echo "Server is ready!"
+
+      - name: Run mobile E2E tests
+        run: |
+          npx playwright test tests/e2e/${{ matrix.suite }}/ --project="${{ matrix.device }}" --reporter=html,json,junit,list
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: http://localhost:3001
+          CI: true
+          NODE_ENV: test
+        continue-on-error: true
+
+      - name: Stop preview server
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            kill $(cat server.pid) || true
+            rm server.pid
+          fi
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-mobile-${{ matrix.suite }}-${{ matrix.device }}
+          path: playwright-report/
+          retention-days: 30
+
+  e2e-all-tests:
+    name: E2E Tests - All Suites (Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.test_suite == 'all'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build application
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder_key' }}
+          NODE_ENV: production
+
+      - name: Start preview server
+        run: |
+          npm run preview &
+          echo $! > server.pid
+          sleep 15
+        env:
+          PORT: 3001
+
+      - name: Wait for server to be ready
+        run: |
+          timeout 120 bash -c 'until curl -f http://localhost:3001 > /dev/null 2>&1; do sleep 3; done' || exit 1
+          echo "Server is ready!"
+
+      - name: Run all E2E tests
+        run: |
+          npx playwright test tests/e2e/ --project=chromium --reporter=html,json,junit,list
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: http://localhost:3001
+          CI: true
+          NODE_ENV: test
+
+      - name: Stop preview server
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            kill $(cat server.pid) || true
+            rm server.pid
+          fi
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-all-tests
+          path: playwright-report/
+          retention-days: 30
+
+  test-summary:
+    name: E2E Test Summary
+    runs-on: ubuntu-latest
+    needs: [e2e-tests, e2e-mobile]
+    if: always()
+    
+    steps:
+      - name: Generate test summary
+        run: |
+          echo "## 🧪 E2E Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Desktop Browser Tests" >> $GITHUB_STEP_SUMMARY
+          echo "| Browser | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Chromium | ${{ needs.e2e-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Firefox | ${{ needs.e2e-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| WebKit | ${{ needs.e2e-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Mobile Device Tests" >> $GITHUB_STEP_SUMMARY
+          echo "| Device | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Mobile Chrome | ${{ needs.e2e-mobile.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mobile Safari | ${{ needs.e2e-mobile.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Suites Covered" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Authentication Flow" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Document Upload" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ PDF Viewer V2 (Highlighting & Features)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 **View detailed reports in the artifacts section above.**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.e2e-tests.result }}" != "success" ] || [ "${{ needs.e2e-mobile.result }}" != "success" ]; then
+            echo "❌ Some E2E tests failed. Please:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Check the test artifacts for screenshots and videos" >> $GITHUB_STEP_SUMMARY
+            echo "2. Review the Playwright HTML reports" >> $GITHUB_STEP_SUMMARY
+            echo "3. Fix the failing tests and push again" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ All E2E tests passed!" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Fail if tests failed
+        if: needs.e2e-tests.result != 'success' || needs.e2e-mobile.result != 'success'
+        run: |
+          echo "Some E2E tests failed. Check the artifacts for detailed reports."
+          exit 1
+
