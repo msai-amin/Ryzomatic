@@ -755,8 +755,13 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         },
       })
 
-      // Add to local state
-      setHighlights(prev => [...prev, newHighlight])
+      // Add to local state and immediately update ref for instant display
+      setHighlights(prev => {
+        const updated = [...prev, newHighlight]
+        // Immediately update ref so highlight appears without delay
+        highlightsRef.current = updated
+        return updated
+      })
       
       console.log('Highlight created:', newHighlight)
     } catch (error) {
@@ -812,43 +817,150 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         return null
       }
       
-      // Calculate position with viewport boundary detection
+      // Calculate responsive popup size based on viewport
+      // Get viewport dimensions for responsive sizing
+      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
+      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800
+      
+      // Calculate responsive popup dimensions (smaller on mobile, larger on desktop)
+      // Base sizes: mobile (viewport < 768px), tablet (768-1024px), desktop (>1024px)
+      const isMobile = viewportWidth < 768
+      const isTablet = viewportWidth >= 768 && viewportWidth < 1024
+      
+      const popupWidth = isMobile ? Math.min(280, viewportWidth * 0.85) 
+        : isTablet ? Math.min(300, viewportWidth * 0.4)
+        : Math.min(340, viewportWidth * 0.28)
+      
+      const popupWidthPercent = (popupWidth / viewportWidth) * 100
+      const popupHeightPx = isMobile ? 200 : isTablet ? 220 : 240
+      const popupHeightPercent = (popupHeightPx / viewportHeight) * 100
+      
+      // Calculate position with viewport boundary detection and spacing
       const leftPercent = props.selectionRegion.left || 0
-      const topPercent = (props.selectionRegion.top || 0) + (props.selectionRegion.height || 0)
-      // Adjust if popup would go off right edge (assuming ~300px width)
-      const adjustedLeft = leftPercent > 70 ? `${leftPercent - 15}%` : `${leftPercent}%`
+      const topPercent = props.selectionRegion.top || 0
+      const heightPercent = props.selectionRegion.height || 0
+      
+      // Add spacing from selection (responsive: ~1.5% on mobile, ~2.5% on desktop)
+      const spacingOffset = isMobile ? 1.5 : 2.5
+      const popupTopPercent = topPercent + heightPercent + spacingOffset
+      
+      // Check if popup would go off bottom of viewport
+      const shouldPositionAbove = popupTopPercent + popupHeightPercent > 95
+      
+      // Final top position - either below (with spacing) or above selection
+      const finalTopPercent = shouldPositionAbove 
+        ? Math.max(2, topPercent - popupHeightPercent - spacingOffset)
+        : popupTopPercent
+      
+      // Adjust horizontal position if popup would go off edges
+      let adjustedLeft = leftPercent
+      if (leftPercent + popupWidthPercent > 95) {
+        // Shift left to keep it in viewport
+        adjustedLeft = Math.max(2, leftPercent - (popupWidthPercent - (100 - leftPercent)))
+      } else if (leftPercent < 2) {
+        // Shift right if too close to left edge
+        adjustedLeft = 2
+      }
       
       return (
         <div
           style={{
             background: 'var(--color-surface, #111827)',
             border: '1px solid var(--color-border, #374151)',
-            borderRadius: '8px',
-            padding: '10px',
+            borderRadius: isMobile ? '10px' : '12px',
+            padding: isMobile ? '12px' : '14px',
             position: 'absolute',
-            left: adjustedLeft,
-            top: `${topPercent}%`,
+            left: `${adjustedLeft}%`,
+            top: `${finalTopPercent}%`,
             zIndex: 1000,
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
-            minWidth: '240px',
-            maxWidth: '320px',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.2)',
+            width: `${popupWidthPercent}%`,
+            maxWidth: `${popupWidth}px`,
+            minWidth: isMobile ? '240px' : '260px',
             color: 'var(--color-text-primary, #f9fafb)',
+            marginTop: shouldPositionAbove ? '0' : '8px',
+            marginBottom: shouldPositionAbove ? '8px' : '0',
+            animation: 'fadeIn 0.2s ease-out',
+            transform: 'translateZ(0)',
           }}
         >
-          {/* Selected text preview - simplified */}
+          {/* Visual connection indicator (arrow) - positioned outside border */}
+          {!shouldPositionAbove && (
+            <>
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '-9px',
+                  left: '20px',
+                  width: 0,
+                  height: 0,
+                  borderLeft: '9px solid transparent',
+                  borderRight: '9px solid transparent',
+                  borderBottom: '9px solid var(--color-border, #374151)',
+                  zIndex: 1001,
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '-8px',
+                  left: '21px',
+                  width: 0,
+                  height: 0,
+                  borderLeft: '8px solid transparent',
+                  borderRight: '8px solid transparent',
+                  borderBottom: '8px solid var(--color-surface, #111827)',
+                  zIndex: 1002,
+                }}
+              />
+            </>
+          )}
+          {shouldPositionAbove && (
+            <>
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '-9px',
+                  left: '20px',
+                  width: 0,
+                  height: 0,
+                  borderLeft: '9px solid transparent',
+                  borderRight: '9px solid transparent',
+                  borderTop: '9px solid var(--color-border, #374151)',
+                  zIndex: 1001,
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '-8px',
+                  left: '21px',
+                  width: 0,
+                  height: 0,
+                  borderLeft: '8px solid transparent',
+                  borderRight: '8px solid transparent',
+                  borderTop: '8px solid var(--color-surface, #111827)',
+                  zIndex: 1002,
+                }}
+              />
+            </>
+          )}
+
+          {/* Selected text preview - responsive spacing */}
           <div style={{ 
-            marginBottom: '10px', 
-            fontSize: '13px', 
+            marginBottom: isMobile ? '10px' : '12px', 
+            fontSize: isMobile ? '12px' : '13px', 
             color: 'var(--color-text-secondary, #d1d5db)',
-            lineHeight: '1.4',
-            padding: '6px 8px',
-            borderRadius: '4px',
+            lineHeight: '1.5',
+            padding: isMobile ? '8px 10px' : '10px 12px',
+            borderRadius: '6px',
             backgroundColor: 'var(--color-background, #0f172a)',
-            maxHeight: '60px',
+            maxHeight: isMobile ? '50px' : '60px',
             overflow: 'hidden',
-            textOverflow: 'ellipsis'
+            textOverflow: 'ellipsis',
+            border: '1px solid var(--color-border, #374151)',
           }}>
-            "{props.selectedText && props.selectedText.length > 80 ? props.selectedText.substring(0, 80) + '...' : (props.selectedText || '')}"
+            "{props.selectedText && props.selectedText.length > (isMobile ? 60 : 80) ? props.selectedText.substring(0, isMobile ? 60 : 80) + '...' : (props.selectedText || '')}"
           </div>
 
           {/* Primary Action - Save Highlight */}
@@ -857,21 +969,30 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
               backgroundColor: colorHex,
               color: '#000',
               border: 'none',
-              borderRadius: '6px',
-              padding: '8px 16px',
+              borderRadius: isMobile ? '6px' : '8px',
+              padding: isMobile ? '8px 14px' : '10px 18px',
               cursor: 'pointer',
-              fontSize: '14px',
+              fontSize: isMobile ? '13px' : '14px',
               fontWeight: '600',
               width: '100%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
-              marginBottom: '8px',
-              transition: 'opacity 0.2s',
+              gap: isMobile ? '6px' : '8px',
+              marginBottom: isMobile ? '8px' : '10px',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
             }}
-            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '0.9'
+              e.currentTarget.style.transform = 'translateY(-1px)'
+              e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.15)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '1'
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)'
+            }}
             onClick={async () => {
               if (props.selectedText && props.highlightAreas) {
                 await handleCreateHighlight(props.highlightAreas, props.selectedText, props.selectionData)
@@ -879,7 +1000,18 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
               props.cancel()
             }}
           >
-            <Save className="w-4 h-4" />
+            {/* Color square indicator */}
+            <div
+              style={{
+                width: isMobile ? '14px' : '16px',
+                height: isMobile ? '14px' : '16px',
+                backgroundColor: colorHex,
+                border: '2px solid rgba(0, 0, 0, 0.2)',
+                borderRadius: '3px',
+                flexShrink: 0,
+              }}
+            />
+            <Save className={isMobile ? "w-3.5 h-3.5" : "w-4 h-4"} />
             Save Highlight
           </button>
 
@@ -887,8 +1019,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           <div style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
-            gap: '6px',
-            marginBottom: '6px'
+            gap: isMobile ? '6px' : '8px',
+            marginBottom: isMobile ? '8px' : '10px'
           }}>
             <button
               style={{
@@ -965,7 +1097,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           {/* Tertiary Actions */}
           <div style={{
             display: 'flex',
-            gap: '6px'
+            gap: '8px'
           }}>
             <button
               style={{
