@@ -54,8 +54,10 @@ export default [
       },
     },
     rules: {
+      // Apply recommended configs first
       ...js.configs.recommended.rules,
       ...react.configs.recommended.rules,
+      // Then override with our custom rules (these take precedence)
       'react/react-in-jsx-scope': 'off',
       'react/jsx-uses-react': 'off',
       'react/no-unescaped-entities': 'off',

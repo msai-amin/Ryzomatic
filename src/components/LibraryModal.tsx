@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types, no-undef */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Book, FileText, Music, Trash2, Download, Upload, HardDrive, Cloud, CloudOff, RefreshCw, Star, LayoutList, LayoutGrid, Rows, Plus, Edit3, Loader2 } from 'lucide-react';
@@ -13,7 +14,7 @@ import { notesService } from '../services/notesService';
 
 // Enhanced SavedBook type that includes both camelCase and snake_case properties
 // This type extends SavedBook with additional properties from Supabase
-export type EnhancedSavedBook = SavedBook & {
+type EnhancedSavedBook = SavedBook & {
   is_favorite?: boolean;
   file_size?: number;
   [key: string]: any; // Allow additional properties from Supabase
