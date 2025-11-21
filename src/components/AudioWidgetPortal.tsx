@@ -10,11 +10,9 @@ import { createPortal } from 'react-dom'
 import { AudioWidget } from './AudioWidget'
 
 export const AudioWidgetPortal: React.FC = () => {
-  const [mounted, setMounted] = useState(false)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
     console.log('🔊 AudioWidgetPortal: Mounted, waiting for app initialization...')
     
     // Wait 1 second for app to fully initialize before rendering AudioWidget
@@ -24,15 +22,17 @@ export const AudioWidgetPortal: React.FC = () => {
     }, 1000)
     
     return () => {
-      console.log('🔊 AudioWidgetPortal: Unmounting')
+      console.log('🔊 AudioWidgetPortal: Cleanup (component unmounting or re-rendering)')
       clearTimeout(timer)
     }
-  }, [])
+  }, []) // Empty deps = only run once on mount
 
   // Don't render on server or before ready
-  if (typeof document === 'undefined' || !mounted || !ready) {
+  if (typeof document === 'undefined' || !ready) {
     return null
   }
+
+  console.log('🔊 AudioWidgetPortal: Rendering AudioWidget to document.body')
 
   // Render AudioWidget directly to document.body via portal
   return createPortal(
