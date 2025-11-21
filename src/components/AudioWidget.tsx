@@ -42,18 +42,20 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     setAudioWidgetPosition
   } = useAppStore()
   
-  // Debug: Log rendering state
+  // Debug: Log rendering state - ALWAYS log, even if no document
   useEffect(() => {
     console.log('🔊 AudioWidget: Render state', {
       hasDocument: !!currentDocument,
-      documentId: currentDocument?.id,
+      documentId: currentDocument?.id || 'NO_DOCUMENT',
+      documentName: currentDocument?.name || 'NO_DOCUMENT',
       readingMode: pdfViewer.readingMode,
       hasPageTexts: !!currentDocument?.pageTexts,
       hasCleanedPageTexts: !!currentDocument?.cleanedPageTexts,
       pageTextsLength: currentDocument?.pageTexts?.length || 0,
       cleanedPageTextsLength: currentDocument?.cleanedPageTexts?.length || 0,
       position,
-      isVisible: !!currentDocument
+      isVisible: !!currentDocument,
+      willRender: !!currentDocument
     });
   }, [currentDocument?.id, pdfViewer.readingMode, currentDocument?.pageTexts?.length, currentDocument?.cleanedPageTexts?.length, position]);
   

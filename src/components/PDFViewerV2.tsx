@@ -2034,6 +2034,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             onClose={() => setContextMenu(null)}
           />
         )}
+        {/* Audio Widget - CRITICAL: Must be rendered in Reading Mode */}
+        <AudioWidget />
       </>
     )
   }
