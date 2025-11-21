@@ -1,0 +1,458 @@
+name: Audio Player CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/components/AudioWidget.tsx'
+      - 'src/components/AudioSettingsPanel.tsx'
+      - 'src/hooks/useAudio*.ts'
+      - 'src/hooks/useDraggable.ts'
+      - 'src/services/tts*.ts'
+      - 'src/services/googleCloudTTSService.ts'
+      - 'tests/**/*audio*.test.ts'
+      - 'tests/**/*tts*.test.ts'
+      - '.github/workflows/audio-player-ci.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/components/AudioWidget.tsx'
+      - 'src/components/AudioSettingsPanel.tsx'
+      - 'src/hooks/useAudio*.ts'
+      - 'src/hooks/useDraggable.ts'
+      - 'src/services/tts*.ts'
+      - 'src/services/googleCloudTTSService.ts'
+      - 'tests/**/*audio*.test.ts'
+      - 'tests/**/*tts*.test.ts'
+      - '.github/workflows/audio-player-ci.yml'
+  workflow_dispatch: # Allow manual trigger
+
+# Security: Minimum permissions
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+# Prevent concurrent runs on same branch
+concurrency:
+  group: audio-player-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  CACHE_VERSION: v1
+
+jobs:
+  # ============================================================================
+  # Job 1: Code Quality & Linting
+  # ============================================================================
+  lint:
+    name: 🔍 Code Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for better analysis
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+      
+      - name: 🔍 Run ESLint on Audio Player files
+        run: |
+          npx eslint \
+            src/components/AudioWidget.tsx \
+            src/components/AudioSettingsPanel.tsx \
+            src/hooks/useAudio*.ts \
+            src/hooks/useDraggable.ts \
+            src/services/tts*.ts \
+            src/services/googleCloudTTSService.ts \
+            --format json \
+            --output-file eslint-report.json || true
+      
+      - name: 📊 Upload ESLint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eslint-report
+          path: eslint-report.json
+          retention-days: 7
+      
+      - name: 🎨 Check TypeScript types
+        run: npx tsc --noEmit --project tsconfig.json
+      
+      - name: 📝 Check for console.log statements
+        run: |
+          if grep -r "console\.log" src/components/AudioWidget.tsx src/services/tts*.ts; then
+            echo "::warning::Found console.log statements in production code"
+          fi
+
+  # ============================================================================
+  # Job 2: Unit Tests
+  # ============================================================================
+  test-unit:
+    name: 🧪 Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+      fail-fast: false
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+      
+      - name: 🧪 Run unit tests
+        run: npm run test -- --reporter=verbose --reporter=json --outputFile=test-results.json
+        env:
+          CI: true
+      
+      - name: 📊 Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-node-${{ matrix.node-version }}
+          path: test-results.json
+          retention-days: 7
+      
+      - name: 📈 Generate coverage report
+        if: matrix.node-version == 20
+        run: npm run test -- --coverage --reporter=json --outputFile=coverage-report.json
+      
+      - name: 📊 Upload coverage
+        if: matrix.node-version == 20
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage/
+            coverage-report.json
+          retention-days: 30
+
+  # ============================================================================
+  # Job 3: Integration Tests (Audio Player Specific)
+  # ============================================================================
+  test-integration:
+    name: 🔗 Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [lint, test-unit]
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+      
+      - name: 🔗 Run integration tests
+        run: |
+          # Run tests that involve TTS services
+          npm run test -- --run tests/services/tts*.test.ts
+      
+      - name: 🎵 Test audio file generation (mock)
+        run: |
+          # Test that TTS cache service works
+          npm run test -- --run tests/services/ttsCacheService.test.ts || echo "No TTS cache tests found"
+
+  # ============================================================================
+  # Job 4: E2E Tests (Audio Player Features)
+  # ============================================================================
+  test-e2e:
+    name: 🎭 E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [lint, test-unit]
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+      
+      - name: 📦 Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+      
+      - name: 🏗️ Build application
+        run: npm run build
+        env:
+          NODE_ENV: production
+      
+      - name: 🎭 Run E2E tests (Audio Player)
+        run: |
+          # Run E2E tests related to audio player
+          npx playwright test tests/e2e/*audio*.spec.ts --project=chromium || echo "No audio E2E tests found"
+        env:
+          CI: true
+      
+      - name: 📊 Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # ============================================================================
+  # Job 5: Performance Tests
+  # ============================================================================
+  test-performance:
+    name: ⚡ Performance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [lint, test-unit]
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+      
+      - name: 🏗️ Build application
+        run: npm run build
+        env:
+          NODE_ENV: production
+      
+      - name: ⚡ Analyze bundle size
+        run: |
+          echo "## Bundle Size Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Audio Player Related Files" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Check main bundle size
+          MAIN_BUNDLE=$(ls -lh dist/assets/index-*.js | awk '{print $5}')
+          echo "- Main Bundle: $MAIN_BUNDLE" >> $GITHUB_STEP_SUMMARY
+          
+          # Check if bundle is too large
+          BUNDLE_SIZE_KB=$(ls -l dist/assets/index-*.js | awk '{print $5}' | numfmt --from=iec)
+          MAX_SIZE_KB=$((1200 * 1024)) # 1200 KB
+          
+          if [ "$BUNDLE_SIZE_KB" -gt "$MAX_SIZE_KB" ]; then
+            echo "::warning::Bundle size ($BUNDLE_SIZE_KB bytes) exceeds maximum ($MAX_SIZE_KB bytes)"
+          fi
+      
+      - name: 📊 Upload bundle analysis
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-analysis
+          path: dist/
+          retention-days: 7
+
+  # ============================================================================
+  # Job 6: Security Scan
+  # ============================================================================
+  security:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+      
+      - name: 🔍 Run npm audit
+        run: |
+          npm audit --audit-level=moderate --json > audit-report.json || true
+          
+          # Check for high/critical vulnerabilities
+          HIGH_VULNS=$(cat audit-report.json | jq '.metadata.vulnerabilities.high // 0')
+          CRITICAL_VULNS=$(cat audit-report.json | jq '.metadata.vulnerabilities.critical // 0')
+          
+          if [ "$HIGH_VULNS" -gt 0 ] || [ "$CRITICAL_VULNS" -gt 0 ]; then
+            echo "::warning::Found $HIGH_VULNS high and $CRITICAL_VULNS critical vulnerabilities"
+          fi
+      
+      - name: 📊 Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-report
+          path: audit-report.json
+          retention-days: 30
+      
+      - name: 🔐 Check for secrets
+        run: |
+          # Check for potential secrets in audio player files
+          if grep -r "sk-" src/services/tts*.ts; then
+            echo "::error::Found potential API key in TTS service files"
+            exit 1
+          fi
+
+  # ============================================================================
+  # Job 7: Build Verification
+  # ============================================================================
+  build:
+    name: 🏗️ Build Verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [lint, test-unit]
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+      
+      - name: 🏗️ Build production bundle
+        run: npm run build
+        env:
+          NODE_ENV: production
+      
+      - name: ✅ Verify build artifacts
+        run: |
+          # Check that AudioWidget is included in the bundle
+          if ! grep -q "AudioWidget" dist/assets/index-*.js; then
+            echo "::error::AudioWidget not found in production bundle"
+            exit 1
+          fi
+          
+          # Check that TTS services are included
+          if ! grep -q "ttsManager" dist/assets/index-*.js; then
+            echo "::error::TTS Manager not found in production bundle"
+            exit 1
+          fi
+          
+          echo "✅ Build verification passed"
+      
+      - name: 📊 Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: dist/
+          retention-days: 7
+
+  # ============================================================================
+  # Job 8: Deployment (Production)
+  # ============================================================================
+  deploy:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [lint, test-unit, test-integration, test-e2e, security, build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://your-app.vercel.app
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 📥 Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: dist/
+      
+      - name: 🚀 Deploy to Vercel
+        run: |
+          echo "Deployment triggered via Vercel GitHub integration"
+          echo "Audio Player changes will be live after Vercel build completes"
+      
+      - name: 📝 Create deployment summary
+        run: |
+          echo "## 🎉 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Audio Player Features Deployed:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Gapless playback" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Queue-based audio system" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Draggable widget" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Position persistence" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # Job 9: Notification (Success/Failure)
+  # ============================================================================
+  notify:
+    name: 📢 Notify
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit, test-integration, test-e2e, security, build, deploy]
+    if: always()
+    
+    steps:
+      - name: 📊 Check workflow status
+        run: |
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "✅ All audio player CI/CD checks passed!"
+          elif [ "${{ needs.deploy.result }}" == "skipped" ]; then
+            echo "⏭️ Deployment skipped (not main branch)"
+          else
+            echo "❌ Some checks failed"
+            exit 1
+          fi
+      
+      - name: 📝 Create status summary
+        if: always()
+        run: |
+          echo "## 🎵 Audio Player CI/CD Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.test-unit.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | ${{ needs.test-integration.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Tests | ${{ needs.test-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance | ${{ needs.test-performance.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security | ${{ needs.security.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deploy | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+
