@@ -25,7 +25,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   // Version marker to verify live bundle
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      console.log('🔊 AudioWidget version:', 'v2');
+      console.log('🔊 AudioWidget version:', 'v3-reading-mode-fix');
     }
   }, []);
   const {
@@ -41,6 +41,21 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     audioWidgetPosition,
     setAudioWidgetPosition
   } = useAppStore()
+  
+  // Debug: Log rendering state
+  useEffect(() => {
+    console.log('🔊 AudioWidget: Render state', {
+      hasDocument: !!currentDocument,
+      documentId: currentDocument?.id,
+      readingMode: pdfViewer.readingMode,
+      hasPageTexts: !!currentDocument?.pageTexts,
+      hasCleanedPageTexts: !!currentDocument?.cleanedPageTexts,
+      pageTextsLength: currentDocument?.pageTexts?.length || 0,
+      cleanedPageTextsLength: currentDocument?.cleanedPageTexts?.length || 0,
+      position,
+      isVisible: !!currentDocument
+    });
+  }, [currentDocument?.id, pdfViewer.readingMode, currentDocument?.pageTexts?.length, currentDocument?.cleanedPageTexts?.length, position]);
   
   // CRITICAL: Normalize IDs to prevent React comparison error
   const normalizedDocumentId = currentDocument?.id ?? ''
@@ -1005,12 +1020,18 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const currentParagraphIndex = tts.currentParagraphIndex ?? 0
   const totalParagraphs = tts.paragraphs.length
 
+  // Don't render if no document is loaded
+  if (!currentDocument) {
+    console.log('🔊 AudioWidget: Not rendering - no document loaded');
+    return null;
+  }
+
   return (
     <>
       {/* Toggle Bar - Always Visible */}
       <div
         ref={widgetRef}
-        className={`fixed z-60 transition-shadow duration-300 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${className}`}
+        className={`fixed z-[9999] transition-shadow duration-300 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${className}`}
         style={{
           left: `${position.x}px`,
           top: `${position.y}px`,
