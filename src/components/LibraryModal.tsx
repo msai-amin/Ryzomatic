@@ -321,8 +321,9 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         supabaseStorageService.setCurrentUser(null)
       }
       loadData();
+      fetchCollections(); // Also refresh collections when modal opens or refreshTrigger changes
     }
-  }, [isOpen, activeTab, refreshTrigger, normalizedUserId]);
+  }, [isOpen, activeTab, refreshTrigger, normalizedUserId, fetchCollections]);
 
   const loadData = async () => {
     console.log('LibraryModal: Loading data...');
@@ -1175,21 +1176,22 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
           title: 'Moved to Trash',
           message: 'File moved to trash. You can restore it later from the Trash folder.'
         });
-      }
-      
-      // Reload the library
-      console.log('Reloading library data...');
-      await loadData();
-      console.log('Library data reloaded successfully');
-      
+        }
+        
+        // Reload the library and refresh collections
+        console.log('Reloading library data...');
+        await loadData();
+        await fetchCollections(); // Refresh folder counts
+        console.log('Library data and collections reloaded successfully');
+        
       setConfirmDialog(null);
     } catch (error: any) {
-      console.error('Error deleting book:', error);
-      console.error('Error details:', {
+        console.error('Error deleting book:', error);
+        console.error('Error details:', {
         message: error?.message,
         stack: error?.stack,
         name: error?.name
-      });
+        });
       setMessageDialog({
         type: 'error',
         title: 'Error',
@@ -1199,7 +1201,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
     } finally {
       setConfirmBusy(false);
     }
-  }, [confirmDialog, loadData]);
+  }, [confirmDialog, loadData, fetchCollections]);
 
   const handleCancelDelete = useCallback(() => {
     if (!confirmBusy) {
@@ -1212,8 +1214,9 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
     const confirmed = window.confirm('Delete this audio file?');
     if (confirmed) {
       try {
-        await storageService.deleteAudio(id);
-        loadData();
+      await storageService.deleteAudio(id);
+      await loadData();
+      await fetchCollections(); // Refresh folder counts
         setMessageDialog({
           type: 'success',
           title: 'Deleted',
@@ -1244,11 +1247,12 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         try {
           const data = event.target?.result as string;
           storageService.importData(data);
-          loadData();
+          await loadData();
+          await fetchCollections(); // Refresh folder counts
           setMessageDialog({
             type: 'success',
             title: 'Success',
@@ -1292,6 +1296,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
           simpleGoogleAuth.syncFromGoogleAuth(user);
         }
         await loadData();
+        await fetchCollections(); // Refresh folder counts
         alert('Google Drive sync is now enabled.');
       } else {
         alert('Google Drive access was not granted. Please try again if you want to enable sync.');
@@ -1315,6 +1320,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       await storageService.syncToGoogleDrive();
       await storageService.setLastSyncTime();
       await loadData(); // Refresh data
+      await fetchCollections(); // Refresh folder counts
       alert('Successfully synced to Google Drive!');
     } catch (error) {
       console.error('Sync error:', error);
@@ -1335,6 +1341,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       await storageService.syncFromGoogleDrive();
       await storageService.setLastSyncTime();
       await loadData(); // Refresh data
+      await fetchCollections(); // Refresh folder counts
       alert('Successfully synced from Google Drive!');
     } catch (error) {
       console.error('Sync error:', error);
@@ -1412,7 +1419,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                   </div>
 
                 {syncStatus.lastSync && (
-                  <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                     <div
                       className="rounded-full px-3 py-1 text-xs"
                       style={{
@@ -1423,8 +1430,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                     >
                       Last sync · {syncStatus.lastSync.toLocaleString()}
                     </div>
-                  </div>
-                )}
+                    </div>
+                  )}
               </div>
 
               <div className="flex flex-wrap gap-3 text-xs md:text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
@@ -2253,8 +2260,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       </div>
     </div>
   </div>
+          </div>
         </div>
-      </div>
 
       {/* Confirm Delete Dialog */}
       {confirmDialog && (
