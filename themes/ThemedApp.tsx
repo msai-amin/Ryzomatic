@@ -14,8 +14,7 @@ import { backgroundProcessingService } from '../src/services/backgroundProcessin
 import { timerService, TimerState } from '../src/services/timerService'
 import { CustomizableReadingWizard } from '../src/components/customReading/CustomizableReadingWizard'
 import { DocumentUpload } from '../src/components/DocumentUpload'
-// Lazy load AudioWidget to avoid circular dependency issues
-const AudioWidget = React.lazy(() => import('../src/components/AudioWidget').then(m => ({ default: m.AudioWidget })))
+import { AudioWidgetPortal } from '../src/components/AudioWidgetPortal'
 
 const ThemedAppContent: React.FC = () => {
   const [timerState, setTimerState] = useState<TimerState>(timerService.getState())
@@ -112,23 +111,8 @@ const ThemedAppContent: React.FC = () => {
         <DocumentUpload onClose={() => setShowUploadModal(false)} />
       )}
       
-      {/* Audio Widget - TEMPORARILY DISABLED to test if it's causing the ReferenceError */}
-      {/* DEBUG: Test if this section renders at all */}
-      <div style={{ 
-        position: 'fixed', 
-        bottom: '20px', 
-        right: '20px', 
-        background: 'red', 
-        color: 'white', 
-        padding: '10px', 
-        zIndex: 999999,
-        border: '3px solid yellow'
-      }}>
-        DEBUG: ThemedApp rendering - AudioWidget DISABLED for testing
-      </div>
-      {/* <React.Suspense fallback={<div>Loading audio...</div>}>
-        <AudioWidget />
-      </React.Suspense> */}
+      {/* Audio Widget - Rendered via Portal to document.body to avoid circular dependencies */}
+      <AudioWidgetPortal />
 
       {/* Pomodoro Bottom Bar - Visible when there is an active or paused session */}
       {user && currentDocument && hasActiveTimer && (
