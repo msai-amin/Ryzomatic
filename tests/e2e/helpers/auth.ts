@@ -191,8 +191,8 @@ export async function ensureAuthenticated(page: Page): Promise<boolean> {
       const isVisible = await element.isVisible({ timeout: 5000 }).catch(() => false);
       if (isVisible) {
         console.log(`✅ Authentication verified via: ${selector}`);
-        return true;
-      }
+  return true;
+}
     } catch (e) {
       // Continue to next indicator
     }

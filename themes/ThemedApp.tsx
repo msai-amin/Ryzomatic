@@ -14,7 +14,7 @@ import { backgroundProcessingService } from '../src/services/backgroundProcessin
 import { timerService, TimerState } from '../src/services/timerService'
 import { CustomizableReadingWizard } from '../src/components/customReading/CustomizableReadingWizard'
 import { DocumentUpload } from '../src/components/DocumentUpload'
-import { useAudioWidgetMount } from '../src/hooks/useAudioWidgetMount'
+import { AudioWidget } from '../src/components/AudioWidget'
 
 const ThemedAppContent: React.FC = () => {
   const [timerState, setTimerState] = useState<TimerState>(timerService.getState())
@@ -33,9 +33,6 @@ const ThemedAppContent: React.FC = () => {
   
   // Enable keyboard shortcuts
   useKeyboardShortcuts()
-  
-  // Mount AudioWidget outside React tree (persistent across re-renders)
-  useAudioWidgetMount()
 
   // Start background processing service
   useEffect(() => {
@@ -114,7 +111,8 @@ const ThemedAppContent: React.FC = () => {
         <DocumentUpload onClose={() => setShowUploadModal(false)} />
       )}
       
-      {/* AudioWidget managed by useAudioWidgetMount hook - persistent across re-renders */}
+      {/* AudioWidget - Persistent across re-renders, only visible when document is loaded */}
+      {currentDocument && <AudioWidget />}
 
       {/* Pomodoro Bottom Bar - Visible when there is an active or paused session */}
       {user && currentDocument && hasActiveTimer && (

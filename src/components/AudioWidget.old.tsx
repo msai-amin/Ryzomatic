@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAppStore, Voice, TTSPosition } from '../store/appStore'
 import { ttsManager } from '../services/ttsManager'
-import { ttsManagerWithQueue } from '../services/ttsManagerWithQueue'
-import { createSegmentsFromParagraphs } from '../services/ttsQueue'
 import { AudioSettingsPanel } from './AudioSettingsPanel'
 import { ttsCacheService, TTSCacheQuery } from '../services/ttsCacheService'
 import { supabase } from '../../lib/supabase'
@@ -16,9 +14,7 @@ import {
   SkipForward,
   Settings,
   ChevronDown,
-  ChevronUp,
-  Zap,
-  ZapOff
+  ChevronUp
 } from 'lucide-react'
 
 interface AudioWidgetProps {
@@ -136,25 +132,12 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     return stored === null ? true : stored === 'true'
   })
   const [playbackMode, setPlaybackMode] = useState<'paragraph' | 'page' | 'continue'>('paragraph')
-  const [gaplessMode, setGaplessMode] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false
-    const stored = window.localStorage.getItem('audioWidgetGaplessMode')
-    return stored === 'true'
-  })
-  
   // Persist expanded/collapsed state
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('audioWidgetExpanded', String(isExpanded))
     }
   }, [isExpanded])
-  
-  // Persist gapless mode
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('audioWidgetGaplessMode', String(gaplessMode))
-    }
-  }, [gaplessMode])
   const [savedPosition, setSavedPosition] = useState<TTSPosition | null>(null)
   const lastClickTimeRef = useRef<number>(0)
   const previousDocumentIdRef = useRef<string | null>(null)
@@ -941,48 +924,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               if (currentDocument?.id) {
                 saveCurrentPosition(currentDocument.id)
               }
+              updateTTS({ isPlaying: false, isPaused: false, currentWordIndex: null })
               
-              // Gapless mode: Auto-advance without stopping
-              if (gaplessMode && tts.autoAdvanceParagraph && playbackMode === 'paragraph') {
-                const currentIndex = tts.currentParagraphIndex ?? 0
-                if (currentIndex < tts.paragraphs.length - 1) {
-                  // Move to next paragraph
-                  updateTTS({ currentParagraphIndex: currentIndex + 1, currentWordIndex: null })
-                  
-                  // Get next paragraph text
-                  const nextText = tts.paragraphs[currentIndex + 1]
-                  if (nextText && nextText.trim()) {
-                    // Continue playing immediately (gapless)
-                    ttsManager.speak(
-                      nextText,
-                      () => {
-                        // Recursive call for continuous playback
-                        if (currentDocument?.id) {
-                          saveCurrentPosition(currentDocument.id)
-                        }
-                        updateTTS({ isPlaying: false, isPaused: false, currentWordIndex: null })
-                      },
-                      (word, charIndex) => {
-                        const safeText = typeof nextText === 'string' ? nextText : String(nextText || '')
-                        const words = safeText.slice(0, charIndex + 1).split(/\s+/)
-                        const wordIndex = words.length - 1
-                        updateTTS({ currentWordIndex: wordIndex })
-                      }
-                    )
-                  } else {
-                    updateTTS({ isPlaying: false, isPaused: false, currentWordIndex: null })
-                  }
-                } else {
-                  // End of document
-                  updateTTS({ isPlaying: false, isPaused: false, currentWordIndex: null })
-                }
-              } else {
-                // Normal mode: Stop and optionally advance
-                updateTTS({ isPlaying: false, isPaused: false, currentWordIndex: null })
-                
-                if (tts.autoAdvanceParagraph && playbackMode === 'paragraph') {
-                  handleNextParagraph()
-                }
+              if (tts.autoAdvanceParagraph && playbackMode === 'paragraph') {
+                handleNextParagraph()
               }
             },
             (word, charIndex) => {
@@ -1005,7 +950,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         setIsProcessing(false)
       }
     }
-  }, [playbackMode, gaplessMode, tts.isPlaying, tts.autoAdvanceParagraph, tts.paragraphs, isProcessing, updateTTS, getTextForPlaybackMode, normalizedDocumentId, pdfViewer.currentPage, tts.currentParagraphIndex, tts.voiceName, tts.rate, tts.pitch, saveCurrentPosition, currentDocument?.id])
+  }, [playbackMode, tts.isPlaying, tts.autoAdvanceParagraph, isProcessing, updateTTS, getTextForPlaybackMode, normalizedDocumentId, pdfViewer.currentPage, tts.currentParagraphIndex, tts.voiceName, tts.rate, tts.pitch, saveCurrentPosition])
 
   // Handle playback mode change
   const handlePlaybackModeChange = useCallback((newMode: 'paragraph' | 'page' | 'continue') => {
@@ -1149,20 +1094,6 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                 Continue
               </button>
             </div>
-            
-            {/* Gapless Mode Toggle */}
-            <button
-              onClick={() => setGaplessMode(!gaplessMode)}
-              className={`p-1.5 rounded transition-all ${
-                gaplessMode 
-                  ? 'text-green-500 bg-green-500/10' 
-                  : 'text-gray-500 hover:text-gray-300'
-              }`}
-              title={gaplessMode ? "Gapless playback enabled (seamless transitions)" : "Enable gapless playback"}
-              aria-label={gaplessMode ? "Disable gapless playback" : "Enable gapless playback"}
-            >
-              {gaplessMode ? <Zap className="w-4 h-4" /> : <ZapOff className="w-4 h-4" />}
-            </button>
           </div>
         )}
 
