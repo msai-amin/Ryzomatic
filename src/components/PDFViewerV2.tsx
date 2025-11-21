@@ -30,7 +30,6 @@ import { Eye, BookOpen, FileText, Type, Highlighter, Sparkles, RotateCcw, Chevro
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { notesService } from '../services/notesService'
-import { AudioWidget } from './AudioWidget'
 import { HighlightColorPopover } from './HighlightColorPopover'
 import { OCRBanner, OCRStatusBadge } from './OCRStatusBadge'
 import { HighlightManagementPanel } from './HighlightManagementPanel'
@@ -2034,8 +2033,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             onClose={() => setContextMenu(null)}
           />
         )}
-        {/* Audio Widget - CRITICAL: Must be rendered in Reading Mode */}
-        <AudioWidget />
+        {/* AudioWidget now rendered at ThemedApp level - visible in all modes */}
       </>
     )
   }
@@ -2531,8 +2529,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         />
       )}
       
-      {/* Audio Widget */}
-      <AudioWidget />
+      {/* AudioWidget now rendered at ThemedApp level - visible in all modes */}
       
       {/* Highlight Color Popover */}
       <HighlightColorPopover

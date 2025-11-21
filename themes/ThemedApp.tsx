@@ -14,6 +14,7 @@ import { backgroundProcessingService } from '../src/services/backgroundProcessin
 import { timerService, TimerState } from '../src/services/timerService'
 import { CustomizableReadingWizard } from '../src/components/customReading/CustomizableReadingWizard'
 import { DocumentUpload } from '../src/components/DocumentUpload'
+import { AudioWidget } from '../src/components/AudioWidget'
 
 const ThemedAppContent: React.FC = () => {
   const [timerState, setTimerState] = useState<TimerState>(timerService.getState())
@@ -109,6 +110,9 @@ const ThemedAppContent: React.FC = () => {
       {showUploadModal && (
         <DocumentUpload onClose={() => setShowUploadModal(false)} />
       )}
+      
+      {/* Audio Widget - Rendered at app level to be visible in all modes */}
+      <AudioWidget />
 
       {/* Pomodoro Bottom Bar - Visible when there is an active or paused session */}
       {user && currentDocument && hasActiveTimer && (
