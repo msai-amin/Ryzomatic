@@ -380,14 +380,14 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
           {relatedDocuments.map((relationship) => (
             <div
               key={relationship.relationship_id}
-              className="p-3 rounded-lg border transition-colors cursor-pointer group"
-              style={{ 
-                borderColor: 'var(--color-border)',
-                backgroundColor: 'var(--color-surface)'
-              }}
-              onClick={() => onPreviewDocument(relationship)}
-            >
-              <div className="flex items-start justify-between mb-2">
+              className="p-3 rounded-lg border transition-colors cursor-pointer group hover:shadow-md"
+                style={{ 
+                  borderColor: 'var(--color-border)',
+                  backgroundColor: 'var(--color-surface)'
+                }}
+                onClick={() => onPreviewDocument(relationship)}
+              >
+                <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center space-x-2 flex-1 min-w-0">
                   <FileText className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-text-secondary)' }} />
                   <h4 className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
