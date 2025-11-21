@@ -43,18 +43,21 @@ if (!currentDocument) {
 
 **Why**: Prevents the widget from appearing when there's no content to play.
 
-### Fix 2: Increased Z-Index
-Changed z-index from `z-60` to `z-[9999]`:
+### Fix 2: Increased Z-Index (CRITICAL FIX)
+Changed z-index from `z-60` → `z-[9999]` → **`z-[100000]`** (final):
 
 ```typescript
-className={`fixed z-[9999] transition-shadow duration-300 ...`}
+className={`fixed z-[100000] transition-shadow duration-300 ...`}
 ```
 
-**Why**: Ensures the AudioWidget appears above all other UI elements, including:
-- Reading Mode overlays
-- Modals (typically z-[10000] for backdrop, z-[10001] for content)
-- Sidebars
-- Other floating elements
+**Why**: The CustomizableReadingWizard modal uses:
+- Backdrop: `z-[9998]`
+- Modal content: `z-[9999]`
+- Internal elements: `z-[10001]`
+
+Other modals (LibraryModal, GeneralSettings) use `z-[10000]`.
+
+The AudioWidget **must be above all modals** to remain accessible during Reading Mode setup and usage. Using `z-[100000]` ensures it's always the topmost element.
 
 ### Fix 3: Enhanced Debug Logging
 Added comprehensive logging to track widget state:
@@ -148,13 +151,17 @@ Look for these console messages:
 
 ### Z-Index Hierarchy
 ```
-z-[10001] - Modal content (highest)
-z-[10000] - Modal backdrop
-z-[9999]  - AudioWidget (NEW)
-z-[100]   - Sidebars
-z-60      - AudioWidget (OLD - too low)
-z-50      - Floating panels
+z-[100000] - AudioWidget (FINAL - always on top)
+z-[10001]  - CustomizableReadingWizard internal elements
+z-[10000]  - LibraryModal, GeneralSettings modals
+z-[9999]   - CustomizableReadingWizard modal content
+z-[9998]   - CustomizableReadingWizard backdrop
+z-[100]    - Sidebars
+z-60       - AudioWidget (OLD - way too low)
+z-50       - Floating panels
 ```
+
+**Key Insight**: The AudioWidget must have the **highest z-index** of any element in the application to remain accessible at all times, especially during Reading Mode wizard and while reading.
 
 ### Text Source Selection Logic
 The AudioWidget dynamically selects the text source based on:

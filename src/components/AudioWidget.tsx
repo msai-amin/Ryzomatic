@@ -25,7 +25,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   // Version marker to verify live bundle
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      console.log('🔊 AudioWidget version:', 'v3-reading-mode-fix');
+      console.log('🔊 AudioWidget version:', 'v4-z-index-100000');
     }
   }, []);
   const {
@@ -1028,10 +1028,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
   return (
     <>
-      {/* Toggle Bar - Always Visible */}
+      {/* Toggle Bar - Always Visible - HIGHEST Z-INDEX to stay above all modals */}
       <div
         ref={widgetRef}
-        className={`fixed z-[9999] transition-shadow duration-300 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${className}`}
+        className={`fixed z-[100000] transition-shadow duration-300 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${className}`}
         style={{
           left: `${position.x}px`,
           top: `${position.y}px`,
