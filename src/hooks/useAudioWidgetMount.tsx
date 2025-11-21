@@ -31,8 +31,11 @@ export const useAudioWidgetMount = () => {
         // Create persistent container
         audioWidgetContainer = document.createElement('div')
         audioWidgetContainer.id = 'audio-widget-root'
-        audioWidgetContainer.style.cssText = 'position: fixed; z-index: 100000;'
+        // Start hidden, will show when document loads
+        audioWidgetContainer.style.cssText = 'position: fixed; z-index: 100000; bottom: 20px; right: 20px; display: none;'
         document.body.appendChild(audioWidgetContainer)
+        
+        console.log('🔊 useAudioWidgetMount: Created container element (should have RED BORDER)', audioWidgetContainer)
 
         // Create React root
         audioWidgetRoot = createRoot(audioWidgetContainer)
@@ -61,7 +64,12 @@ export const useAudioWidgetMount = () => {
     if (!audioWidgetContainer) return
 
     if (currentDocument) {
-      console.log('🔊 useAudioWidgetMount: Document loaded, showing AudioWidget')
+      console.log('🔊 useAudioWidgetMount: Document loaded, showing AudioWidget', {
+        documentName: currentDocument.name,
+        containerExists: !!audioWidgetContainer,
+        containerDisplay: audioWidgetContainer?.style.display,
+        containerInDOM: document.body.contains(audioWidgetContainer)
+      })
       audioWidgetContainer.style.display = 'block'
     } else {
       console.log('🔊 useAudioWidgetMount: No document, hiding AudioWidget')

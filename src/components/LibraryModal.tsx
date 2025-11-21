@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types, no-undef */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Book, FileText, Music, Trash2, Download, Upload, HardDrive, Cloud, CloudOff, RefreshCw, Star, LayoutList, LayoutGrid, Rows, Plus, Edit3, Loader2 } from 'lucide-react';

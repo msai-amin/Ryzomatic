@@ -54,11 +54,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       hasCleanedPageTexts: !!currentDocument?.cleanedPageTexts,
       pageTextsLength: currentDocument?.pageTexts?.length || 0,
       cleanedPageTextsLength: currentDocument?.cleanedPageTexts?.length || 0,
-      position,
       isVisible: !!currentDocument,
       willRender: !!currentDocument
     });
-  }, [currentDocument?.id, pdfViewer.readingMode, currentDocument?.pageTexts?.length, currentDocument?.cleanedPageTexts?.length, position]);
+  }, [currentDocument?.id, pdfViewer.readingMode, currentDocument?.pageTexts?.length, currentDocument?.cleanedPageTexts?.length]);
   
   // CRITICAL: Normalize IDs to prevent React comparison error
   const normalizedDocumentId = currentDocument?.id ?? ''
