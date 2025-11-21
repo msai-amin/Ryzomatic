@@ -5,66 +5,63 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Security: Restrict permissions to minimum required
+permissions:
+  contents: write # Needed for tagging releases
+  deployments: write # Needed for deployment status
+
 jobs:
   pre-deploy:
     name: Pre-deployment Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    permissions:
+      contents: read
     
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
       
       - name: Clean install
-        run: |
-          rm -rf node_modules package-lock.json
-          npm install
+        run: npm ci
       
       - name: Run all checks
         run: |
           npm run lint
           npx tsc --noEmit
-          npm run test:ci || echo "Tests failed (allowed for now)"
+          npm run test:ci
           npm run build
-
-  deploy-preview:
-    name: Deploy Preview
-    runs-on: ubuntu-latest
-    needs: pre-deploy
-    if: github.event_name == 'pull_request'
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      
-      - name: Clean install
-        run: |
-          rm -rf node_modules package-lock.json
-          npm install
-      
-      - name: Build
-        run: npm run build
-      
-      - name: Run smoke tests
-        run: echo "Smoke tests would run here"
-        # TODO: Add actual smoke test script
+        env:
+          # Security: Use mock values for build checks
+          VITE_SUPABASE_URL: 'https://mock.supabase.co'
+          VITE_SUPABASE_ANON_KEY: 'mock-anon-key'
 
   deploy-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    environment: Production
+    environment: 
+      name: Production
+      url: https://ryzomatic.net
     needs: pre-deploy
     if: github.ref == 'refs/heads/main'
+    timeout-minutes: 10
+    
+    permissions:
+      contents: write
+      deployments: write
     
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v25
@@ -73,32 +70,54 @@ jobs:
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           scope: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-args: '--prod'
       
-      - name: Run health check
+      - name: Wait for deployment
+        run: sleep 30
+      
+      - name: Health check
         run: |
-          echo "Waiting for deployment to propagate..."
-          sleep 30
-          echo "Health check would run here"
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://ryzomatic.net)
+          if [ $response -eq 200 ]; then
+            echo "✅ Health check passed"
+          else
+            echo "❌ Health check failed with status $response"
+            exit 1
+          fi
       
       - name: Tag release
         run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git tag -a "v$(date +%Y%m%d-%H%M%S)" -m "Release $(date +%Y%m%d-%H%M%S)"
-          git push origin --tags || echo "Tag already exists"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          TAG="v$(date +%Y%m%d-%H%M%S)"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG" || echo "Tag already exists"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   post-deploy:
     name: Post-deployment
     runs-on: ubuntu-latest
     needs: deploy-production
+    timeout-minutes: 5
+    
+    permissions:
+      contents: read
     
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       
       - name: Generate changelog
-        run: echo "Changelog generation would go here"
+        run: |
+          echo "📝 Generating changelog..."
+          git log --oneline -10 > changelog.txt
+          cat changelog.txt
       
-      - name: Notify team
-        run: echo "Team notification would go here"
-        # TODO: Add Slack/Discord webhook notification
-
+      - name: Upload changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog-${{ github.sha }}
+          path: changelog.txt
+          retention-days: 30

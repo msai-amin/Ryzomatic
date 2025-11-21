@@ -21,19 +21,36 @@ node_modules
 /build
 /.vercel
 
-# Environment variables
+# Environment variables - CRITICAL: Never commit these!
 .env
+.env.*
+!.env.example
+!.env.template
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 .env.supabase
+.env.serverless
+
+# Secrets and credentials
+*.pem
+*.key
+*.cert
+*.p12
+*.pfx
+secrets/
+credentials/
+*.secret
 
 # IDE
-.vscode
+.vscode/*
+!.vscode/settings.json.example
+!.vscode/extensions.json
 .idea
 *.swp
 *.swo
+*.iml
 
 # OS
 .DS_Store
@@ -47,6 +64,9 @@ Thumbs.db
 # Testing
 coverage
 .nyc_output
+playwright-report
+test-results
+*.lcov
 
 # Logs
 logs
@@ -55,11 +75,25 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+lerna-debug.log*
 
 # Cache
 .cache
 .parcel-cache
 .turbo
+.eslintcache
+.stylelintcache
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Backup files
+*.bak
+*.backup
+*~
 
 # Misc
 *.tsbuildinfo
@@ -68,4 +102,25 @@ pnpm-debug.log*
 *.pid.lock
 .archive
 archive/
-// Deployment trigger 20251117-030249
+
+# GitHub Actions artifacts (local)
+.github/workflows/*.log
+
+# Vercel
+.vercel
+
+# Sentry
+.sentryclirc
+
+# Database dumps
+*.sql
+*.db
+*.sqlite
+*.sqlite3
+!supabase/migrations/*.sql
+
+# API keys and tokens (extra safety)
+**/api-keys.json
+**/tokens.json
+**/*secret*.json
+**/*credentials*.json

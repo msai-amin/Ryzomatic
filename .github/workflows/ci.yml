@@ -6,13 +6,24 @@ on:
   push:
     branches: [ main ]
 
+# Security: Restrict permissions to minimum required
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    
+    # Security: Prevent running on forks to protect secrets
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'push'
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false # Security: Don't persist credentials
 
       - name: Use Node.js 20
         uses: actions/setup-node@v4
@@ -21,7 +32,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci # Use ci instead of install for reproducible builds
 
       - name: Lint
         run: npm run lint
@@ -34,23 +45,23 @@ jobs:
 
       - name: Build
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://example.supabase.co' }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'anon_key_placeholder' }}
+          # Security: Use secrets with fallback for PR previews
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://mock.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'mock-anon-key' }}
         run: npm run build
 
       - name: Upload dist artifact
-        if: always()
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: dist
+          name: dist-${{ github.sha }}
           path: dist
+          retention-days: 7
 
       - name: Upload coverage artifact
-        if: always()
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage
+          name: coverage-${{ github.sha }}
           path: coverage
-
- 
-
+          retention-days: 7
