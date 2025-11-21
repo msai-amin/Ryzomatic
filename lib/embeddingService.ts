@@ -15,13 +15,24 @@ export class EmbeddingService {
    */
   async embed(text: string): Promise<number[]> {
     try {
+      // Get auth token from Supabase session
+      const { supabase } = await import('./supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Add auth token if available
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      
       // Use server-side API endpoint instead of calling Gemini directly
       // This keeps API keys secure and avoids 403 errors
       const response = await fetch('/api/gemini/embedding', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({ text }),
       });
 
