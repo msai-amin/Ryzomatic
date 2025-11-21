@@ -343,7 +343,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
             }}
           >
             {isOpen && (
-              <div className="px-4 pb-6" style={{ paddingTop: '8px' }}>
+            <div className="px-4 pb-6" style={{ paddingTop: '8px' }}>
 
               {/* Recently Viewed Section */}
               <div className="mb-6">
@@ -715,7 +715,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
                   {sectionsExpanded.achievements && <AchievementPanel userId={user.id} />}
                 </div>
               )}
-              </div>
+            </div>
             )}
           </div>
           <div 
@@ -727,24 +727,24 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
               transition: 'opacity 300ms ease-in-out, transform 300ms ease-in-out'
             }}
           >
-            {railItems.map((item) => (
-              <Tooltip key={item.id} content={item.label} position="right">
-                <button
-                  onClick={() => handleRailItemClick(item)}
-                  className="p-2 rounded-lg transition-colors"
-                  style={{
-                    backgroundColor: 'var(--color-surface)',
-                    color: 'var(--color-text-secondary)',
-                    border: '1px solid var(--color-border)'
-                  }}
-                  aria-label={item.label}
-                  title={item.label}
-                >
-                  <item.icon className="w-5 h-5" />
-                </button>
-              </Tooltip>
-            ))}
-          </div>
+              {railItems.map((item) => (
+                <Tooltip key={item.id} content={item.label} position="right">
+                  <button
+                onClick={() => handleRailItemClick(item)}
+                    className="p-2 rounded-lg transition-colors"
+                    style={{
+                      backgroundColor: 'var(--color-surface)',
+                      color: 'var(--color-text-secondary)',
+                      border: '1px solid var(--color-border)'
+                    }}
+                    aria-label={item.label}
+                    title={item.label}
+                  >
+                    <item.icon className="w-5 h-5" />
+                  </button>
+                </Tooltip>
+              ))}
+            </div>
         </div>
       </aside>
 

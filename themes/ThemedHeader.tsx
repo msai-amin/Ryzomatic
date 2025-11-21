@@ -22,6 +22,7 @@ import { LibraryModal } from '../src/components/LibraryModal'
 import { AuthModal } from '../src/components/AuthModal'
 import { Tooltip } from '../src/components/Tooltip'
 import { timerService, TimerState } from '../src/services/timerService'
+import { UnsavedChangesDialog } from '../src/components/UnsavedChangesDialog'
 
 interface ThemedHeaderProps {
   onUploadClick: () => void
@@ -46,7 +47,10 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     setCurrentDocument,
     isRightSidebarOpen,
     setIsRightSidebarOpen,
-    setRightSidebarTab
+    setRightSidebarTab,
+    hasUnsavedChanges,
+    setHasUnsavedChanges,
+    closeDocumentWithoutSaving
   } = useAppStore()
 
   const [showSettings, setShowSettings] = useState(false)
@@ -55,10 +59,48 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
   const [showLibrary, setShowLibrary] = useState(false)
   const [showAuth, setShowAuth] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
 
   const handleLogout = async () => {
     await logout()
     setIsUserMenuOpen(false)
+  }
+
+  // Handle logo click to return to main UI
+  const handleLogoClick = () => {
+    if (!currentDocument) {
+      // No document open, nothing to do
+      return
+    }
+
+    // Check if there are unsaved changes
+    if (hasUnsavedChanges) {
+      setShowUnsavedDialog(true)
+    } else {
+      // No unsaved changes, close document immediately
+      setCurrentDocument(null)
+    }
+  }
+
+  // Save changes and close document
+  const handleSaveAndClose = async () => {
+    // Note: In the current implementation, changes are auto-saved
+    // (highlights, notes, reading position, TTS position)
+    // So we just need to mark as saved and close
+    setHasUnsavedChanges(false)
+    setShowUnsavedDialog(false)
+    setCurrentDocument(null)
+  }
+
+  // Discard changes and close document
+  const handleDiscardAndClose = () => {
+    closeDocumentWithoutSaving()
+    setShowUnsavedDialog(false)
+  }
+
+  // Cancel close operation
+  const handleCancelClose = () => {
+    setShowUnsavedDialog(false)
   }
 
   useEffect(() => {
@@ -143,13 +185,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     }
   }
 
-  const handleLogoClick = () => {
-    if (currentDocument) {
-      setCurrentDocument(null)
-    }
-    openLibrary()
-  }
-
   const tierLabel = useMemo(() => user?.tier?.toUpperCase() ?? 'STANDARD', [user?.tier])
 
 
@@ -168,15 +203,18 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
       <div className="flex w-full flex-col gap-3">
         <div className="flex w-full flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-6">
-            <div
-              className="flex items-center gap-2 rounded-lg px-2 py-1"
+            <button
+              onClick={handleLogoClick}
+              className="flex items-center gap-2 rounded-lg px-2 py-1 transition-all hover:bg-[var(--color-surface-hover)] active:scale-95 cursor-pointer"
               style={{ color: 'var(--color-text-primary)' }}
+              aria-label="Return to main view"
+              title="Return to main view"
             >
               <img src="/ryzomatic-logo.png" alt="ryzomatic" className="h-6 w-6" />
               <span className="text-sm font-semibold tracking-[0.18em]" style={{ color: 'var(--color-text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}>
                 ryzomatic
               </span>
-            </div>
+            </button>
             
             {/* Navigation: Library */}
             <nav className="flex items-center">
@@ -772,6 +810,15 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
           </div>,
           document.body
         )}
+
+      {/* Unsaved Changes Dialog */}
+      <UnsavedChangesDialog
+        isOpen={showUnsavedDialog}
+        onSave={handleSaveAndClose}
+        onDiscard={handleDiscardAndClose}
+        onCancel={handleCancelClose}
+        documentName={currentDocument?.name}
+      />
     </>
   )
 }

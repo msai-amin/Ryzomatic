@@ -60,6 +60,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     setChatMode,
     toggleChat,
     isChatOpen,
+    setHasUnsavedChanges,
   } = useAppStore()
 
   // 1. Get values from the (now safe) hook
@@ -763,6 +764,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         return updated
       })
       
+      // Mark document as having unsaved changes
+      setHasUnsavedChanges(true)
+      
       console.log('Highlight created:', newHighlight)
     } catch (error) {
       console.error('Error creating highlight:', error)
@@ -1129,6 +1133,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                       undefined,
                       false
                     )
+                    setHasUnsavedChanges(true)
                     setIsRightSidebarOpen(true)
                     setRightSidebarTab('notes')
                   }
@@ -2552,6 +2557,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             try {
               await highlightService.deleteHighlight(id)
               setHighlights(prev => prev.filter(h => h.id !== id))
+              setHasUnsavedChanges(true)
             } catch (error) {
               console.error('Error deleting highlight:', error)
             }
@@ -2560,6 +2566,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             try {
               await Promise.all(ids.map(id => highlightService.deleteHighlight(id)))
               setHighlights(prev => prev.filter(h => !ids.includes(h.id)))
+              setHasUnsavedChanges(true)
             } catch (error) {
               console.error('Error deleting highlights:', error)
             }

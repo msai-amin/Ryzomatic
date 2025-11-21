@@ -270,6 +270,8 @@ interface AppState {
   // Customizable Reading wizard
   customReadingWizard: CustomReadingWizardState
 
+  // Unsaved changes tracking
+  hasUnsavedChanges: boolean
   
   // Actions
   setUser: (user: AuthUser | null) => void
@@ -508,6 +510,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     status: 'idle',
     error: null
   },
+  
+  // Unsaved changes tracking
+  hasUnsavedChanges: false,
   
   // Authentication actions
   setUser: (user) => set({ user }),
@@ -1040,6 +1045,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadTTSPosition: (documentId) => {
     const state = get()
     return state.tts.documentPositions[documentId] || null
+  },
+  
+  // Unsaved changes tracking
+  setHasUnsavedChanges: (hasChanges) => set({ hasUnsavedChanges: hasChanges }),
+  
+  closeDocumentWithoutSaving: () => {
+    set({ 
+      currentDocument: null,
+      hasUnsavedChanges: false,
+      chatMessages: [],
+      selectedTextContext: null
+    })
   }
 }))
 

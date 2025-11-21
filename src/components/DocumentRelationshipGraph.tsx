@@ -422,7 +422,7 @@ export const DocumentRelationshipGraph: React.FC<DocumentRelationshipGraphProps>
     // Cleanup
     return () => {
       simulation.stop();
-    };
+  };
   }, [relationships, isLoading, dimensions, selectedNode, sourceDocumentId, currentDocument]);
 
   if (isLoading) {
@@ -470,10 +470,10 @@ export const DocumentRelationshipGraph: React.FC<DocumentRelationshipGraphProps>
       </div>
 
       {/* Graph Visualization */}
-      <div 
+          <div
         ref={containerRef}
         className="flex-1 overflow-hidden rounded-lg border" 
-        style={{ 
+            style={{
           borderColor: 'var(--color-border)',
           backgroundColor: 'var(--color-surface)',
           minHeight: '500px',
@@ -483,12 +483,12 @@ export const DocumentRelationshipGraph: React.FC<DocumentRelationshipGraphProps>
         <svg 
           ref={svgRef} 
           className="w-full h-full"
-          style={{ 
+                      style={{
             backgroundColor: 'var(--color-surface)',
             display: 'block'
-          }}
-        />
-      </div>
+                        }}
+                      />
+                    </div>
 
       {/* Selected Node Details */}
       {selectedRelationship && selectedNode && (
@@ -501,33 +501,33 @@ export const DocumentRelationshipGraph: React.FC<DocumentRelationshipGraphProps>
               {selectedRelationship.related_title}
             </h4>
             {selectedRelationship.relevance_percentage !== null && (
-              <span 
+                              <span 
                 className="text-xs font-semibold px-2 py-0.5 rounded"
-                style={{
+                                style={{
                   backgroundColor: getRelevanceColor(selectedRelationship.relevance_percentage),
-                  color: 'var(--color-text-inverse)'
-                }}
-              >
+                                  color: 'var(--color-text-inverse)'
+                                }}
+                              >
                 {selectedRelationship.relevance_percentage}% relevant
-              </span>
-            )}
-          </div>
+                              </span>
+                            )}
+                          </div>
           {selectedRelationship.relationship_description && (
-            <p className="text-xs mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+                          <p className="text-xs mb-2" style={{ color: 'var(--color-text-secondary)' }}>
               {selectedRelationship.relationship_description}
-            </p>
-          )}
+                          </p>
+                        )}
           {selectedRelationship.ai_generated_description && (
-            <details className="text-xs">
-              <summary className="cursor-pointer mb-1" style={{ color: 'var(--color-text-secondary)' }}>
-                AI Analysis
-              </summary>
-              <p className="mt-1" style={{ color: 'var(--color-text-primary)' }}>
+                          <details className="text-xs">
+                            <summary className="cursor-pointer mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+                              AI Analysis
+                            </summary>
+                            <p className="mt-1" style={{ color: 'var(--color-text-primary)' }}>
                 {selectedRelationship.ai_generated_description.substring(0, 300)}
                 {selectedRelationship.ai_generated_description.length > 300 ? '...' : ''}
-              </p>
-            </details>
-          )}
+                            </p>
+                          </details>
+                        )}
           {onOpenDocument && (
             <button
               onClick={() => onOpenDocument(selectedNode)}
