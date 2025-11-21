@@ -4,6 +4,7 @@ import { errorHandler, ErrorType, ErrorSeverity } from './errorHandler';
 import { bookStorageService } from './bookStorageService';
 import { configurePDFWorker } from '../utils/pdfjsConfig';
 import { googleAuthService } from './googleAuthService';
+import { documentContentService } from './documentContentService';
 
 export interface SavedBook {
   id: string;
@@ -548,6 +549,21 @@ class SupabaseStorageService {
                 originalArrayBufferSize: book.fileData.byteLength,
                 copyArrayBufferSize: pdfDataCopy.byteLength
               });
+              
+              // Store extracted text in document_content table for future use
+              // This enables vector search and avoids re-parsing
+              const fullText = sanitizedPageTexts.join('\n\n');
+              if (fullText.length > 0 && this.currentUserId) {
+                documentContentService.storeDocumentContent(
+                  data.id,
+                  this.currentUserId,
+                  fullText,
+                  'pdfjs'
+                ).catch(error => {
+                  logger.warn('Failed to store document content', context, error);
+                  // Don't fail the main operation if content storage fails
+                });
+              }
               
               // Clean up the PDF document to free memory
               pdf.destroy();

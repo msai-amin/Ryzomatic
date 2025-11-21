@@ -8,6 +8,7 @@ import { simpleGoogleAuth } from '../services/simpleGoogleAuth'
 import { logger, trackPerformance } from '../services/logger'
 import { errorHandler, ErrorType, ErrorSeverity } from '../services/errorHandler'
 import { validatePDFFile, validateFile } from '../services/validation'
+import { documentContentService } from '../services/documentContentService'
 import { OCRConsentDialog } from './OCRConsentDialog'
 import { calculateOCRCredits } from '../utils/ocrUtils'
 import { extractStructuredText } from '../utils/pdfTextExtractor'
@@ -306,6 +307,20 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
                 console.log('🔄 Updating document ID from', document.id, 'to database ID:', databaseId);
                 document.id = databaseId as typeof document.id;
               }
+              
+              // Store extracted text for vector search and graph generation
+              if (user?.id && pageTexts.length > 0) {
+                const fullText = pageTexts.join('\n\n');
+                documentContentService.storeDocumentContent(
+                  databaseId,
+                  user.id,
+                  fullText,
+                  'pdfjs'
+                ).catch(error => {
+                  logger.warn('Failed to store document content', { documentId: databaseId }, error);
+                  // Don't fail the upload if content storage fails
+                });
+              }
               saveSucceeded = true; // Mark save as succeeded
               
               logger.info('Document saved to Supabase', context, {
@@ -483,6 +498,21 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
                 console.log('🔄 Updating document ID from', document.id, 'to database ID:', databaseId);
                 document.id = databaseId as typeof document.id;
               }
+              
+              // Store extracted text for vector search and graph generation
+              if (user?.id && sections.length > 0) {
+                const fullText = sections.join('\n\n');
+                documentContentService.storeDocumentContent(
+                  databaseId,
+                  user.id,
+                  fullText,
+                  'epub'
+                ).catch(error => {
+                  logger.warn('Failed to store document content', { documentId: databaseId }, error);
+                  // Don't fail the upload if content storage fails
+                });
+              }
+              
               saveSucceeded = true;
 
               logger.info('EPUB saved to Supabase', context, {
@@ -611,6 +641,20 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
                 console.log('🔄 Updating document ID from', document.id, 'to database ID:', databaseId);
                 document.id = databaseId as typeof document.id;
               }
+              
+              // Store text content for vector search and graph generation
+              if (user?.id && content.length > 0) {
+                documentContentService.storeDocumentContent(
+                  databaseId,
+                  user.id,
+                  content,
+                  'manual'
+                ).catch(error => {
+                  logger.warn('Failed to store document content', { documentId: databaseId }, error);
+                  // Don't fail the upload if content storage fails
+                });
+              }
+              
               saveSucceeded = true; // Mark save as succeeded
               
               logger.info('Document saved to Supabase', context, {
