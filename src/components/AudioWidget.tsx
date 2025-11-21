@@ -25,7 +25,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   // Version marker to verify live bundle
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      console.log('🔊 AudioWidget version:', 'v4-z-index-100000');
+      console.log('🔊 AudioWidget version:', 'v5-always-render-debug');
+      console.log('🔊 AudioWidget: Mounted at ThemedApp level');
     }
   }, []);
   const {
@@ -1022,11 +1023,13 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const currentParagraphIndex = tts.currentParagraphIndex ?? 0
   const totalParagraphs = tts.paragraphs.length
 
-  // Don't render if no document is loaded
-  if (!currentDocument) {
-    console.log('🔊 AudioWidget: Not rendering - no document loaded');
-    return null;
-  }
+  // TEMPORARY: Always render for debugging - check console for state
+  console.log('🔊 AudioWidget: About to render', {
+    hasDocument: !!currentDocument,
+    documentId: currentDocument?.id || 'NONE',
+    documentName: currentDocument?.name || 'NONE',
+    willRender: true
+  });
 
   return (
     <>
