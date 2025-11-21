@@ -112,7 +112,7 @@ const ThemedAppContent: React.FC = () => {
         <DocumentUpload onClose={() => setShowUploadModal(false)} />
       )}
       
-      {/* Audio Widget - Rendered at app level to be visible in all modes */}
+      {/* Audio Widget - TEMPORARILY DISABLED to test if it's causing the ReferenceError */}
       {/* DEBUG: Test if this section renders at all */}
       <div style={{ 
         position: 'fixed', 
@@ -124,11 +124,11 @@ const ThemedAppContent: React.FC = () => {
         zIndex: 999999,
         border: '3px solid yellow'
       }}>
-        DEBUG: ThemedApp rendering - AudioWidget should be below this
+        DEBUG: ThemedApp rendering - AudioWidget DISABLED for testing
       </div>
-      <React.Suspense fallback={<div>Loading audio...</div>}>
+      {/* <React.Suspense fallback={<div>Loading audio...</div>}>
         <AudioWidget />
-      </React.Suspense>
+      </React.Suspense> */}
 
       {/* Pomodoro Bottom Bar - Visible when there is an active or paused session */}
       {user && currentDocument && hasActiveTimer && (
