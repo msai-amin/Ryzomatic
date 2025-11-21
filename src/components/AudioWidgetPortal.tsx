@@ -5,11 +5,11 @@
  * with a delay to ensure all other components are fully initialized first.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { AudioWidget } from './AudioWidget'
 
-export const AudioWidgetPortal: React.FC = () => {
+const AudioWidgetPortalComponent: React.FC = () => {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
@@ -40,4 +40,7 @@ export const AudioWidgetPortal: React.FC = () => {
     document.body
   )
 }
+
+// Memoize to prevent re-renders when parent (ThemedApp) re-renders
+export const AudioWidgetPortal = memo(AudioWidgetPortalComponent)
 
