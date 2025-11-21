@@ -112,6 +112,19 @@ const ThemedAppContent: React.FC = () => {
       )}
       
       {/* Audio Widget - Rendered at app level to be visible in all modes */}
+      {/* DEBUG: Test if this section renders at all */}
+      <div style={{ 
+        position: 'fixed', 
+        bottom: '20px', 
+        right: '20px', 
+        background: 'red', 
+        color: 'white', 
+        padding: '10px', 
+        zIndex: 999999,
+        border: '3px solid yellow'
+      }}>
+        DEBUG: ThemedApp rendering - AudioWidget should be below this
+      </div>
       <AudioWidget />
 
       {/* Pomodoro Bottom Bar - Visible when there is an active or paused session */}
