@@ -192,28 +192,26 @@ class DocumentContentService {
       const embedding = await embeddingService.embed(summaryText);
       const embeddingVector = embeddingService.formatForPgVector(embedding);
 
-      // Check if description already exists
+      // Check if description already exists (now checking user_books columns)
       const { data: existing, error: checkError } = await supabase
-        .from('document_descriptions')
-        .select('id')
-        .eq('book_id', bookId)
-        .eq('user_id', userId)
+        .from('user_books')
+        .select('id, description_embedding')
+        .eq('id', bookId)
         .single();
 
       if (checkError && checkError.code !== 'PGRST116') {
         throw checkError;
       }
 
-      if (existing) {
-        // Update existing description
+      if (existing && existing.description_embedding) {
+        // Update existing description in user_books
         const { error: updateError } = await supabase
-          .from('document_descriptions')
+          .from('user_books')
           .update({
             description_embedding: embeddingVector,
-            last_auto_generated_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            last_auto_generated_at: new Date().toISOString()
           })
-          .eq('id', existing.id);
+          .eq('id', bookId);
 
         if (updateError) {
           throw updateError;
@@ -221,19 +219,18 @@ class DocumentContentService {
 
         logger.info('Updated document description embedding', context);
       } else {
-        // Create new description
-        const { error: insertError } = await supabase
-          .from('document_descriptions')
-          .insert({
-            book_id: bookId,
-            user_id: userId,
+        // Update user_books with embedding (book must exist)
+        const { error: updateError } = await supabase
+          .from('user_books')
+          .update({
             description_embedding: embeddingVector,
-            is_ai_generated: true,
+            ai_description: 'Auto-generated embedding', // Placeholder or actual description if available
             last_auto_generated_at: new Date().toISOString()
-          });
+          })
+          .eq('id', bookId);
 
-        if (insertError) {
-          throw insertError;
+        if (updateError) {
+          throw updateError;
         }
 
         logger.info('Created document description with embedding', context);

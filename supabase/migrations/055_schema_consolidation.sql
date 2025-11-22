@@ -186,10 +186,19 @@ SET search_path = 'public'
 AS $$
 BEGIN
   -- Only trigger if embedding was added or changed
-  IF NEW.description_embedding IS NOT NULL AND 
-     (TG_OP = 'INSERT' OR OLD.description_embedding IS DISTINCT FROM NEW.description_embedding) THEN
-    
-    PERFORM auto_generate_document_relationships(NEW.id, 0.60);
+  -- For INSERT: always trigger if embedding is not null
+  -- For UPDATE: trigger if embedding changed from null to not null, or if it's a new value
+  IF NEW.description_embedding IS NOT NULL THEN
+    IF TG_OP = 'INSERT' THEN
+      PERFORM auto_generate_document_relationships(NEW.id, 0.60);
+    ELSIF TG_OP = 'UPDATE' THEN
+      -- Only trigger if embedding was null before or if it's actually different
+      -- Compare by casting to text to avoid vector operator issues
+      IF OLD.description_embedding IS NULL OR 
+         (OLD.description_embedding::text IS DISTINCT FROM NEW.description_embedding::text) THEN
+        PERFORM auto_generate_document_relationships(NEW.id, 0.60);
+      END IF;
+    END IF;
   END IF;
   
   RETURN NEW;

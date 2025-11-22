@@ -60,26 +60,13 @@ class BackgroundProcessingService {
 
   private async processMissingDescriptions() {
     try {
-      // First, get all book IDs that already have descriptions
-      const { data: existingDescriptions } = await supabase
-        .from('document_descriptions')
-        .select('book_id');
-
-      const existingBookIds = existingDescriptions?.map(d => d.book_id) || [];
-
-      // Get documents without descriptions
-      let query = supabase
+      // Check for books without embeddings (now stored in user_books.description_embedding)
+      const { data: books, error } = await supabase
         .from('user_books')
         .select('id, user_id, text_content')
         .not('text_content', 'is', null)
+        .is('description_embedding', null)
         .limit(10);
-
-      // Only add the not.in filter if there are existing descriptions
-      if (existingBookIds.length > 0) {
-        query = query.not('id', 'in', `(${existingBookIds.join(',')})`);
-      }
-
-      const { data: books, error } = await query;
 
       if (error || !books) return;
 
