@@ -183,9 +183,14 @@ $$;
 ALTER TABLE document_relationships DROP CONSTRAINT IF EXISTS document_relationships_source_description_id_fkey;
 ALTER TABLE document_relationships DROP CONSTRAINT IF EXISTS document_relationships_related_description_id_fkey;
 
--- Drop document_descriptions table and its trigger
-DROP TRIGGER IF EXISTS auto_generate_relationships_trigger ON document_descriptions;
-DROP TABLE IF EXISTS document_descriptions;
+-- Drop document_descriptions table and its trigger (if table exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'document_descriptions') THEN
+    DROP TRIGGER IF EXISTS auto_generate_relationships_trigger ON document_descriptions;
+    DROP TABLE document_descriptions;
+  END IF;
+END $$;
 
 -- Create trigger for user_books embedding updates
 CREATE OR REPLACE FUNCTION trigger_auto_generate_relationships_books()
