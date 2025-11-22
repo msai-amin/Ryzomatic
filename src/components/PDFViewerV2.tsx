@@ -687,11 +687,13 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     if (typeof window === 'undefined' || typeof window.document === 'undefined') return
 
     const handleResize = () => {
-      // Trigger a resize event on the viewer container to force react-pdf-viewer to recalculate
+      // Force react-pdf-viewer to recalculate layout by triggering a custom event
+      // DO NOT dispatch 'resize' event here as it causes infinite loop
       const viewerContainer = window.document.querySelector('.pdf-viewer-container')
       if (viewerContainer) {
-        // Dispatch a custom resize event
-        window.dispatchEvent(new Event('resize'))
+        // Dispatch a custom event instead of 'resize' to avoid infinite loop
+        const customEvent = new CustomEvent('pdf-viewer-resize', { bubbles: true })
+        viewerContainer.dispatchEvent(customEvent)
       }
     }
 
