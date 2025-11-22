@@ -5,6 +5,10 @@ import { Tooltip } from './Tooltip';
 import { useAppStore } from '../store/appStore';
 import { supabaseStorageService } from '../services/supabaseStorageService';
 import { authService } from '../services/supabaseAuthService';
+import { extractWithFallback } from '../services/pdfExtractionOrchestrator';
+import { extractEpub } from '../services/epubExtractionOrchestrator';
+import { documentContentService } from '../services/documentContentService';
+import { logger } from '../services/logger';
 
 interface RelatedDocumentsPanelProps {
   relatedDocuments: DocumentRelationshipWithDetails[];
@@ -104,25 +108,70 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
     try {
       // Initialize storage service
       supabaseStorageService.setCurrentUser(user.id);
+      documentContentService.setCurrentUser(user.id);
 
       // Read file content
       let fileData: string | Blob;
+      let pageTexts: string[] = [];
+      const fileType = file.type === 'application/pdf' ? 'pdf' : 
+                       file.type === 'application/epub+zip' ? 'epub' : 'text';
+
       if (file.type === 'text/plain' || file.type === 'text/markdown') {
         fileData = await file.text();
+        pageTexts = [fileData]; // Text files have single "page"
+      } else if (file.type === 'application/pdf') {
+        // Extract text from PDF
+        logger.info('RelatedDocumentsPanel: Extracting text from PDF', { fileName: file.name });
+        const extractionResult = await extractWithFallback(file);
+        fileData = file;
+        pageTexts = extractionResult.pageTexts || [];
+        logger.info('RelatedDocumentsPanel: PDF text extracted', { 
+          fileName: file.name, 
+          pages: pageTexts.length 
+        });
+      } else if (file.type === 'application/epub+zip') {
+        // Extract text from EPUB
+        logger.info('RelatedDocumentsPanel: Extracting text from EPUB', { fileName: file.name });
+        const extractionResult = await extractEpub(file);
+        fileData = file;
+        pageTexts = extractionResult.pageTexts || [];
+        logger.info('RelatedDocumentsPanel: EPUB text extracted', { 
+          fileName: file.name, 
+          chapters: pageTexts.length 
+        });
       } else {
         fileData = file;
       }
 
-      // Upload to library
+      // Upload to library with extracted text
       documentId = await supabaseStorageService.saveBook({
         id: crypto.randomUUID(),
         title: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
         fileName: file.name,
-        type: file.type === 'application/pdf' ? 'pdf' : 
-              file.type === 'application/epub+zip' ? 'epub' : 'text',
+        type: fileType,
         savedAt: new Date(),
         fileData: fileData,
+        pageTexts: pageTexts.length > 0 ? pageTexts : undefined, // Include extracted text
       });
+
+      // Save document content for preview and embeddings
+      if (documentId && pageTexts.length > 0) {
+        const fullText = pageTexts.join('\n\n');
+        await documentContentService.saveDocumentContent({
+          book_id: documentId,
+          user_id: user.id,
+          content: fullText,
+          extraction_method: fileType === 'pdf' ? 'pdfjs' : fileType === 'epub' ? 'epub' : 'manual',
+        });
+        logger.info('RelatedDocumentsPanel: Document content stored', { 
+          documentId, 
+          textLength: fullText.length 
+        });
+
+        // Generate embedding and description for automatic graph relationships
+        await documentContentService.generateEmbeddingAndDescription(documentId, user.id, fullText);
+        logger.info('RelatedDocumentsPanel: Embedding generation triggered', { documentId });
+      }
 
       setUploadingFiles(prev => {
         const next = new Set(prev);
