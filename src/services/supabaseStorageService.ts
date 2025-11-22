@@ -232,12 +232,14 @@ class SupabaseStorageService {
         hasIdInUserBook: 'id' in userBook
       });
 
-      // CRITICAL: Use direct supabase.insert() instead of userBooks.create()
-      // to ensure the id field is included in the INSERT statement
-      // userBooks.create() has type Omit<UserBook, 'id'> which might strip it out
+      // CRITICAL: Use upsert to handle duplicate IDs gracefully
+      // This avoids vector comparison errors when a book with the same ID already exists
       const { data, error } = await supabase
         .from('user_books')
-        .insert(userBook as any)
+        .upsert(userBook as any, {
+          onConflict: 'id',
+          ignoreDuplicates: false
+        })
         .select()
         .single();
       
