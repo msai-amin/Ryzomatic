@@ -17,32 +17,37 @@ ADD COLUMN IF NOT EXISTS pomodoro_mode TEXT CHECK (pomodoro_mode IN ('work', 'sh
 -- Index for Pomodoro queries
 CREATE INDEX IF NOT EXISTS idx_reading_sessions_pomodoro ON reading_sessions(user_id, is_pomodoro);
 
--- Migrate data from pomodoro_sessions to reading_sessions
-INSERT INTO reading_sessions (
-  id,
-  user_id,
-  book_id,
-  session_type,
-  start_time,
-  end_time,
-  duration_seconds,
-  is_pomodoro,
-  pomodoro_mode,
-  created_at
-)
-SELECT 
-  id,
-  user_id,
-  book_id,
-  'study', -- Default session type for Pomodoro
-  started_at,
-  ended_at,
-  duration_seconds,
-  TRUE,
-  mode,
-  created_at
-FROM pomodoro_sessions
-ON CONFLICT (id) DO NOTHING;
+-- Migrate data from pomodoro_sessions to reading_sessions (if table exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'pomodoro_sessions') THEN
+    INSERT INTO reading_sessions (
+      id,
+      user_id,
+      book_id,
+      session_type,
+      start_time,
+      end_time,
+      duration_seconds,
+      is_pomodoro,
+      pomodoro_mode,
+      created_at
+    )
+    SELECT 
+      id,
+      user_id,
+      book_id,
+      'study', -- Default session type for Pomodoro
+      started_at,
+      ended_at,
+      duration_seconds,
+      TRUE,
+      mode,
+      created_at
+    FROM pomodoro_sessions
+    ON CONFLICT (id) DO NOTHING;
+  END IF;
+END $$;
 
 -- Drop dependent materialized views first
 DROP MATERIALIZED VIEW IF EXISTS reading_stats_weekly;
