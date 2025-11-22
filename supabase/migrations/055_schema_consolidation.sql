@@ -79,6 +79,9 @@ SET
 FROM document_descriptions dd
 WHERE ub.id = dd.book_id;
 
+-- Drop existing function to avoid ambiguity with overloaded signatures
+DROP FUNCTION IF EXISTS auto_generate_document_relationships(UUID, DECIMAL);
+
 -- Update auto_generate_document_relationships function to use user_books
 CREATE OR REPLACE FUNCTION auto_generate_document_relationships(
   source_book_uuid UUID,
