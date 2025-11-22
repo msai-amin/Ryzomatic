@@ -2,6 +2,9 @@
 -- Consolidates sessions, descriptions, and deduplicates content
 -- Date: 2025-01-XX
 
+-- Enable vector extension if not already enabled
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
+
 -- ============================================================================
 -- 1. CONSOLIDATE SESSIONS
 -- ============================================================================
@@ -54,15 +57,16 @@ DROP TABLE IF EXISTS pomodoro_sessions;
 -- ============================================================================
 
 -- Add description fields to user_books
+-- Use public.vector explicitly to avoid path issues
 ALTER TABLE user_books
-ADD COLUMN IF NOT EXISTS description_embedding vector(768),
+ADD COLUMN IF NOT EXISTS description_embedding public.vector(768),
 ADD COLUMN IF NOT EXISTS ai_description TEXT,
 ADD COLUMN IF NOT EXISTS user_description TEXT,
 ADD COLUMN IF NOT EXISTS last_auto_generated_at TIMESTAMPTZ;
 
 -- Index for vector similarity search on user_books
 CREATE INDEX IF NOT EXISTS idx_user_books_embedding ON user_books 
-  USING ivfflat (description_embedding vector_cosine_ops) WITH (lists = 100)
+  USING ivfflat (description_embedding public.vector_cosine_ops) WITH (lists = 100)
   WHERE description_embedding IS NOT NULL;
 
 -- Migrate data from document_descriptions to user_books
@@ -89,7 +93,7 @@ DECLARE
   user_uuid UUID;
   relationships_created INTEGER := 0;
   related_record RECORD;
-  source_embedding vector(768);
+  source_embedding public.vector(768);
 BEGIN
   -- Get current user
   user_uuid := auth.uid();
