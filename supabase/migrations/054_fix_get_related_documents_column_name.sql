@@ -6,6 +6,9 @@
 -- FIX: Update get_related_documents_with_details function
 -- ============================================================================
 
+-- Drop the function if it exists to avoid signature conflicts
+DROP FUNCTION IF EXISTS get_related_documents_with_details(UUID);
+
 CREATE OR REPLACE FUNCTION get_related_documents_with_details(
   p_document_id UUID
 )
@@ -28,6 +31,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = 'public'
 AS $$
 BEGIN
   RETURN QUERY
