@@ -44,8 +44,18 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
 
   const [showSettings, setShowSettings] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
+  const [streak, setStreak] = useState<any>(null)
   
   const notificationSoundRef = useRef<HTMLAudioElement | null>(null)
+
+  // Fetch streak data
+  useEffect(() => {
+    if (user?.id) {
+      pomodoroGamificationService.getUserStreak(user.id).then(data => {
+        if (data) setStreak(data)
+      })
+    }
+  }, [user?.id])
 
   // Subscribe to timer service
   useEffect(() => {
@@ -348,20 +358,29 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
               </div>
             )}
             
-            <div className="flex items-center justify-between text-sm pt-2 border-t"
-              style={{ borderColor: 'var(--color-border)' }}
-            >
-              <div style={{ color: 'var(--color-text-secondary)' }}>
-                <span className="font-medium">Sessions:</span>{' '}
-                <span className="font-bold" style={{ color: getModeColor() }}>
-                  {timerState.completedSessions}
-                </span>
+            <div className="space-y-2 pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
+              <div className="flex items-center justify-between text-sm">
+                <div style={{ color: 'var(--color-text-secondary)' }}>
+                  <span className="font-medium">Streak:</span>{' '}
+                  <span className="font-bold text-orange-500">
+                    {streak?.current_streak || 0} days 🔥
+                  </span>
+                </div>
+                <div style={{ color: 'var(--color-text-secondary)' }}>
+                  <span className="font-medium">Sessions:</span>{' '}
+                  <span className="font-bold" style={{ color: getModeColor() }}>
+                    {timerState.completedSessions}
+                  </span>
+                </div>
               </div>
-              <div style={{ color: 'var(--color-text-secondary)' }}>
-                <span className="font-medium">Until long break:</span>{' '}
-                <span className="font-bold" style={{ color: getModeColor() }}>
-                  {settings.sessionsUntilLongBreak - (timerState.completedSessions % settings.sessionsUntilLongBreak)}
-                </span>
+              
+              <div className="flex items-center justify-between text-sm">
+                <div style={{ color: 'var(--color-text-secondary)' }}>
+                  <span className="font-medium">Until long break:</span>{' '}
+                  <span className="font-bold" style={{ color: getModeColor() }}>
+                    {settings.sessionsUntilLongBreak - (timerState.completedSessions % settings.sessionsUntilLongBreak)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

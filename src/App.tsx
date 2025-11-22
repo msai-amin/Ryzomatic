@@ -17,6 +17,8 @@ import { librarySearchService } from './services/librarySearchService'
 import { ThemeProvider } from '../themes/ThemeProvider'
 import { useAuth } from './contexts/AuthContext'
 import { ensurePdfViewerStyles, arePdfViewerStylesApplied } from './styles/ensurePdfViewerStyles'
+import { useAchievementToasts } from './components/AchievementToast'
+import { timerService } from './services/timerService'
 
 function App() {
   // Use AuthContext as the single source of truth for auth state
@@ -33,6 +35,18 @@ function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
   const [showNeoReader, setShowNeoReader] = useState(false)
+
+  const { showAchievement, AchievementToastContainer } = useAchievementToasts()
+
+  useEffect(() => {
+    // Subscribe to achievements
+    const unsubscribe = timerService.onAchievement((achievements) => {
+      achievements.forEach(achievement => {
+        showAchievement(achievement)
+      })
+    })
+    return unsubscribe
+  }, [showAchievement])
 
   useEffect(() => {
     ensurePdfViewerStyles()
@@ -405,6 +419,7 @@ function App() {
     <ThemeProvider>
       <a href="#main-content" className="skip-link">Skip to main content</a>
       <ThemedApp />
+      <AchievementToastContainer />
     </ThemeProvider>
   );
 }

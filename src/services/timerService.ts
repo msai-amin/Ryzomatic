@@ -40,11 +40,18 @@ class TimerService {
   }
 
   private listeners: Set<(state: TimerState) => void> = new Set()
+  private achievementListeners: Set<(achievements: any[]) => void> = new Set()
 
   // Subscribe to timer state changes
   subscribe(listener: (state: TimerState) => void): () => void {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
+  }
+
+  // Subscribe to achievement events
+  onAchievement(listener: (achievements: any[]) => void): () => void {
+    this.achievementListeners.add(listener)
+    return () => this.achievementListeners.delete(listener)
   }
 
   // Get current timer state
@@ -69,12 +76,12 @@ class TimerService {
     this.startCountdown(userId, documentId)
 
     // Database session creation in background (non-blocking)
-    // This runs async without blocking the UI
-    if (userId && documentId && this.state.mode === 'work') {
+    // Now tracks BOTH work and break sessions for better analytics
+    if (userId && documentId) {
       pomodoroService.startSession(userId, documentId, this.state.mode)
         .then(session => {
           if (session) {
-            console.log('Pomodoro session started:', session.id)
+            console.log(`Pomodoro ${this.state.mode} session started:`, session.id)
           } else {
             console.warn('Session creation failed, but timer continues')
           }
@@ -193,6 +200,7 @@ class TimerService {
 
         if (newAchievements.length > 0) {
           console.log('New achievements unlocked:', newAchievements)
+          this.achievementListeners.forEach(listener => listener(newAchievements))
         }
       } catch (error) {
         console.error('Error completing Pomodoro session:', error)

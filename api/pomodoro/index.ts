@@ -132,20 +132,35 @@ async function handleGamificationGet(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: 'Invalid token' });
   }
 
-  // For GET, return empty arrays (achievements and streak)
-  // This is a simplified response - in production, query from database
-  return res.status(200).json({
-    success: true,
-    achievements: [],
-    streak: {
-      current_streak: 0,
-      longest_streak: 0,
-      last_session_date: null,
-      weekly_goal: 7,
-      weekly_progress: 0,
-      week_start_date: null,
-    },
-  });
+  try {
+    // Use Promise.all to fetch data in parallel
+    const [achievementsResult, streakResult] = await Promise.all([
+      supabase.rpc('get_user_achievements', { p_user_id: user.id }),
+      supabase.rpc('get_user_streak', { p_user_id: user.id })
+    ]);
+
+    const { data: achievements, error: achError } = achievementsResult;
+    const { data: streak, error: streakError } = streakResult;
+
+    if (achError) console.error('Error fetching achievements:', achError);
+    if (streakError) console.error('Error fetching streak:', streakError);
+
+    return res.status(200).json({
+      success: true,
+      achievements: achievements || [],
+      streak: streak?.[0] || {
+        current_streak: 0,
+        longest_streak: 0,
+        last_session_date: null,
+        weekly_goal: 15,
+        weekly_progress: 0,
+        week_start_date: null,
+      },
+    });
+  } catch (error: any) {
+    console.error('Gamification GET error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 }
 
 async function handleGamificationPost(req: VercelRequest, res: VercelResponse) {
@@ -159,45 +174,70 @@ async function handleGamificationPost(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: 'Invalid token' });
   }
 
-  const { achievementType, pointsEarned, checkAchievements, updateStreak } = req.body;
+  const { achievementType, pointsEarned, checkAchievements, updateStreak, bookId, mode, completed } = req.body;
 
-  // Handle different gamification actions
-  if (checkAchievements) {
-    // Return empty achievements for now
-    return res.status(200).json({
-      success: true,
-      newAchievements: [],
-    });
-  }
+  try {
+    // Handle different gamification actions
+    if (checkAchievements) {
+      // Call the database function to check for new achievements
+      const { data: newAchievements, error } = await supabase
+        .rpc('check_pomodoro_achievements', {
+          p_user_id: user.id,
+          p_session_data: { bookId, mode, completed }
+        });
 
-  if (updateStreak) {
-    // Success response - no actual update for now
-    return res.status(200).json({
-      success: true,
-    });
-  }
+      if (error) {
+        console.error('Error checking achievements:', error);
+        return res.status(500).json({ error: error.message });
+      }
 
-  // Update user profile with gamification data
-  if (achievementType || pointsEarned !== undefined) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({
-        metadata: {
-          achievementType,
-          pointsEarned,
-        },
-      })
-      .eq('id', user.id)
-      .select()
-      .single();
+      // Insert any newly unlocked achievements
+      if (newAchievements && newAchievements.length > 0) {
+        const achievementsToInsert = newAchievements.map((ach: any) => ({
+          user_id: user.id,
+          achievement_type: ach.achievement_type,
+          metadata: ach.metadata
+        }));
 
-    if (error) {
-      return res.status(500).json({ error: error.message });
+        const { error: insertError } = await supabase
+          .from('pomodoro_achievements')
+          .insert(achievementsToInsert);
+
+        if (insertError) {
+          console.error('Error inserting achievements:', insertError);
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        newAchievements: newAchievements || [],
+      });
     }
 
-    return res.status(200).json({ success: true, profile: data });
-  }
+    if (updateStreak) {
+      const { error } = await supabase
+        .rpc('update_pomodoro_streak', { p_user_id: user.id });
 
-  return res.status(200).json({ success: true });
+      if (error) {
+        console.error('Error updating streak:', error);
+        return res.status(500).json({ error: error.message });
+      }
+
+      return res.status(200).json({
+        success: true,
+      });
+    }
+
+    // Update user profile with gamification data (legacy/fallback)
+    if (achievementType || pointsEarned !== undefined) {
+      // We don't use this path anymore but keeping for backward compatibility if needed
+      return res.status(200).json({ success: true });
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (error: any) {
+    console.error('Gamification POST error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 }
 

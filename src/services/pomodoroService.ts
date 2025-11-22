@@ -256,10 +256,22 @@ class PomodoroService {
         return null
       }
 
+      const startTime = new Date(data.started_at).getTime()
+      const elapsed = Math.floor((Date.now() - startTime) / 1000)
+      
+      // Validate: if more than 2 hours elapsed, assume session is stale/abandoned
+      // This prevents resuming a session that should have ended long ago
+      if (elapsed > 7200) {
+        console.warn('Session too old ( > 2 hours), auto-completing as abandoned')
+        await pomodoroSessions.stopSession(data.id, elapsed, false)
+        this.clearActiveSession()
+        return null
+      }
+
       // Restore local state
       this.activeSessionId = data.id
       this.activeBookId = data.book_id
-      this.sessionStartTime = new Date(data.started_at).getTime()
+      this.sessionStartTime = startTime
 
       return {
         id: data.id,
