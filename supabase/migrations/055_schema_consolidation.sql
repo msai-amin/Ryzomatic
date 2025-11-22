@@ -103,7 +103,7 @@ CREATE FUNCTION auto_generate_document_relationships(
 RETURNS INTEGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = 'public'
+SET search_path = 'public', 'extensions'
 AS $$
 DECLARE
   user_uuid UUID;
