@@ -32,7 +32,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
   setAsCurrentDocument = true,
   zIndexClass = 'z-50'
 }) => {
-  const { addDocument, setLoading, refreshLibrary, user } = useAppStore()
+  const { addDocument, setLoading, refreshLibrary, refreshRelatedDocuments, user } = useAppStore()
   const [dragActive, setDragActive] = useState(false)
   const [showOCRDialog, setShowOCRDialog] = useState(false)
   const [ocrPendingData, setOcrPendingData] = useState<any>(null)
@@ -352,6 +352,10 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
               console.log('DocumentUpload: Calling refreshLibrary() after successful PDF save')
               refreshLibrary();
               
+              // Refresh related documents graph for currently viewed document
+              console.log('DocumentUpload: Calling refreshRelatedDocuments() after successful PDF save')
+              refreshRelatedDocuments();
+              
               // Upload to Google Drive "Readings In Progress" if user is signed in
               if (simpleGoogleAuth.isSignedIn()) {
                 try {
@@ -544,6 +548,10 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
               }
 
               refreshLibrary();
+              
+              // Refresh related documents graph for currently viewed document
+              console.log('DocumentUpload: Calling refreshRelatedDocuments() after successful EPUB save')
+              refreshRelatedDocuments();
             } catch (err) {
               const error = err instanceof Error ? err : new Error('Unknown error occurred while saving');
               logger.error('Failed to save EPUB to library', context, error, {
@@ -683,6 +691,10 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
               // Trigger library refresh
               console.log('DocumentUpload: Calling refreshLibrary() after successful text save')
               refreshLibrary();
+              
+              // Refresh related documents graph for currently viewed document
+              console.log('DocumentUpload: Calling refreshRelatedDocuments() after successful text save')
+              refreshRelatedDocuments();
             } catch (err) {
               // Save failed - don't add document to store if saveToLibrary was requested
               const error = err instanceof Error ? err : new Error('Unknown error occurred while saving');
