@@ -1,6 +1,29 @@
 // Notes Service for managing research notes with SQ3R framework
 import { userNotes, userBooks, supabase } from '../../lib/supabase';
 import { sendMessageToAI } from './aiService';
+import { conceptExtractionService } from './conceptExtractionService';
+
+// Helper function to extract concepts from note (runs in background)
+async function extractConceptsFromNote(
+  noteId: string,
+  noteText: string,
+  userId: string,
+  bookId: string,
+  pageNumber: number
+): Promise<void> {
+  try {
+    await conceptExtractionService.extractFromNote(
+      noteId,
+      noteText,
+      userId,
+      bookId,
+      pageNumber
+    )
+    console.log('Successfully extracted concepts from note:', noteId)
+  } catch (error) {
+    console.error('Exception in concept extraction:', error)
+  }
+}
 import { Document } from '../store/appStore';
 
 export interface NoteMetadata {
@@ -106,6 +129,13 @@ class NotesService {
       if (error) {
         console.error('NotesService: Error creating note:', error);
         return { data: null, error: error as Error };
+      }
+
+      // Extract concepts asynchronously (don't block response)
+      if (content && content.length > 10 && data) {
+        // Fire and forget - extract concepts in background
+        extractConceptsFromNote(data.id, content, userId, bookId, pageNumber)
+          .catch(err => console.error('Background concept extraction failed:', err))
       }
 
       return { data: data as NoteWithMetadata, error: null };

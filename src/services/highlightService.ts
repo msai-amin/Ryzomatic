@@ -6,6 +6,7 @@
  */
 
 import { authService } from './supabaseAuthService';
+import { supabase } from '../../lib/supabase';
 
 /**
  * HighlightArea format from react-pdf-viewer
@@ -217,10 +218,55 @@ class HighlightService {
       // Update cache
       this.addToCache(data.bookId, result.highlight);
 
+      // Extract concepts asynchronously (don't block response)
+      if (data.highlightedText && data.highlightedText.length > 10) {
+        // Fire and forget - extract concepts in background
+        this.extractConceptsFromHighlight(
+          result.highlight.id,
+          data.highlightedText,
+          data.bookId,
+          data.pageNumber
+        ).catch(err => console.error('Background concept extraction failed:', err))
+      }
+
       return result.highlight;
     } catch (error) {
       console.error('Error creating highlight:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Extract concepts from highlight (runs in background)
+   */
+  private async extractConceptsFromHighlight(
+    highlightId: string,
+    highlightText: string,
+    bookId: string,
+    pageNumber: number
+  ): Promise<void> {
+    try {
+      // Get current user
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user?.id) {
+        console.warn('No user session for concept extraction')
+        return
+      }
+
+      // Import concept extraction service dynamically to avoid circular dependencies
+      const { conceptExtractionService } = await import('./conceptExtractionService')
+      
+      await conceptExtractionService.extractFromHighlight(
+        highlightId,
+        highlightText,
+        session.user.id,
+        bookId,
+        pageNumber
+      )
+      
+      console.log('Successfully extracted concepts from highlight:', highlightId)
+    } catch (error) {
+      console.error('Exception in concept extraction:', error)
     }
   }
 

@@ -762,6 +762,133 @@ export const pomodoroSessions = {
   }
 };
 
+// Cognitive Path helpers
+export const cognitivePaths = {
+  async startSession(userId: string, bookId: string | null, sessionType: string = 'reading', previousSessionId?: string | null) {
+    const { data, error } = await supabase
+      .from('reading_sessions')
+      .insert({
+        user_id: userId,
+        book_id: bookId,
+        session_type: sessionType,
+        start_time: new Date().toISOString(),
+        previous_session_id: previousSessionId || null
+      })
+      .select()
+      .single();
+    
+    return { data, error };
+  },
+
+  async endSession(sessionId: string, highlightsCreated: number = 0, notesCreated: number = 0, pagesRead: number[] = [], nextDocumentId?: string | null) {
+    const endTime = new Date().toISOString();
+    
+    // Get start time to calculate duration
+    const { data: session } = await supabase
+      .from('reading_sessions')
+      .select('start_time')
+      .eq('id', sessionId)
+      .single();
+
+    const durationSeconds = session?.start_time
+      ? Math.floor((new Date(endTime).getTime() - new Date(session.start_time).getTime()) / 1000)
+      : null;
+
+    const { data, error } = await supabase
+      .from('reading_sessions')
+      .update({
+        end_time: endTime,
+        duration_seconds: durationSeconds,
+        highlights_created: highlightsCreated,
+        notes_created: notesCreated,
+        pages_read: pagesRead,
+        next_document_id: nextDocumentId || null
+      })
+      .eq('id', sessionId)
+      .select()
+      .single();
+    
+    return { data, error };
+  },
+
+  async logNavigation(
+    userId: string,
+    toDocumentId: string,
+    navigationType: string = 'manual_open',
+    fromDocumentId?: string | null,
+    triggerHighlightId?: string | null,
+    triggerNoteId?: string | null,
+    triggerConceptId?: string | null,
+    timeSpentSeconds?: number | null
+  ) {
+    const { data, error } = await supabase
+      .from('document_navigation_log')
+      .insert({
+        user_id: userId,
+        from_document_id: fromDocumentId || null,
+        to_document_id: toDocumentId,
+        navigation_type: navigationType,
+        trigger_highlight_id: triggerHighlightId || null,
+        trigger_note_id: triggerNoteId || null,
+        trigger_concept_id: triggerConceptId || null,
+        navigation_time: new Date().toISOString(),
+        time_spent_seconds: timeSpentSeconds || null
+      })
+      .select()
+      .single();
+    
+    return { data, error };
+  },
+
+  async connectHighlightNote(
+    userId: string,
+    highlightId: string,
+    noteId: string,
+    connectionType: string = 'expanded'
+  ) {
+    const { data, error } = await supabase
+      .from('highlight_note_connections')
+      .insert({
+        user_id: userId,
+        highlight_id: highlightId,
+        note_id: noteId,
+        connection_type: connectionType
+      })
+      .select()
+      .single();
+    
+    return { data, error };
+  },
+
+  async getCognitiveGraph(bookId: string, userId: string, includeTypes: string[] = ['document', 'note', 'highlight', 'concept']) {
+    const { data, error } = await supabase.rpc('get_cognitive_path_graph', {
+      book_uuid: bookId,
+      user_uuid: userId,
+      include_types: includeTypes
+    });
+    
+    return { data, error };
+  },
+
+  async getReadingFlow(userId: string, limit: number = 50) {
+    const { data, error } = await supabase.rpc('get_reading_flow', {
+      user_uuid: userId,
+      limit_count: limit
+    });
+    
+    return { data, error };
+  },
+
+  async getConceptConnections(conceptId: string, userId: string) {
+    const { data, error } = await supabase.rpc('get_concept_connections', {
+      concept_uuid: conceptId,
+      user_uuid: userId
+    });
+    
+    return { data, error };
+  }
+};
+
 // Document Relationships interfaces
 export interface DocumentRelationship {
   id: string;

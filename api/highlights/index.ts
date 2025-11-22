@@ -4,6 +4,26 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.VITE_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
+// Helper function to extract concepts from highlight (runs in background)
+// This is a simplified version - full concept extraction happens client-side
+async function extractConceptsFromHighlight(
+  highlightId: string,
+  highlightText: string,
+  userId: string,
+  bookId: string,
+  pageNumber: number
+): Promise<void> {
+  try {
+    // Concept extraction will be handled client-side by conceptExtractionService
+    // This is just a placeholder for future server-side extraction if needed
+    // The client-side service will call cognitivePathService methods which
+    // interact with the database to store concepts
+    console.log('Concept extraction triggered for highlight:', highlightId)
+  } catch (error) {
+    console.error('Exception in concept extraction:', error)
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Credentials', 'true')
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -216,6 +236,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (error) {
         console.error('Error creating highlight:', error)
         return res.status(500).json({ error: 'Failed to create highlight', details: error.message })
+      }
+
+      // Extract concepts asynchronously (don't block response)
+      if (highlightedText && highlightedText.length > 10) {
+        // Fire and forget - extract concepts in background
+        extractConceptsFromHighlight(highlight.id, highlightedText, user.id, bookId, pageNumber)
+          .catch(err => console.error('Background concept extraction failed:', err))
       }
 
       return res.status(200).json({ success: true, highlight })
