@@ -80,10 +80,13 @@ FROM document_descriptions dd
 WHERE ub.id = dd.book_id;
 
 -- Drop ALL existing overloaded versions of the function to avoid ambiguity
+-- Drop by signature if exists, then drop any remaining versions
+DROP FUNCTION IF EXISTS auto_generate_document_relationships(UUID, DECIMAL);
+DROP FUNCTION IF EXISTS auto_generate_document_relationships(UUID);
 DROP FUNCTION IF EXISTS auto_generate_document_relationships CASCADE;
 
 -- Update auto_generate_document_relationships function to use user_books
-CREATE OR REPLACE FUNCTION auto_generate_document_relationships(
+CREATE FUNCTION auto_generate_document_relationships(
   source_book_uuid UUID,
   similarity_threshold DECIMAL DEFAULT 0.60
 )
