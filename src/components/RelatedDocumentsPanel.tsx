@@ -108,7 +108,7 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
     try {
       // Initialize storage service
       supabaseStorageService.setCurrentUser(user.id);
-      documentContentService.setCurrentUser(user.id);
+      // Note: documentContentService methods take userId as parameter, no need to setCurrentUser
 
       // Read file content
       let fileData: string | Blob;
@@ -157,20 +157,19 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
       // Save document content for preview and embeddings
       if (documentId && pageTexts.length > 0) {
         const fullText = pageTexts.join('\n\n');
-        await documentContentService.saveDocumentContent({
-          book_id: documentId,
-          user_id: user.id,
-          content: fullText,
-          extraction_method: fileType === 'pdf' ? 'pdfjs' : fileType === 'epub' ? 'epub' : 'manual',
-        });
+        await documentContentService.storeDocumentContent(
+          documentId,
+          user.id,
+          fullText,
+          fileType === 'pdf' ? 'pdfjs' : fileType === 'epub' ? 'epub' : 'manual'
+        );
         logger.info('RelatedDocumentsPanel: Document content stored', { 
           documentId, 
           textLength: fullText.length 
         });
 
-        // Generate embedding and description for automatic graph relationships
-        await documentContentService.generateEmbeddingAndDescription(documentId, user.id, fullText);
-        logger.info('RelatedDocumentsPanel: Embedding generation triggered', { documentId });
+        // Note: generateEmbeddingAndDescription is private, embedding generation happens automatically via database trigger
+        logger.info('RelatedDocumentsPanel: Embedding generation will be triggered automatically', { documentId });
       }
 
       setUploadingFiles(prev => {
