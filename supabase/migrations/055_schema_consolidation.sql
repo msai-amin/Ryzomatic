@@ -74,15 +74,20 @@ CREATE INDEX IF NOT EXISTS idx_user_books_embedding ON user_books
   USING ivfflat (description_embedding extensions.vector_cosine_ops) WITH (lists = 100)
   WHERE description_embedding IS NOT NULL;
 
--- Migrate data from document_descriptions to user_books
-UPDATE user_books ub
-SET 
-  description_embedding = dd.description_embedding,
-  ai_description = dd.ai_generated_description,
-  user_description = dd.user_entered_description,
-  last_auto_generated_at = dd.last_auto_generated_at
-FROM document_descriptions dd
-WHERE ub.id = dd.book_id;
+-- Migrate data from document_descriptions to user_books (if table exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'document_descriptions') THEN
+    UPDATE user_books ub
+    SET 
+      description_embedding = dd.description_embedding,
+      ai_description = dd.ai_generated_description,
+      user_description = dd.user_entered_description,
+      last_auto_generated_at = dd.last_auto_generated_at
+    FROM document_descriptions dd
+    WHERE ub.id = dd.book_id;
+  END IF;
+END $$;
 
 -- Drop ALL existing overloaded versions of the function to avoid ambiguity
 -- Drop by signature if exists, then drop any remaining versions
