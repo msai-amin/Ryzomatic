@@ -220,6 +220,9 @@ BEGIN
 END;
 $$;
 
+-- Drop trigger if it exists before creating it
+DROP TRIGGER IF EXISTS auto_generate_relationships_books_trigger ON user_books;
+
 CREATE TRIGGER auto_generate_relationships_books_trigger
   AFTER INSERT OR UPDATE OF description_embedding ON user_books
   FOR EACH ROW
