@@ -18,6 +18,7 @@ export interface DocumentDescription {
 export class DocumentDescriptionService {
   /**
    * Get document description (user-entered or AI-generated)
+   * Now reads from user_books table
    */
   async getDescription(bookId: string, userId: string): Promise<DocumentDescription | null> {
     try {
@@ -27,9 +28,9 @@ export class DocumentDescriptionService {
       }
 
       const { data, error } = await supabase
-        .from('document_descriptions')
-        .select('*')
-        .eq('book_id', bookId)
+        .from('user_books')
+        .select('id, ai_description, user_description, description_embedding, last_auto_generated_at, created_at, updated_at')
+        .eq('id', bookId)
         .eq('user_id', userId)
         .single();
 
@@ -37,7 +38,21 @@ export class DocumentDescriptionService {
         throw error;
       }
 
-      return data || null;
+      if (!data) return null;
+
+      // Map user_books columns to DocumentDescription interface
+      return {
+        id: data.id,
+        book_id: bookId,
+        user_id: userId,
+        ai_generated_description: data.ai_description,
+        user_entered_description: data.user_description,
+        is_ai_generated: !!data.ai_description,
+        description_embedding: data.description_embedding,
+        last_auto_generated_at: data.last_auto_generated_at,
+        created_at: data.created_at,
+        updated_at: data.updated_at
+      };
     } catch (error) {
       console.error('Error getting document description:', error);
       return null;
@@ -83,44 +98,35 @@ export class DocumentDescriptionService {
       const embedding = await embeddingService.embed(aiDescription);
       const embeddingString = embeddingService.formatForPgVector(embedding);
 
-      // Check if description already exists
-      const existing = await this.getDescription(bookId, userId);
+      // Update user_books with description and embedding
+      const { data, error } = await supabase
+        .from('user_books')
+        .update({
+          ai_description: aiDescription,
+          description_embedding: embeddingString,
+          last_auto_generated_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', bookId)
+        .eq('user_id', userId)
+        .select('id, ai_description, user_description, description_embedding, last_auto_generated_at, created_at, updated_at')
+        .single();
 
-      if (existing) {
-        // Update existing description
-        const { data, error } = await supabase
-          .from('document_descriptions')
-          .update({
-            ai_generated_description: aiDescription,
-            description_embedding: embeddingString,
-            is_ai_generated: true,
-            last_auto_generated_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existing.id)
-          .select()
-          .single();
+      if (error) throw error;
 
-        if (error) throw error;
-        return data;
-      } else {
-        // Create new description
-        const { data, error } = await supabase
-          .from('document_descriptions')
-          .insert({
-            book_id: bookId,
-            user_id: userId,
-            ai_generated_description: aiDescription,
-            description_embedding: embeddingString,
-            is_ai_generated: true,
-            last_auto_generated_at: new Date().toISOString()
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-        return data;
-      }
+      // Map to DocumentDescription interface
+      return {
+        id: data.id,
+        book_id: bookId,
+        user_id: userId,
+        ai_generated_description: data.ai_description,
+        user_entered_description: data.user_description,
+        is_ai_generated: true,
+        description_embedding: data.description_embedding,
+        last_auto_generated_at: data.last_auto_generated_at,
+        created_at: data.created_at,
+        updated_at: data.updated_at
+      };
     } catch (error) {
       console.error('Error generating description:', error);
       return null;
@@ -137,38 +143,33 @@ export class DocumentDescriptionService {
         return null;
       }
 
-      const existing = await this.getDescription(bookId, userId);
+      // Update user_books with user description
+      const { data, error } = await supabase
+        .from('user_books')
+        .update({
+          user_description: userDescription,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', bookId)
+        .eq('user_id', userId)
+        .select('id, ai_description, user_description, description_embedding, last_auto_generated_at, created_at, updated_at')
+        .single();
 
-      if (existing) {
-        // Update existing
-        const { data, error } = await supabase
-          .from('document_descriptions')
-          .update({
-            user_entered_description: userDescription,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existing.id)
-          .select()
-          .single();
+      if (error) throw error;
 
-        if (error) throw error;
-        return data;
-      } else {
-        // Create new with user description
-        const { data, error } = await supabase
-          .from('document_descriptions')
-          .insert({
-            book_id: bookId,
-            user_id: userId,
-            user_entered_description: userDescription,
-            is_ai_generated: false
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-        return data;
-      }
+      // Map to DocumentDescription interface
+      return {
+        id: data.id,
+        book_id: bookId,
+        user_id: userId,
+        ai_generated_description: data.ai_description,
+        user_entered_description: data.user_description,
+        is_ai_generated: false,
+        description_embedding: data.description_embedding,
+        last_auto_generated_at: data.last_auto_generated_at,
+        created_at: data.created_at,
+        updated_at: data.updated_at
+      };
     } catch (error) {
       console.error('Error updating description:', error);
       return null;
@@ -176,7 +177,7 @@ export class DocumentDescriptionService {
   }
 
   /**
-   * Delete document description
+   * Delete document description (clears description fields in user_books)
    */
   async deleteDescription(bookId: string, userId: string): Promise<boolean> {
     try {
@@ -185,10 +186,17 @@ export class DocumentDescriptionService {
         return false;
       }
 
+      // Clear description fields instead of deleting the book
       const { error } = await supabase
-        .from('document_descriptions')
-        .delete()
-        .eq('book_id', bookId)
+        .from('user_books')
+        .update({
+          ai_description: null,
+          user_description: null,
+          description_embedding: null,
+          last_auto_generated_at: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', bookId)
         .eq('user_id', userId);
 
       if (error) throw error;
