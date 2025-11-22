@@ -163,6 +163,10 @@ BEGIN
 END;
 $$;
 
+-- Drop foreign key constraints on document_relationships first
+ALTER TABLE document_relationships DROP CONSTRAINT IF EXISTS document_relationships_source_description_id_fkey;
+ALTER TABLE document_relationships DROP CONSTRAINT IF EXISTS document_relationships_related_description_id_fkey;
+
 -- Drop document_descriptions table and its trigger
 DROP TRIGGER IF EXISTS auto_generate_relationships_trigger ON document_descriptions;
 DROP TABLE IF EXISTS document_descriptions;
