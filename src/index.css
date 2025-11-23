@@ -999,9 +999,39 @@
   background-color: var(--color-background, #000000) !important;
 }
 
+/* Improve canvas rendering quality for crisp text on high-DPI displays */
+/* This only affects the canvas layer, NOT highlight positioning */
+.pdf-viewer-container .rpv-core__canvas-layer canvas {
+  /* Optimize rendering for text clarity - let browser choose best method */
+  image-rendering: auto !important;
+  /* Force hardware acceleration for better performance and quality */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform;
+  /* Prevent blur from CSS transforms */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Ensure crisp rendering */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
 /* Override text layer background */
 .pdf-viewer-container .rpv-core__text-layer {
   background-color: transparent !important;
+  /* Improve text rendering quality */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Ensure highlight layer is NOT affected by canvas optimizations */
+/* Highlights use react-pdf-viewer's getCssProperties() which handles positioning independently */
+.pdf-viewer-container .rpv-highlight__area,
+.pdf-viewer-container .rpv-highlight__area * {
+  /* Don't apply canvas optimizations to highlights */
+  image-rendering: auto;
+  transform: none; /* Highlights use their own transforms from getCssProperties */
 }
 
 /* Dark Mode for PDF Viewer - Invert colors for dark pages with bright text */
