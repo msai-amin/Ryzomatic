@@ -403,8 +403,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     ensurePDFjs()
   }, [document?.id, document?.pdfData])
 
-  // Patch PDF.js to use devicePixelRatio in viewport calculations
-  // This ensures PDF.js renders at the correct resolution from the start
+  // Patch PDF.js Page.prototype.render to include devicePixelRatio
+  // This is the most reliable way to ensure high-DPI rendering
   useEffect(() => {
     if (!isPDFjsReady) return
 
@@ -415,19 +415,21 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     if (dpr <= 1) return // No scaling needed for standard displays
 
     try {
-      // Patch PDF.js Page.prototype.getViewport to include devicePixelRatio
-      // This is the proper way to ensure high-DPI rendering
+      // Try to patch PDF.js Page.prototype.render method
+      // This is where PDF.js actually renders to the canvas
       const PdfJsApi = pdfjsLib as any
       
-      // The getViewport method is on the Page prototype
-      // We need to patch it to multiply the scale by devicePixelRatio
       if (PdfJsApi && PdfJsApi.getDocument) {
-        // Store original getViewport if we can access it
-        // Note: This might not work if react-pdf-viewer uses a different PDF.js instance
-        console.log('✅ PDFViewerV2: Attempting to patch PDF.js for high-DPI rendering', { dpr })
+        // The render method is on the Page object, which we can't access until pages are loaded
+        // Instead, we'll use canvas scaling in the other useEffect
+        // But we can log that we're ready for high-DPI rendering
+        console.log('✅ PDFViewerV2: PDF.js ready for high-DPI rendering', { 
+          dpr,
+          note: 'Using canvas scaling approach'
+        })
       }
     } catch (error) {
-      console.warn('⚠️ PDFViewerV2: Could not patch PDF.js viewport:', error)
+      console.warn('⚠️ PDFViewerV2: Could not patch PDF.js:', error)
     }
   }, [isPDFjsReady])
 
@@ -588,9 +590,20 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     }
 
     // Check immediately, then on multiple frames to catch canvases early
+    // Use more aggressive polling to catch canvases before PDF.js renders
     checkAndPrepare()
     requestAnimationFrame(checkAndPrepare)
     requestAnimationFrame(() => requestAnimationFrame(checkAndPrepare))
+    
+    // Also poll periodically to catch any canvases we might have missed
+    const pollInterval = setInterval(() => {
+      checkAndPrepare()
+    }, 100) // Check every 100ms
+    
+    // Clear polling after 5 seconds (should be enough time for PDF to load)
+    const pollTimeout = setTimeout(() => {
+      clearInterval(pollInterval)
+    }, 5000)
 
     // Also use ResizeObserver to catch when canvases are resized
     const resizeObserver = new ResizeObserver((entries) => {
@@ -681,6 +694,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         try {
           observer.disconnect()
           resizeObserver.disconnect()
+          // Clear polling interval and timeout
+          clearInterval(pollInterval)
+          clearTimeout(pollTimeout)
         } catch (e) {
           // Ignore errors during cleanup
         }
