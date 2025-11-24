@@ -436,47 +436,63 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // 1. We set canvas.width/height BEFORE PDF.js renders (not after)
   // 2. We preserve CSS dimensions (canvas.style.width/height) so getCssProperties() still works
   // 3. Highlights use CSS dimensions via getCssProperties(), not internal canvas dimensions
+  // NOTE: Wrapped in try-catch to prevent interference with react-pdf-viewer's internal code
   useEffect(() => {
     if (!isPDFjsReady) return
 
-    // Wait for container to be available (it might not exist immediately)
-    const findContainer = (): Element | null => {
-      const container = document.querySelector('.pdf-viewer-container')
-      if (container && container instanceof Element) {
-        return container
+    try {
+      // Wait for container to be available (it might not exist immediately)
+      const findContainer = (): Element | null => {
+        try {
+          const container = document.querySelector('.pdf-viewer-container')
+          if (container && container instanceof Element) {
+            return container
+          }
+        } catch (e) {
+          console.warn('⚠️ PDFViewerV2: Error finding container:', e)
+        }
+        return null
       }
-      return null
-    }
 
-    let container = findContainer()
-    if (!container) {
-      // Retry after a short delay if container doesn't exist yet
-      const timeoutId = setTimeout(() => {
-        const retryContainer = findContainer()
-        if (!retryContainer) return
-        // Container found, but we can't re-run the effect from here
-        // The effect will re-run when isPDFjsReady changes or component re-renders
-      }, 100)
-      return () => clearTimeout(timeoutId)
-    }
+      let container = findContainer()
+      if (!container) {
+        // Retry after a short delay if container doesn't exist yet
+        const timeoutId = setTimeout(() => {
+          const retryContainer = findContainer()
+          if (!retryContainer) return
+          // Container found, but we can't re-run the effect from here
+          // The effect will re-run when isPDFjsReady changes or component re-renders
+        }, 100)
+        return () => clearTimeout(timeoutId)
+      }
 
-    const dpr = window.devicePixelRatio || 1
-    if (dpr <= 1) return // No scaling needed for standard displays
+      const dpr = window.devicePixelRatio || 1
+      if (dpr <= 1) return // No scaling needed for standard displays
 
     // More aggressive approach: use IntersectionObserver + immediate check
     // to catch canvases as early as possible
 
     // Function to scale canvas BEFORE PDF.js renders to it
     const prepareCanvasForHighDPI = (canvas: HTMLCanvasElement) => {
-      // Skip if already processed
-      if (canvas.dataset.highDpiPrepared === 'true') {
-        return
-      }
+      try {
+        // Skip if already processed
+        if (canvas.dataset.highDpiPrepared === 'true') {
+          return
+        }
 
-      // Get display dimensions from CSS (this is what getCssProperties() uses)
-      const rect = canvas.getBoundingClientRect()
-      if (rect.width === 0 || rect.height === 0) {
-        // Canvas not yet sized, wait for it
+        // Ensure canvas is still in the DOM and valid
+        if (!canvas.isConnected) {
+          return
+        }
+
+        // Get display dimensions from CSS (this is what getCssProperties() uses)
+        const rect = canvas.getBoundingClientRect()
+        if (rect.width === 0 || rect.height === 0) {
+          // Canvas not yet sized, wait for it
+          return
+        }
+      } catch (e) {
+        // Silently fail to avoid breaking react-pdf-viewer
         return
       }
 
@@ -552,18 +568,23 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
     // More aggressive timing: check immediately and use multiple strategies
     const checkAndPrepare = () => {
-      // Ensure container is still valid and is a DOM element
-      if (!container || !(container instanceof Element)) return
-      
-      const existingCanvases = container.querySelectorAll('.rpv-core__canvas-layer canvas')
-      existingCanvases.forEach((canvas) => {
-        if (canvas instanceof HTMLCanvasElement) {
-          // Try immediately
-          prepareCanvasForHighDPI(canvas)
-          // Also try on next frame (in case canvas isn't ready yet)
-          requestAnimationFrame(() => prepareCanvasForHighDPI(canvas))
-        }
-      })
+      try {
+        // Ensure container is still valid and is a DOM element
+        if (!container || !(container instanceof Element) || !container.isConnected) return
+        
+        const existingCanvases = container.querySelectorAll('.rpv-core__canvas-layer canvas')
+        existingCanvases.forEach((canvas) => {
+          if (canvas instanceof HTMLCanvasElement) {
+            // Try immediately
+            prepareCanvasForHighDPI(canvas)
+            // Also try on next frame (in case canvas isn't ready yet)
+            requestAnimationFrame(() => prepareCanvasForHighDPI(canvas))
+          }
+        })
+      } catch (e) {
+        // Silently fail to avoid breaking react-pdf-viewer
+        console.warn('⚠️ PDFViewerV2: Error in checkAndPrepare:', e)
+      }
     }
 
     // Check immediately, then on multiple frames to catch canvases early
@@ -573,17 +594,22 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
     // Also use ResizeObserver to catch when canvases are resized
     const resizeObserver = new ResizeObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.target instanceof HTMLCanvasElement) {
-          const canvas = entry.target
-          // Reset the prepared flag if canvas was resized
-          if (canvas.dataset.highDpiPrepared === 'true') {
-            delete canvas.dataset.highDpiPrepared
+      try {
+        entries.forEach((entry) => {
+          if (entry.target instanceof HTMLCanvasElement) {
+            const canvas = entry.target
+            // Reset the prepared flag if canvas was resized
+            if (canvas.dataset.highDpiPrepared === 'true') {
+              delete canvas.dataset.highDpiPrepared
+            }
+            // Prepare it again with new dimensions
+            prepareCanvasForHighDPI(canvas)
           }
-          // Prepare it again with new dimensions
-          prepareCanvasForHighDPI(canvas)
-        }
-      })
+        })
+      } catch (e) {
+        // Silently fail to avoid breaking react-pdf-viewer
+        console.warn('⚠️ PDFViewerV2: Error in ResizeObserver:', e)
+      }
     })
 
     // Observe all canvases for size changes
@@ -599,33 +625,50 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
     // Watch for new canvas elements with immediate processing
     const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (node instanceof HTMLCanvasElement) {
-            // Try immediately (most aggressive)
-            prepareCanvasForHighDPI(node)
-            // Observe for resize
-            resizeObserver.observe(node)
-            // Also try on next frames as fallback
-            requestAnimationFrame(() => {
+      try {
+        mutations.forEach((mutation) => {
+          mutation.addedNodes.forEach((node) => {
+            if (node instanceof HTMLCanvasElement) {
+              // Try immediately (most aggressive)
               prepareCanvasForHighDPI(node)
-              requestAnimationFrame(() => prepareCanvasForHighDPI(node))
-            })
-          } else if (node instanceof Element && typeof node.querySelectorAll === 'function') {
-            const canvases = node.querySelectorAll('canvas')
-            canvases.forEach((canvas) => {
-              if (canvas instanceof HTMLCanvasElement) {
-                prepareCanvasForHighDPI(canvas)
-                resizeObserver.observe(canvas)
-                requestAnimationFrame(() => {
-                  prepareCanvasForHighDPI(canvas)
-                  requestAnimationFrame(() => prepareCanvasForHighDPI(canvas))
-                })
+              // Observe for resize
+              try {
+                resizeObserver.observe(node)
+              } catch (e) {
+                // Ignore observe errors
               }
-            })
-          }
+              // Also try on next frames as fallback
+              requestAnimationFrame(() => {
+                prepareCanvasForHighDPI(node)
+                requestAnimationFrame(() => prepareCanvasForHighDPI(node))
+              })
+            } else if (node instanceof Element && typeof node.querySelectorAll === 'function' && node.isConnected) {
+              try {
+                const canvases = node.querySelectorAll('canvas')
+                canvases.forEach((canvas) => {
+                  if (canvas instanceof HTMLCanvasElement) {
+                    prepareCanvasForHighDPI(canvas)
+                    try {
+                      resizeObserver.observe(canvas)
+                    } catch (e) {
+                      // Ignore observe errors
+                    }
+                    requestAnimationFrame(() => {
+                      prepareCanvasForHighDPI(canvas)
+                      requestAnimationFrame(() => prepareCanvasForHighDPI(canvas))
+                    })
+                  }
+                })
+              } catch (e) {
+                // Silently fail to avoid breaking react-pdf-viewer
+              }
+            }
+          })
         })
-      })
+      } catch (e) {
+        // Silently fail to avoid breaking react-pdf-viewer
+        console.warn('⚠️ PDFViewerV2: Error in MutationObserver:', e)
+      }
     })
 
     // Observe for new canvases
@@ -634,9 +677,17 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       subtree: true
     })
 
-    return () => {
-      observer.disconnect()
-      resizeObserver.disconnect()
+      return () => {
+        try {
+          observer.disconnect()
+          resizeObserver.disconnect()
+        } catch (e) {
+          // Ignore errors during cleanup
+        }
+      }
+    } catch (error) {
+      console.error('❌ PDFViewerV2: Error in canvas scaling setup:', error)
+      // Don't break the PDF viewer if canvas scaling fails
     }
   }, [isPDFjsReady])
   
