@@ -26,7 +26,7 @@ import { highlightService, Highlight as HighlightType } from '../services/highli
 import { useTheme } from '../../themes/ThemeProvider'
 import { getPDFWorkerSrc, configurePDFWorker } from '../utils/pdfjsConfig'
 import { parseTextWithBreaks, TextSegment } from '../utils/readingModeUtils'
-import { Eye, BookOpen, FileText, Type, Highlighter, Sparkles, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ZoomIn, ZoomOut, RotateCw, Search, Palette, Moon, Sun, Maximize2, StickyNote, Library, Upload, MousePointer, Save, MessageSquare, Lightbulb, X } from 'lucide-react'
+import { Eye, BookOpen, FileText, Type, Highlighter, Sparkles, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ZoomIn, ZoomOut, RotateCw, Search, Palette, Moon, Sun, Maximize2, StickyNote, Library, Upload, MousePointer, Save, MessageSquare, Lightbulb, X, PenTool } from 'lucide-react'
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { notesService } from '../services/notesService'
@@ -60,6 +60,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     toggleChat,
     isChatOpen,
     setHasUnsavedChanges,
+    addReviewCitation,
+    isEditorialMode
   } = useAppStore()
 
   // 1. Get values from the (now safe) hook
@@ -1253,49 +1255,82 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             display: 'flex',
             gap: '8px'
           }}>
-            <button
-              style={{
-                backgroundColor: 'var(--color-surface-hover, #1f2937)',
-                border: '1px solid var(--color-border, #374151)',
-                borderRadius: '6px',
-                padding: '6px 10px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                color: 'var(--color-text-primary, #f9fafb)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '4px',
-                flex: 1,
-                transition: 'background-color 0.2s',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface, #111827)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover, #1f2937)'}
-              onClick={async () => {
-                try {
-                  if (document.id && userId && props.selectedText) {
-                    await notesService.createNote(
-                      userId,
-                      document.id,
-                      ((props.highlightAreas?.[0]?.pageIndex ?? 0) + 1),
-                      props.selectedText,
-                      'freeform',
-                      undefined,
-                      false
-                    )
-                    setHasUnsavedChanges(true)
-                    setIsRightSidebarOpen(true)
-                    setRightSidebarTab('notes')
+            {isEditorialMode ? (
+              <button
+                style={{
+                  backgroundColor: 'var(--color-surface-hover, #1f2937)',
+                  border: '1px solid var(--color-border, #374151)',
+                  borderRadius: '6px',
+                  padding: '6px 10px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  color: 'var(--color-text-primary, #f9fafb)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  flex: 1,
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface, #111827)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover, #1f2937)'}
+                onClick={() => {
+                  if (props.selectedText) {
+                    const pageNumber = (props.highlightAreas?.[0]?.pageIndex ?? 0) + 1
+                    const citation = `> "${props.selectedText}" (Page ${pageNumber})`
+                    addReviewCitation(citation)
                   }
-                } catch (err) {
-                  console.error('Failed to save note from selection popover', err)
-                }
-                props.cancel()
-              }}
-            >
-              <StickyNote className="w-3.5 h-3.5" />
-              Save Note
-            </button>
+                  props.cancel()
+                }}
+              >
+                <PenTool className="w-3.5 h-3.5" />
+                Review
+              </button>
+            ) : (
+              <button
+                style={{
+                  backgroundColor: 'var(--color-surface-hover, #1f2937)',
+                  border: '1px solid var(--color-border, #374151)',
+                  borderRadius: '6px',
+                  padding: '6px 10px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  color: 'var(--color-text-primary, #f9fafb)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  flex: 1,
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface, #111827)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover, #1f2937)'}
+                onClick={async () => {
+                  try {
+                    if (document.id && userId && props.selectedText) {
+                      await notesService.createNote(
+                        userId,
+                        document.id,
+                        ((props.highlightAreas?.[0]?.pageIndex ?? 0) + 1),
+                        props.selectedText,
+                        'freeform',
+                        undefined,
+                        false
+                      )
+                      setHasUnsavedChanges(true)
+                      setIsRightSidebarOpen(true)
+                      setRightSidebarTab('notes')
+                    }
+                  } catch (err) {
+                    console.error('Failed to save note from selection popover', err)
+                  }
+                  props.cancel()
+                }}
+              >
+                <StickyNote className="w-3.5 h-3.5" />
+                Save Note
+              </button>
+            )}
             <button
               style={{
                 backgroundColor: 'transparent',
@@ -2674,7 +2709,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           options={createAIContextMenuOptions(
             handleClarification,
             handleFurtherReading,
-            handleSaveNote
+            handleSaveNote,
+            handleIncludeInReview,
+            isEditorialMode
           )}
           onClose={() => setContextMenu(null)}
         />

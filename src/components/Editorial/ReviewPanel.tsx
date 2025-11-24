@@ -1,6 +1,9 @@
 import React from 'react'
+import { useAppStore } from '../../store/appStore'
 
 export const ReviewPanel: React.FC = () => {
+  const { reviewCitations } = useAppStore()
+
   return (
     <div className="flex flex-col h-full bg-[var(--color-surface)] border-l border-[var(--color-border)] text-[var(--color-text-primary)]">
       <div className="p-4 border-b border-[var(--color-border)] flex justify-between items-center">
@@ -20,6 +23,18 @@ export const ReviewPanel: React.FC = () => {
             Start writing your review here...
           </p>
           
+          {/* Citations List */}
+          {reviewCitations.length > 0 && (
+            <div className="my-4 space-y-2">
+              <h4 className="text-sm font-medium text-[var(--color-text-secondary)] uppercase tracking-wider">Citations</h4>
+              {reviewCitations.map((citation, index) => (
+                <blockquote key={index} className="pl-4 border-l-2 border-[var(--color-primary)] text-sm italic text-[var(--color-text-secondary)]">
+                  {citation}
+                </blockquote>
+              ))}
+            </div>
+          )}
+
           {/* Placeholder for Drag & Drop area */}
           <div className="my-8 p-8 border-2 border-dashed border-[var(--color-border)] rounded-lg text-center text-[var(--color-text-tertiary)]">
             Drag highlighted text here to create a citation
