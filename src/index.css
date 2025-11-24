@@ -1016,6 +1016,8 @@
   -webkit-backface-visibility: hidden;
 }
 
+/* Note: CSS scaling would break highlights, so we rely on JavaScript canvas scaling instead */
+
 /* Override text layer background */
 .pdf-viewer-container .rpv-core__text-layer {
   background-color: transparent !important;

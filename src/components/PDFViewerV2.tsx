@@ -491,79 +491,79 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           // Canvas not yet sized, wait for it
           return
         }
+
+        // Get current CSS dimensions (preserve these for highlight calculations)
+        const cssWidth = rect.width
+        const cssHeight = rect.height
+
+        // Calculate internal canvas resolution (higher for high-DPI)
+        const targetWidth = Math.floor(cssWidth * dpr)
+        const targetHeight = Math.floor(cssHeight * dpr)
+
+        // Get current internal dimensions
+        const currentWidth = canvas.width
+        const currentHeight = canvas.height
+
+        // Check if canvas has been rendered to (has image data)
+        // If it has content, don't modify (would break rendering)
+        const ctx = canvas.getContext('2d', { willReadFrequently: false })
+        if (!ctx) return
+
+        // Try to detect if canvas has been rendered to
+        // If width/height match CSS size exactly (not scaled), it probably hasn't been rendered yet
+        const isLikelyUnrendered = currentWidth === cssWidth && currentHeight === cssHeight
+
+        // Only scale if:
+        // 1. Not already at correct resolution, AND
+        // 2. Likely not yet rendered (matches CSS size exactly)
+        if (currentWidth === targetWidth && currentHeight === targetHeight) {
+          canvas.dataset.highDpiPrepared = 'true'
+          return
+        }
+
+        // If canvas has been rendered at wrong resolution, we can't fix it without breaking highlights
+        if (!isLikelyUnrendered && currentWidth > 0 && currentHeight > 0) {
+          console.warn('⚠️ PDFViewerV2: Canvas already rendered, skipping high-DPI scaling to preserve highlights')
+          return
+        }
+
+        // CRITICAL: Preserve CSS dimensions so getCssProperties() still works correctly
+        // getCssProperties() uses getBoundingClientRect() which returns CSS dimensions
+        // We set internal resolution higher but keep CSS size the same
+        
+        // Store original CSS dimensions if not already set
+        if (!canvas.style.width) {
+          canvas.style.width = cssWidth + 'px'
+        }
+        if (!canvas.style.height) {
+          canvas.style.height = cssHeight + 'px'
+        }
+
+        // Set internal resolution (higher for crisp rendering)
+        // Render at devicePixelRatio resolution for sharp text on high-DPI displays
+        canvas.width = targetWidth
+        canvas.height = targetHeight
+
+        // Scale context so PDF.js renders at correct size
+        // The context scale matches devicePixelRatio so rendering is pixel-perfect
+        ctx.scale(dpr, dpr)
+
+        // Ensure CSS dimensions are preserved (critical for highlights)
+        canvas.style.width = cssWidth + 'px'
+        canvas.style.height = cssHeight + 'px'
+
+        canvas.dataset.highDpiPrepared = 'true'
+
+        console.log('✅ PDFViewerV2: Prepared canvas for high-DPI rendering', {
+          cssSize: `${cssWidth}x${cssHeight}`,
+          canvasSize: `${targetWidth}x${targetHeight}`,
+          dpr,
+          note: 'CSS dimensions preserved for highlight compatibility'
+        })
       } catch (e) {
         // Silently fail to avoid breaking react-pdf-viewer
-        return
+        console.warn('⚠️ PDFViewerV2: Error preparing canvas for high-DPI:', e)
       }
-
-      // Get current CSS dimensions (preserve these for highlight calculations)
-      const cssWidth = rect.width
-      const cssHeight = rect.height
-
-      // Calculate internal canvas resolution (higher for high-DPI)
-      const targetWidth = Math.floor(cssWidth * dpr)
-      const targetHeight = Math.floor(cssHeight * dpr)
-
-      // Get current internal dimensions
-      const currentWidth = canvas.width
-      const currentHeight = canvas.height
-
-      // Check if canvas has been rendered to (has image data)
-      // If it has content, don't modify (would break rendering)
-      const ctx = canvas.getContext('2d', { willReadFrequently: false })
-      if (!ctx) return
-
-      // Try to detect if canvas has been rendered to
-      // If width/height match CSS size exactly (not scaled), it probably hasn't been rendered yet
-      const isLikelyUnrendered = currentWidth === cssWidth && currentHeight === cssHeight
-
-      // Only scale if:
-      // 1. Not already at correct resolution, AND
-      // 2. Likely not yet rendered (matches CSS size exactly)
-      if (currentWidth === targetWidth && currentHeight === targetHeight) {
-        canvas.dataset.highDpiPrepared = 'true'
-        return
-      }
-
-      // If canvas has been rendered at wrong resolution, we can't fix it without breaking highlights
-      if (!isLikelyUnrendered && currentWidth > 0 && currentHeight > 0) {
-        console.warn('⚠️ PDFViewerV2: Canvas already rendered, skipping high-DPI scaling to preserve highlights')
-        return
-      }
-
-      // CRITICAL: Preserve CSS dimensions so getCssProperties() still works correctly
-      // getCssProperties() uses getBoundingClientRect() which returns CSS dimensions
-      // We set internal resolution higher but keep CSS size the same
-      
-      // Store original CSS dimensions if not already set
-      if (!canvas.style.width) {
-        canvas.style.width = cssWidth + 'px'
-      }
-      if (!canvas.style.height) {
-        canvas.style.height = cssHeight + 'px'
-      }
-
-      // Set internal resolution (higher for crisp rendering)
-      // Render at devicePixelRatio resolution for sharp text on high-DPI displays
-      canvas.width = targetWidth
-      canvas.height = targetHeight
-
-      // Scale context so PDF.js renders at correct size
-      // The context scale matches devicePixelRatio so rendering is pixel-perfect
-      ctx.scale(dpr, dpr)
-
-      // Ensure CSS dimensions are preserved (critical for highlights)
-      canvas.style.width = cssWidth + 'px'
-      canvas.style.height = cssHeight + 'px'
-
-      canvas.dataset.highDpiPrepared = 'true'
-
-      console.log('✅ PDFViewerV2: Prepared canvas for high-DPI rendering', {
-        cssSize: `${cssWidth}x${cssHeight}`,
-        canvasSize: `${targetWidth}x${targetHeight}`,
-        dpr,
-        note: 'CSS dimensions preserved for highlight compatibility'
-      })
     }
 
     // More aggressive timing: check immediately and use multiple strategies
