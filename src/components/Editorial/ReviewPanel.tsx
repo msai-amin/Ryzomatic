@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Bold, Italic, List, ListOrdered, Quote, LayoutTemplate } from 'lucide-react'
+import TextStyle from '@tiptap/extension-text-style'
+import { Color } from '@tiptap/extension-color'
+import Highlight from '@tiptap/extension-highlight'
+import { Bold, Italic, List, ListOrdered, Quote, LayoutTemplate, Palette, Highlighter } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 
 type ReviewTemplate = 'standard' | 'neurips' | 'medical' | 'reject'
@@ -82,6 +85,9 @@ export const ReviewPanel: React.FC = () => {
   const editor = useEditor({
     extensions: [
       StarterKit,
+      TextStyle,
+      Color,
+      Highlight.configure({ multicast: true }),
       Placeholder.configure({
         placeholder: 'Write your referee report here...',
       }),
@@ -147,6 +153,64 @@ export const ReviewPanel: React.FC = () => {
           >
             <ListOrdered size={16} />
           </button>
+          <div className="w-px bg-[var(--color-border)] mx-1 my-1" />
+          
+          {/* Text Color */}
+          <div className="relative group">
+            <button
+                className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors text-[var(--color-text-secondary)]`}
+                title="Text Color"
+            >
+                <Palette size={16} />
+            </button>
+            <div className="absolute top-full left-0 mt-1 p-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-xl flex gap-1 z-50 hidden group-hover:flex">
+                {['#000000', '#4b5563', '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'].map(color => (
+                    <button
+                        key={color}
+                        onClick={() => editor.chain().focus().setColor(color).run()}
+                        className="w-6 h-6 rounded-full border border-gray-200"
+                        style={{ backgroundColor: color }}
+                        title={color}
+                    />
+                ))}
+                <button
+                    onClick={() => editor.chain().focus().unsetColor().run()}
+                    className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center text-xs bg-white text-black"
+                    title="Reset Color"
+                >
+                    X
+                </button>
+            </div>
+          </div>
+
+          {/* Highlight Color */}
+          <div className="relative group">
+            <button
+                className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors ${editor.isActive('highlight') ? 'text-[var(--color-primary)] bg-[var(--color-background)]' : 'text-[var(--color-text-secondary)]'}`}
+                title="Highlight"
+            >
+                <Highlighter size={16} />
+            </button>
+            <div className="absolute top-full left-0 mt-1 p-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-xl flex gap-1 z-50 hidden group-hover:flex">
+                {['#fef08a', '#bbf7d0', '#bfdbfe', '#fecaca', '#e9d5ff'].map(color => (
+                    <button
+                        key={color}
+                        onClick={() => editor.chain().focus().toggleHighlight({ color }).run()}
+                        className="w-6 h-6 rounded-full border border-gray-200"
+                        style={{ backgroundColor: color }}
+                        title={color}
+                    />
+                ))}
+                <button
+                    onClick={() => editor.chain().focus().unsetHighlight().run()}
+                    className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center text-xs bg-white text-black"
+                    title="Remove Highlight"
+                >
+                    X
+                </button>
+            </div>
+          </div>
+
           <div className="w-px bg-[var(--color-border)] mx-1 my-1" />
           <div className="relative">
             <button
