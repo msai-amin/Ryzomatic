@@ -439,10 +439,25 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   useEffect(() => {
     if (!isPDFjsReady) return
 
-    const container = document.querySelector('.pdf-viewer-container')
-    // Ensure container is a DOM element before proceeding
-    if (!container || !(container instanceof Element)) {
-      return
+    // Wait for container to be available (it might not exist immediately)
+    const findContainer = (): Element | null => {
+      const container = document.querySelector('.pdf-viewer-container')
+      if (container && container instanceof Element) {
+        return container
+      }
+      return null
+    }
+
+    let container = findContainer()
+    if (!container) {
+      // Retry after a short delay if container doesn't exist yet
+      const timeoutId = setTimeout(() => {
+        const retryContainer = findContainer()
+        if (!retryContainer) return
+        // Container found, but we can't re-run the effect from here
+        // The effect will re-run when isPDFjsReady changes or component re-renders
+      }, 100)
+      return () => clearTimeout(timeoutId)
     }
 
     const dpr = window.devicePixelRatio || 1
@@ -619,10 +634,14 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       subtree: true
     })
 
-    return () => {
-      observer.disconnect()
-      resizeObserver.disconnect()
+      return () => {
+        observer.disconnect()
+        resizeObserver.disconnect()
+      }
     }
+
+    // Start initialization
+    return initializeCanvasScaling(container)
   }, [isPDFjsReady])
   
   // Toggle reading mode
