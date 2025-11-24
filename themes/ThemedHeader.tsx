@@ -13,7 +13,8 @@ import {
   FileText,
   Volume2,
   StickyNote,
-  Library
+  Library,
+  PenTool
 } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { TypographySettings } from '../src/components/TypographySettings'
@@ -50,7 +51,11 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     setRightSidebarTab,
     hasUnsavedChanges,
     setHasUnsavedChanges,
-    closeDocumentWithoutSaving
+    closeDocumentWithoutSaving,
+    isEditorialMode,
+    setEditorialMode,
+    setAudioWidgetPosition,
+    audioWidgetPosition
   } = useAppStore()
 
   const [showSettings, setShowSettings] = useState(false)
@@ -217,7 +222,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             </button>
             
             {/* Navigation: Library */}
-            <nav className="flex items-center">
+            <nav className="flex items-center gap-1">
               <button
                 onClick={openLibrary}
                 className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]"
@@ -229,6 +234,22 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                 <Library className="h-4 w-4" />
                 <span>Library</span>
               </button>
+              
+              {/* Navigation: Editorial */}
+              {currentDocument && (
+                <button
+                  onClick={() => setEditorialMode(!isEditorialMode)}
+                  className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]"
+                  style={{ 
+                    color: isEditorialMode ? 'var(--color-primary)' : 'var(--color-text-primary)',
+                    backgroundColor: isEditorialMode ? 'var(--color-surface-hover)' : 'transparent',
+                  }}
+                  aria-label="Toggle Editorial Mode"
+                >
+                  <PenTool className="h-4 w-4" />
+                  <span>Editorial</span>
+                </button>
+              )}
             </nav>
           </div>
 
@@ -236,21 +257,39 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             {/* Tools Group: Pomodoro + AI Assistant */}
             <div className="flex items-center gap-2">
               {user && currentDocument && isTimerPristine && (
-                <Tooltip content="Start Pomodoro timer" position="bottom">
-                  <button
-                    data-tour="pomodoro-button"
-                    onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
-                    className="rounded-lg p-2 transition-all duration-300"
-                    style={{ 
-                      backgroundColor: 'transparent', 
-                      border: '1px solid var(--color-border)',
-                      fontSize: '1.35rem' 
-                    }}
-                    aria-label="Toggle Pomodoro timer"
-                  >
-                    🍅
-                  </button>
-                </Tooltip>
+                <div className="flex items-center gap-2">
+                    {isEditorialMode && (
+                        <Tooltip content="Audio Controls" position="bottom">
+                            <button
+                                onClick={() => setAudioWidgetPosition(audioWidgetPosition === 'hidden' ? 'header' : 'hidden')}
+                                className="rounded-lg p-2 transition-all duration-300"
+                                style={{ 
+                                    backgroundColor: 'transparent', 
+                                    border: '1px solid var(--color-border)',
+                                    color: 'var(--color-text-primary)'
+                                }}
+                                aria-label="Toggle Audio Controls"
+                            >
+                                <Volume2 className="h-5 w-5" />
+                            </button>
+                        </Tooltip>
+                    )}
+                    <Tooltip content="Start Pomodoro timer" position="bottom">
+                        <button
+                            data-tour="pomodoro-button"
+                            onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
+                            className="rounded-lg p-2 transition-all duration-300"
+                            style={{ 
+                                backgroundColor: 'transparent', 
+                                border: '1px solid var(--color-border)',
+                                fontSize: '1.35rem' 
+                            }}
+                            aria-label="Toggle Pomodoro timer"
+                        >
+                            🍅
+                        </button>
+                    </Tooltip>
+                </div>
               )}
 
               <Tooltip content="Ask the AI Assistant" position="bottom">

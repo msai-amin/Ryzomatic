@@ -15,6 +15,7 @@ import { timerService, TimerState } from '../src/services/timerService'
 import { CustomizableReadingWizard } from '../src/components/customReading/CustomizableReadingWizard'
 import { DocumentUpload } from '../src/components/DocumentUpload'
 import { AudioWidget } from '../src/components/AudioWidget'
+import { EditorialLayout } from '../src/components/Editorial/EditorialLayout'
 
 const ThemedAppContent: React.FC = () => {
   const [timerState, setTimerState] = useState<TimerState>(timerService.getState())
@@ -27,7 +28,8 @@ const ThemedAppContent: React.FC = () => {
     isNavRailExpanded,
     setNavRailExpanded,
     isChatOpen,
-    openCustomReadingWizard
+    openCustomReadingWizard,
+    isEditorialMode
   } = useAppStore()
   const { showAchievement, AchievementToastContainer } = useAchievementToasts()
   
@@ -99,9 +101,15 @@ const ThemedAppContent: React.FC = () => {
         />
 
         {/* Main Content */}
-        <ThemedMainContent>
-          <DocumentViewer onUploadClick={handleOpenUpload} />
-        </ThemedMainContent>
+        {isEditorialMode ? (
+          <main className="flex-1 flex flex-col h-[calc(100vh-80px)] overflow-hidden relative">
+             <EditorialLayout />
+          </main>
+        ) : (
+          <ThemedMainContent>
+            <DocumentViewer onUploadClick={handleOpenUpload} />
+          </ThemedMainContent>
+        )}
       </div>
 
       {isChatOpen && <DetachedChatWindow />}
@@ -112,7 +120,7 @@ const ThemedAppContent: React.FC = () => {
       )}
       
       {/* AudioWidget - Persistent across re-renders, only visible when document is loaded */}
-      {currentDocument && <AudioWidget />}
+      {currentDocument && !isEditorialMode && <AudioWidget />}
 
       {/* Pomodoro Bottom Bar - Visible when there is an active or paused session */}
       {user && currentDocument && hasActiveTimer && (

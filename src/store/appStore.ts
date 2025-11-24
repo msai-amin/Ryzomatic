@@ -191,7 +191,10 @@ interface AppState {
   
   // UI state
   isChatOpen: boolean
+  isEditorialMode: boolean
   isRightSidebarOpen: boolean
+  audioWidgetPosition: 'default' | 'header' | 'hidden'
+  setAudioWidgetPosition: (position: 'default' | 'header' | 'hidden') => void
   rightSidebarTab: 'notes' | 'highlights'
   rightSidebarWidth: number
   chatWindowPosition: { top: number; left: number }
@@ -283,6 +286,7 @@ interface AppState {
   updateDocument: (document: Document) => void
   removeDocument: (id: string) => void
   toggleChat: () => void
+  setEditorialMode: (enabled: boolean) => void
   setIsRightSidebarOpen: (open: boolean) => void
   setRightSidebarTab: (tab: 'notes' | 'highlights') => void
   setRightSidebarWidth: (width: number) => void
@@ -767,6 +771,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     return { isChatOpen: next }
   }),
+
+  setEditorialMode: (enabled) => set({ isEditorialMode: enabled }),
+  
+  audioWidgetPosition: 'default',
+  setAudioWidgetPosition: (position) => set({ audioWidgetPosition: position }),
   
   setIsRightSidebarOpen: (open) => set(() => {
     if (typeof window !== 'undefined') {
