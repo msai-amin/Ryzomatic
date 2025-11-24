@@ -403,9 +403,79 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     ensurePDFjs()
   }, [document?.id, document?.pdfData])
 
-  // NOTE: Removed canvas scaling code - it was making text blurrier
-  // react-pdf-viewer handles canvas rendering internally and our interference
-  // was degrading quality. CSS optimizations in index.css are sufficient.
+  // Patch PDF.js Page.prototype.getViewport to ensure high-DPI rendering
+  // This patches the viewport scale calculation to account for devicePixelRatio
+  // SAFE: Highlights use percentage-based coordinates relative to CSS dimensions, not viewport
+  // SAFE: TTS uses PDF text content, not viewport dimensions
+  // react-pdf-viewer already handles CSS dimension separation, so this won't break highlights
+  useEffect(() => {
+    if (!isPDFjsReady) return
+
+    const pdfjsLib = (globalThis as any).pdfjsLib
+    if (!pdfjsLib || !pdfjsLib.getDocument) return
+
+    const dpr = window.devicePixelRatio || 1
+    if (dpr <= 1) {
+      console.log('✅ PDFViewerV2: Standard DPI display, no viewport patching needed', { dpr })
+      return
+    }
+
+    try {
+      // Patch getDocument to intercept page creation and patch getViewport
+      const originalGetDocument = pdfjsLib.getDocument
+      
+      pdfjsLib.getDocument = function(params: any) {
+        const loadingTask = originalGetDocument.call(this, params)
+        
+        // Intercept document loading to patch pages
+        const originalPromise = loadingTask.promise
+        loadingTask.promise = originalPromise.then((doc: any) => {
+          if (!doc || !doc.getPage) return doc
+          
+          // Patch getPage to intercept page instances
+          const originalGetPage = doc.getPage.bind(doc)
+          doc.getPage = function(pageIndex: number) {
+            const pagePromise = originalGetPage(pageIndex)
+            return pagePromise.then((page: any) => {
+              if (!page || !page.getViewport || page._viewportPatched) {
+                return page
+              }
+              
+              // Patch getViewport to multiply scale by devicePixelRatio
+              const originalGetViewport = page.getViewport.bind(page)
+              page.getViewport = function(params: any) {
+                if (params && typeof params.scale === 'number') {
+                  // Multiply scale by devicePixelRatio for higher resolution
+                  // react-pdf-viewer will handle CSS dimension separation automatically
+                  const scaledParams = {
+                    ...params,
+                    scale: params.scale * dpr
+                  }
+                  return originalGetViewport(scaledParams)
+                }
+                return originalGetViewport(params)
+              }
+              
+              page._viewportPatched = true
+              return page
+            })
+          }
+          
+          return doc
+        })
+        
+        return loadingTask
+      }
+      
+      console.log('✅ PDFViewerV2: Patched PDF.js viewport for high-DPI rendering', {
+        dpr,
+        note: 'Viewport scale multiplied by devicePixelRatio - highlights and TTS unaffected'
+      })
+    } catch (error) {
+      console.warn('⚠️ PDFViewerV2: Could not patch PDF.js viewport:', error)
+      // Don't break the PDF viewer if patching fails
+    }
+  }, [isPDFjsReady])
   
   // Toggle reading mode
   const toggleReadingMode = useCallback(() => {
