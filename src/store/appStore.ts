@@ -149,7 +149,7 @@ export interface Voice {
   languageCode: string
   gender: string
   type?: string
-  model?: string // Required for some Google Cloud TTS voices
+  model?: string // Legacy field, not used with Azure TTS
 }
 
 export interface TTSPosition {
@@ -164,7 +164,7 @@ export interface TTSSettings {
   isEnabled: boolean
   isPlaying: boolean
   isPaused: boolean
-  provider: 'native' | 'google-cloud'
+  provider: 'native' | 'azure'
   rate: number
   pitch: number
   volume: number
@@ -413,8 +413,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   pdfViewer: {
     currentPage: 1,
     numPages: null,
-    zoom: 1.0,
-    scale: 1.0,
+    zoom: 1.4, // Set to 140% for optimal text quality on high-DPI displays
+    scale: 1.4, // Set to 140% for optimal text quality on high-DPI displays
     rotation: 0,
     viewMode: 'pdf',
     scrollMode: 'continuous', // Default to Continuous Scrolling mode
