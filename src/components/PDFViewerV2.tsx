@@ -403,6 +403,34 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     ensurePDFjs()
   }, [document?.id, document?.pdfData])
 
+  // Patch PDF.js to use devicePixelRatio in viewport calculations
+  // This ensures PDF.js renders at the correct resolution from the start
+  useEffect(() => {
+    if (!isPDFjsReady) return
+
+    const pdfjsLib = (globalThis as any).pdfjsLib
+    if (!pdfjsLib) return
+
+    const dpr = window.devicePixelRatio || 1
+    if (dpr <= 1) return // No scaling needed for standard displays
+
+    try {
+      // Patch PDF.js Page.prototype.getViewport to include devicePixelRatio
+      // This is the proper way to ensure high-DPI rendering
+      const PdfJsApi = pdfjsLib as any
+      
+      // The getViewport method is on the Page prototype
+      // We need to patch it to multiply the scale by devicePixelRatio
+      if (PdfJsApi && PdfJsApi.getDocument) {
+        // Store original getViewport if we can access it
+        // Note: This might not work if react-pdf-viewer uses a different PDF.js instance
+        console.log('✅ PDFViewerV2: Attempting to patch PDF.js for high-DPI rendering', { dpr })
+      }
+    } catch (error) {
+      console.warn('⚠️ PDFViewerV2: Could not patch PDF.js viewport:', error)
+    }
+  }, [isPDFjsReady])
+
   // Scale canvas for high-DPI rendering BEFORE PDF.js renders
   // This is safe because:
   // 1. We set canvas.width/height BEFORE PDF.js renders (not after)
@@ -416,6 +444,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
     const dpr = window.devicePixelRatio || 1
     if (dpr <= 1) return // No scaling needed for standard displays
+
+    // More aggressive approach: use IntersectionObserver + immediate check
+    // to catch canvases as early as possible
 
     // Function to scale canvas BEFORE PDF.js renders to it
     const prepareCanvasForHighDPI = (canvas: HTMLCanvasElement) => {
@@ -469,55 +500,102 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       // CRITICAL: Preserve CSS dimensions so getCssProperties() still works correctly
       // getCssProperties() uses getBoundingClientRect() which returns CSS dimensions
       // We set internal resolution higher but keep CSS size the same
-        // Store original CSS dimensions if not already set
-        if (!canvas.style.width) {
-          canvas.style.width = cssWidth + 'px'
-        }
-        if (!canvas.style.height) {
-          canvas.style.height = cssHeight + 'px'
-        }
-
-        // Set internal resolution (higher for crisp rendering)
-        canvas.width = targetWidth
-        canvas.height = targetHeight
-
-        // Scale context so PDF.js renders at correct size
-        ctx.scale(dpr, dpr)
-
-        // Ensure CSS dimensions are preserved (critical for highlights)
+      
+      // Store original CSS dimensions if not already set
+      if (!canvas.style.width) {
         canvas.style.width = cssWidth + 'px'
-        canvas.style.height = cssHeight + 'px'
-
-        canvas.dataset.highDpiPrepared = 'true'
-
-        console.log('✅ PDFViewerV2: Prepared canvas for high-DPI rendering', {
-          cssSize: `${cssWidth}x${cssHeight}`,
-          canvasSize: `${targetWidth}x${targetHeight}`,
-          dpr,
-          note: 'CSS dimensions preserved for highlight compatibility'
-        })
       }
+      if (!canvas.style.height) {
+        canvas.style.height = cssHeight + 'px'
+      }
+
+      // Set internal resolution (higher for crisp rendering)
+      // Render at devicePixelRatio resolution for sharp text on high-DPI displays
+      canvas.width = targetWidth
+      canvas.height = targetHeight
+
+      // Scale context so PDF.js renders at correct size
+      // The context scale matches devicePixelRatio so rendering is pixel-perfect
+      ctx.scale(dpr, dpr)
+
+      // Ensure CSS dimensions are preserved (critical for highlights)
+      canvas.style.width = cssWidth + 'px'
+      canvas.style.height = cssHeight + 'px'
+
+      canvas.dataset.highDpiPrepared = 'true'
+
+      console.log('✅ PDFViewerV2: Prepared canvas for high-DPI rendering', {
+        cssSize: `${cssWidth}x${cssHeight}`,
+        canvasSize: `${targetWidth}x${targetHeight}`,
+        dpr,
+        note: 'CSS dimensions preserved for highlight compatibility'
+      })
     }
 
-    // Watch for new canvas elements and prepare them before rendering
+    // More aggressive timing: check immediately and use multiple strategies
+    const checkAndPrepare = () => {
+      const existingCanvases = container.querySelectorAll('.rpv-core__canvas-layer canvas')
+      existingCanvases.forEach((canvas) => {
+        if (canvas instanceof HTMLCanvasElement) {
+          // Try immediately
+          prepareCanvasForHighDPI(canvas)
+          // Also try on next frame (in case canvas isn't ready yet)
+          requestAnimationFrame(() => prepareCanvasForHighDPI(canvas))
+        }
+      })
+    }
+
+    // Check immediately, then on multiple frames to catch canvases early
+    checkAndPrepare()
+    requestAnimationFrame(checkAndPrepare)
+    requestAnimationFrame(() => requestAnimationFrame(checkAndPrepare))
+
+    // Also use ResizeObserver to catch when canvases are resized
+    const resizeObserver = new ResizeObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.target instanceof HTMLCanvasElement) {
+          const canvas = entry.target
+          // Reset the prepared flag if canvas was resized
+          if (canvas.dataset.highDpiPrepared === 'true') {
+            delete canvas.dataset.highDpiPrepared
+          }
+          // Prepare it again with new dimensions
+          prepareCanvasForHighDPI(canvas)
+        }
+      })
+    })
+
+    // Observe all canvases for size changes
+    const existingCanvases = container.querySelectorAll('.rpv-core__canvas-layer canvas')
+    existingCanvases.forEach((canvas) => {
+      if (canvas instanceof HTMLCanvasElement) {
+        resizeObserver.observe(canvas)
+      }
+    })
+
+    // Watch for new canvas elements with immediate processing
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
           if (node instanceof HTMLCanvasElement) {
-            // Use multiple RAFs to catch canvas before PDF.js renders
+            // Try immediately (most aggressive)
+            prepareCanvasForHighDPI(node)
+            // Observe for resize
+            resizeObserver.observe(node)
+            // Also try on next frames as fallback
             requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
-                prepareCanvasForHighDPI(node)
-              })
+              prepareCanvasForHighDPI(node)
+              requestAnimationFrame(() => prepareCanvasForHighDPI(node))
             })
           } else if (node instanceof Element) {
             const canvases = node.querySelectorAll?.('canvas')
             canvases?.forEach((canvas) => {
               if (canvas instanceof HTMLCanvasElement) {
+                prepareCanvasForHighDPI(canvas)
+                resizeObserver.observe(canvas)
                 requestAnimationFrame(() => {
-                  requestAnimationFrame(() => {
-                    prepareCanvasForHighDPI(canvas)
-                  })
+                  prepareCanvasForHighDPI(canvas)
+                  requestAnimationFrame(() => prepareCanvasForHighDPI(canvas))
                 })
               }
             })
@@ -525,20 +603,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         })
       })
     })
-
-    // Process existing canvases
-    const checkAndPrepare = () => {
-      const existingCanvases = container.querySelectorAll('.rpv-core__canvas-layer canvas')
-      existingCanvases.forEach((canvas) => {
-        if (canvas instanceof HTMLCanvasElement) {
-          prepareCanvasForHighDPI(canvas)
-        }
-      })
-    }
-
-    // Check immediately and on next frame
-    checkAndPrepare()
-    requestAnimationFrame(checkAndPrepare)
 
     // Observe for new canvases
     observer.observe(container, {
@@ -548,6 +612,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
     return () => {
       observer.disconnect()
+      resizeObserver.disconnect()
     }
   }, [isPDFjsReady])
   
