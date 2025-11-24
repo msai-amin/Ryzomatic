@@ -440,7 +440,10 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     if (!isPDFjsReady) return
 
     const container = document.querySelector('.pdf-viewer-container')
-    if (!container) return
+    // Ensure container is a DOM element before proceeding
+    if (!container || !(container instanceof Element)) {
+      return
+    }
 
     const dpr = window.devicePixelRatio || 1
     if (dpr <= 1) return // No scaling needed for standard displays
@@ -909,7 +912,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       // Force react-pdf-viewer to recalculate layout by triggering a custom event
       // DO NOT dispatch 'resize' event here as it causes infinite loop
       const viewerContainer = window.document.querySelector('.pdf-viewer-container')
-      if (viewerContainer) {
+      if (viewerContainer && viewerContainer instanceof Element) {
         // Dispatch a custom event instead of 'resize' to avoid infinite loop
         const customEvent = new CustomEvent('pdf-viewer-resize', { bubbles: true })
         viewerContainer.dispatchEvent(customEvent)
