@@ -634,14 +634,10 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       subtree: true
     })
 
-      return () => {
-        observer.disconnect()
-        resizeObserver.disconnect()
-      }
+    return () => {
+      observer.disconnect()
+      resizeObserver.disconnect()
     }
-
-    // Start initialization
-    return initializeCanvasScaling(container)
   }, [isPDFjsReady])
   
   // Toggle reading mode
