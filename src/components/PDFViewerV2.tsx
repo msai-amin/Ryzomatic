@@ -534,6 +534,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
 
     // More aggressive timing: check immediately and use multiple strategies
     const checkAndPrepare = () => {
+      // Ensure container is still valid and is a DOM element
+      if (!container || !(container instanceof Element)) return
+      
       const existingCanvases = container.querySelectorAll('.rpv-core__canvas-layer canvas')
       existingCanvases.forEach((canvas) => {
         if (canvas instanceof HTMLCanvasElement) {
@@ -566,12 +569,15 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     })
 
     // Observe all canvases for size changes
-    const existingCanvases = container.querySelectorAll('.rpv-core__canvas-layer canvas')
-    existingCanvases.forEach((canvas) => {
-      if (canvas instanceof HTMLCanvasElement) {
-        resizeObserver.observe(canvas)
-      }
-    })
+    // Use a safe query that checks container exists
+    if (container && container instanceof Element) {
+      const existingCanvases = container.querySelectorAll('.rpv-core__canvas-layer canvas')
+      existingCanvases.forEach((canvas) => {
+        if (canvas instanceof HTMLCanvasElement) {
+          resizeObserver.observe(canvas)
+        }
+      })
+    }
 
     // Watch for new canvas elements with immediate processing
     const observer = new MutationObserver((mutations) => {
@@ -587,9 +593,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
               prepareCanvasForHighDPI(node)
               requestAnimationFrame(() => prepareCanvasForHighDPI(node))
             })
-          } else if (node instanceof Element) {
-            const canvases = node.querySelectorAll?.('canvas')
-            canvases?.forEach((canvas) => {
+          } else if (node instanceof Element && typeof node.querySelectorAll === 'function') {
+            const canvases = node.querySelectorAll('canvas')
+            canvases.forEach((canvas) => {
               if (canvas instanceof HTMLCanvasElement) {
                 prepareCanvasForHighDPI(canvas)
                 resizeObserver.observe(canvas)
