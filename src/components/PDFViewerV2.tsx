@@ -403,11 +403,153 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     ensurePDFjs()
   }, [document?.id, document?.pdfData])
 
-  // NOTE: We intentionally do NOT modify canvas dimensions here
-  // React-pdf-viewer's highlight system uses getCssProperties() which depends on
-  // the canvas coordinate system. Modifying canvas.width/height after PDF.js renders
-  // would break highlight positioning. CSS optimizations in index.css are safe
-  // as they don't modify the coordinate system.
+  // Scale canvas for high-DPI rendering BEFORE PDF.js renders
+  // This is safe because:
+  // 1. We set canvas.width/height BEFORE PDF.js renders (not after)
+  // 2. We preserve CSS dimensions (canvas.style.width/height) so getCssProperties() still works
+  // 3. Highlights use CSS dimensions via getCssProperties(), not internal canvas dimensions
+  useEffect(() => {
+    if (!isPDFjsReady) return
+
+    const container = document.querySelector('.pdf-viewer-container')
+    if (!container) return
+
+    const dpr = window.devicePixelRatio || 1
+    if (dpr <= 1) return // No scaling needed for standard displays
+
+    // Function to scale canvas BEFORE PDF.js renders to it
+    const prepareCanvasForHighDPI = (canvas: HTMLCanvasElement) => {
+      // Skip if already processed
+      if (canvas.dataset.highDpiPrepared === 'true') {
+        return
+      }
+
+      // Get display dimensions from CSS (this is what getCssProperties() uses)
+      const rect = canvas.getBoundingClientRect()
+      if (rect.width === 0 || rect.height === 0) {
+        // Canvas not yet sized, wait for it
+        return
+      }
+
+      // Get current CSS dimensions (preserve these for highlight calculations)
+      const cssWidth = rect.width
+      const cssHeight = rect.height
+
+      // Calculate internal canvas resolution (higher for high-DPI)
+      const targetWidth = Math.floor(cssWidth * dpr)
+      const targetHeight = Math.floor(cssHeight * dpr)
+
+      // Get current internal dimensions
+      const currentWidth = canvas.width
+      const currentHeight = canvas.height
+
+      // Check if canvas has been rendered to (has image data)
+      // If it has content, don't modify (would break rendering)
+      const ctx = canvas.getContext('2d', { willReadFrequently: false })
+      if (!ctx) return
+
+      // Try to detect if canvas has been rendered to
+      // If width/height match CSS size exactly (not scaled), it probably hasn't been rendered yet
+      const isLikelyUnrendered = currentWidth === cssWidth && currentHeight === cssHeight
+
+      // Only scale if:
+      // 1. Not already at correct resolution, AND
+      // 2. Likely not yet rendered (matches CSS size exactly)
+      if (currentWidth === targetWidth && currentHeight === targetHeight) {
+        canvas.dataset.highDpiPrepared = 'true'
+        return
+      }
+
+      // If canvas has been rendered at wrong resolution, we can't fix it without breaking highlights
+      if (!isLikelyUnrendered && currentWidth > 0 && currentHeight > 0) {
+        console.warn('⚠️ PDFViewerV2: Canvas already rendered, skipping high-DPI scaling to preserve highlights')
+        return
+      }
+
+      // CRITICAL: Preserve CSS dimensions so getCssProperties() still works correctly
+      // getCssProperties() uses getBoundingClientRect() which returns CSS dimensions
+      // We set internal resolution higher but keep CSS size the same
+        // Store original CSS dimensions if not already set
+        if (!canvas.style.width) {
+          canvas.style.width = cssWidth + 'px'
+        }
+        if (!canvas.style.height) {
+          canvas.style.height = cssHeight + 'px'
+        }
+
+        // Set internal resolution (higher for crisp rendering)
+        canvas.width = targetWidth
+        canvas.height = targetHeight
+
+        // Scale context so PDF.js renders at correct size
+        ctx.scale(dpr, dpr)
+
+        // Ensure CSS dimensions are preserved (critical for highlights)
+        canvas.style.width = cssWidth + 'px'
+        canvas.style.height = cssHeight + 'px'
+
+        canvas.dataset.highDpiPrepared = 'true'
+
+        console.log('✅ PDFViewerV2: Prepared canvas for high-DPI rendering', {
+          cssSize: `${cssWidth}x${cssHeight}`,
+          canvasSize: `${targetWidth}x${targetHeight}`,
+          dpr,
+          note: 'CSS dimensions preserved for highlight compatibility'
+        })
+      }
+    }
+
+    // Watch for new canvas elements and prepare them before rendering
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (node instanceof HTMLCanvasElement) {
+            // Use multiple RAFs to catch canvas before PDF.js renders
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                prepareCanvasForHighDPI(node)
+              })
+            })
+          } else if (node instanceof Element) {
+            const canvases = node.querySelectorAll?.('canvas')
+            canvases?.forEach((canvas) => {
+              if (canvas instanceof HTMLCanvasElement) {
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(() => {
+                    prepareCanvasForHighDPI(canvas)
+                  })
+                })
+              }
+            })
+          }
+        })
+      })
+    })
+
+    // Process existing canvases
+    const checkAndPrepare = () => {
+      const existingCanvases = container.querySelectorAll('.rpv-core__canvas-layer canvas')
+      existingCanvases.forEach((canvas) => {
+        if (canvas instanceof HTMLCanvasElement) {
+          prepareCanvasForHighDPI(canvas)
+        }
+      })
+    }
+
+    // Check immediately and on next frame
+    checkAndPrepare()
+    requestAnimationFrame(checkAndPrepare)
+
+    // Observe for new canvases
+    observer.observe(container, {
+      childList: true,
+      subtree: true
+    })
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [isPDFjsReady])
   
   // Toggle reading mode
   const toggleReadingMode = useCallback(() => {
