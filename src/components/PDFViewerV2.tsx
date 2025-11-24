@@ -393,14 +393,17 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           })
         }
         
-        // --- START PATCH ---
-        // Apply high-DPI patch immediately after loading (before setIsPDFjsReady)
+        // --- START HIGH-DPI PATCH ---
+        // Apply comprehensive high-DPI patch immediately after loading (before setIsPDFjsReady)
         // This ensures patch is applied BEFORE Viewer component starts rendering
         // Fixes race condition where patch was applied too late
         if (pdfjsLib && pdfjsLib.getDocument && !pdfjsLib._patchedForHighDPI) {
             const dpr = window.devicePixelRatio || 1
             if (dpr > 1) {
-                console.log('✅ PDFViewerV2: Applying high-DPI patch in ensurePDFjs', { dpr })
+                console.log('✅ PDFViewerV2: Applying comprehensive high-DPI patch in ensurePDFjs', { dpr })
+                
+                // Patch 1: Viewport scale multiplication (forces higher resolution rendering)
+                // This makes PDF.js render at native resolution (e.g. 2x on Retina)
                 const originalGetDocument = pdfjsLib.getDocument
                 pdfjsLib.getDocument = function(params: any) {
                     const loadingTask = originalGetDocument.call(this, params)
@@ -410,6 +413,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                         doc.getPage = function(pageIndex: number) {
                             return originalGetPage.call(this, pageIndex).then((page: any) => {
                                 if (!page || !page.getViewport || page._viewportPatched) return page
+                                
+                                // Patch viewport to multiply scale by DPR
                                 const originalGetViewport = page.getViewport.bind(page)
                                 page.getViewport = function(params: any) {
                                     if (params && typeof params.scale === 'number') {
@@ -417,6 +422,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                                     }
                                     return originalGetViewport(params)
                                 }
+                                
                                 page._viewportPatched = true
                                 return page
                             })
@@ -425,10 +431,112 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                     })
                     return loadingTask
                 }
+                
+                // Patch 2: MutationObserver to catch canvas elements and ensure proper scaling
+                // This is a safety net for any canvases that might not respect the viewport patch
+                // Only fixes canvases that are clearly under-resolved (internal resolution < style * DPR)
+                if (typeof window !== 'undefined' && window.MutationObserver) {
+                    const fixCanvasResolution = (canvas: HTMLCanvasElement) => {
+                        if (canvas._dprFixed) return // Already fixed
+                        
+                        const rect = canvas.getBoundingClientRect()
+                        if (!rect.width || !rect.height) return
+                        
+                        const styleWidth = rect.width
+                        const styleHeight = rect.height
+                        const currentWidth = canvas.width
+                        const currentHeight = canvas.height
+                        const expectedWidth = styleWidth * dpr
+                        const expectedHeight = styleHeight * dpr
+                        
+                        // Only fix if canvas is clearly under-resolved
+                        // Allow some tolerance (10%) for rounding differences
+                        const tolerance = 0.1
+                        if (currentWidth < expectedWidth * (1 - tolerance) || 
+                            currentHeight < expectedHeight * (1 - tolerance)) {
+                            
+                            // Store original style dimensions
+                            const originalStyleWidth = canvas.style.width || styleWidth + 'px'
+                            const originalStyleHeight = canvas.style.height || styleHeight + 'px'
+                            
+                            // Set internal resolution to match DPR
+                            canvas.width = expectedWidth
+                            canvas.height = expectedHeight
+                            canvas.style.width = originalStyleWidth
+                            canvas.style.height = originalStyleHeight
+                            
+                            // Mark as fixed to prevent re-processing
+                            canvas._dprFixed = true
+                            
+                            console.log('✅ PDFViewerV2: Fixed canvas resolution', {
+                                dpr,
+                                original: { width: currentWidth, height: currentHeight },
+                                new: { width: canvas.width, height: canvas.height },
+                                style: { width: styleWidth, height: styleHeight }
+                            })
+                            
+                            // Trigger re-render by dispatching a resize event
+                            // This ensures PDF.js re-renders with the new canvas resolution
+                            window.requestAnimationFrame(() => {
+                                const event = new Event('resize')
+                                window.dispatchEvent(event)
+                            })
+                        }
+                    }
+                    
+                    const canvasObserver = new MutationObserver((mutations) => {
+                        mutations.forEach((mutation) => {
+                            mutation.addedNodes.forEach((node) => {
+                                if (node instanceof HTMLCanvasElement) {
+                                    const canvas = node as HTMLCanvasElement
+                                    // Only patch PDF viewer canvases
+                                    if (canvas.closest('.pdf-viewer-container') || 
+                                        canvas.closest('.rpv-core__canvas-layer')) {
+                                        // Use requestAnimationFrame to ensure canvas is fully initialized
+                                        requestAnimationFrame(() => {
+                                            fixCanvasResolution(canvas)
+                                        })
+                                    }
+                                }
+                            })
+                        })
+                    })
+                    
+                    // Also check existing canvases
+                    const checkExistingCanvases = () => {
+                        const canvases = document.querySelectorAll('.pdf-viewer-container canvas, .rpv-core__canvas-layer canvas')
+                        canvases.forEach((canvas) => {
+                            if (canvas instanceof HTMLCanvasElement) {
+                                requestAnimationFrame(() => {
+                                    fixCanvasResolution(canvas)
+                                })
+                            }
+                        })
+                    }
+                    
+                    // Start observing when DOM is ready
+                    if (document.body) {
+                        canvasObserver.observe(document.body, {
+                            childList: true,
+                            subtree: true
+                        })
+                        // Check existing canvases immediately
+                        setTimeout(checkExistingCanvases, 100)
+                    } else {
+                        window.addEventListener('DOMContentLoaded', () => {
+                            canvasObserver.observe(document.body, {
+                                childList: true,
+                                subtree: true
+                            })
+                            setTimeout(checkExistingCanvases, 100)
+                        })
+                    }
+                }
+                
                 pdfjsLib._patchedForHighDPI = true
             }
         }
-        // --- END PATCH ---
+        // --- END HIGH-DPI PATCH ---
         
         setIsPDFjsReady(true)
       } catch (error) {

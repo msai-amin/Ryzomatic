@@ -999,10 +999,18 @@
   background-color: var(--color-background, #000000) !important;
 }
 
-/* Minimal canvas styling - let react-pdf-viewer handle rendering */
+/* High-DPI canvas styling - ensure crisp rendering */
 .pdf-viewer-container .rpv-core__canvas-layer canvas {
-  /* Don't interfere with react-pdf-viewer's rendering */
-  image-rendering: auto;
+  /* Prevent CSS downscaling - let internal resolution handle DPR */
+  image-rendering: -webkit-optimize-contrast; /* Safari */
+  image-rendering: crisp-edges; /* Firefox */
+  image-rendering: pixelated; /* Fallback */
+  /* Force hardware acceleration for better rendering */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  /* Prevent blur from CSS transforms */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 /* Override text layer background */
