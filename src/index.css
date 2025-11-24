@@ -999,24 +999,11 @@
   background-color: var(--color-background, #000000) !important;
 }
 
-/* Improve canvas rendering quality for crisp text on high-DPI displays */
-/* This only affects the canvas layer, NOT highlight positioning */
+/* Minimal canvas styling - let react-pdf-viewer handle rendering */
 .pdf-viewer-container .rpv-core__canvas-layer canvas {
-  /* Optimize rendering for text clarity - let browser choose best method */
-  image-rendering: auto !important;
-  /* Force hardware acceleration for better performance and quality */
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
-  will-change: transform;
-  /* Prevent blur from CSS transforms */
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  /* Ensure crisp rendering */
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
+  /* Don't interfere with react-pdf-viewer's rendering */
+  image-rendering: auto;
 }
-
-/* Note: CSS scaling would break highlights, so we rely on JavaScript canvas scaling instead */
 
 /* Override text layer background */
 .pdf-viewer-container .rpv-core__text-layer {
