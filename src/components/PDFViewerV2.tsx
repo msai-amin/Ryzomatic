@@ -401,7 +401,13 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     }
     
     ensurePDFjs()
-  }, []) // Run once on mount
+  }, [document?.id, document?.pdfData])
+
+  // NOTE: We intentionally do NOT modify canvas dimensions here
+  // React-pdf-viewer's highlight system uses getCssProperties() which depends on
+  // the canvas coordinate system. Modifying canvas.width/height after PDF.js renders
+  // would break highlight positioning. CSS optimizations in index.css are safe
+  // as they don't modify the coordinate system.
   
   // Toggle reading mode
   const toggleReadingMode = useCallback(() => {
