@@ -1,12 +1,83 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Bold, Italic, List, ListOrdered, Quote } from 'lucide-react'
+import { Bold, Italic, List, ListOrdered, Quote, LayoutTemplate } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
+
+type ReviewTemplate = 'standard' | 'neurips' | 'medical' | 'reject'
+
+const TEMPLATES: Record<ReviewTemplate, { label: string; content: string }> = {
+  standard: {
+    label: 'Standard Journal Review',
+    content: `
+      <h3>Summary</h3>
+      <p>Provide a brief summary of the paper's contribution...</p>
+      <h3>General Assessment</h3>
+      <p>High-level feedback on novelty, significance, and methodology.</p>
+      <h3>Major Points</h3>
+      <ul>
+        <li>Critical flaw or required experiment 1...</li>
+        <li>Critical flaw or required experiment 2...</li>
+      </ul>
+      <h3>Minor Points</h3>
+      <ul>
+        <li>Typos, formatting, or small clarifications...</li>
+      </ul>
+    `
+  },
+  neurips: {
+    label: 'Conference (NeurIPS/ICML)',
+    content: `
+      <h3>Summary</h3>
+      <p>What is the paper about?</p>
+      <h3>Strengths</h3>
+      <ul>
+        <li>Strength 1 (e.g. Novelty)</li>
+        <li>Strength 2 (e.g. Rigorous Theory)</li>
+      </ul>
+      <h3>Weaknesses</h3>
+      <ul>
+        <li>Weakness 1</li>
+        <li>Weakness 2</li>
+      </ul>
+      <h3>Questions for Authors</h3>
+      <ul>
+        <li>Question 1...</li>
+      </ul>
+      <h3>Limitations & Ethics</h3>
+      <p>Did the authors discuss limits? Any ethical concerns?</p>
+    `
+  },
+  medical: {
+    label: 'Structured (Medical/Social)',
+    content: `
+      <h3>Originality</h3>
+      <p>Is the work novel?</p>
+      <h3>Methodology</h3>
+      <p>Is the study design appropriate and robust?</p>
+      <h3>Results</h3>
+      <p>Are the data presented clearly and do they support conclusions?</p>
+      <h3>Reproducibility</h3>
+      <p>Is the data/code available?</p>
+      <h3>Clarity</h3>
+      <p>Is the writing accessible?</p>
+    `
+  },
+  reject: {
+    label: 'Desk Reject',
+    content: `
+      <h3>Summary</h3>
+      <p>Brief acknowledgment of topic...</p>
+      <h3>Fatal Flaw / Reason for Rejection</h3>
+      <p>The single critical reason for rejection (e.g. out of scope, fatal methodological error)...</p>
+    `
+  }
+}
 
 export const ReviewPanel: React.FC = () => {
   const { reviewCitations, reviewContent, setReviewContent } = useAppStore()
+  const [showTemplates, setShowTemplates] = useState(false)
 
   const editor = useEditor({
     extensions: [
@@ -76,13 +147,39 @@ export const ReviewPanel: React.FC = () => {
           >
             <ListOrdered size={16} />
           </button>
-          <button
-            onClick={() => editor.chain().focus().toggleBlockquote().run()}
-            className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors ${editor.isActive('blockquote') ? 'text-[var(--color-primary)] bg-[var(--color-background)]' : 'text-[var(--color-text-secondary)]'}`}
-            title="Quote"
-          >
-            <Quote size={16} />
-          </button>
+          <div className="w-px bg-[var(--color-border)] mx-1 my-1" />
+          <div className="relative">
+            <button
+                onClick={() => setShowTemplates(!showTemplates)}
+                className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors ${showTemplates ? 'text-[var(--color-primary)] bg-[var(--color-background)]' : 'text-[var(--color-text-secondary)]'}`}
+                title="Insert Template"
+            >
+                <LayoutTemplate size={16} />
+            </button>
+            {showTemplates && (
+                <div className="absolute right-0 top-full mt-2 w-48 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl z-50 overflow-hidden">
+                    {Object.entries(TEMPLATES).map(([key, template]) => (
+                        <button
+                            key={key}
+                            onClick={() => {
+                                if (editor) {
+                                    // Ask for confirmation if there is content
+                                    if (!editor.isEmpty && !window.confirm('This will replace current content. Continue?')) {
+                                        return
+                                    }
+                                    editor.commands.setContent(template.content)
+                                    setReviewContent(template.content)
+                                    setShowTemplates(false)
+                                }
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-surface-hover)] text-[var(--color-text-primary)]"
+                        >
+                            {template.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+          </div>
         </div>
       </div>
       
