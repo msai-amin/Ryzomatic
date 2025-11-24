@@ -193,7 +193,9 @@ interface AppState {
   isChatOpen: boolean
   isEditorialMode: boolean
   reviewCitations: string[]
+  reviewContent: string
   addReviewCitation: (citation: string) => void
+  setReviewContent: (content: string) => void
   isRightSidebarOpen: boolean
   audioWidgetPosition: 'default' | 'header' | 'hidden'
   setAudioWidgetPosition: (position: 'default' | 'header' | 'hidden') => void
@@ -777,7 +779,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   setEditorialMode: (enabled) => set({ isEditorialMode: enabled }),
   
   reviewCitations: [],
+  reviewContent: '',
   addReviewCitation: (citation) => set((state) => ({ reviewCitations: [...state.reviewCitations, citation] })),
+  setReviewContent: (content) => set({ reviewContent: content }),
 
   audioWidgetPosition: 'default',
   setAudioWidgetPosition: (position) => set({ audioWidgetPosition: position }),
