@@ -208,15 +208,82 @@ export const ReviewPanel: React.FC = () => {
         await peerReviewService.submitReview(currentDocument.id, user.id)
 
         // Get clean content from editor
-        const cleanContent = (editor?.getHTML() || reviewContent || '').trim()
+        const rawContent = (editor?.getHTML() || reviewContent || '').trim()
+        
+        // Convert TipTap HTML to simpler, more compatible HTML structure
+        // The html-docx-js-typescript library has issues with complex HTML, so we simplify it
+        const tempDiv = document.createElement('div')
+        tempDiv.innerHTML = rawContent
+        
+        // Function to convert HTML nodes to simpler HTML
+        const simplifyHTML = (node: Node): string => {
+            if (node.nodeType === Node.TEXT_NODE) {
+                return (node.textContent || '').replace(/\s+/g, ' ').trim()
+            }
+            
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                const el = node as Element
+                const tagName = el.tagName.toLowerCase()
+                
+                // Process children
+                const children = Array.from(el.childNodes)
+                    .map(simplifyHTML)
+                    .filter(text => text.length > 0)
+                    .join('')
+                
+                if (!children) return ''
+                
+                // Convert to simpler tags
+                switch (tagName) {
+                    case 'h1':
+                    case 'h2':
+                    case 'h3':
+                    case 'h4':
+                    case 'h5':
+                    case 'h6':
+                        return `<${tagName}>${children}</${tagName}>`
+                    case 'p':
+                        return `<p>${children}</p>`
+                    case 'strong':
+                    case 'b':
+                        return `<strong>${children}</strong>`
+                    case 'em':
+                    case 'i':
+                        return `<em>${children}</em>`
+                    case 'u':
+                        return `<u>${children}</u>`
+                    case 'ul':
+                        return `<ul>${children}</ul>`
+                    case 'ol':
+                        return `<ol>${children}</ol>`
+                    case 'li':
+                        return `<li>${children}</li>`
+                    case 'br':
+                        return '<br/>'
+                    case 'blockquote':
+                        return `<p style="margin-left: 20px; font-style: italic;">${children}</p>`
+                    case 'div':
+                        return children // Flatten divs
+                    default:
+                        return children // Return children for unknown tags
+                }
+            }
+            
+            return ''
+        }
+        
+        // Convert to simplified HTML
+        const simplifiedContent = Array.from(tempDiv.childNodes)
+            .map(simplifyHTML)
+            .filter(html => html.length > 0)
+            .join('')
         
         // Escape HTML in metadata to prevent injection
         const docName = (currentDocument?.name || 'Untitled').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         const reviewerName = (user?.full_name || user?.email || 'Anonymous').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         const reportDate = new Date().toLocaleDateString()
         
-        // Build HTML string - use inline styles as the library may not process <style> tags well
-        // The library expects a complete, valid HTML document
+        // Build simple, clean HTML string that the library can handle
         const htmlString = `<!DOCTYPE html>
 <html>
 <head>
@@ -230,7 +297,7 @@ export const ReviewPanel: React.FC = () => {
     <p style="margin-bottom: 1em;"><strong>Reviewer:</strong> ${reviewerName}</p>
     <hr style="border: none; border-top: 1px solid #ccc; margin: 20px 0;"/>
     <div style="margin-top: 20px;">
-    ${cleanContent}
+    ${simplifiedContent || rawContent}
     </div>
 </body>
 </html>`
