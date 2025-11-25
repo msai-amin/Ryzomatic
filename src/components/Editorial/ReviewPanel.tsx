@@ -2,10 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import TextStyle from '@tiptap/extension-text-style'
-import { Color } from '@tiptap/extension-color'
-import Highlight from '@tiptap/extension-highlight'
-import { Bold, Italic, List, ListOrdered, Quote, LayoutTemplate, Palette, Highlighter } from 'lucide-react'
+import { Bold, Italic, List, ListOrdered, Quote, LayoutTemplate, Sun, Moon } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 
 type ReviewTemplate = 'standard' | 'neurips' | 'medical' | 'reject'
@@ -81,13 +78,11 @@ const TEMPLATES: Record<ReviewTemplate, { label: string; content: string }> = {
 export const ReviewPanel: React.FC = () => {
   const { reviewCitations, reviewContent, setReviewContent } = useAppStore()
   const [showTemplates, setShowTemplates] = useState(false)
+  const [editorTheme, setEditorTheme] = useState<'light' | 'dark'>('dark')
 
   const editor = useEditor({
     extensions: [
       StarterKit,
-      TextStyle,
-      Color,
-      Highlight.configure({ multicast: true }),
       Placeholder.configure({
         placeholder: 'Write your referee report here...',
       }),
@@ -98,7 +93,9 @@ export const ReviewPanel: React.FC = () => {
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-invert max-w-none focus:outline-none min-h-[200px]',
+        class: `prose max-w-none focus:outline-none min-h-[200px] ${
+          editorTheme === 'dark' ? 'prose-invert' : ''
+        }`,
       },
     },
   })
@@ -251,7 +248,13 @@ export const ReviewPanel: React.FC = () => {
         {/* Editor */}
         <div className="mb-8">
             <h3 className="text-[var(--color-text-primary)] mb-4 font-medium">General Comments</h3>
-            <div className="min-h-[300px] p-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)]">
+            <div 
+              className={`min-h-[300px] p-4 rounded-lg border border-[var(--color-border)] transition-colors duration-200 ${
+                editorTheme === 'dark' 
+                  ? 'bg-[var(--color-background)] text-[var(--color-text-primary)]' 
+                  : 'bg-white text-gray-900'
+              }`}
+            >
                 <EditorContent editor={editor} />
             </div>
         </div>
