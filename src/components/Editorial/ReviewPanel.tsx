@@ -215,68 +215,35 @@ export const ReviewPanel: React.FC = () => {
         const reviewerName = (user?.full_name || user?.email || 'Anonymous').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         const reportDate = new Date().toLocaleDateString()
         
-        // Build HTML string - ensure cleanContent is properly inserted
+        // Build HTML string - use inline styles as the library may not process <style> tags well
+        // The library expects a complete, valid HTML document
         const htmlString = `<!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
     <title>Referee Report</title>
-    <style>
-        body { 
-            font-family: '${reviewFontFamily}', serif; 
-            font-size: ${reviewFontSize}pt; 
-            line-height: 1.5; 
-            margin: 40px;
-            color: #000;
-        }
-        h2 { 
-            font-size: ${reviewFontSize + 4}pt; 
-            font-weight: bold; 
-            margin-top: 0;
-            margin-bottom: 20px;
-        }
-        h3 { 
-            font-size: ${reviewFontSize + 2}pt; 
-            font-weight: bold; 
-            margin-top: 1em; 
-            margin-bottom: 0.5em; 
-        }
-        p { 
-            margin-bottom: 1em; 
-        }
-        ul, ol { 
-            margin-bottom: 1em; 
-            margin-left: 1.5em; 
-        }
-        li { 
-            margin-bottom: 0.5em; 
-        }
-        hr {
-            border: none;
-            border-top: 1px solid #ccc;
-            margin: 20px 0;
-        }
-        strong {
-            font-weight: bold;
-        }
-    </style>
 </head>
-<body>
-    <h2>Referee Report</h2>
-    <p><strong>Document:</strong> ${docName}</p>
-    <p><strong>Date:</strong> ${reportDate}</p>
-    <p><strong>Reviewer:</strong> ${reviewerName}</p>
-    <hr/>
+<body style="font-family: '${reviewFontFamily}', serif; font-size: ${reviewFontSize}pt; line-height: 1.5; margin: 40px;">
+    <h2 style="font-size: ${reviewFontSize + 4}pt; font-weight: bold; margin-top: 0; margin-bottom: 20px;">Referee Report</h2>
+    <p style="margin-bottom: 1em;"><strong>Document:</strong> ${docName}</p>
+    <p style="margin-bottom: 1em;"><strong>Date:</strong> ${reportDate}</p>
+    <p style="margin-bottom: 1em;"><strong>Reviewer:</strong> ${reviewerName}</p>
+    <hr style="border: none; border-top: 1px solid #ccc; margin: 20px 0;"/>
+    <div style="margin-top: 20px;">
     ${cleanContent}
+    </div>
 </body>
 </html>`
 
+        // Log the full HTML to help debug
         console.log('Generating DOCX from HTML:', {
             cleanContentLength: cleanContent.length,
             cleanContentPreview: cleanContent.substring(0, 200),
+            cleanContentFull: cleanContent, // Log full content for debugging
             hasContent: hasContent,
             htmlLength: htmlString.length,
-            htmlPreview: htmlString.substring(0, 500)
+            htmlPreview: htmlString.substring(0, 500),
+            htmlFull: htmlString // Log full HTML for debugging
         })
 
         // Generate DOCX blob - the library expects a complete HTML document
