@@ -6,7 +6,7 @@ import { Bold, Italic, List, ListOrdered, Quote, LayoutTemplate, Sun, Moon, Spar
 import { autoReviewService } from '../../services/ai/autoReviewService'
 import { peerReviewService } from '../../services/peerReviewService'
 import { useAppStore } from '../../store/appStore'
-import { asBlob } from 'html-docx-js-typescript'
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx'
 import { saveAs } from 'file-saver'
 
 const FONT_FAMILIES = [
@@ -210,147 +210,184 @@ export const ReviewPanel: React.FC = () => {
         // Get clean content from editor
         const rawContent = (editor?.getHTML() || reviewContent || '').trim()
         
-        // Convert TipTap HTML to simpler, more compatible HTML structure
-        // The html-docx-js-typescript library has issues with complex HTML, so we simplify it
-        const tempDiv = document.createElement('div')
-        tempDiv.innerHTML = rawContent
+        // Convert HTML to docx structure
+        const contentDiv = document.createElement('div')
+        contentDiv.innerHTML = rawContent
         
-        // Function to convert HTML nodes to simpler HTML
-        const simplifyHTML = (node: Node): string => {
-            if (node.nodeType === Node.TEXT_NODE) {
-                return (node.textContent || '').replace(/\s+/g, ' ').trim()
+        // Helper to convert HTML nodes to docx paragraphs
+        const htmlToParagraphs = (node: Node): Paragraph[] => {
+          const paragraphs: Paragraph[] = []
+          
+          if (node.nodeType === Node.TEXT_NODE) {
+            const text = (node.textContent || '').trim()
+            if (text) {
+              paragraphs.push(new Paragraph({ text, spacing: { after: 200 } }))
             }
+            return paragraphs
+          }
+          
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const el = node as Element
+            const tagName = el.tagName.toLowerCase()
+            const text = el.textContent || ''
             
-            if (node.nodeType === Node.ELEMENT_NODE) {
-                const el = node as Element
-                const tagName = el.tagName.toLowerCase()
-                
-                // Process children
-                const children = Array.from(el.childNodes)
-                    .map(simplifyHTML)
-                    .filter(text => text.length > 0)
-                    .join('')
-                
-                if (!children) return ''
-                
-                // Convert to simpler tags
-                switch (tagName) {
-                    case 'h1':
-                    case 'h2':
-                    case 'h3':
-                    case 'h4':
-                    case 'h5':
-                    case 'h6':
-                        return `<${tagName}>${children}</${tagName}>`
-                    case 'p':
-                        return `<p>${children}</p>`
-                    case 'strong':
-                    case 'b':
-                        return `<strong>${children}</strong>`
-                    case 'em':
-                    case 'i':
-                        return `<em>${children}</em>`
-                    case 'u':
-                        return `<u>${children}</u>`
-                    case 'ul':
-                        return `<ul>${children}</ul>`
-                    case 'ol':
-                        return `<ol>${children}</ol>`
-                    case 'li':
-                        return `<li>${children}</li>`
-                    case 'br':
-                        return '<br/>'
-                    case 'blockquote':
-                        return `<p style="margin-left: 20px; font-style: italic;">${children}</p>`
-                    case 'div':
-                        return children // Flatten divs
-                    default:
-                        return children // Return children for unknown tags
+            switch (tagName) {
+              case 'h1':
+                return [new Paragraph({ text, heading: HeadingLevel.HEADING_1, spacing: { after: 200 } })]
+              case 'h2':
+                return [new Paragraph({ text, heading: HeadingLevel.HEADING_2, spacing: { after: 200 } })]
+              case 'h3':
+                return [new Paragraph({ text, heading: HeadingLevel.HEADING_3, spacing: { after: 200 } })]
+              case 'h4':
+              case 'h5':
+              case 'h6':
+                return [new Paragraph({ text, heading: HeadingLevel.HEADING_4, spacing: { after: 200 } })]
+              case 'p':
+                // Handle formatting within paragraphs
+                const runs: TextRun[] = []
+                const processNode = (n: Node) => {
+                  if (n.nodeType === Node.TEXT_NODE) {
+                    const t = n.textContent || ''
+                    if (t.trim()) runs.push(new TextRun(t))
+                  } else if (n.nodeType === Node.ELEMENT_NODE) {
+                    const e = n as Element
+                    const tag = e.tagName.toLowerCase()
+                    const content = e.textContent || ''
+                    if (tag === 'strong' || tag === 'b') {
+                      runs.push(new TextRun({ text: content, bold: true }))
+                    } else if (tag === 'em' || tag === 'i') {
+                      runs.push(new TextRun({ text: content, italics: true }))
+                    } else if (tag === 'u') {
+                      runs.push(new TextRun({ text: content, underline: {} }))
+                    } else {
+                      Array.from(e.childNodes).forEach(processNode)
+                    }
+                  }
                 }
+                Array.from(el.childNodes).forEach(processNode)
+                if (runs.length > 0) {
+                  return [new Paragraph({ children: runs, spacing: { after: 200 } })]
+                }
+                return [new Paragraph({ text, spacing: { after: 200 } })]
+              case 'ul':
+              case 'ol':
+                const items: Paragraph[] = []
+                el.querySelectorAll('li').forEach(li => {
+                  items.push(new Paragraph({ 
+                    text: li.textContent || '', 
+                    bullet: { level: 0 },
+                    spacing: { after: 100 }
+                  }))
+                })
+                return items
+              case 'li':
+                return [new Paragraph({ text, bullet: { level: 0 }, spacing: { after: 100 } })]
+              case 'br':
+                return [new Paragraph({ text: '' })]
+              case 'div':
+                // Process children
+                const childParas: Paragraph[] = []
+                Array.from(el.childNodes).forEach(child => {
+                  childParas.push(...htmlToParagraphs(child))
+                })
+                return childParas
+              default:
+                // For other tags, just get text content
+                if (text.trim()) {
+                  return [new Paragraph({ text, spacing: { after: 200 } })]
+                }
+                return []
             }
-            
-            return ''
+          }
+          
+          return []
         }
         
-        // Convert to simplified HTML
-        const simplifiedContent = Array.from(tempDiv.childNodes)
-            .map(simplifyHTML)
-            .filter(html => html.length > 0)
-            .join('')
+        // Convert all content to paragraphs
+        const contentParagraphs: Paragraph[] = []
+        Array.from(contentDiv.childNodes).forEach(node => {
+          contentParagraphs.push(...htmlToParagraphs(node))
+        })
         
-        // Escape HTML in metadata to prevent injection
-        const docName = (currentDocument?.name || 'Untitled').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        const reviewerName = (user?.full_name || user?.email || 'Anonymous').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        // If no paragraphs, create one from text
+        if (contentParagraphs.length === 0) {
+          contentParagraphs.push(new Paragraph({ text: textContent, spacing: { after: 200 } }))
+        }
+
+        // Create document
+        const docName = currentDocument?.name || 'Untitled'
+        const reviewerName = user?.full_name || user?.email || 'Anonymous'
         const reportDate = new Date().toLocaleDateString()
-        
-        // Build simple, clean HTML string that the library can handle
-        const htmlString = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Referee Report</title>
-</head>
-<body style="font-family: '${reviewFontFamily}', serif; font-size: ${reviewFontSize}pt; line-height: 1.5; margin: 40px;">
-    <h2 style="font-size: ${reviewFontSize + 4}pt; font-weight: bold; margin-top: 0; margin-bottom: 20px;">Referee Report</h2>
-    <p style="margin-bottom: 1em;"><strong>Document:</strong> ${docName}</p>
-    <p style="margin-bottom: 1em;"><strong>Date:</strong> ${reportDate}</p>
-    <p style="margin-bottom: 1em;"><strong>Reviewer:</strong> ${reviewerName}</p>
-    <hr style="border: none; border-top: 1px solid #ccc; margin: 20px 0;"/>
-    <div style="margin-top: 20px;">
-    ${simplifiedContent || rawContent}
-    </div>
-</body>
-</html>`
 
-        // Log the full HTML to help debug
-        console.log('Generating DOCX from HTML:', {
-            cleanContentLength: cleanContent.length,
-            cleanContentPreview: cleanContent.substring(0, 200),
-            cleanContentFull: cleanContent, // Log full content for debugging
-            hasContent: hasContent,
-            htmlLength: htmlString.length,
-            htmlPreview: htmlString.substring(0, 500),
-            htmlFull: htmlString // Log full HTML for debugging
+        const doc = new Document({
+          sections: [{
+            properties: {},
+            children: [
+              new Paragraph({
+                text: 'Referee Report',
+                heading: HeadingLevel.HEADING_1,
+                spacing: { after: 400 }
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: 'Document: ', bold: true }),
+                  new TextRun({ text: docName })
+                ],
+                spacing: { after: 200 }
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: 'Date: ', bold: true }),
+                  new TextRun({ text: reportDate })
+                ],
+                spacing: { after: 200 }
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: 'Reviewer: ', bold: true }),
+                  new TextRun({ text: reviewerName })
+                ],
+                spacing: { after: 400 }
+              }),
+              new Paragraph({
+                text: '─────────────────────────────────────────',
+                spacing: { after: 400 }
+              }),
+              ...contentParagraphs
+            ]
+          }],
+          styles: {
+            default: {
+              document: {
+                run: {
+                  font: reviewFontFamily,
+                  size: reviewFontSize * 2, // docx uses half-points
+                },
+              },
+            },
+          },
         })
 
-        // Generate DOCX blob - the library expects a complete HTML document
-        const blob = await asBlob(htmlString)
-        
-        console.log('asBlob result:', {
-            blob: blob,
-            blobType: typeof blob,
-            blobSize: blob instanceof Blob ? blob.size : 'not a blob',
-            blobTypeProperty: blob instanceof Blob ? blob.type : 'N/A'
+        console.log('Generating DOCX with docx package:', {
+          contentLength: rawContent.length,
+          paragraphsCount: contentParagraphs.length
         })
+
+        // Generate blob using Packer
+        const blob = await Packer.toBlob(doc)
         
-        if (!blob) {
-            throw new Error('asBlob returned null or undefined')
-        }
-        
-        // Handle both Blob and Buffer (library can return either)
-        let finalBlob: Blob
-        if (blob instanceof Blob) {
-            finalBlob = blob
-        } else if (blob && typeof blob === 'object' && 'buffer' in blob) {
-            // It's a Buffer (Node.js), convert to Blob
-            finalBlob = new Blob([blob as any], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
-        } else {
-            // Try to create a Blob from whatever we got
-            finalBlob = new Blob([blob as any], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
-        }
-        
-        if (!finalBlob || finalBlob.size === 0) {
-            throw new Error(`Generated DOCX blob is empty (size: ${finalBlob?.size || 0})`)
+        if (!blob || blob.size === 0) {
+            throw new Error('Generated DOCX blob is empty')
         }
 
-        console.log('Final DOCX blob:', { 
-            size: finalBlob.size, 
-            type: finalBlob.type,
-            sizeKB: (finalBlob.size / 1024).toFixed(2) + ' KB'
+        console.log('DOCX blob generated:', { 
+            size: blob.size, 
+            type: blob.type,
+            sizeKB: (blob.size / 1024).toFixed(2) + ' KB'
         })
         
         const fileName = `Referee_Report_${(currentDocument?.name || 'draft').replace(/[^a-z0-9]/gi, '_')}.docx`
-        saveAs(finalBlob, fileName)
+        saveAs(blob, fileName)
         
         console.log('DOCX file download initiated:', fileName)
         
