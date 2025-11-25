@@ -40,43 +40,7 @@ const LandingPage: React.FC = () => {
     { name: "Pricing", href: "#pricing" },
   ];
 
-  const featureCards: FeatureCard[] = [
-    {
-      title: "Intelligent Document Network",
-      description: "Upload any paper and watch ryzomatic instantly map it to your entire collection. Discover surprising connections between theories, find contrasting views, and surface related research you didn't know you had.",
-      icon: "🌐"
-    },
-    {
-      title: "AI Reading Assistant",
-      description: "Your AI reads alongside you, highlighting key concepts, explaining complex ideas, and answering questions in real-time. It remembers everything from every document—no more searching through old notes.",
-      icon: "🤖"
-    },
-    {
-      title: "Natural-Voice Reader",
-      description: "Listen to papers with premium TTS voices while you multitask. Adjustable speed, pitch, and voice selection let you learn at your own pace—hands-free.",
-      icon: "🎧"
-    },
-    {
-      title: "Smart Document Organization",
-      description: "Automatic tagging, smart collections, and intelligent search help you find exactly what you need from hundreds of papers. Your library becomes a searchable knowledge base.",
-      icon: "📁"
-    },
-    {
-      title: "Integrated Pomodoro Timer",
-      description: "Stay focused during deep research sessions with built-in timing tools. Track productivity, take structured breaks, and maintain mental stamina.",
-      icon: "⏱️"
-    },
-    {
-      title: "Advanced Annotation Tools",
-      description: "Highlight, annotate, and tag concepts across all documents. Create study notes that link to specific sections and build your personal research archive.",
-      icon: "📝"
-    },
-    {
-      title: "Universal Export Formats",
-      description: "Export your research notes in Markdown, HTML, JSON, or plain text formats. Works seamlessly with Zotero, Notion, Obsidian, and other research platforms.",
-      icon: "💾"
-    }
-  ];
+  const featureCards: FeatureCard[] = [];
 
   const useCases: UseCase[] = [
     {
@@ -292,48 +256,6 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="bg-gradient-to-b from-white to-slate-50">
-        <div className="mx-auto max-w-7xl px-6 py-24 sm:py-32">
-          <div className="flex flex-col gap-4 text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-slate-900 max-w-3xl mx-auto" style={{ fontFamily: "'Inter', sans-serif" }}>
-              Connect Your Ideas, Not Just Your Documents
-            </h2>
-            <p className="mx-auto max-w-2xl text-lg md:text-xl text-slate-600 leading-relaxed mt-4">
-              Everything you need to transform your PDF library into an intelligent research workspace.
-            </p>
-          </div>
-          
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 mt-12">
-            {featureCards.map((feature, index) => (
-              <div
-                key={feature.title}
-                className="group relative rounded-xl border border-slate-200 bg-white p-8 transition-all duration-300 hover:border-slate-300 hover:shadow-xl hover:-translate-y-1"
-              >
-                {/* Number badge for visual interest */}
-                <div className="absolute -top-4 -left-4 h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">
-                  {index + 1}
-                </div>
-                
-                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 text-slate-700 transition-all duration-300 group-hover:from-slate-100 group-hover:to-slate-200 group-hover:scale-110 text-3xl mb-4">
-                  {feature.icon}
-                </div>
-                
-                <h3 className="text-xl font-bold text-slate-900 mb-3" style={{ fontFamily: "'Inter', sans-serif" }}>
-                  {feature.title}
-                </h3>
-                
-                <p className="text-slate-600 leading-relaxed">
-                  {feature.description}
-                </p>
-                
-                {/* Hover accent line */}
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-green-400 to-blue-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* Use Cases Section */}
       <section id="use-cases" className="bg-white">
