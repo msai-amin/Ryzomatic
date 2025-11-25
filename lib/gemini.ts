@@ -33,6 +33,34 @@ export class GeminiService {
     };
   }
 
+  /**
+   * Generate content from a simple text prompt
+   */
+  async generateContent(content: string, systemPrompt?: string, tier: string = 'free'): Promise<string | null> {
+    try {
+      const model = this.getModel(tier);
+      const config = this.getGenerationConfig(tier);
+
+      // If system prompt is supported/needed, you can prepend it or use systemInstruction if the SDK supports it
+      // Gemini 1.5 Pro/Flash supports systemInstruction in getGenerativeModel
+      // For now, prepending context is safe
+      const fullPrompt = systemPrompt 
+        ? `${systemPrompt}\n\nUser Input:\n${content}`
+        : content;
+
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+        generationConfig: config,
+      });
+
+      const response = result.response;
+      return response.text();
+    } catch (error) {
+      console.error('Gemini generateContent error:', error);
+      return null;
+    }
+  }
+
   private formatHistory(
     history?: Array<{ role: string; content: string }>,
     documentContent?: string

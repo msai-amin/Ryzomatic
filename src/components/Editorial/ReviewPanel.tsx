@@ -3,80 +3,10 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Bold, Italic, List, ListOrdered, Quote, LayoutTemplate, Sun, Moon, Sparkles, Loader2 } from 'lucide-react'
-import { useAppStore } from '../../store/appStore'
-
-type ReviewTemplate = 'standard' | 'neurips' | 'medical' | 'reject'
-
-const TEMPLATES: Record<ReviewTemplate, { label: string; content: string }> = {
-  standard: {
-    label: 'Standard Journal Review',
-    content: `
-      <h3>Summary</h3>
-      <p>Provide a brief summary of the paper's contribution...</p>
-      <h3>General Assessment</h3>
-      <p>High-level feedback on novelty, significance, and methodology.</p>
-      <h3>Major Points</h3>
-      <ul>
-        <li>Critical flaw or required experiment 1...</li>
-        <li>Critical flaw or required experiment 2...</li>
-      </ul>
-      <h3>Minor Points</h3>
-      <ul>
-        <li>Typos, formatting, or small clarifications...</li>
-      </ul>
-    `
-  },
-  neurips: {
-    label: 'Conference (NeurIPS/ICML)',
-    content: `
-      <h3>Summary</h3>
-      <p>What is the paper about?</p>
-      <h3>Strengths</h3>
-      <ul>
-        <li>Strength 1 (e.g. Novelty)</li>
-        <li>Strength 2 (e.g. Rigorous Theory)</li>
-      </ul>
-      <h3>Weaknesses</h3>
-      <ul>
-        <li>Weakness 1</li>
-        <li>Weakness 2</li>
-      </ul>
-      <h3>Questions for Authors</h3>
-      <ul>
-        <li>Question 1...</li>
-      </ul>
-      <h3>Limitations & Ethics</h3>
-      <p>Did the authors discuss limits? Any ethical concerns?</p>
-    `
-  },
-  medical: {
-    label: 'Structured (Medical/Social)',
-    content: `
-      <h3>Originality</h3>
-      <p>Is the work novel?</p>
-      <h3>Methodology</h3>
-      <p>Is the study design appropriate and robust?</p>
-      <h3>Results</h3>
-      <p>Are the data presented clearly and do they support conclusions?</p>
-      <h3>Reproducibility</h3>
-      <p>Is the data/code available?</p>
-      <h3>Clarity</h3>
-      <p>Is the writing accessible?</p>
-    `
-  },
-  reject: {
-    label: 'Desk Reject',
-    content: `
-      <h3>Summary</h3>
-      <p>Brief acknowledgment of topic...</p>
-      <h3>Fatal Flaw / Reason for Rejection</h3>
-      <p>The single critical reason for rejection (e.g. out of scope, fatal methodological error)...</p>
-    `
-  }
-}
+import { autoReviewService } from '../../services/ai/autoReviewService'
 
 export const ReviewPanel: React.FC = () => {
-  const { reviewCitations, reviewContent, setReviewContent, currentDocument } = useAppStore()
+  const { reviewCitations, reviewContent, setReviewContent, currentDocument, user } = useAppStore()
   const [showTemplates, setShowTemplates] = useState(false)
   const [editorTheme, setEditorTheme] = useState<'light' | 'dark'>('dark')
   const [isAutoReviewing, setIsAutoReviewing] = useState(false)
@@ -101,9 +31,12 @@ export const ReviewPanel: React.FC = () => {
     },
   })
 
-  // Mock Auto-Review Function (Replace with real AI call later)
+  // Auto-Review Function
   const handleAutoReview = async () => {
-    if (!currentDocument) return
+    if (!currentDocument || !user) {
+        alert('Please open a document and sign in first.')
+        return
+    }
     
     if (!editor?.isEmpty && !window.confirm('This will replace current content with an AI-generated review. Continue?')) {
         return
@@ -112,29 +45,14 @@ export const ReviewPanel: React.FC = () => {
     setIsAutoReviewing(true)
     
     try {
-        // TODO: Replace with actual LLM call using AUTO_REVIEW_SYSTEM_PROMPT
-        // For now, simulate network delay and return mock content
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        // Generate review using Gemini
+        const reviewHtml = await autoReviewService.generateAutoReview(currentDocument.id, user.id)
         
-        const mockReview = `
-            <h3>AI-Generated Review (Draft)</h3>
-            <p><strong>Summary:</strong> This paper presents a novel approach to... [AI would fill this based on document content]</p>
-            <h3>Strengths</h3>
-            <ul>
-                <li>Strong theoretical foundation.</li>
-                <li>Comprehensive dataset.</li>
-            </ul>
-            <h3>Weaknesses</h3>
-            <ul>
-                <li>Experimental baselines are missing.</li>
-            </ul>
-            <p><em>(This is a placeholder. Connect to LLM service to generate real reviews.)</em></p>
-        `
-        editor?.commands.setContent(mockReview)
-        setReviewContent(mockReview)
+        editor?.commands.setContent(reviewHtml)
+        setReviewContent(reviewHtml)
     } catch (error) {
         console.error('Auto-review failed:', error)
-        alert('Failed to generate review.')
+        alert('Failed to generate review. Please ensure the document has text content.')
     } finally {
         setIsAutoReviewing(false)
     }
