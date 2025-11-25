@@ -1,20 +1,43 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Get API key from environment (works in both Node.js and Vite)
-const getApiKey = () => {
-  // Vite/browser environment
+const getApiKey = (): string => {
+  // Vite/browser environment - check import.meta.env first (from .env.local or Vercel)
   if (typeof import.meta !== 'undefined' && import.meta.env) {
-    return import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || '';
+    const viteKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (viteKey && viteKey.trim().length > 0) {
+      return viteKey.trim();
+    }
+    // Fallback to GEMINI_API_KEY in Vite (though it won't be exposed without VITE_ prefix)
+    const geminiKey = import.meta.env.GEMINI_API_KEY;
+    if (geminiKey && geminiKey.trim().length > 0) {
+      return geminiKey.trim();
+    }
   }
   // Node.js/server environment
   if (typeof process !== 'undefined' && process.env) {
-    return process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '';
+    const processKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    if (processKey && processKey.trim().length > 0) {
+      return processKey.trim();
+    }
   }
   return '';
 };
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(getApiKey());
+// Lazy initialization - create genAI instance only when needed with current API key
+let genAIInstance: GoogleGenerativeAI | null = null;
+
+const getGenAI = (): GoogleGenerativeAI => {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    throw new Error('Gemini API key is not configured. Please set VITE_GEMINI_API_KEY in your .env.local file (for local development) or in Vercel environment variables (for production).');
+  }
+  // Recreate instance if API key changed or if not initialized
+  if (!genAIInstance) {
+    genAIInstance = new GoogleGenerativeAI(apiKey);
+  }
+  return genAIInstance;
+};
 
 // Model configuration based on tier
 const MODEL_CONFIG = {
@@ -33,7 +56,7 @@ const MODEL_CONFIG = {
 export class GeminiService {
   private getModel(tier: string = 'free') {
     const config = MODEL_CONFIG[tier as keyof typeof MODEL_CONFIG] || MODEL_CONFIG.free;
-    return genAI.getGenerativeModel({ model: config.model });
+    return getGenAI().getGenerativeModel({ model: config.model });
   }
 
   private getGenerationConfig(tier: string = 'free') {
