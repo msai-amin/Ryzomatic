@@ -6,6 +6,7 @@ import { createSegmentsFromParagraphs } from '../services/ttsQueue'
 import { AudioSettingsPanel } from './AudioSettingsPanel'
 import { ttsCacheService, TTSCacheQuery } from '../services/ttsCacheService'
 import { supabase } from '../../lib/supabase'
+import { Tooltip } from './Tooltip'
 import { 
   Play, 
   Pause, 
@@ -18,7 +19,8 @@ import {
   ChevronDown,
   ChevronUp,
   Zap,
-  ZapOff
+  ZapOff,
+  X
 } from 'lucide-react'
 
 interface AudioWidgetProps {
@@ -44,7 +46,9 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     isRightSidebarOpen,
     rightSidebarWidth,
     audioWidgetPosition,
-    setAudioWidgetPosition
+    setAudioWidgetPosition,
+    audioWidgetVisible,
+    setAudioWidgetVisible
   } = useAppStore()
   
   // Debug: Log rendering state - ALWAYS log, even if no document
@@ -1270,6 +1274,30 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           >
             {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
           </button>
+
+          {/* Close Button */}
+          <Tooltip content="Close Audio Widget" position="top">
+            <button
+              onClick={() => {
+                handleStop()
+                setAudioWidgetVisible(false)
+              }}
+              className="p-2 rounded-full transition-all"
+              style={{ color: 'var(--color-text-primary)' }}
+              aria-label="Close Audio Widget"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'
+                e.currentTarget.style.color = '#ef4444'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent'
+                e.currentTarget.style.color = 'var(--color-text-primary)'
+              }}
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </Tooltip>
         </div>
 
         {/* Minimal progress indicator when collapsed */}

@@ -1,7 +1,20 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// Get API key from environment (works in both Node.js and Vite)
+const getApiKey = () => {
+  // Vite/browser environment
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || '';
+  }
+  // Node.js/server environment
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '';
+  }
+  return '';
+};
+
 // Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new GoogleGenerativeAI(getApiKey());
 
 // Model configuration based on tier
 const MODEL_CONFIG = {
@@ -31,6 +44,34 @@ export class GeminiService {
       topP: 0.95,
       maxOutputTokens: config.maxOutputTokens,
     };
+  }
+
+  /**
+   * Generate content from a simple text prompt
+   */
+  async generateContent(content: string, systemPrompt?: string, tier: string = 'free'): Promise<string | null> {
+    try {
+      const model = this.getModel(tier);
+      const config = this.getGenerationConfig(tier);
+
+      // If system prompt is supported/needed, you can prepend it or use systemInstruction if the SDK supports it
+      // Gemini 1.5 Pro/Flash supports systemInstruction in getGenerativeModel
+      // For now, prepending context is safe
+      const fullPrompt = systemPrompt 
+        ? `${systemPrompt}\n\nUser Input:\n${content}`
+        : content;
+
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+        generationConfig: config,
+      });
+
+      const response = result.response;
+      return response.text();
+    } catch (error) {
+      console.error('Gemini generateContent error:', error);
+      return null;
+    }
   }
 
   private formatHistory(

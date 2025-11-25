@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Book, FileText, Music, Trash2, Download, Upload, HardDrive, Cloud, CloudOff, RefreshCw, Star, LayoutList, LayoutGrid, Rows, Plus, Edit3, Loader2 } from 'lucide-react';
+import { X, Book, FileText, Music, Trash2, Download, Upload, HardDrive, Cloud, CloudOff, RefreshCw, Star, LayoutList, LayoutGrid, Rows, Plus, Edit3, Loader2, PenTool } from 'lucide-react';
 import { storageService, SavedBook, Note, SavedAudio } from '../services/storageService'
 import { supabaseStorageService } from '../services/supabaseStorageService';
 import { useAppStore } from '../store/appStore';
@@ -10,6 +10,9 @@ import { libraryOrganizationService, Collection } from '../services/libraryOrgan
 import { CollectionTree } from './library/CollectionTree';
 import { supabase } from '../../lib/supabase';
 import { notesService } from '../services/notesService';
+import { peerReviewService, PeerReview } from '../services/peerReviewService';
+import { asBlob } from 'html-docx-js-typescript';
+import { saveAs } from 'file-saver';
 
 // Enhanced SavedBook type that includes both camelCase and snake_case properties
 // This type extends SavedBook with additional properties from Supabase
@@ -223,6 +226,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
   const [confirmDialog, setConfirmDialog] = useState<{ bookId: string; isInTrash: boolean } | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [messageDialog, setMessageDialog] = useState<{ type: 'success' | 'error' | 'info'; title: string; message: string } | null>(null);
+  const [reviews, setReviews] = useState<Map<string, PeerReview>>(new Map());
   const { /* setCurrentDocument, */ addDocument, user } = useAppStore();
   
   // CRITICAL: Normalize user.id to prevent React comparison error
@@ -415,6 +419,13 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       setNotes(supabaseNotes);
       setAudio(supabaseAudio);
       
+      // Load reviews for all books
+      if (user?.id && normalizedBooks.length > 0) {
+        const bookIds = normalizedBooks.map(book => book.id);
+        const reviewsMap = await peerReviewService.loadReviewsForBooks(bookIds, user.id);
+        setReviews(reviewsMap);
+      }
+      
       // Use Supabase storage info
       setStorageInfo(supabaseStorageService.getStorageInfo());
       
@@ -451,6 +462,14 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       setBooks(normalizedBooks);
       setNotes(storageService.getAllNotes());
       setAudio(await storageService.getAllAudio());
+      
+      // Load reviews for all books (from Supabase even if using localStorage fallback)
+      if (user?.id && normalizedBooks.length > 0) {
+        const bookIds = normalizedBooks.map(book => book.id);
+        const reviewsMap = await peerReviewService.loadReviewsForBooks(bookIds, user.id);
+        setReviews(reviewsMap);
+      }
+      
       setStorageInfo(storageService.getStorageInfo());
       
       // Check Google Drive status
@@ -1275,6 +1294,61 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
     audioElement.play();
   };
 
+  const handleDownloadReview = async (book: EnhancedSavedBook) => {
+    if (!user?.id) {
+      alert('You need to be signed in to download reviews.')
+      return
+    }
+
+    const review = reviews.get(book.id)
+    if (!review || !review.review_content) {
+      alert('No review found for this document.')
+      return
+    }
+
+    try {
+      const htmlString = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <title>Referee Report</title>
+          <style>
+            body { font-family: '${review.font_family}', serif; font-size: ${review.font_size}pt; line-height: 1.5; margin: 1in; }
+            h3 { font-size: ${review.font_size + 2}pt; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; }
+            p { margin-bottom: 1em; }
+            ul, ol { margin-bottom: 1em; margin-left: 1.5em; }
+            li { margin-bottom: 0.5em; }
+          </style>
+        </head>
+        <body>
+          <h2>Referee Report</h2>
+          <p><strong>Document:</strong> ${book.title || 'Untitled'}</p>
+          <p><strong>Date:</strong> ${review.submitted_at ? new Date(review.submitted_at).toLocaleDateString() : new Date(review.created_at).toLocaleDateString()}</p>
+          <p><strong>Reviewer:</strong> ${user?.full_name || user?.email || 'Anonymous'}</p>
+          <p><strong>Status:</strong> ${review.status.charAt(0).toUpperCase() + review.status.slice(1)}</p>
+          <hr/>
+          ${review.review_content}
+          ${review.citations && review.citations.length > 0 ? `
+            <hr/>
+            <h3>Citations</h3>
+            <ul>
+              ${review.citations.map(citation => `<li>${citation}</li>`).join('')}
+            </ul>
+          ` : ''}
+        </body>
+        </html>
+      `
+
+      const blob = await asBlob(htmlString)
+      const fileName = `Referee_Report_${book.title?.replace(/\.pdf$/i, '') || 'Untitled'}.docx`
+      saveAs(blob as Blob, fileName)
+    } catch (error) {
+      console.error('Failed to download review:', error)
+      alert('Failed to download review. Please try again.')
+    }
+  }
+
   const handleDownloadAudio = (audio: SavedAudio) => {
     const url = URL.createObjectURL(audio.audioBlob);
     const a = document.createElement('a');
@@ -1663,6 +1737,17 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                                       <Star className="w-3 h-3 fill-current" /> Favourite
                                     </span>
                                   )}
+                                  {reviews.has(book.id) && (
+                                    <span
+                                      className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
+                                      style={{
+                                        backgroundColor: 'rgba(59,130,246,0.18)',
+                                        color: '#3b82f6'
+                                      }}
+                                    >
+                                      <PenTool className="w-3 h-3" /> Review
+                                    </span>
+                                  )}
                                 </div>
                                 <h3 className="text-lg font-semibold leading-snug" style={{ color: 'var(--color-text-primary)' }}>
                                   {book.title}
@@ -1676,6 +1761,29 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                               </div>
                               <div className="flex items-center gap-2">
                                 {renderFavoriteButton(book)}
+                                {reviews.has(book.id) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      handleDownloadReview(book);
+                                    }}
+                                    className="rounded-xl p-2 transition-all duration-300"
+                                    style={{
+                                      color: '#3b82f6',
+                                      backgroundColor: 'rgba(59,130,246,0.12)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.22)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.12)';
+                                    }}
+                                    title="Download Review"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </button>
+                                )}
             <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1754,9 +1862,22 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                               className="flex-1 cursor-pointer"
                               onClick={() => handleOpenBook(book)}
                             >
-                              <h3 className="font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
-                                {book.title}
-                              </h3>
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="font-semibold truncate flex-1" style={{ color: 'var(--color-text-primary)' }}>
+                                  {book.title}
+                                </h3>
+                                {reviews.has(book.id) && (
+                                  <span
+                                    className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium flex-shrink-0"
+                                    style={{
+                                      backgroundColor: 'rgba(59,130,246,0.18)',
+                                      color: '#3b82f6'
+                                    }}
+                                  >
+                                    <PenTool className="w-3 h-3" />
+                                  </span>
+                                )}
+                              </div>
                               <p className="mt-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
                                 {book.type.toUpperCase()} • {book.totalPages ? `${book.totalPages} pages` : 'Text file'}
                               </p>
@@ -1773,6 +1894,30 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                           </div>
                           <div className="mt-4 flex items-center justify-between text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
                             <span>Saved {new Date(book.savedAt).toLocaleDateString()}</span>
+                            <div className="flex items-center gap-1">
+                              {reviews.has(book.id) && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    handleDownloadReview(book);
+                                  }}
+                                  className="rounded-xl p-1.5 transition-all"
+                                  style={{
+                                    color: '#3b82f6',
+                                    backgroundColor: 'rgba(59,130,246,0.12)'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.22)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.12)';
+                                  }}
+                                  title="Download Review"
+                                >
+                                  <Download className="w-3 h-3" />
+                                </button>
+                              )}
                             <button
                               onClick={() => handleRenameDocument(book)}
                               disabled={isRenaming}
@@ -1809,6 +1954,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                       >
                               <Trash2 className="w-4 h-4" />
                             </button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -1845,9 +1991,22 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                                 className="flex-1 cursor-pointer"
                                 onClick={() => handleOpenBook(book)}
                               >
-                                <h3 className="text-xl font-semibold leading-tight" style={{ color: 'var(--color-text-primary)' }}>
-                                  {book.title}
-                                </h3>
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h3 className="text-xl font-semibold leading-tight flex-1" style={{ color: 'var(--color-text-primary)' }}>
+                                    {book.title}
+                                  </h3>
+                                  {reviews.has(book.id) && (
+                                    <span
+                                      className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium flex-shrink-0"
+                                      style={{
+                                        backgroundColor: 'rgba(59,130,246,0.18)',
+                                        color: '#3b82f6'
+                                      }}
+                                    >
+                                      <PenTool className="w-3 h-3" /> Review
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="mt-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
                           {book.type.toUpperCase()} • {book.totalPages ? `${book.totalPages} pages` : 'Text file'}
                         </p>
@@ -1858,6 +2017,31 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                       </div>
                               <div className="flex items-center gap-2">
                                 {renderFavoriteButton(book)}
+                                {reviews.has(book.id) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      handleDownloadReview(book);
+                                    }}
+                                    className="rounded-xl px-3 py-2 text-xs font-medium transition-all"
+                                    style={{
+                                      color: '#3b82f6',
+                                      backgroundColor: 'rgba(59,130,246,0.12)',
+                                      border: '1px solid rgba(59,130,246,0.24)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.22)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.12)';
+                                    }}
+                                    title="Download Review"
+                                  >
+                                    <Download className="w-3 h-3 inline mr-1" />
+                                    Review
+                                  </button>
+                                )}
                       <button
                                   onClick={() => handleRenameDocument(book)}
                                   disabled={isRenaming}

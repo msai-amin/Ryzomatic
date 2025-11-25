@@ -54,8 +54,8 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     closeDocumentWithoutSaving,
     isEditorialMode,
     setEditorialMode,
-    setAudioWidgetPosition,
-    audioWidgetPosition
+    audioWidgetVisible,
+    setAudioWidgetVisible
   } = useAppStore()
 
   const [showSettings, setShowSettings] = useState(false)
@@ -235,7 +235,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                 <span>Library</span>
               </button>
               
-              {/* Navigation: Editorial */}
+              {/* Navigation: Peer Review */}
               {currentDocument && (
                 <button
                   onClick={() => setEditorialMode(!isEditorialMode)}
@@ -244,10 +244,10 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                     color: isEditorialMode ? 'var(--color-primary)' : 'var(--color-text-primary)',
                     backgroundColor: isEditorialMode ? 'var(--color-surface-hover)' : 'transparent',
                   }}
-                  aria-label="Toggle Editorial Mode"
+                  aria-label="Toggle Peer Review Mode"
                 >
                   <PenTool className="h-4 w-4" />
-                  <span>Editorial</span>
+                  <span>Peer Review</span>
                 </button>
               )}
             </nav>
@@ -256,40 +256,65 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
           <div className="flex flex-wrap items-center justify-end gap-4 sm:flex-nowrap">
             {/* Tools Group: Pomodoro + AI Assistant */}
             <div className="flex items-center gap-2">
-              {user && currentDocument && isTimerPristine && (
-                <div className="flex items-center gap-2">
-                    {isEditorialMode && (
-                        <Tooltip content="Audio Controls" position="bottom">
-                            <button
-                                onClick={() => setAudioWidgetPosition(audioWidgetPosition === 'hidden' ? 'header' : 'hidden')}
-                                className="rounded-lg p-2 transition-all duration-300"
-                                style={{ 
-                                    backgroundColor: 'transparent', 
-                                    border: '1px solid var(--color-border)',
-                                    color: 'var(--color-text-primary)'
-                                }}
-                                aria-label="Toggle Audio Controls"
-                            >
-                                <Volume2 className="h-5 w-5" />
-                            </button>
-                        </Tooltip>
-                    )}
-                    <Tooltip content="Start Pomodoro timer" position="bottom">
-                        <button
-                            data-tour="pomodoro-button"
-                            onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
-                            className="rounded-lg p-2 transition-all duration-300"
-                            style={{ 
-                                backgroundColor: 'transparent', 
-                                border: '1px solid var(--color-border)',
-                                fontSize: '1.35rem' 
-                            }}
-                            aria-label="Toggle Pomodoro timer"
-                        >
-                            🍅
-                        </button>
+              {user && currentDocument && (
+                <>
+                  {/* Audio Widget Toggle - Show when widget is closed */}
+                  {!audioWidgetVisible && !isEditorialMode && (
+                    <Tooltip content="Open Audio Widget" position="bottom">
+                      <button
+                        onClick={() => setAudioWidgetVisible(true)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all hover:bg-[var(--color-surface-hover)]"
+                        style={{ 
+                          backgroundColor: 'transparent', 
+                          border: '1px solid var(--color-border)',
+                          color: 'var(--color-text-primary)'
+                        }}
+                        aria-label="Open Audio Widget"
+                      >
+                        <Volume2 className="h-4 w-4 flex-shrink-0" />
+                        <span className="hidden sm:inline">Audio</span>
+                      </button>
                     </Tooltip>
-                </div>
+                  )}
+                  
+                  {/* Editorial Mode Audio Controls - Show reopen button when audio widget is closed */}
+                  {isEditorialMode && !audioWidgetVisible && (
+                    <Tooltip content="Open Audio Widget" position="bottom">
+                      <button
+                        onClick={() => setAudioWidgetVisible(true)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all hover:bg-[var(--color-surface-hover)]"
+                        style={{ 
+                          backgroundColor: 'transparent', 
+                          border: '1px solid var(--color-border)',
+                          color: 'var(--color-text-primary)'
+                        }}
+                        aria-label="Open Audio Widget"
+                      >
+                        <Volume2 className="h-4 w-4 flex-shrink-0" />
+                        <span className="hidden sm:inline">Audio</span>
+                      </button>
+                    </Tooltip>
+                  )}
+                </>
+              )}
+              
+              {user && currentDocument && isTimerPristine && (
+                <Tooltip content="Start Pomodoro timer" position="bottom">
+                  <button
+                    data-tour="pomodoro-button"
+                    onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
+                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all"
+                    style={{ 
+                      backgroundColor: 'transparent', 
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '1.35rem' 
+                    }}
+                    aria-label="Toggle Pomodoro timer"
+                  >
+                    🍅
+                  </button>
+                </Tooltip>
               )}
 
               <Tooltip content="Ask the AI Assistant" position="bottom">
