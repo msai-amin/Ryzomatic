@@ -194,11 +194,19 @@ interface AppState {
   isEditorialMode: boolean
   reviewCitations: string[]
   reviewContent: string
+  reviewFontFamily: string
+  reviewFontSize: number
+  reviewTheme: 'light' | 'dark'
   addReviewCitation: (citation: string) => void
   setReviewContent: (content: string) => void
+  setReviewFontFamily: (fontFamily: string) => void
+  setReviewFontSize: (fontSize: number) => void
+  setReviewTheme: (theme: 'light' | 'dark') => void
   isRightSidebarOpen: boolean
   audioWidgetPosition: 'default' | 'header' | 'hidden'
   setAudioWidgetPosition: (position: 'default' | 'header' | 'hidden') => void
+  audioWidgetVisible: boolean
+  setAudioWidgetVisible: (visible: boolean) => void
   rightSidebarTab: 'notes' | 'highlights'
   rightSidebarWidth: number
   chatWindowPosition: { top: number; left: number }
@@ -780,11 +788,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   
   reviewCitations: [],
   reviewContent: '',
+  reviewFontFamily: 'Times New Roman',
+  reviewFontSize: 12,
+  reviewTheme: 'dark',
   addReviewCitation: (citation) => set((state) => ({ reviewCitations: [...state.reviewCitations, citation] })),
   setReviewContent: (content) => set({ reviewContent: content }),
+  setReviewFontFamily: (fontFamily) => set({ reviewFontFamily: fontFamily }),
+  setReviewFontSize: (fontSize) => set({ reviewFontSize: fontSize }),
+  setReviewTheme: (theme) => set({ reviewTheme: theme }),
 
   audioWidgetPosition: 'default',
   setAudioWidgetPosition: (position) => set({ audioWidgetPosition: position }),
+  audioWidgetVisible: true,
+  setAudioWidgetVisible: (visible) => set({ audioWidgetVisible: visible }),
   
   setIsRightSidebarOpen: (open) => set(() => {
     if (typeof window !== 'undefined') {

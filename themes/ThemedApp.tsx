@@ -29,7 +29,8 @@ const ThemedAppContent: React.FC = () => {
     setNavRailExpanded,
     isChatOpen,
     openCustomReadingWizard,
-    isEditorialMode
+    isEditorialMode,
+    audioWidgetVisible
   } = useAppStore()
   const { showAchievement, AchievementToastContainer } = useAchievementToasts()
   
@@ -120,7 +121,7 @@ const ThemedAppContent: React.FC = () => {
       )}
       
       {/* AudioWidget - Persistent across re-renders, only visible when document is loaded */}
-      {currentDocument && !isEditorialMode && <AudioWidget />}
+      {currentDocument && !isEditorialMode && audioWidgetVisible && <AudioWidget />}
 
       {/* Pomodoro Bottom Bar - Visible when there is an active or paused session */}
       {user && currentDocument && hasActiveTimer && (

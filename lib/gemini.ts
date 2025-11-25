@@ -1,7 +1,20 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// Get API key from environment (works in both Node.js and Vite)
+const getApiKey = () => {
+  // Vite/browser environment
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || '';
+  }
+  // Node.js/server environment
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '';
+  }
+  return '';
+};
+
 // Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new GoogleGenerativeAI(getApiKey());
 
 // Model configuration based on tier
 const MODEL_CONFIG = {

@@ -2,17 +2,116 @@ import React, { useEffect, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Bold, Italic, List, ListOrdered, Quote, LayoutTemplate, Sun, Moon, Sparkles, Loader2, Download } from 'lucide-react'
+import { Bold, Italic, List, ListOrdered, Quote, LayoutTemplate, Sun, Moon, Sparkles, Loader2, Download, Type } from 'lucide-react'
 import { autoReviewService } from '../../services/ai/autoReviewService'
+import { peerReviewService } from '../../services/peerReviewService'
 import { useAppStore } from '../../store/appStore'
 import { asBlob } from 'html-docx-js-typescript'
 import { saveAs } from 'file-saver'
 
+const FONT_FAMILIES = [
+  'Times New Roman',
+  'Arial',
+  'Helvetica',
+  'Georgia',
+  'Courier New',
+  'Verdana',
+  'Calibri',
+  'Garamond',
+] as const
+
+const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24] as const
+
+const TEMPLATES = {
+  standard: {
+    label: 'Standard Review',
+    content: `
+      <h3>Summary</h3>
+      <p>Provide a concise summary of the paper's main contribution, methodology, and key findings.</p>
+      
+      <h3>General Assessment</h3>
+      <p>Offer a high-level evaluation of the paper's overall quality, significance, novelty, and potential impact.</p>
+      
+      <h3>Major Points</h3>
+      <ul>
+        <li>Identify critical issues that must be addressed for the paper to be acceptable.</li>
+        <li>Provide specific references to sections, figures, or tables where applicable.</li>
+      </ul>
+      
+      <h3>Minor Points</h3>
+      <ul>
+        <li>List smaller issues that would improve clarity, presentation, or robustness.</li>
+        <li>Include typos, grammatical errors, or suggestions for improved phrasing.</li>
+      </ul>
+      
+      <h3>Recommendation</h3>
+      <p>State your recommendation: Accept, Minor Revisions, Major Revisions, or Reject.</p>
+    `,
+  },
+  neurips: {
+    label: 'NeurIPS Style',
+    content: `
+      <h3>Summary</h3>
+      <p>Brief summary of the paper's contribution.</p>
+      
+      <h3>Strengths</h3>
+      <ul>
+        <li>List the main strengths of the paper.</li>
+      </ul>
+      
+      <h3>Weaknesses</h3>
+      <ul>
+        <li>Identify areas where the paper could be improved.</li>
+      </ul>
+      
+      <h3>Questions for Authors</h3>
+      <ul>
+        <li>Pose specific questions for clarification during the rebuttal phase.</li>
+      </ul>
+      
+      <h3>Rating</h3>
+      <p>Overall rating and recommendation.</p>
+    `,
+  },
+  medical: {
+    label: 'Medical Journal',
+    content: `
+      <h3>Summary</h3>
+      <p>Summarize the research question, methods, results, and conclusions.</p>
+      
+      <h3>Methodology</h3>
+      <p>Evaluate the study design, sample size, statistical methods, and potential biases.</p>
+      
+      <h3>Results</h3>
+      <p>Assess the presentation and interpretation of results, including figures and tables.</p>
+      
+      <h3>Discussion</h3>
+      <p>Evaluate the discussion of limitations, clinical significance, and future directions.</p>
+      
+      <h3>Recommendation</h3>
+      <p>Accept, Minor Revisions, Major Revisions, or Reject.</p>
+    `,
+  },
+} as const
+
 export const ReviewPanel: React.FC = () => {
-  const { reviewCitations, reviewContent, setReviewContent, currentDocument, user } = useAppStore()
+  const { 
+    reviewCitations, 
+    reviewContent, 
+    setReviewContent,
+    reviewFontFamily,
+    reviewFontSize,
+    reviewTheme,
+    setReviewFontFamily,
+    setReviewFontSize,
+    setReviewTheme,
+    currentDocument, 
+    user 
+  } = useAppStore()
   const [showTemplates, setShowTemplates] = useState(false)
-  const [editorTheme, setEditorTheme] = useState<'light' | 'dark'>('dark')
   const [isAutoReviewing, setIsAutoReviewing] = useState(false)
+  const [showFontMenu, setShowFontMenu] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   const editor = useEditor({
     extensions: [
@@ -28,11 +127,21 @@ export const ReviewPanel: React.FC = () => {
     editorProps: {
       attributes: {
         class: `prose max-w-none focus:outline-none min-h-[200px] ${
-          editorTheme === 'dark' ? 'prose-invert' : ''
+          reviewTheme === 'dark' ? 'prose-invert' : ''
         }`,
+        style: `font-family: ${reviewFontFamily}; font-size: ${reviewFontSize}pt;`,
       },
     },
   })
+
+  // Update editor style when font settings change
+  useEffect(() => {
+    if (editor?.view?.dom) {
+      const editorElement = editor.view.dom as HTMLElement
+      editorElement.style.fontFamily = reviewFontFamily
+      editorElement.style.fontSize = `${reviewFontSize}pt`
+    }
+  }, [editor, reviewFontFamily, reviewFontSize])
 
   // Auto-Review Function
   const handleAutoReview = async () => {
@@ -48,27 +157,47 @@ export const ReviewPanel: React.FC = () => {
     setIsAutoReviewing(true)
     
     try {
-        // Generate review using Gemini
-        const reviewHtml = await autoReviewService.generateAutoReview(currentDocument.id, user.id)
+        console.log('🔍 Auto Review: Starting', { documentId: currentDocument.id, userId: user.id })
         
+        // Generate review using Gemini (with fallback to in-memory pageTexts)
+        const reviewHtml = await autoReviewService.generateAutoReview(
+            currentDocument.id, 
+            user.id,
+            currentDocument.pageTexts // Fallback if DB fetch fails
+        )
+        
+        if (!reviewHtml) {
+            throw new Error('AI returned empty review')
+        }
+        
+        console.log('✅ Auto Review: Success', { reviewLength: reviewHtml.length })
         editor?.commands.setContent(reviewHtml)
         setReviewContent(reviewHtml)
-    } catch (error) {
-        console.error('Auto-review failed:', error)
-        alert('Failed to generate review. Please ensure the document has text content.')
+    } catch (error: any) {
+        console.error('❌ Auto-review failed:', error)
+        const errorMessage = error?.message || 'Unknown error occurred'
+        alert(`Failed to generate review: ${errorMessage}\n\nCheck console for details.`)
     } finally {
         setIsAutoReviewing(false)
     }
   }
 
-  // Download as DOCX
+  // Download as DOCX and submit review
   const handleDownloadReview = async () => {
     if (!reviewContent) {
         alert('Review content is empty.')
         return
     }
 
+    if (!currentDocument?.id || !user?.id) {
+        alert('Document or user information missing.')
+        return
+    }
+
     try {
+        // Submit review to database
+        await peerReviewService.submitReview(currentDocument.id, user.id)
+
         const htmlString = `
             <!DOCTYPE html>
             <html lang="en">
@@ -76,8 +205,8 @@ export const ReviewPanel: React.FC = () => {
                 <meta charset="UTF-8">
                 <title>Referee Report</title>
                 <style>
-                    body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; }
-                    h3 { font-size: 14pt; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; }
+                    body { font-family: '${reviewFontFamily}', serif; font-size: ${reviewFontSize}pt; line-height: 1.5; }
+                    h3 { font-size: ${reviewFontSize + 2}pt; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; }
                     p { margin-bottom: 1em; }
                     ul, ol { margin-bottom: 1em; margin-left: 1.5em; }
                     li { margin-bottom: 0.5em; }
@@ -87,6 +216,7 @@ export const ReviewPanel: React.FC = () => {
                 <h2>Referee Report</h2>
                 <p><strong>Document:</strong> ${currentDocument?.name || 'Untitled'}</p>
                 <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+                <p><strong>Reviewer:</strong> ${user?.full_name || user?.email || 'Anonymous'}</p>
                 <hr/>
                 ${reviewContent}
             </body>
@@ -102,6 +232,52 @@ export const ReviewPanel: React.FC = () => {
         alert('Failed to generate DOCX file.')
     }
   }
+
+  // Load review from database on mount
+  useEffect(() => {
+    if (currentDocument?.id && user?.id) {
+      peerReviewService.loadReview(currentDocument.id, user.id).then((review) => {
+        if (review && editor) {
+          setReviewContent(review.review_content)
+          setReviewFontFamily(review.font_family)
+          setReviewFontSize(review.font_size)
+          setReviewTheme(review.theme)
+          editor.commands.setContent(review.review_content)
+        }
+      }).catch((error) => {
+        console.error('Failed to load review:', error)
+      })
+    }
+  }, [currentDocument?.id, user?.id, editor])
+
+  // Auto-save review to database
+  useEffect(() => {
+    if (!currentDocument?.id || !user?.id || !reviewContent) return
+
+    const saveTimeout = setTimeout(async () => {
+      setIsSaving(true)
+      try {
+        await peerReviewService.saveReview(
+          currentDocument.id,
+          user.id,
+          {
+            review_content: reviewContent,
+            citations: reviewCitations,
+            font_family: reviewFontFamily,
+            font_size: reviewFontSize,
+            theme: reviewTheme,
+            status: 'draft',
+          }
+        )
+      } catch (error) {
+        console.error('Failed to auto-save review:', error)
+      } finally {
+        setIsSaving(false)
+      }
+    }, 2000) // Debounce: save 2 seconds after last change
+
+    return () => clearTimeout(saveTimeout)
+  }, [reviewContent, reviewCitations, reviewFontFamily, reviewFontSize, reviewTheme, currentDocument?.id, user?.id])
 
   // Sync content if store changes externally (optional safety)
   useEffect(() => {
@@ -155,13 +331,64 @@ export const ReviewPanel: React.FC = () => {
           </button>
           <div className="w-px bg-[var(--color-border)] mx-1 my-1" />
           
+          {/* Font Controls */}
+          <div className="relative">
+            <button
+              onClick={() => setShowFontMenu(!showFontMenu)}
+              className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors text-[var(--color-text-secondary)]`}
+              title="Font Settings"
+            >
+              <Type size={16} />
+            </button>
+            {showFontMenu && (
+              <div className="absolute right-0 top-full mt-2 w-56 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl z-50 p-3">
+                <div className="mb-3">
+                  <label className="text-xs font-medium text-[var(--color-text-secondary)] mb-1 block">Font Family</label>
+                  <select
+                    value={reviewFontFamily}
+                    onChange={(e) => {
+                      setReviewFontFamily(e.target.value)
+                      setShowFontMenu(false)
+                    }}
+                    className="w-full px-2 py-1.5 text-sm rounded border border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  >
+                    {FONT_FAMILIES.map((font) => (
+                      <option key={font} value={font} style={{ fontFamily: font }}>
+                        {font}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-[var(--color-text-secondary)] mb-1 block">Font Size</label>
+                  <select
+                    value={reviewFontSize}
+                    onChange={(e) => {
+                      setReviewFontSize(Number(e.target.value))
+                      setShowFontMenu(false)
+                    }}
+                    className="w-full px-2 py-1.5 text-sm rounded border border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  >
+                    {FONT_SIZES.map((size) => (
+                      <option key={size} value={size}>
+                        {size}pt
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="w-px bg-[var(--color-border)] mx-1 my-1" />
+          
           {/* Theme Toggle */}
           <button
-            onClick={() => setEditorTheme(editorTheme === 'dark' ? 'light' : 'dark')}
+            onClick={() => setReviewTheme(reviewTheme === 'dark' ? 'light' : 'dark')}
             className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors text-[var(--color-text-secondary)]`}
-            title={`Switch to ${editorTheme === 'dark' ? 'Light' : 'Dark'} Mode`}
+            title={`Switch to ${reviewTheme === 'dark' ? 'Light' : 'Dark'} Mode`}
           >
-            {editorTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            {reviewTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
           <div className="w-px bg-[var(--color-border)] mx-1 my-1" />
@@ -215,13 +442,14 @@ export const ReviewPanel: React.FC = () => {
       <div className="flex-1 p-6 overflow-y-auto">
         {/* Editor */}
         <div className="mb-8">
-            <h3 className="text-[var(--color-text-primary)] mb-4 font-medium">General Comments</h3>
+            <h3 className="text-[var(--color-text-primary)] mb-4 font-medium">Review and Comments</h3>
             <div 
-              className={`min-h-[300px] p-4 rounded-lg border border-[var(--color-border)] transition-colors duration-200 ${
-                editorTheme === 'dark' 
+              className={`min-h-[300px] max-h-[600px] p-4 rounded-lg border border-[var(--color-border)] transition-colors duration-200 overflow-y-auto ${
+                reviewTheme === 'dark' 
                   ? 'bg-[var(--color-background)] text-[var(--color-text-primary)]' 
                   : 'bg-white text-gray-900'
               }`}
+              style={{ fontFamily: reviewFontFamily, fontSize: `${reviewFontSize}pt` }}
             >
                 <EditorContent editor={editor} />
             </div>
@@ -255,8 +483,8 @@ export const ReviewPanel: React.FC = () => {
       <div className="p-4 border-t border-[var(--color-border)] bg-[var(--color-background-secondary)]">
         <div className="flex justify-between items-center">
           <span className="text-xs text-[var(--color-text-tertiary)] flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-            Auto-saved just now
+            <div className={`w-2 h-2 rounded-full ${isSaving ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`}></div>
+            {isSaving ? 'Saving...' : 'Auto-saved'}
           </span>
           <button 
             onClick={handleDownloadReview}

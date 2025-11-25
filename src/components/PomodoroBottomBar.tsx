@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Play, Pause, Square, Settings, ChevronUp, ChevronDown, Timer } from 'lucide-react'
+import { Play, Pause, Square, Settings, ChevronUp, ChevronDown, Timer, X } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { Tooltip } from './Tooltip'
 import { timerService, TimerState } from '../services/timerService'
@@ -77,6 +77,10 @@ export const PomodoroBottomBar: React.FC<PomodoroBottomBarProps> = ({ onExpand }
   }
 
   const handleStop = () => {
+    timerService.resetTimer(user.id)
+  }
+
+  const handleClose = () => {
     timerService.resetTimer(user.id)
   }
 
@@ -238,6 +242,28 @@ export const PomodoroBottomBar: React.FC<PomodoroBottomBarProps> = ({ onExpand }
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface)'}
             >
               <ChevronDown className="w-4 h-4" />
+            </button>
+          </Tooltip>
+
+          <Tooltip content="Close Timer" position="top">
+            <button
+              onClick={handleClose}
+              className="p-2 rounded-lg transition-colors"
+              style={{
+                backgroundColor: 'var(--color-surface)',
+                color: 'var(--color-text-primary)',
+                border: '1px solid var(--color-border)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'
+                e.currentTarget.style.color = '#ef4444'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-surface)'
+                e.currentTarget.style.color = 'var(--color-text-primary)'
+              }}
+            >
+              <X className="w-4 h-4" />
             </button>
           </Tooltip>
         </div>
