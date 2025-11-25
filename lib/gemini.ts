@@ -51,6 +51,12 @@ export class GeminiService {
    */
   async generateContent(content: string, systemPrompt?: string, tier: string = 'free'): Promise<string | null> {
     try {
+      const apiKey = getApiKey();
+      if (!apiKey || apiKey.trim().length === 0) {
+        console.error('Gemini API key is not configured');
+        throw new Error('Gemini API key is not configured. Please set VITE_GEMINI_API_KEY or GEMINI_API_KEY environment variable.');
+      }
+
       const model = this.getModel(tier);
       const config = this.getGenerationConfig(tier);
 
@@ -67,10 +73,64 @@ export class GeminiService {
       });
 
       const response = result.response;
-      return response.text();
-    } catch (error) {
+      
+      // Check for safety blocks before getting text
+      const candidates = response.candidates || [];
+      if (candidates.length === 0) {
+        throw new Error('No response candidates returned from Gemini API. This may indicate a safety filter block or API error.');
+      }
+      
+      const candidate = candidates[0];
+      if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+        const reason = candidate.finishReason;
+        if (reason === 'SAFETY') {
+          throw new Error('Content was blocked by safety filters. The document content may have triggered content safety policies.');
+        }
+        if (reason === 'RECITATION') {
+          throw new Error('Content was blocked due to recitation concerns. The document may contain copyrighted material.');
+        }
+        if (reason === 'MAX_TOKENS') {
+          throw new Error('Response exceeded maximum token limit. Try reducing the document content length.');
+        }
+        throw new Error(`Generation stopped unexpectedly. Finish reason: ${reason}`);
+      }
+      
+      const text = response.text();
+      
+      // Check if response was blocked by safety filters
+      if (!text || text.trim().length === 0) {
+        const finishReason = response.candidates?.[0]?.finishReason;
+        if (finishReason === 'SAFETY') {
+          throw new Error('Content was blocked by safety filters. Please try with different content.');
+        }
+        if (finishReason === 'RECITATION') {
+          throw new Error('Content was blocked due to recitation concerns.');
+        }
+        if (finishReason && finishReason !== 'STOP') {
+          throw new Error(`Generation stopped unexpectedly. Reason: ${finishReason}`);
+        }
+        throw new Error('Empty response from Gemini API');
+      }
+      
+      return text;
+    } catch (error: any) {
       console.error('Gemini generateContent error:', error);
-      return null;
+      
+      // Provide more specific error messages
+      if (error?.message?.includes('API key')) {
+        throw new Error('Gemini API key is not configured or invalid. Please check your environment variables.');
+      }
+      if (error?.status === 429) {
+        throw new Error('Gemini API quota exceeded. Please try again later.');
+      }
+      if (error?.status === 403) {
+        throw new Error('Gemini API access denied. Please check your API key permissions.');
+      }
+      if (error?.message) {
+        throw new Error(`Gemini API error: ${error.message}`);
+      }
+      
+      throw new Error(`Failed to generate content: ${error?.toString() || 'Unknown error'}`);
     }
   }
 

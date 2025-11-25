@@ -37,11 +37,11 @@ export class AutoReviewService {
         AUTO_REVIEW_SYSTEM_PROMPT
       );
 
-      if (!review) {
-        throw new Error('AI failed to generate a review.');
+      if (!review || review.trim().length === 0) {
+        throw new Error('AI returned an empty review. This may be due to content safety filters or API configuration issues.');
       }
 
-      logger.info('Auto Review generated successfully', { documentId });
+      logger.info('Auto Review generated successfully', { documentId, reviewLength: review.length });
       return review;
 
     } catch (error) {
