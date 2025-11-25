@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Bold, Italic, List, ListOrdered, Quote, LayoutTemplate, Sun, Moon } from 'lucide-react'
+import { Bold, Italic, List, ListOrdered, Quote, LayoutTemplate, Sun, Moon, Sparkles, Loader2 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 
 type ReviewTemplate = 'standard' | 'neurips' | 'medical' | 'reject'
@@ -76,9 +76,10 @@ const TEMPLATES: Record<ReviewTemplate, { label: string; content: string }> = {
 }
 
 export const ReviewPanel: React.FC = () => {
-  const { reviewCitations, reviewContent, setReviewContent } = useAppStore()
+  const { reviewCitations, reviewContent, setReviewContent, currentDocument } = useAppStore()
   const [showTemplates, setShowTemplates] = useState(false)
   const [editorTheme, setEditorTheme] = useState<'light' | 'dark'>('dark')
+  const [isAutoReviewing, setIsAutoReviewing] = useState(false)
 
   const editor = useEditor({
     extensions: [
@@ -99,6 +100,45 @@ export const ReviewPanel: React.FC = () => {
       },
     },
   })
+
+  // Mock Auto-Review Function (Replace with real AI call later)
+  const handleAutoReview = async () => {
+    if (!currentDocument) return
+    
+    if (!editor?.isEmpty && !window.confirm('This will replace current content with an AI-generated review. Continue?')) {
+        return
+    }
+
+    setIsAutoReviewing(true)
+    
+    try {
+        // TODO: Replace with actual LLM call using AUTO_REVIEW_SYSTEM_PROMPT
+        // For now, simulate network delay and return mock content
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        
+        const mockReview = `
+            <h3>AI-Generated Review (Draft)</h3>
+            <p><strong>Summary:</strong> This paper presents a novel approach to... [AI would fill this based on document content]</p>
+            <h3>Strengths</h3>
+            <ul>
+                <li>Strong theoretical foundation.</li>
+                <li>Comprehensive dataset.</li>
+            </ul>
+            <h3>Weaknesses</h3>
+            <ul>
+                <li>Experimental baselines are missing.</li>
+            </ul>
+            <p><em>(This is a placeholder. Connect to LLM service to generate real reviews.)</em></p>
+        `
+        editor?.commands.setContent(mockReview)
+        setReviewContent(mockReview)
+    } catch (error) {
+        console.error('Auto-review failed:', error)
+        alert('Failed to generate review.')
+    } finally {
+        setIsAutoReviewing(false)
+    }
+  }
 
   // Sync content if store changes externally (optional safety)
   useEffect(() => {
@@ -159,6 +199,18 @@ export const ReviewPanel: React.FC = () => {
             title={`Switch to ${editorTheme === 'dark' ? 'Light' : 'Dark'} Mode`}
           >
             {editorTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+
+          <div className="w-px bg-[var(--color-border)] mx-1 my-1" />
+          
+          {/* Auto Review Button */}
+          <button
+            onClick={handleAutoReview}
+            disabled={isAutoReviewing}
+            className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors ${isAutoReviewing ? 'opacity-50 cursor-not-allowed' : 'text-[var(--color-primary)]'}`}
+            title="Generate Auto Review (AI)"
+          >
+            {isAutoReviewing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
           </button>
 
           <div className="w-px bg-[var(--color-border)] mx-1 my-1" />
