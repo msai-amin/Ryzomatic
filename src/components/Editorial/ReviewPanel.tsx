@@ -221,7 +221,10 @@ export const ReviewPanel: React.FC = () => {
           if (node.nodeType === Node.TEXT_NODE) {
             const text = (node.textContent || '').trim()
             if (text) {
-              paragraphs.push(new Paragraph({ text, spacing: { after: 200 } }))
+              paragraphs.push(new Paragraph({ 
+                children: [new TextRun({ text, color: "000000" })],
+                spacing: { after: 200 } 
+              }))
             }
             return paragraphs
           }
@@ -233,32 +236,48 @@ export const ReviewPanel: React.FC = () => {
             
             switch (tagName) {
               case 'h1':
-                return [new Paragraph({ text, heading: HeadingLevel.HEADING_1, spacing: { after: 200 } })]
+                return [new Paragraph({ 
+                  children: [new TextRun({ text, color: "000000" })],
+                  heading: HeadingLevel.HEADING_1, 
+                  spacing: { after: 200 } 
+                })]
               case 'h2':
-                return [new Paragraph({ text, heading: HeadingLevel.HEADING_2, spacing: { after: 200 } })]
+                return [new Paragraph({ 
+                  children: [new TextRun({ text, color: "000000" })],
+                  heading: HeadingLevel.HEADING_2, 
+                  spacing: { after: 200 } 
+                })]
               case 'h3':
-                return [new Paragraph({ text, heading: HeadingLevel.HEADING_3, spacing: { after: 200 } })]
+                return [new Paragraph({ 
+                  children: [new TextRun({ text, color: "000000" })],
+                  heading: HeadingLevel.HEADING_3, 
+                  spacing: { after: 200 } 
+                })]
               case 'h4':
               case 'h5':
               case 'h6':
-                return [new Paragraph({ text, heading: HeadingLevel.HEADING_4, spacing: { after: 200 } })]
+                return [new Paragraph({ 
+                  children: [new TextRun({ text, color: "000000" })],
+                  heading: HeadingLevel.HEADING_4, 
+                  spacing: { after: 200 } 
+                })]
               case 'p':
                 // Handle formatting within paragraphs
                 const runs: TextRun[] = []
                 const processNode = (n: Node) => {
                   if (n.nodeType === Node.TEXT_NODE) {
                     const t = n.textContent || ''
-                    if (t.trim()) runs.push(new TextRun(t))
+                    if (t.trim()) runs.push(new TextRun({ text: t, color: "000000" }))
                   } else if (n.nodeType === Node.ELEMENT_NODE) {
                     const e = n as Element
                     const tag = e.tagName.toLowerCase()
                     const content = e.textContent || ''
                     if (tag === 'strong' || tag === 'b') {
-                      runs.push(new TextRun({ text: content, bold: true }))
+                      runs.push(new TextRun({ text: content, bold: true, color: "000000" }))
                     } else if (tag === 'em' || tag === 'i') {
-                      runs.push(new TextRun({ text: content, italics: true }))
+                      runs.push(new TextRun({ text: content, italics: true, color: "000000" }))
                     } else if (tag === 'u') {
-                      runs.push(new TextRun({ text: content, underline: {} }))
+                      runs.push(new TextRun({ text: content, underline: {}, color: "000000" }))
                     } else {
                       Array.from(e.childNodes).forEach(processNode)
                     }
@@ -268,20 +287,27 @@ export const ReviewPanel: React.FC = () => {
                 if (runs.length > 0) {
                   return [new Paragraph({ children: runs, spacing: { after: 200 } })]
                 }
-                return [new Paragraph({ text, spacing: { after: 200 } })]
+                return [new Paragraph({ 
+                  children: [new TextRun({ text, color: "000000" })],
+                  spacing: { after: 200 } 
+                })]
               case 'ul':
               case 'ol':
                 const items: Paragraph[] = []
                 el.querySelectorAll('li').forEach(li => {
                   items.push(new Paragraph({ 
-                    text: li.textContent || '', 
+                    children: [new TextRun({ text: li.textContent || '', color: "000000" })],
                     bullet: { level: 0 },
                     spacing: { after: 100 }
                   }))
                 })
                 return items
               case 'li':
-                return [new Paragraph({ text, bullet: { level: 0 }, spacing: { after: 100 } })]
+                return [new Paragraph({ 
+                  children: [new TextRun({ text, color: "000000" })],
+                  bullet: { level: 0 }, 
+                  spacing: { after: 100 } 
+                })]
               case 'br':
                 return [new Paragraph({ text: '' })]
               case 'div':
@@ -294,7 +320,10 @@ export const ReviewPanel: React.FC = () => {
               default:
                 // For other tags, just get text content
                 if (text.trim()) {
-                  return [new Paragraph({ text, spacing: { after: 200 } })]
+                  return [new Paragraph({ 
+                    children: [new TextRun({ text, color: "000000" })],
+                    spacing: { after: 200 } 
+                  })]
                 }
                 return []
             }
@@ -311,7 +340,10 @@ export const ReviewPanel: React.FC = () => {
         
         // If no paragraphs, create one from text
         if (contentParagraphs.length === 0) {
-          contentParagraphs.push(new Paragraph({ text: textContent, spacing: { after: 200 } }))
+          contentParagraphs.push(new Paragraph({ 
+            children: [new TextRun({ text: textContent, color: "000000" })],
+            spacing: { after: 200 } 
+          }))
         }
 
         // Create document
@@ -324,33 +356,33 @@ export const ReviewPanel: React.FC = () => {
             properties: {},
             children: [
               new Paragraph({
-                text: 'Referee Report',
+                children: [new TextRun({ text: 'Referee Report', color: "000000" })],
                 heading: HeadingLevel.HEADING_1,
                 spacing: { after: 400 }
               }),
               new Paragraph({
                 children: [
-                  new TextRun({ text: 'Document: ', bold: true }),
-                  new TextRun({ text: docName })
+                  new TextRun({ text: 'Document: ', bold: true, color: "000000" }),
+                  new TextRun({ text: docName, color: "000000" })
                 ],
                 spacing: { after: 200 }
               }),
               new Paragraph({
                 children: [
-                  new TextRun({ text: 'Date: ', bold: true }),
-                  new TextRun({ text: reportDate })
+                  new TextRun({ text: 'Date: ', bold: true, color: "000000" }),
+                  new TextRun({ text: reportDate, color: "000000" })
                 ],
                 spacing: { after: 200 }
               }),
               new Paragraph({
                 children: [
-                  new TextRun({ text: 'Reviewer: ', bold: true }),
-                  new TextRun({ text: reviewerName })
+                  new TextRun({ text: 'Reviewer: ', bold: true, color: "000000" }),
+                  new TextRun({ text: reviewerName, color: "000000" })
                 ],
                 spacing: { after: 400 }
               }),
               new Paragraph({
-                text: '─────────────────────────────────────────',
+                children: [new TextRun({ text: '─────────────────────────────────────────', color: "000000" })],
                 spacing: { after: 400 }
               }),
               ...contentParagraphs
@@ -362,6 +394,7 @@ export const ReviewPanel: React.FC = () => {
                 run: {
                   font: reviewFontFamily,
                   size: reviewFontSize * 2, // docx uses half-points
+                  color: "000000", // Default black color
                 },
               },
             },
