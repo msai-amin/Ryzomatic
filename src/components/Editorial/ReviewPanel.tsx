@@ -152,61 +152,14 @@ export const ReviewPanel: React.FC = () => {
           </button>
           <div className="w-px bg-[var(--color-border)] mx-1 my-1" />
           
-          {/* Text Color */}
-          <div className="relative group">
-            <button
-                className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors text-[var(--color-text-secondary)]`}
-                title="Text Color"
-            >
-                <Palette size={16} />
-            </button>
-            <div className="absolute top-full left-0 mt-1 p-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-xl flex gap-1 z-50 hidden group-hover:flex">
-                {['#000000', '#4b5563', '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'].map(color => (
-                    <button
-                        key={color}
-                        onClick={() => editor.chain().focus().setColor(color).run()}
-                        className="w-6 h-6 rounded-full border border-gray-200"
-                        style={{ backgroundColor: color }}
-                        title={color}
-                    />
-                ))}
-                <button
-                    onClick={() => editor.chain().focus().unsetColor().run()}
-                    className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center text-xs bg-white text-black"
-                    title="Reset Color"
-                >
-                    X
-                </button>
-            </div>
-          </div>
-
-          {/* Highlight Color */}
-          <div className="relative group">
-            <button
-                className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors ${editor.isActive('highlight') ? 'text-[var(--color-primary)] bg-[var(--color-background)]' : 'text-[var(--color-text-secondary)]'}`}
-                title="Highlight"
-            >
-                <Highlighter size={16} />
-            </button>
-            <div className="absolute top-full left-0 mt-1 p-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-xl flex gap-1 z-50 hidden group-hover:flex">
-                {['#fef08a', '#bbf7d0', '#bfdbfe', '#fecaca', '#e9d5ff'].map(color => (
-                    <button
-                        key={color}
-                        onClick={() => editor.chain().focus().toggleHighlight({ color }).run()}
-                        className="w-6 h-6 rounded-full border border-gray-200"
-                        style={{ backgroundColor: color }}
-                        title={color}
-                    />
-                ))}
-                <button
-                    onClick={() => editor.chain().focus().unsetHighlight().run()}
-                    className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center text-xs bg-white text-black"
-                    title="Remove Highlight"
-                >
-                    X
-                </button>
-            </div>
-          </div>
+          {/* Theme Toggle */}
+          <button
+            onClick={() => setEditorTheme(editorTheme === 'dark' ? 'light' : 'dark')}
+            className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors text-[var(--color-text-secondary)]`}
+            title={`Switch to ${editorTheme === 'dark' ? 'Light' : 'Dark'} Mode`}
+          >
+            {editorTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
 
           <div className="w-px bg-[var(--color-border)] mx-1 my-1" />
           <div className="relative">
