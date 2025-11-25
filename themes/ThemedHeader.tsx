@@ -245,6 +245,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                     backgroundColor: isEditorialMode ? 'var(--color-surface-hover)' : 'transparent',
                   }}
                   aria-label="Toggle Peer Review Mode"
+                  title="Open Peer Review Panel"
                 >
                   <PenTool className="h-4 w-4" />
                   <span>Peer Review</span>
