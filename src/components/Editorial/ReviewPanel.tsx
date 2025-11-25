@@ -2,8 +2,11 @@ import React, { useEffect, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Bold, Italic, List, ListOrdered, Quote, LayoutTemplate, Sun, Moon, Sparkles, Loader2 } from 'lucide-react'
+import { Bold, Italic, List, ListOrdered, Quote, LayoutTemplate, Sun, Moon, Sparkles, Loader2, Download } from 'lucide-react'
 import { autoReviewService } from '../../services/ai/autoReviewService'
+import { useAppStore } from '../../store/appStore'
+import { asBlob } from 'html-docx-js-typescript'
+import { saveAs } from 'file-saver'
 
 export const ReviewPanel: React.FC = () => {
   const { reviewCitations, reviewContent, setReviewContent, currentDocument, user } = useAppStore()
@@ -55,6 +58,48 @@ export const ReviewPanel: React.FC = () => {
         alert('Failed to generate review. Please ensure the document has text content.')
     } finally {
         setIsAutoReviewing(false)
+    }
+  }
+
+  // Download as DOCX
+  const handleDownloadReview = async () => {
+    if (!reviewContent) {
+        alert('Review content is empty.')
+        return
+    }
+
+    try {
+        const htmlString = `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <title>Referee Report</title>
+                <style>
+                    body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; }
+                    h3 { font-size: 14pt; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; }
+                    p { margin-bottom: 1em; }
+                    ul, ol { margin-bottom: 1em; margin-left: 1.5em; }
+                    li { margin-bottom: 0.5em; }
+                </style>
+            </head>
+            <body>
+                <h2>Referee Report</h2>
+                <p><strong>Document:</strong> ${currentDocument?.name || 'Untitled'}</p>
+                <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+                <hr/>
+                ${reviewContent}
+            </body>
+            </html>
+        `
+
+        // @ts-ignore: asBlob type definition mismatch
+        const blob = await asBlob(htmlString)
+        saveAs(blob as Blob, `Referee_Report_${currentDocument?.name || 'draft'}.docx`)
+        
+    } catch (error) {
+        console.error('DOCX generation failed:', error)
+        alert('Failed to generate DOCX file.')
     }
   }
 
@@ -213,7 +258,11 @@ export const ReviewPanel: React.FC = () => {
             <div className="w-2 h-2 rounded-full bg-green-500"></div>
             Auto-saved just now
           </span>
-          <button className="px-4 py-2 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-hover)] font-medium shadow-lg shadow-[var(--color-primary)]/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
+          <button 
+            onClick={handleDownloadReview}
+            className="px-4 py-2 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-hover)] font-medium shadow-lg shadow-[var(--color-primary)]/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2"
+          >
+            <Download size={16} />
             Submit Review
           </button>
         </div>
