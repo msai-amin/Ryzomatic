@@ -203,8 +203,6 @@ interface AppState {
   setReviewFontSize: (fontSize: number) => void
   setReviewTheme: (theme: 'light' | 'dark') => void
   isRightSidebarOpen: boolean
-  audioWidgetPosition: 'default' | 'header' | 'hidden'
-  setAudioWidgetPosition: (position: 'default' | 'header' | 'hidden') => void
   audioWidgetVisible: boolean
   setAudioWidgetVisible: (visible: boolean) => void
   rightSidebarTab: 'notes' | 'highlights'
@@ -797,8 +795,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   setReviewFontSize: (fontSize) => set({ reviewFontSize: fontSize }),
   setReviewTheme: (theme) => set({ reviewTheme: theme }),
 
-  audioWidgetPosition: 'default',
-  setAudioWidgetPosition: (position) => set({ audioWidgetPosition: position }),
   audioWidgetVisible: true,
   setAudioWidgetVisible: (visible) => set({ audioWidgetVisible: visible }),
   

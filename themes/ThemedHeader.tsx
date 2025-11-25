@@ -54,8 +54,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     closeDocumentWithoutSaving,
     isEditorialMode,
     setEditorialMode,
-    setAudioWidgetPosition,
-    audioWidgetPosition,
     audioWidgetVisible,
     setAudioWidgetVisible
   } = useAppStore()
