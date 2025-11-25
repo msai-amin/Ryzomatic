@@ -367,31 +367,43 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       // Filter books based on whether we're viewing Trash or not
       let filteredBooks = supabaseBooks;
       if (trashCollectionId) {
-        // Get all book_collections for these books
-        const bookIds = supabaseBooks.map(b => b.id);
-        if (bookIds.length > 0) {
+        if (isViewingTrash) {
+          // When viewing Trash, query for books that are in Trash collection
           const { data: bookCollections } = await supabase
             .from('book_collections')
-            .select('book_id, collection_id')
-            .in('book_id', bookIds);
+            .select('book_id')
+            .eq('collection_id', trashCollectionId);
           
-          // Create a set of book IDs that are in Trash
-          const booksInTrash = new Set(
-            (bookCollections || [])
-              .filter(bc => bc.collection_id === trashCollectionId)
-              .map(bc => bc.book_id)
-          );
+          const trashBookIds = new Set((bookCollections || []).map(bc => bc.book_id));
           
-          if (isViewingTrash) {
-            // When viewing Trash, only show books that are in Trash
-            filteredBooks = supabaseBooks.filter(book => booksInTrash.has(book.id));
-            console.log('LibraryModal: Showing trash books only:', {
-              total: supabaseBooks.length,
-              inTrash: booksInTrash.size,
+          if (trashBookIds.size > 0) {
+            // Get full book data for books in Trash using supabaseStorageService
+            const allBooksFromService = await supabaseStorageService.getAllBooks();
+            filteredBooks = allBooksFromService.filter(book => trashBookIds.has(book.id));
+            console.log('LibraryModal: Showing trash books:', {
+              trashBookIds: trashBookIds.size,
               filtered: filteredBooks.length
             });
           } else {
-            // When not viewing Trash, filter out books that are in Trash
+            filteredBooks = [];
+            console.log('LibraryModal: No books in Trash');
+          }
+        } else {
+          // When not viewing Trash, filter out books that are in Trash
+          const bookIds = supabaseBooks.map(b => b.id);
+          if (bookIds.length > 0) {
+            const { data: bookCollections } = await supabase
+              .from('book_collections')
+              .select('book_id, collection_id')
+              .in('book_id', bookIds);
+            
+            // Create a set of book IDs that are in Trash
+            const booksInTrash = new Set(
+              (bookCollections || [])
+                .filter(bc => bc.collection_id === trashCollectionId)
+                .map(bc => bc.book_id)
+            );
+            
             filteredBooks = supabaseBooks.filter(book => !booksInTrash.has(book.id));
             console.log('LibraryModal: Filtered out trash books:', {
               total: supabaseBooks.length,
@@ -1629,6 +1641,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                         onToggleFavorite={handleToggleCollectionFavorite}
                         onReorderCollections={handleReorderCollections}
                         onMoveCollection={handleMoveCollection}
+                        totalBooksCount={books.length}
                         className="max-h-[420px] overflow-y-auto pr-1"
                       />
                     )}
@@ -1749,7 +1762,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                                     </span>
                                   )}
                                 </div>
-                                <h3 className="text-lg font-semibold leading-snug" style={{ color: 'var(--color-text-primary)' }}>
+                                <h3 className="text-lg leading-snug" style={{ color: 'var(--color-text-primary)' }}>
                                   {book.title}
                                 </h3>
                                 <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
@@ -1863,9 +1876,9 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                               onClick={() => handleOpenBook(book)}
                             >
                               <div className="flex items-center gap-2 mb-1">
-                                <h3 className="font-semibold truncate flex-1" style={{ color: 'var(--color-text-primary)' }}>
-                                  {book.title}
-                                </h3>
+                              <h3 className="truncate flex-1" style={{ color: 'var(--color-text-primary)' }}>
+                                {book.title}
+                              </h3>
                                 {reviews.has(book.id) && (
                                   <span
                                     className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium flex-shrink-0"
@@ -1992,7 +2005,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                                 onClick={() => handleOpenBook(book)}
                               >
                                 <div className="flex items-center gap-2 mb-2">
-                                  <h3 className="text-xl font-semibold leading-tight flex-1" style={{ color: 'var(--color-text-primary)' }}>
+                                  <h3 className="text-xl leading-tight flex-1" style={{ color: 'var(--color-text-primary)' }}>
                                     {book.title}
                                   </h3>
                                   {reviews.has(book.id) && (

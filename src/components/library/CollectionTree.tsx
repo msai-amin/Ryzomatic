@@ -43,6 +43,7 @@ interface CollectionTreeProps {
   onToggleFavorite: (collectionId: string, isFavorite: boolean) => void;
   onReorderCollections: (parentId: string | null, orderedIds: string[]) => Promise<void> | void;
   onMoveCollection: (collectionId: string) => void;
+  totalBooksCount?: number; // Total books count (excluding trash)
   className?: string;
 }
 
@@ -394,6 +395,7 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({
   onToggleFavorite,
   onReorderCollections,
   onMoveCollection,
+  totalBooksCount,
   className = ''
 }) => {
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(new Set());
@@ -601,7 +603,7 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({
         <Folder className="w-4 h-4 mr-2" style={{ color: 'var(--color-text-secondary)' }} />
         <span className="flex-1 text-sm font-medium">All Books</span>
         <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-          ({collections.reduce((sum, c) => sum + (c.book_count || 0), 0)})
+          ({totalBooksCount !== undefined ? totalBooksCount : collections.reduce((sum, c) => sum + (c.book_count || 0), 0)})
         </span>
       </div>
 

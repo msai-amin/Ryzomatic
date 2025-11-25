@@ -491,7 +491,7 @@ export const ReviewPanel: React.FC = () => {
             className="px-4 py-2 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-hover)] font-medium shadow-lg shadow-[var(--color-primary)]/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2"
           >
             <Download size={16} />
-            Submit Review
+                    Download Review
           </button>
         </div>
       </div>
