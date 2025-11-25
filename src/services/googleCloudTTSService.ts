@@ -118,6 +118,47 @@ class GoogleCloudTTSService {
            this.apiKey.length >= 20; // Real API keys are longer
   }
 
+  private isOnLandingPage(): boolean {
+    if (typeof window === 'undefined') return false;
+    
+    // Check if we're on the landing page
+    // Landing page is shown when user is not authenticated
+    const urlParams = new URLSearchParams(window.location.search);
+    const wantsAuth = urlParams.get('auth') === 'true';
+    const isNeoReader = urlParams.get('neo') === 'true';
+    
+    // If auth modal or NeoReader is requested, we're not on landing page
+    if (wantsAuth || isNeoReader) return false;
+    
+    // Check if there's a Supabase session in localStorage
+    // If session exists, user is likely authenticated and not on landing page
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (supabaseUrl) {
+        const projectRef = supabaseUrl.split('//')[1]?.split('.')[0];
+        if (projectRef) {
+          const sessionKey = `sb-${projectRef}-auth-token`;
+          const session = localStorage.getItem(sessionKey);
+          if (session) {
+            try {
+              const sessionData = JSON.parse(session);
+              if (sessionData?.access_token) {
+                return false; // Has session, not on landing page
+              }
+            } catch (e) {
+              // Invalid session data
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+    
+    // No session found, likely on landing page
+    return true;
+  }
+
   // Set a default natural voice
   private async setDefaultVoice(): Promise<void> {
     if (!this.isConfigured()) {
@@ -436,6 +477,13 @@ class GoogleCloudTTSService {
   }
 
   async speak(text: string, onEnd?: () => void, onWord?: (word: string, charIndex: number) => void): Promise<void> {
+    // Skip TTS if on landing page
+    if (this.isOnLandingPage()) {
+      console.log('Google Cloud TTS skipped: on landing page');
+      if (onEnd) onEnd();
+      return;
+    }
+
     try {
       // CRITICAL: Reset stop flag FIRST before any async operations
       // This ensures new playback can proceed even if stop() was called previously

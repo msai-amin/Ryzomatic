@@ -1287,49 +1287,49 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                 Review
               </button>
             ) : (
-              <button
-                style={{
-                  backgroundColor: 'var(--color-surface-hover, #1f2937)',
-                  border: '1px solid var(--color-border, #374151)',
-                  borderRadius: '6px',
-                  padding: '6px 10px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  color: 'var(--color-text-primary, #f9fafb)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '4px',
-                  flex: 1,
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface, #111827)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover, #1f2937)'}
-                onClick={async () => {
-                  try {
-                    if (document.id && userId && props.selectedText) {
-                      await notesService.createNote(
-                        userId,
-                        document.id,
-                        ((props.highlightAreas?.[0]?.pageIndex ?? 0) + 1),
-                        props.selectedText,
-                        'freeform',
-                        undefined,
-                        false
-                      )
-                      setHasUnsavedChanges(true)
-                      setIsRightSidebarOpen(true)
-                      setRightSidebarTab('notes')
-                    }
-                  } catch (err) {
-                    console.error('Failed to save note from selection popover', err)
+            <button
+              style={{
+                backgroundColor: 'var(--color-surface-hover, #1f2937)',
+                border: '1px solid var(--color-border, #374151)',
+                borderRadius: '6px',
+                padding: '6px 10px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                color: 'var(--color-text-primary, #f9fafb)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                flex: 1,
+                transition: 'background-color 0.2s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface, #111827)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover, #1f2937)'}
+              onClick={async () => {
+                try {
+                  if (document.id && userId && props.selectedText) {
+                    await notesService.createNote(
+                      userId,
+                      document.id,
+                      ((props.highlightAreas?.[0]?.pageIndex ?? 0) + 1),
+                      props.selectedText,
+                      'freeform',
+                      undefined,
+                      false
+                    )
+                    setHasUnsavedChanges(true)
+                    setIsRightSidebarOpen(true)
+                    setRightSidebarTab('notes')
                   }
-                  props.cancel()
-                }}
-              >
-                <StickyNote className="w-3.5 h-3.5" />
-                Save Note
-              </button>
+                } catch (err) {
+                  console.error('Failed to save note from selection popover', err)
+                }
+                props.cancel()
+              }}
+            >
+              <StickyNote className="w-3.5 h-3.5" />
+              Save Note
+            </button>
             )}
             <button
               style={{

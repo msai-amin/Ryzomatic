@@ -107,9 +107,9 @@ const ThemedAppContent: React.FC = () => {
              <EditorialLayout />
           </main>
         ) : (
-          <ThemedMainContent>
-            <DocumentViewer onUploadClick={handleOpenUpload} />
-          </ThemedMainContent>
+        <ThemedMainContent>
+          <DocumentViewer onUploadClick={handleOpenUpload} />
+        </ThemedMainContent>
         )}
       </div>
 

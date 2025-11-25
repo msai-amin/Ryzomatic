@@ -32,5 +32,14 @@ The user will provide the text of the academic paper.
 
 ### **Output:**
 Generate the review in formatted HTML (using <h3>, <p>, <ul>, <li>, <strong> tags) suitable for direct insertion into a rich text editor. Do not wrap the output in markdown code blocks.
+
+### **Length Guidelines:**
+- Keep the review comprehensive but concise
+- Summary: 1 paragraph (3-5 sentences)
+- Strengths: 3-5 bullet points
+- Weaknesses: 3-7 bullet points (be specific but brief)
+- Detailed Comments: 2-4 paragraphs covering major sections
+- Recommendation: 1-2 sentences with clear justification
+- Total review should be thorough but not exceed ~3000 words
 `
 

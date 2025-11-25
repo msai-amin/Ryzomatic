@@ -28,13 +28,16 @@ export class AutoReviewService {
       }
 
       // 2. Truncate content if too long (Gemini Flash has ~1M token context, but let's be safe/efficient)
-      // Taking first 50k characters (~10-15k tokens) usually covers Intro, Method, Results
-      const truncatedContent = content.substring(0, 100000);
+      // Taking first 80k characters (~20k tokens) usually covers Intro, Method, Results
+      // Reduced from 100k to ensure we have room for the response
+      const truncatedContent = content.substring(0, 80000);
 
-      // 3. Call Gemini AI
+      // 3. Call Gemini AI with 'custom' tier for higher output token limit (8192 vs 4096)
+      // Auto-review can generate long responses, so we need the higher limit
       const review = await geminiService.generateContent(
         truncatedContent,
-        AUTO_REVIEW_SYSTEM_PROMPT
+        AUTO_REVIEW_SYSTEM_PROMPT,
+        'custom' // Use custom tier for 8192 max output tokens
       );
 
       if (!review || review.trim().length === 0) {

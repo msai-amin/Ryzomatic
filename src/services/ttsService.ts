@@ -54,6 +54,12 @@ class TextToSpeechService {
   private recordingStream: MediaStream | null = null;
 
   constructor() {
+    // Skip initialization if on landing page
+    if (this.isOnLandingPage()) {
+      this.synth = window.speechSynthesis;
+      return;
+    }
+    
     this.synth = window.speechSynthesis;
     this.loadVoices();
 
@@ -61,6 +67,52 @@ class TextToSpeechService {
     if (speechSynthesis.onvoiceschanged !== undefined) {
       speechSynthesis.onvoiceschanged = () => this.loadVoices();
     }
+  }
+
+  private isOnLandingPage(): boolean {
+    if (typeof window === 'undefined') return false;
+    
+    // Check if we're on the landing page
+    // Landing page is shown when user is not authenticated
+    const urlParams = new URLSearchParams(window.location.search);
+    const wantsAuth = urlParams.get('auth') === 'true';
+    const isNeoReader = urlParams.get('neo') === 'true';
+    
+    // If auth modal or NeoReader is requested, we're not on landing page
+    if (wantsAuth || isNeoReader) return false;
+    
+    // Check if there's a Supabase session in localStorage
+    // If session exists, user is likely authenticated and not on landing page
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (supabaseUrl) {
+        const projectRef = supabaseUrl.split('//')[1]?.split('.')[0];
+        if (projectRef) {
+          const sessionKey = `sb-${projectRef}-auth-token`;
+          const session = localStorage.getItem(sessionKey);
+          if (session) {
+            try {
+              const sessionData = JSON.parse(session);
+              if (sessionData?.access_token) {
+                return false; // Has session, not on landing page
+              }
+            } catch (e) {
+              // Invalid session data
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+    
+    // No session found, likely on landing page
+    return true;
+  }
+  
+  private shouldSkipTTS(): boolean {
+    // Skip TTS operations if on landing page
+    return this.isOnLandingPage();
   }
 
   private loadVoices() {
@@ -227,6 +279,13 @@ class TextToSpeechService {
   }
 
   speak(text: string, onEnd?: () => void, onWord?: (word: string, charIndex: number) => void) {
+    // Skip TTS if on landing page
+    if (this.shouldSkipTTS()) {
+      console.log('TTS skipped: on landing page');
+      if (onEnd) onEnd();
+      return;
+    }
+
     console.log('TTSService.speak called:', {
       textLength: text.length,
       textPreview: text.substring(0, 100) + (text.length > 100 ? '...' : ''),

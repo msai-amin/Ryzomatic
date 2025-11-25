@@ -390,20 +390,20 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
           }
         } else {
           // When not viewing Trash, filter out books that are in Trash
-          const bookIds = supabaseBooks.map(b => b.id);
-          if (bookIds.length > 0) {
-            const { data: bookCollections } = await supabase
-              .from('book_collections')
-              .select('book_id, collection_id')
-              .in('book_id', bookIds);
-            
-            // Create a set of book IDs that are in Trash
-            const booksInTrash = new Set(
-              (bookCollections || [])
-                .filter(bc => bc.collection_id === trashCollectionId)
-                .map(bc => bc.book_id)
-            );
-            
+        const bookIds = supabaseBooks.map(b => b.id);
+        if (bookIds.length > 0) {
+          const { data: bookCollections } = await supabase
+            .from('book_collections')
+            .select('book_id, collection_id')
+            .in('book_id', bookIds);
+          
+          // Create a set of book IDs that are in Trash
+          const booksInTrash = new Set(
+            (bookCollections || [])
+              .filter(bc => bc.collection_id === trashCollectionId)
+              .map(bc => bc.book_id)
+          );
+          
             filteredBooks = supabaseBooks.filter(book => !booksInTrash.has(book.id));
             console.log('LibraryModal: Filtered out trash books:', {
               total: supabaseBooks.length,
@@ -2006,8 +2006,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                               >
                                 <div className="flex items-center gap-2 mb-2">
                                   <h3 className="text-xl leading-tight flex-1" style={{ color: 'var(--color-text-primary)' }}>
-                                    {book.title}
-                                  </h3>
+                                  {book.title}
+                                </h3>
                                   {reviews.has(book.id) && (
                                     <span
                                       className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium flex-shrink-0"
