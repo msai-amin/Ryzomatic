@@ -207,14 +207,19 @@ export const ReviewPanel: React.FC = () => {
         // Submit review to database
         await peerReviewService.submitReview(currentDocument.id, user.id)
 
-        // Clean and prepare HTML content (use editor content if available, otherwise fallback to state)
+        // Get clean content from editor
         const cleanContent = (editor?.getHTML() || reviewContent || '').trim()
         
+        // Escape HTML in metadata to prevent injection
+        const docName = (currentDocument?.name || 'Untitled').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        const reviewerName = (user?.full_name || user?.email || 'Anonymous').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        const reportDate = new Date().toLocaleDateString()
+        
+        // Build HTML string - ensure cleanContent is properly inserted
         const htmlString = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Referee Report</title>
     <style>
         body { 
@@ -258,32 +263,69 @@ export const ReviewPanel: React.FC = () => {
 </head>
 <body>
     <h2>Referee Report</h2>
-    <p><strong>Document:</strong> ${(currentDocument?.name || 'Untitled').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
-    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-    <p><strong>Reviewer:</strong> ${(user?.full_name || user?.email || 'Anonymous').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+    <p><strong>Document:</strong> ${docName}</p>
+    <p><strong>Date:</strong> ${reportDate}</p>
+    <p><strong>Reviewer:</strong> ${reviewerName}</p>
     <hr/>
     ${cleanContent}
 </body>
 </html>`
 
         console.log('Generating DOCX from HTML:', {
-            contentLength: cleanContent.length,
+            cleanContentLength: cleanContent.length,
+            cleanContentPreview: cleanContent.substring(0, 200),
             hasContent: hasContent,
-            htmlLength: htmlString.length
+            htmlLength: htmlString.length,
+            htmlPreview: htmlString.substring(0, 500)
         })
 
-        // Generate DOCX blob
+        // Generate DOCX blob - the library expects a complete HTML document
         const blob = await asBlob(htmlString)
         
-        if (!blob || blob.size === 0) {
-            throw new Error('Generated DOCX blob is empty')
+        console.log('asBlob result:', {
+            blob: blob,
+            blobType: typeof blob,
+            blobSize: blob instanceof Blob ? blob.size : 'not a blob',
+            blobTypeProperty: blob instanceof Blob ? blob.type : 'N/A'
+        })
+        
+        if (!blob) {
+            throw new Error('asBlob returned null or undefined')
+        }
+        
+        // Handle both Blob and Buffer (library can return either)
+        let finalBlob: Blob
+        if (blob instanceof Blob) {
+            finalBlob = blob
+        } else if (blob && typeof blob === 'object' && 'buffer' in blob) {
+            // It's a Buffer (Node.js), convert to Blob
+            finalBlob = new Blob([blob as any], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+        } else {
+            // Try to create a Blob from whatever we got
+            finalBlob = new Blob([blob as any], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+        }
+        
+        if (!finalBlob || finalBlob.size === 0) {
+            throw new Error(`Generated DOCX blob is empty (size: ${finalBlob?.size || 0})`)
         }
 
-        console.log('DOCX blob generated:', { size: blob.size, type: blob.type })
-        saveAs(blob as Blob, `Referee_Report_${(currentDocument?.name || 'draft').replace(/[^a-z0-9]/gi, '_')}.docx`)
+        console.log('Final DOCX blob:', { 
+            size: finalBlob.size, 
+            type: finalBlob.type,
+            sizeKB: (finalBlob.size / 1024).toFixed(2) + ' KB'
+        })
+        
+        const fileName = `Referee_Report_${(currentDocument?.name || 'draft').replace(/[^a-z0-9]/gi, '_')}.docx`
+        saveAs(finalBlob, fileName)
+        
+        console.log('DOCX file download initiated:', fileName)
         
     } catch (error) {
         console.error('DOCX generation failed:', error)
+        console.error('Error details:', {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined
+        })
         alert(`Failed to generate DOCX file: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
