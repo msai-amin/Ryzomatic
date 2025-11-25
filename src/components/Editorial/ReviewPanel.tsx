@@ -184,8 +184,17 @@ export const ReviewPanel: React.FC = () => {
 
   // Download as DOCX and submit review
   const handleDownloadReview = async () => {
-    if (!reviewContent) {
-        alert('Review content is empty.')
+    // Get the latest content directly from the editor to ensure we have the most up-to-date content
+    const currentContent = editor?.getHTML() || reviewContent || ''
+    
+    // Better validation: check if content is actually meaningful (not just empty tags)
+    const tempDiv = document.createElement('div')
+    tempDiv.innerHTML = currentContent
+    const textContent = tempDiv.textContent || tempDiv.innerText || ''
+    const hasContent = textContent.trim().length > 0
+
+    if (!currentContent || !hasContent) {
+        alert('Review content is empty. Please write your review before downloading.')
         return
     }
 
@@ -198,38 +207,84 @@ export const ReviewPanel: React.FC = () => {
         // Submit review to database
         await peerReviewService.submitReview(currentDocument.id, user.id)
 
-        const htmlString = `
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <title>Referee Report</title>
-                <style>
-                    body { font-family: '${reviewFontFamily}', serif; font-size: ${reviewFontSize}pt; line-height: 1.5; }
-                    h3 { font-size: ${reviewFontSize + 2}pt; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; }
-                    p { margin-bottom: 1em; }
-                    ul, ol { margin-bottom: 1em; margin-left: 1.5em; }
-                    li { margin-bottom: 0.5em; }
-                </style>
-            </head>
-            <body>
-                <h2>Referee Report</h2>
-                <p><strong>Document:</strong> ${currentDocument?.name || 'Untitled'}</p>
-                <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                <p><strong>Reviewer:</strong> ${user?.full_name || user?.email || 'Anonymous'}</p>
-                <hr/>
-                ${reviewContent}
-            </body>
-            </html>
-        `
+        // Clean and prepare HTML content (use editor content if available, otherwise fallback to state)
+        const cleanContent = (editor?.getHTML() || reviewContent || '').trim()
+        
+        const htmlString = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Referee Report</title>
+    <style>
+        body { 
+            font-family: '${reviewFontFamily}', serif; 
+            font-size: ${reviewFontSize}pt; 
+            line-height: 1.5; 
+            margin: 40px;
+            color: #000;
+        }
+        h2 { 
+            font-size: ${reviewFontSize + 4}pt; 
+            font-weight: bold; 
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        h3 { 
+            font-size: ${reviewFontSize + 2}pt; 
+            font-weight: bold; 
+            margin-top: 1em; 
+            margin-bottom: 0.5em; 
+        }
+        p { 
+            margin-bottom: 1em; 
+        }
+        ul, ol { 
+            margin-bottom: 1em; 
+            margin-left: 1.5em; 
+        }
+        li { 
+            margin-bottom: 0.5em; 
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #ccc;
+            margin: 20px 0;
+        }
+        strong {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h2>Referee Report</h2>
+    <p><strong>Document:</strong> ${(currentDocument?.name || 'Untitled').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+    <p><strong>Reviewer:</strong> ${(user?.full_name || user?.email || 'Anonymous').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+    <hr/>
+    ${cleanContent}
+</body>
+</html>`
 
-        // @ts-ignore: asBlob type definition mismatch
+        console.log('Generating DOCX from HTML:', {
+            contentLength: cleanContent.length,
+            hasContent: hasContent,
+            htmlLength: htmlString.length
+        })
+
+        // Generate DOCX blob
         const blob = await asBlob(htmlString)
-        saveAs(blob as Blob, `Referee_Report_${currentDocument?.name || 'draft'}.docx`)
+        
+        if (!blob || blob.size === 0) {
+            throw new Error('Generated DOCX blob is empty')
+        }
+
+        console.log('DOCX blob generated:', { size: blob.size, type: blob.type })
+        saveAs(blob as Blob, `Referee_Report_${(currentDocument?.name || 'draft').replace(/[^a-z0-9]/gi, '_')}.docx`)
         
     } catch (error) {
         console.error('DOCX generation failed:', error)
-        alert('Failed to generate DOCX file.')
+        alert(`Failed to generate DOCX file: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
