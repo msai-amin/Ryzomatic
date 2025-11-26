@@ -1093,6 +1093,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     <>
       {/* Toggle Bar - Always Visible - HIGHEST Z-INDEX to stay above all modals */}
       <div
+        id="onboarding-audio-widget"
+        data-onboarding="onboarding-audio-widget"
         ref={widgetRef}
         className={`fixed z-[100000] transition-shadow duration-300 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${className}`}
         style={{
@@ -1174,6 +1176,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         <div className="flex items-center gap-2 p-1.5">
           {/* Play/Pause Button - Main Control */}
           <button
+            data-onboarding="onboarding-tts-play"
             onClick={handlePlayPause}
             disabled={isProcessing}
             className="p-2 rounded-full transition-all shadow-md"
@@ -1450,6 +1453,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
               {/* Settings Button */}
               <button
+                data-onboarding="onboarding-tts-settings"
                 onClick={() => setShowSettings(!showSettings)}
                 className="p-2 rounded-full transition-all"
                 style={{ 

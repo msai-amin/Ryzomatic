@@ -254,37 +254,37 @@ export const DocumentRelationshipGraph: React.FC<DocumentRelationshipGraphProps>
       };
     } else {
       // Fallback to original document relationships
-      const nodes: GraphNode[] = [
-        {
-          id: sourceDocumentId,
-          title: currentDocument?.name || 'Current Document',
-          fileType: currentDocument?.type || 'pdf',
+  const nodes: GraphNode[] = [
+    {
+      id: sourceDocumentId,
+      title: currentDocument?.name || 'Current Document',
+      fileType: currentDocument?.type || 'pdf',
           nodeType: 'document',
-          isSource: true,
-          x: dimensions.width / 2,
-          y: dimensions.height / 2,
-          fx: dimensions.width / 2,
-          fy: dimensions.height / 2
-        },
-        ...relationships.map(rel => ({
-          id: rel.related_document_id,
-          title: rel.related_title,
-          fileType: rel.related_file_type,
+      isSource: true,
+      x: dimensions.width / 2,
+      y: dimensions.height / 2,
+      fx: dimensions.width / 2,
+      fy: dimensions.height / 2
+    },
+    ...relationships.map(rel => ({
+      id: rel.related_document_id,
+      title: rel.related_title,
+      fileType: rel.related_file_type,
           nodeType: 'document' as const,
-          relevance: rel.relevance_percentage ?? undefined,
-          isSource: false
-        }))
-      ];
+      relevance: rel.relevance_percentage ?? undefined,
+      isSource: false
+    }))
+  ];
 
-      const links: GraphEdge[] = relationships
-        .filter(rel => rel.relevance_percentage !== null && rel.relevance_percentage !== undefined)
-        .map(rel => ({
-          source: sourceDocumentId,
-          target: rel.related_document_id,
-          weight: rel.relevance_percentage!,
+  const links: GraphEdge[] = relationships
+    .filter(rel => rel.relevance_percentage !== null && rel.relevance_percentage !== undefined)
+    .map(rel => ({
+      source: sourceDocumentId,
+      target: rel.related_document_id,
+      weight: rel.relevance_percentage!,
           edgeType: 'similarity',
-          relationshipId: rel.relationship_id
-        }));
+      relationshipId: rel.relationship_id
+    }));
 
       return { nodes, links };
     }
@@ -590,7 +590,7 @@ export const DocumentRelationshipGraph: React.FC<DocumentRelationshipGraphProps>
     // Cleanup
     return () => {
       simulation.stop();
-    };
+  };
   }, [relationships, cognitiveGraphNodes, isLoading, dimensions, selectedNode, sourceDocumentId, currentDocument, useCognitivePaths]);
 
 
@@ -621,7 +621,10 @@ export const DocumentRelationshipGraph: React.FC<DocumentRelationshipGraphProps>
     : null;
 
   return (
-    <div className="h-full flex flex-col">
+    <div 
+      id="onboarding-document-graph"
+      data-onboarding="onboarding-document-graph"
+      className="h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -783,23 +786,23 @@ export const DocumentRelationshipGraph: React.FC<DocumentRelationshipGraphProps>
           </>
         ) : (
           <>
-            <div className="flex items-center gap-4 text-xs flex-wrap">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'var(--color-success)' }} />
-                <span style={{ color: 'var(--color-text-secondary)' }}>High relevance (≥80%)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'var(--color-warning)' }} />
-                <span style={{ color: 'var(--color-text-secondary)' }}>Medium (50-79%)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'var(--color-text-secondary)' }} />
-                <span style={{ color: 'var(--color-text-secondary)' }}>Low (&lt;50%)</span>
-              </div>
-            </div>
-            <p className="text-xs mt-2" style={{ color: 'var(--color-text-tertiary)' }}>
-              Edge thickness and color represent relevance strength • Drag nodes to rearrange • Scroll to zoom • Hover to see connections
-            </p>
+        <div className="flex items-center gap-4 text-xs flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'var(--color-success)' }} />
+            <span style={{ color: 'var(--color-text-secondary)' }}>High relevance (≥80%)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'var(--color-warning)' }} />
+            <span style={{ color: 'var(--color-text-secondary)' }}>Medium (50-79%)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'var(--color-text-secondary)' }} />
+            <span style={{ color: 'var(--color-text-secondary)' }}>Low (&lt;50%)</span>
+          </div>
+        </div>
+        <p className="text-xs mt-2" style={{ color: 'var(--color-text-tertiary)' }}>
+          Edge thickness and color represent relevance strength • Drag nodes to rearrange • Scroll to zoom • Hover to see connections
+        </p>
           </>
         )}
       </div>

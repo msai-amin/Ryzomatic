@@ -99,29 +99,29 @@ export class DocumentDescriptionService {
       const embeddingString = embeddingService.formatForPgVector(embedding);
 
       // Update user_books with description and embedding
-      const { data, error } = await supabase
+        const { data, error } = await supabase
         .from('user_books')
-        .update({
+          .update({
           ai_description: aiDescription,
-          description_embedding: embeddingString,
-          last_auto_generated_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
+            description_embedding: embeddingString,
+            last_auto_generated_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
         .eq('id', bookId)
         .eq('user_id', userId)
         .select('id, ai_description, user_description, description_embedding, last_auto_generated_at, created_at, updated_at')
-        .single();
+          .single();
 
-      if (error) throw error;
+        if (error) throw error;
 
       // Map to DocumentDescription interface
       return {
         id: data.id,
-        book_id: bookId,
-        user_id: userId,
+            book_id: bookId,
+            user_id: userId,
         ai_generated_description: data.ai_description,
         user_entered_description: data.user_description,
-        is_ai_generated: true,
+            is_ai_generated: true,
         description_embedding: data.description_embedding,
         last_auto_generated_at: data.last_auto_generated_at,
         created_at: data.created_at,
@@ -144,24 +144,24 @@ export class DocumentDescriptionService {
       }
 
       // Update user_books with user description
-      const { data, error } = await supabase
+        const { data, error } = await supabase
         .from('user_books')
-        .update({
+          .update({
           user_description: userDescription,
-          updated_at: new Date().toISOString()
-        })
+            updated_at: new Date().toISOString()
+          })
         .eq('id', bookId)
         .eq('user_id', userId)
         .select('id, ai_description, user_description, description_embedding, last_auto_generated_at, created_at, updated_at')
-        .single();
+          .single();
 
-      if (error) throw error;
+        if (error) throw error;
 
       // Map to DocumentDescription interface
       return {
         id: data.id,
-        book_id: bookId,
-        user_id: userId,
+            book_id: bookId,
+            user_id: userId,
         ai_generated_description: data.ai_description,
         user_entered_description: data.user_description,
         is_ai_generated: false,

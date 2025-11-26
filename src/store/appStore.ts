@@ -788,7 +788,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   reviewContent: '',
   reviewFontFamily: 'Times New Roman',
   reviewFontSize: 12,
-  reviewTheme: 'dark',
+  reviewTheme: 'light',
   addReviewCitation: (citation) => set((state) => ({ reviewCitations: [...state.reviewCitations, citation] })),
   setReviewContent: (content) => set({ reviewContent: content }),
   setReviewFontFamily: (fontFamily) => set({ reviewFontFamily: fontFamily }),

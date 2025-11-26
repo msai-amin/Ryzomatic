@@ -9,13 +9,19 @@ import { DetachedChatWindow } from '../src/components/DetachedChatWindow'
 import { useAchievementToasts } from '../src/components/AchievementToast'
 import { useAppStore } from '../src/store/appStore'
 import { useKeyboardShortcuts } from '../src/hooks/useKeyboardShortcuts'
-import { OnboardingProvider, OnboardingOverlay, ContextualHelp } from '../src/components/onboarding'
+import { OnboardingProvider, SpotlightTour, useOnboarding } from '../src/components/onboarding'
 import { backgroundProcessingService } from '../src/services/backgroundProcessingService'
 import { timerService, TimerState } from '../src/services/timerService'
 import { CustomizableReadingWizard } from '../src/components/customReading/CustomizableReadingWizard'
 import { DocumentUpload } from '../src/components/DocumentUpload'
 import { AudioWidget } from '../src/components/AudioWidget'
 import { EditorialLayout } from '../src/components/Editorial/EditorialLayout'
+
+// Wrapper component to use onboarding hook
+const SpotlightTourWrapper: React.FC = () => {
+  const { tourSteps, handleTourAction } = useOnboarding()
+  return <SpotlightTour steps={tourSteps} onAction={handleTourAction} />
+}
 
 const ThemedAppContent: React.FC = () => {
   const [timerState, setTimerState] = useState<TimerState>(timerService.getState())
@@ -78,7 +84,7 @@ const ThemedAppContent: React.FC = () => {
 
   return (
     <OnboardingProvider>
-      <div 
+    <div 
         className="min-h-screen"
         style={{
           backgroundColor: 'var(--color-background)',
@@ -141,8 +147,7 @@ const ThemedAppContent: React.FC = () => {
       <AchievementToastContainer />
 
       {/* Onboarding System */}
-      <OnboardingOverlay />
-      <ContextualHelp />
+      <SpotlightTourWrapper />
 
       {/* Theme Switcher (for development/testing) */}
       <div 

@@ -37,6 +37,7 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
   
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [dragCounter, setDragCounter] = useState(0); // Track drag enter/leave to handle nested elements
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
   const [processingRelationships, setProcessingRelationships] = useState<Set<string>>(new Set());
   
@@ -247,33 +248,52 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
     }
   }, [normalizedDocumentId, user, onRelationshipCreated]);
 
-  // Drag and drop handlers
+  // Drag and drop handlers with improved nested element handling
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    // Check if files are being dragged
     if (e.dataTransfer.types.includes('Files')) {
+      setDragCounter(prev => {
+        const newCount = prev + 1;
+        if (newCount === 1) {
       setIsDragging(true);
+        }
+        return newCount;
+      });
     }
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // Only set isDragging to false if we're leaving the drop zone
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+    
+    // Use counter to handle nested elements properly
+    setDragCounter(prev => {
+      const newCount = prev - 1;
+      if (newCount === 0) {
       setIsDragging(false);
     }
+      return newCount;
+    });
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    // Set drop effect to indicate files can be dropped
+    if (e.dataTransfer.types.includes('Files')) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
   }, []);
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
+    setDragCounter(0);
 
     // CRITICAL: Use normalizedDocumentId instead of currentDocument to prevent undefined in dependency array
     if (!normalizedDocumentId || !user) {
@@ -318,6 +338,8 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
 
   return (
     <div 
+      id="onboarding-related-docs-panel"
+      data-onboarding="onboarding-related-docs-panel"
       className="space-y-3"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
@@ -326,29 +348,34 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
       style={{
         position: 'relative',
         minHeight: '200px',
-        transition: 'all 0.2s ease',
-        border: isDragging ? '2px dashed var(--color-primary)' : 'none',
-        borderRadius: isDragging ? '8px' : '0',
+        transition: 'all 0.2s ease-in-out',
+        border: isDragging ? '2px dashed var(--color-primary)' : '2px solid transparent',
+        borderRadius: '8px',
         backgroundColor: isDragging ? 'var(--color-primary-light)' : 'transparent',
-        padding: isDragging ? '12px' : '0',
+        padding: isDragging ? '16px' : '0',
+        transform: isDragging ? 'scale(1.01)' : 'scale(1)',
       }}
     >
-      {/* Drag overlay */}
+      {/* Drag overlay with improved visibility */}
       {isDragging && (
         <div 
-          className="absolute inset-0 flex items-center justify-center z-10 rounded-lg"
+          className="absolute inset-0 flex items-center justify-center z-50 rounded-lg pointer-events-none"
           style={{
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-            backdropFilter: 'blur(4px)',
+            backgroundColor: 'rgba(59, 130, 246, 0.15)',
+            backdropFilter: 'blur(6px)',
+            border: '2px dashed var(--color-primary)',
+            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
           }}
         >
-          <div className="text-center">
-            <Upload className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--color-primary)' }} />
-            <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+          <div className="text-center px-4">
+            <div className="mb-3 animate-bounce">
+              <Upload className="w-12 h-12 mx-auto" style={{ color: 'var(--color-primary)' }} />
+            </div>
+            <p className="text-base font-semibold mb-1" style={{ color: 'var(--color-text-primary)' }}>
               Drop files here to add related documents
             </p>
-            <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
-              PDF, EPUB, or TXT files
+            <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+              PDF, EPUB, or TXT files supported
             </p>
           </div>
         </div>
@@ -390,13 +417,47 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
           Related Documents
         </h3>
+        <div className="flex items-center gap-2">
+          {/* File input button for touch devices */}
+          <input
+            type="file"
+            id="related-docs-file-input-header"
+            multiple
+            accept=".pdf,.epub,.txt,.md"
+            onChange={(e) => {
+              const files = Array.from(e.target.files || []);
+              files.forEach(file => handleFileUpload(file));
+              e.target.value = '';
+            }}
+            className="hidden"
+          />
+          <label
+            htmlFor="related-docs-file-input-header"
+            className="p-1.5 rounded transition-colors cursor-pointer"
+            style={{ 
+              color: 'var(--color-text-secondary)',
+              backgroundColor: 'transparent'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <Tooltip content="Add Related Document" position="left">
+              <Upload className="w-4 h-4" />
+            </Tooltip>
+          </label>
         {onOpenGraphView && (
           <Tooltip content="View Document Graph" position="left">
             <button
+              id="onboarding-graph-button"
+              data-onboarding="onboarding-graph-button"
               onClick={onOpenGraphView}
               className="p-1 rounded transition-colors hover:bg-gray-100"
               style={{ color: 'var(--color-text-secondary)' }}
@@ -405,6 +466,7 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
             </button>
           </Tooltip>
         )}
+        </div>
       </div>
 
       {/* Document Count */}
@@ -419,23 +481,62 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
           <p className="text-xs mb-2" style={{ color: 'var(--color-text-secondary)' }}>
             No related documents yet
           </p>
-          <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+          <p className="text-xs mb-3" style={{ color: 'var(--color-text-tertiary)' }}>
             Drag and drop PDF, EPUB, or TXT files here
           </p>
+          {/* Hidden file input for touch devices */}
+          <input
+            type="file"
+            id="related-docs-file-input"
+            multiple
+            accept=".pdf,.epub,.txt,.md"
+            onChange={(e) => {
+              const files = Array.from(e.target.files || []);
+              files.forEach(file => handleFileUpload(file));
+              // Reset input
+              e.target.value = '';
+            }}
+            className="hidden"
+          />
+          <label
+            htmlFor="related-docs-file-input"
+            className="inline-block px-3 py-1.5 text-xs font-medium rounded-lg cursor-pointer transition-colors"
+            style={{
+              backgroundColor: 'var(--color-primary)',
+              color: 'white',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-primary-dark)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-primary)';
+            }}
+          >
+            <Upload className="w-3 h-3 inline-block mr-1" />
+            Choose Files
+          </label>
         </div>
       ) : (
         <div className="space-y-2">
-          {relatedDocuments.map((relationship) => (
+          {relatedDocuments.map((relationship, index) => (
             <div
               key={relationship.relationship_id}
-              className="p-3 rounded-lg border transition-colors cursor-pointer group hover:shadow-md"
+              data-onboarding={index === 0 ? "onboarding-related-doc-card" : undefined}
+              className="p-3 rounded-lg border transition-all duration-200 cursor-pointer group hover:shadow-md"
                 style={{ 
                   borderColor: 'var(--color-border)',
                   backgroundColor: 'var(--color-surface)'
                 }}
                 onClick={() => onPreviewDocument(relationship)}
+                onTouchStart={(e) => {
+                  // Add touch feedback
+                  e.currentTarget.style.transform = 'scale(0.98)';
+                }}
+                onTouchEnd={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
               >
-                <div className="flex items-start justify-between mb-2">
+                <div className="flex items-start justify-between mb-2 gap-2">
                 <div className="flex items-center space-x-2 flex-1 min-w-0">
                   <FileText className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-text-secondary)' }} />
                   <h4 className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>

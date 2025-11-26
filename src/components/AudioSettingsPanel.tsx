@@ -123,7 +123,7 @@ export const AudioSettingsPanel: React.FC<AudioSettingsPanelProps> = ({ isOpen, 
         {/* Content */}
         <div className="p-6 space-y-6">
           {/* Voice Selection */}
-          <div>
+          <div data-onboarding="onboarding-tts-voice">
             <div className="flex items-center justify-between mb-3">
               <label className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                 Voice Selection
@@ -158,7 +158,7 @@ export const AudioSettingsPanel: React.FC<AudioSettingsPanelProps> = ({ isOpen, 
           </div>
 
           {/* Speed Control */}
-          <div>
+          <div data-onboarding="onboarding-tts-speed">
             <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text-primary)' }}>
               Playback Speed: {tts.rate.toFixed(1)}x
             </label>

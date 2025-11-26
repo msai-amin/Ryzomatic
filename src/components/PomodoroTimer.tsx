@@ -366,20 +366,20 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ documentId, docume
                     {streak?.current_streak || 0} days 🔥
                   </span>
                 </div>
-                <div style={{ color: 'var(--color-text-secondary)' }}>
-                  <span className="font-medium">Sessions:</span>{' '}
-                  <span className="font-bold" style={{ color: getModeColor() }}>
-                    {timerState.completedSessions}
-                  </span>
-                </div>
+              <div style={{ color: 'var(--color-text-secondary)' }}>
+                <span className="font-medium">Sessions:</span>{' '}
+                <span className="font-bold" style={{ color: getModeColor() }}>
+                  {timerState.completedSessions}
+                </span>
+              </div>
               </div>
               
               <div className="flex items-center justify-between text-sm">
-                <div style={{ color: 'var(--color-text-secondary)' }}>
-                  <span className="font-medium">Until long break:</span>{' '}
-                  <span className="font-bold" style={{ color: getModeColor() }}>
-                    {settings.sessionsUntilLongBreak - (timerState.completedSessions % settings.sessionsUntilLongBreak)}
-                  </span>
+              <div style={{ color: 'var(--color-text-secondary)' }}>
+                <span className="font-medium">Until long break:</span>{' '}
+                <span className="font-bold" style={{ color: getModeColor() }}>
+                  {settings.sessionsUntilLongBreak - (timerState.completedSessions % settings.sessionsUntilLongBreak)}
+                </span>
                 </div>
               </div>
             </div>

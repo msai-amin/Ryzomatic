@@ -1,4 +1,5 @@
 export { OnboardingProvider, useOnboarding } from './OnboardingProvider'
-export { OnboardingOverlay } from './OnboardingOverlay'
-export { ContextualHelp } from './ContextualHelp'
-export type { OnboardingStep, OnboardingContextType } from './OnboardingProvider'
+export { SpotlightTour } from './SpotlightTour'
+export { PeerReviewPreview, AIReviewPreview } from './PeerReviewPreview'
+export type { TourStep } from './SpotlightTour'
+export type { OnboardingContextType, TourType } from './OnboardingProvider'

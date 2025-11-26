@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Bold, Italic, List, ListOrdered, Quote, LayoutTemplate, Sun, Moon, Sparkles, Loader2, Download, Type } from 'lucide-react'
+import { Bold, Italic, List, ListOrdered, Quote, LayoutTemplate, Sun, Moon, Sparkles, Loader2, Download, Type, Menu, X } from 'lucide-react'
 import { autoReviewService } from '../../services/ai/autoReviewService'
 import { peerReviewService } from '../../services/peerReviewService'
 import { useAppStore } from '../../store/appStore'
@@ -112,6 +112,7 @@ export const ReviewPanel: React.FC = () => {
   const [isAutoReviewing, setIsAutoReviewing] = useState(false)
   const [showFontMenu, setShowFontMenu] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
 
   const editor = useEditor({
     extensions: [
@@ -142,6 +143,21 @@ export const ReviewPanel: React.FC = () => {
       editorElement.style.fontSize = `${reviewFontSize}pt`
     }
   }, [editor, reviewFontFamily, reviewFontSize])
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (showMenu && !target.closest('[data-menu-container]')) {
+        setShowMenu(false)
+      }
+    }
+
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showMenu])
 
   // Auto-Review Function
   const handleAutoReview = async () => {
@@ -442,14 +458,24 @@ export const ReviewPanel: React.FC = () => {
           setReviewContent(review.review_content)
           setReviewFontFamily(review.font_family)
           setReviewFontSize(review.font_size)
-          setReviewTheme(review.theme)
+          // Always default to light theme, even if saved review has dark
+          // User can manually change it if they prefer dark
+          setReviewTheme('light')
           editor.commands.setContent(review.review_content)
+        } else {
+          // No review found - ensure default is light
+          setReviewTheme('light')
         }
       }).catch((error) => {
         console.error('Failed to load review:', error)
+        // On error, ensure default is light
+        setReviewTheme('light')
       })
+    } else {
+      // No document or user - ensure default is light
+      setReviewTheme('light')
     }
-  }, [currentDocument?.id, user?.id, editor])
+  }, [currentDocument?.id, user?.id, editor, setReviewTheme])
 
   // Auto-save review to database
   useEffect(() => {
@@ -496,145 +522,269 @@ export const ReviewPanel: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-full bg-[var(--color-surface)] border-l border-[var(--color-border)] text-[var(--color-text-primary)]">
+    <div 
+      id="onboarding-review-panel"
+      data-onboarding="onboarding-review-panel"
+      className="flex flex-col h-full bg-[var(--color-surface)] border-l border-[var(--color-border)] text-[var(--color-text-primary)]">
       {/* Toolbar */}
       <div className="p-4 border-b border-[var(--color-border)] flex justify-between items-center bg-[var(--color-surface)] sticky top-0 z-10">
-        <h2 className="font-semibold text-lg">Review Editor</h2>
-        <div className="flex gap-1 bg-[var(--color-surface-hover)] p-1 rounded-lg">
+        <h2 className="font-semibold text-lg">Reviewer Editor</h2>
+        <div className="flex items-center gap-4">
+          {/* AI-Referee Button - Separated */}
           <button
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors ${editor.isActive('bold') ? 'text-[var(--color-primary)] bg-[var(--color-background)]' : 'text-[var(--color-text-secondary)]'}`}
-            title="Bold"
+            id="onboarding-ai-auto-review"
+            data-onboarding="onboarding-ai-auto-review"
+            onClick={handleAutoReview}
+            disabled={isAutoReviewing}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+              isAutoReviewing 
+                ? 'opacity-50 cursor-not-allowed' 
+                : 'text-[var(--color-primary)] hover:scale-105'
+            }`}
+            style={{
+              boxShadow: isAutoReviewing 
+                ? 'none' 
+                : '0 0 20px rgba(59, 130, 246, 0.4), 0 0 40px rgba(59, 130, 246, 0.2)',
+              textShadow: isAutoReviewing 
+                ? 'none' 
+                : '0 0 8px rgba(59, 130, 246, 0.6)'
+            }}
+            title="Generate Auto Review (AI)"
           >
-            <Bold size={16} />
+            {isAutoReviewing ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Sparkles size={16} />
+            )}
+            <span className="text-sm font-semibold">AI-Referee</span>
           </button>
-          <button
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors ${editor.isActive('italic') ? 'text-[var(--color-primary)] bg-[var(--color-background)]' : 'text-[var(--color-text-secondary)]'}`}
-            title="Italic"
-          >
-            <Italic size={16} />
-          </button>
-          <div className="w-px bg-[var(--color-border)] mx-1 my-1" />
-          <button
-            onClick={() => editor.chain().focus().toggleBulletList().run()}
-            className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors ${editor.isActive('bulletList') ? 'text-[var(--color-primary)] bg-[var(--color-background)]' : 'text-[var(--color-text-secondary)]'}`}
-            title="Bullet List"
-          >
-            <List size={16} />
-          </button>
-          <button
-            onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors ${editor.isActive('orderedList') ? 'text-[var(--color-primary)] bg-[var(--color-background)]' : 'text-[var(--color-text-secondary)]'}`}
-            title="Ordered List"
-          >
-            <ListOrdered size={16} />
-          </button>
-          <div className="w-px bg-[var(--color-border)] mx-1 my-1" />
-          
-          {/* Font Controls */}
-          <div className="relative">
+
+          {/* Hamburger Menu */}
+          <div className="relative" data-menu-container>
             <button
-              onClick={() => setShowFontMenu(!showFontMenu)}
-              className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors text-[var(--color-text-secondary)]`}
-              title="Font Settings"
+              onClick={() => setShowMenu(!showMenu)}
+              className="p-2 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+              title="Menu"
+              aria-label="Toggle menu"
+              aria-expanded={showMenu}
             >
-              <Type size={16} />
+              {showMenu ? <X size={20} /> : <Menu size={20} />}
             </button>
-            {showFontMenu && (
-              <div className="absolute right-0 top-full mt-2 w-56 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl z-50 p-3">
-                <div className="mb-3">
-                  <label className="text-xs font-medium text-[var(--color-text-secondary)] mb-1 block">Font Family</label>
-                  <select
-                    value={reviewFontFamily}
-                    onChange={(e) => {
-                      setReviewFontFamily(e.target.value)
-                      setShowFontMenu(false)
-                    }}
-                    className="w-full px-2 py-1.5 text-sm rounded border border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  >
-                    {FONT_FAMILIES.map((font) => (
-                      <option key={font} value={font} style={{ fontFamily: font }}>
-                        {font}
-                      </option>
-                    ))}
-                  </select>
+
+            {/* Dropdown Menu */}
+            {showMenu && (
+              <div className="absolute right-0 top-full mt-2 w-64 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl z-50 overflow-hidden">
+                {/* Text Formatting Section */}
+                <div className="p-2">
+                  <div className="px-3 py-2 text-xs font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider">
+                    Text Formatting
+                  </div>
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => {
+                        editor.chain().focus().toggleBold().run()
+                        setShowMenu(false)
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                        editor.isActive('bold')
+                          ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                          : 'text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]'
+                      }`}
+                    >
+                      <Bold size={18} />
+                      <span>Bold</span>
+                      {editor.isActive('bold') && (
+                        <span className="ml-auto text-xs text-[var(--color-text-tertiary)]">Active</span>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        editor.chain().focus().toggleItalic().run()
+                        setShowMenu(false)
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                        editor.isActive('italic')
+                          ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                          : 'text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]'
+                      }`}
+                    >
+                      <Italic size={18} />
+                      <span>Italic</span>
+                      {editor.isActive('italic') && (
+                        <span className="ml-auto text-xs text-[var(--color-text-tertiary)]">Active</span>
+                      )}
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-[var(--color-text-secondary)] mb-1 block">Font Size</label>
-                  <select
-                    value={reviewFontSize}
-                    onChange={(e) => {
-                      setReviewFontSize(Number(e.target.value))
-                      setShowFontMenu(false)
-                    }}
-                    className="w-full px-2 py-1.5 text-sm rounded border border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  >
-                    {FONT_SIZES.map((size) => (
-                      <option key={size} value={size}>
-                        {size}pt
-                      </option>
-                    ))}
-                  </select>
+
+                <div className="h-px bg-[var(--color-border)]" />
+
+                {/* Lists Section */}
+                <div className="p-2">
+                  <div className="px-3 py-2 text-xs font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider">
+                    Lists
+                  </div>
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => {
+                        editor.chain().focus().toggleBulletList().run()
+                        setShowMenu(false)
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                        editor.isActive('bulletList')
+                          ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                          : 'text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]'
+                      }`}
+                    >
+                      <List size={18} />
+                      <span>Bullet List</span>
+                      {editor.isActive('bulletList') && (
+                        <span className="ml-auto text-xs text-[var(--color-text-tertiary)]">Active</span>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        editor.chain().focus().toggleOrderedList().run()
+                        setShowMenu(false)
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                        editor.isActive('orderedList')
+                          ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                          : 'text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]'
+                      }`}
+                    >
+                      <ListOrdered size={18} />
+                      <span>Numbered List</span>
+                      {editor.isActive('orderedList') && (
+                        <span className="ml-auto text-xs text-[var(--color-text-tertiary)]">Active</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="h-px bg-[var(--color-border)]" />
+
+                {/* Font Settings Section */}
+                <div className="p-2">
+                  <div className="px-3 py-2 text-xs font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider">
+                    Font Settings
+                  </div>
+                  <div className="space-y-3 px-3 py-2">
+                    <div>
+                      <label className="text-xs font-medium text-[var(--color-text-secondary)] mb-1.5 block">
+                        Font Family
+                      </label>
+                      <select
+                        value={reviewFontFamily}
+                        onChange={(e) => {
+                          setReviewFontFamily(e.target.value)
+                        }}
+                        className="w-full px-2 py-1.5 text-sm rounded border border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      >
+                        {FONT_FAMILIES.map((font) => (
+                          <option key={font} value={font} style={{ fontFamily: font }}>
+                            {font}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-[var(--color-text-secondary)] mb-1.5 block">
+                        Font Size
+                      </label>
+                      <select
+                        value={reviewFontSize}
+                        onChange={(e) => {
+                          setReviewFontSize(Number(e.target.value))
+                        }}
+                        className="w-full px-2 py-1.5 text-sm rounded border border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      >
+                        {FONT_SIZES.map((size) => (
+                          <option key={size} value={size}>
+                            {size}pt
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="h-px bg-[var(--color-border)]" />
+
+                {/* Templates Section */}
+                <div className="p-2">
+                  <div className="px-3 py-2 text-xs font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider">
+                    Templates
+                  </div>
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => {
+                        setShowTemplates(!showTemplates)
+                        if (!showTemplates) {
+                          setShowMenu(false)
+                        }
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+                    >
+                      <LayoutTemplate size={18} />
+                      <span>Insert Template</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="h-px bg-[var(--color-border)]" />
+
+                {/* Theme Section */}
+                <div className="p-2">
+                  <div className="px-3 py-2 text-xs font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider">
+                    Appearance
+                  </div>
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => {
+                        setReviewTheme(reviewTheme === 'dark' ? 'light' : 'dark')
+                        setShowMenu(false)
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+                    >
+                      {reviewTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                      <span>Switch to {reviewTheme === 'dark' ? 'Light' : 'Dark'} Mode</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
-          </div>
 
-          <div className="w-px bg-[var(--color-border)] mx-1 my-1" />
-          
-          {/* Theme Toggle */}
-          <button
-            onClick={() => setReviewTheme(reviewTheme === 'dark' ? 'light' : 'dark')}
-            className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors text-[var(--color-text-secondary)]`}
-            title={`Switch to ${reviewTheme === 'dark' ? 'Light' : 'Dark'} Mode`}
-          >
-            {reviewTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
-
-          <div className="w-px bg-[var(--color-border)] mx-1 my-1" />
-          
-          {/* Auto Review Button */}
-          <button
-            onClick={handleAutoReview}
-            disabled={isAutoReviewing}
-            className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors ${isAutoReviewing ? 'opacity-50 cursor-not-allowed' : 'text-[var(--color-primary)]'}`}
-            title="Generate Auto Review (AI)"
-          >
-            {isAutoReviewing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-          </button>
-
-          <div className="w-px bg-[var(--color-border)] mx-1 my-1" />
-          <div className="relative">
-            <button
-                onClick={() => setShowTemplates(!showTemplates)}
-                className={`p-2 rounded hover:bg-[var(--color-background)] transition-colors ${showTemplates ? 'text-[var(--color-primary)] bg-[var(--color-background)]' : 'text-[var(--color-text-secondary)]'}`}
-                title="Insert Template"
-            >
-                <LayoutTemplate size={16} />
-            </button>
+            {/* Templates Dropdown (separate from menu) */}
             {showTemplates && (
-                <div className="absolute right-0 top-full mt-2 w-48 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl z-50 overflow-hidden">
+              <div className="absolute right-0 top-full mt-2 w-64 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl z-50 overflow-hidden">
+                <div className="p-2">
+                  <div className="px-3 py-2 text-xs font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider">
+                    Review Templates
+                  </div>
+                  <div className="space-y-1">
                     {Object.entries(TEMPLATES).map(([key, template]) => (
-                        <button
-                            key={key}
-                            onClick={() => {
-                                if (editor) {
-                                    // Ask for confirmation if there is content
-                                    if (!editor.isEmpty && !window.confirm('This will replace current content. Continue?')) {
-                                        return
-                                    }
-                                    editor.commands.setContent(template.content)
-                                    setReviewContent(template.content)
-                                    setShowTemplates(false)
-                                }
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-surface-hover)] text-[var(--color-text-primary)]"
-                        >
-                            {template.label}
-                        </button>
+                      <button
+                        key={key}
+                        onClick={() => {
+                          if (editor) {
+                            if (!editor.isEmpty && !window.confirm('This will replace current content. Continue?')) {
+                              return
+                            }
+                            editor.commands.setContent(template.content)
+                            setReviewContent(template.content)
+                            setShowTemplates(false)
+                            setShowMenu(false)
+                          }
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--color-surface-hover)] text-[var(--color-text-primary)] rounded-md transition-colors"
+                      >
+                        {template.label}
+                      </button>
                     ))}
+                  </div>
                 </div>
+              </div>
             )}
           </div>
         </div>
@@ -643,8 +793,9 @@ export const ReviewPanel: React.FC = () => {
       <div className="flex-1 p-6 overflow-y-auto">
         {/* Editor */}
         <div className="mb-8">
-            <h3 className="text-[var(--color-text-primary)] mb-4 font-medium">Review and Comments</h3>
             <div 
+              id="onboarding-review-editor"
+              data-onboarding="onboarding-review-editor"
               className={`min-h-[300px] max-h-[600px] p-4 rounded-lg border border-[var(--color-border)] transition-colors duration-200 overflow-y-auto ${
                 reviewTheme === 'dark' 
                   ? 'bg-[var(--color-background)] text-[var(--color-text-primary)]' 
@@ -688,6 +839,8 @@ export const ReviewPanel: React.FC = () => {
             {isSaving ? 'Saving...' : 'Auto-saved'}
           </span>
           <button 
+            id="onboarding-download-review"
+            data-onboarding="onboarding-download-review"
             onClick={handleDownloadReview}
             className="px-4 py-2 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-hover)] font-medium shadow-lg shadow-[var(--color-primary)]/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2"
           >

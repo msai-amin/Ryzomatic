@@ -4,6 +4,7 @@ import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
 import { pomodoroService } from '../src/services/pomodoroService'
 import { pomodoroGamificationService, StreakInfo, Achievement } from '../src/services/pomodoroGamificationService'
+import { timerService, TimerState } from '../src/services/timerService'
 import { AchievementPanel } from '../src/components/AchievementPanel'
 import { PomodoroDashboard } from '../src/components/PomodoroDashboard'
 import { RelatedDocumentsPanel } from '../src/components/RelatedDocumentsPanel'
@@ -41,6 +42,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
   const [achievements, setAchievements] = useState<Achievement[]>([])
   const [loading, setLoading] = useState(false)
   const [userDocuments, setUserDocuments] = useState<DocumentWithProgress[]>([])
+  const [timerState, setTimerState] = useState<TimerState>(timerService.getState())
   
   // Related Documents state
   const [relatedDocsLoading, setRelatedDocsLoading] = useState(false)
@@ -244,6 +246,19 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
     }
   }, [relatedDocuments, currentDocument?.id, user, refreshRelatedDocuments])
 
+  // Subscribe to timer state changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const unsubscribe = timerService.subscribe(setTimerState)
+    return unsubscribe
+  }, [])
+
+  const workDurationSeconds = timerState.settings.workDuration * 60
+  const isTimerPristine =
+    !timerState.isRunning &&
+    timerState.mode === 'work' &&
+    timerState.timeLeft === workDurationSeconds
+
   const railItems: Array<{
     id: string
     icon: React.ElementType
@@ -313,23 +328,6 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           >
             {isOpen ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
           </button>
-
-          {isOpen && (
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowPomodoroDashboard(true)}
-                className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
-                style={{
-                  borderColor: 'var(--color-border)',
-                  color: 'var(--color-text-primary)',
-                  backgroundColor: 'var(--color-surface-hover)'
-                }}
-              >
-                <Timer className="h-4 w-4" />
-                Focus Timer
-              </button>
-            </div>
-          )}
         </div>
 
         <div className="flex-1 overflow-hidden relative">
@@ -488,15 +486,17 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
                 {sectionsExpanded.related && (
                   <>
                     {currentDocument ? (
-                      <RelatedDocumentsPanel
-                        relatedDocuments={relatedDocuments}
-                        isLoading={relatedDocsLoading}
-                        onAddRelatedDocument={handleAddRelatedDocument}
-                        onPreviewDocument={handlePreviewDocument}
-                        onDeleteRelationship={handleDeleteRelationship}
-                        onOpenGraphView={() => setShowGraphModal(true)}
-                        onRelationshipCreated={refreshRelatedDocuments}
-                      />
+                      <div id="step-related-docs-sidebar">
+                        <RelatedDocumentsPanel
+                          relatedDocuments={relatedDocuments}
+                          isLoading={relatedDocsLoading}
+                          onAddRelatedDocument={handleAddRelatedDocument}
+                          onPreviewDocument={handlePreviewDocument}
+                          onDeleteRelationship={handleDeleteRelationship}
+                          onOpenGraphView={() => setShowGraphModal(true)}
+                          onRelationshipCreated={refreshRelatedDocuments}
+                        />
+                      </div>
                     ) : (
                       <div className="text-center py-6">
                         <FileText className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--color-text-tertiary)' }} />
@@ -728,22 +728,45 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
             }}
           >
               {railItems.map((item) => (
-                <Tooltip key={item.id} content={item.label} position="right">
+                item.id !== 'pomodoro' && (
+                  <Tooltip key={item.id} content={item.label} position="right">
+                    <button
+                      onClick={() => handleRailItemClick(item)}
+                      className="p-2 rounded-lg transition-colors"
+                      style={{
+                        backgroundColor: 'var(--color-surface)',
+                        color: 'var(--color-text-secondary)',
+                        border: '1px solid var(--color-border)'
+                      }}
+                      aria-label={item.label}
+                      title={item.label}
+                    >
+                      <item.icon className="w-5 h-5" />
+                    </button>
+                  </Tooltip>
+                )
+              ))}
+              
+              {/* Pomodoro Button */}
+              {user && currentDocument && (
+                <Tooltip content="Start Pomodoro timer" position="right">
                   <button
-                onClick={() => handleRailItemClick(item)}
+                    id="step-focus-timer"
+                    data-tour="pomodoro-button"
+                    onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
                     className="p-2 rounded-lg transition-colors"
                     style={{
                       backgroundColor: 'var(--color-surface)',
                       color: 'var(--color-text-secondary)',
                       border: '1px solid var(--color-border)'
                     }}
-                    aria-label={item.label}
-                    title={item.label}
+                    aria-label="Pomodoro"
+                    title="Pomodoro"
                   >
-                    <item.icon className="w-5 h-5" />
+                    🍅
                   </button>
                 </Tooltip>
-              ))}
+              )}
             </div>
         </div>
       </aside>
@@ -784,6 +807,8 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           {showGraphModal && user && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
               <div
+                id="onboarding-document-graph"
+                data-onboarding="onboarding-document-graph"
                 className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden"
                 style={{
                   backgroundColor: 'var(--color-surface)',
@@ -802,6 +827,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
                     </div>
                   </div>
                   <button
+                    data-onboarding="close-graph"
                     onClick={() => setShowGraphModal(false)}
                     className="p-2 rounded-lg transition-colors hover:bg-gray-100"
                     style={{ color: 'var(--color-text-secondary)' }}

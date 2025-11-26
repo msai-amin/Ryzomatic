@@ -5,7 +5,7 @@ import { FigureDrawer } from './FigureDrawer'
 
 export const EditorialLayout: React.FC = () => {
   return (
-    <div className="flex h-full w-full overflow-hidden">
+    <div id="onboarding-editorial-layout" data-onboarding="onboarding-editorial-layout" className="flex h-full w-full overflow-hidden">
       {/* Left Pane: PDF Viewer */}
       <div className="w-1/2 h-full relative border-r border-[var(--color-border)]">
         {/* We pass specific props or context to PDFViewerV2 if needed, but it uses global store */}

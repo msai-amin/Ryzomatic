@@ -15,6 +15,21 @@ export const PomodoroBottomBar: React.FC<PomodoroBottomBarProps> = ({ onExpand }
   
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 })
+
+  // Initialize position on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && position === null) {
+      // Calculate initial position from right-20 (80px from right) and top-4 (16px from top)
+      setPosition({
+        x: window.innerWidth - 120, // Approximate width + margin
+        y: 16
+      })
+    }
+  }, [position])
 
   // Subscribe to timer service
   useEffect(() => {
@@ -90,25 +105,93 @@ export const PomodoroBottomBar: React.FC<PomodoroBottomBarProps> = ({ onExpand }
     }
   }
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0 || !position) return // Only handle left mouse button
+    
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    })
+    setDragStartPos({ x: e.clientX, y: e.clientY })
+    setIsDragging(true)
+    e.preventDefault()
+  }
+
+  useEffect(() => {
+    if (!isDragging) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newX = e.clientX - dragOffset.x
+      const newY = e.clientY - dragOffset.y
+      
+      // Constrain to viewport (approximate width: 120px, height: 50px)
+      const maxX = window.innerWidth - 120
+      const maxY = window.innerHeight - 50
+      
+      setPosition({
+        x: Math.max(0, Math.min(newX, maxX)),
+        y: Math.max(0, Math.min(newY, maxY))
+      })
+    }
+
+    const handleMouseUp = (e: MouseEvent) => {
+      setIsDragging(false)
+      
+      // If it was a small movement (click), expand the timer
+      const dragDistance = Math.sqrt(
+        Math.pow(e.clientX - dragStartPos.x, 2) + 
+        Math.pow(e.clientY - dragStartPos.y, 2)
+      )
+      
+      // If movement was less than 5px, treat it as a click
+      if (dragDistance < 5) {
+        // Small delay to allow click handler to fire
+        setTimeout(() => {
+          setIsCollapsed(false)
+        }, 10)
+      }
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isDragging, dragOffset, dragStartPos])
+
   if (isCollapsed) {
     const renderInHeader = typeof document !== 'undefined' && !!document.getElementById('pomodoro-collapsed-anchor')
 
     const collapsedButton = (
       <div
-        className={`${renderInHeader ? 'inline-flex items-center transition-all duration-300 mr-2' : 'fixed top-4 right-20 z-50 transition-all duration-300'}`}
+        className={`${renderInHeader ? 'inline-flex items-center transition-all duration-300 mr-2' : 'fixed z-50 transition-all duration-300 select-none'} ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         style={{
           backgroundColor: modeInfo.bgColor,
           border: `1px solid ${modeInfo.borderColor}`,
           borderRadius: 'var(--border-radius-lg)',
-          boxShadow: renderInHeader ? 'none' : '0 4px 12px rgba(0, 0, 0, 0.15)'
+          boxShadow: renderInHeader ? 'none' : isDragging ? '0 10px 25px rgba(0, 0, 0, 0.3)' : '0 4px 12px rgba(0, 0, 0, 0.15)',
+          left: renderInHeader || position === null ? undefined : `${position.x}px`,
+          top: renderInHeader || position === null ? undefined : `${position.y}px`,
+          right: renderInHeader || position !== null ? undefined : '20px',
+          transform: renderInHeader ? undefined : isDragging ? 'scale(1.05)' : 'scale(1)',
+          userSelect: 'none'
         }}
+        onMouseDown={renderInHeader ? undefined : handleMouseDown}
       >
         <button
-          onClick={() => setIsCollapsed(false)}
+          onClick={() => {
+            // Only expand if we're not dragging
+            if (!isDragging) {
+              setIsCollapsed(false)
+            }
+          }}
           className="flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors"
-          style={{ color: modeInfo.color, backgroundColor: 'transparent' }}
+          style={{ color: modeInfo.color, backgroundColor: 'transparent', pointerEvents: isDragging ? 'none' : 'auto' }}
           onMouseEnter={(e) => {
-            if (!renderInHeader) {
+            if (!renderInHeader && !isDragging) {
               e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)'
             }
           }}

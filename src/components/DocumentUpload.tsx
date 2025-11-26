@@ -402,7 +402,12 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
         if (saveSucceeded) {
           addDocument(document, setAsCurrentDocument)
           resultingDocumentId = document.id
-          resultingDocumentId = document.id
+          // Dispatch custom event for onboarding to detect upload completion
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('document-uploaded', { 
+              detail: { documentId: document.id } 
+            }))
+          }
         } else {
           // Save failed and saveToLibrary was true - don't add document
           logger.warn(
@@ -581,6 +586,12 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
         if (saveSucceeded) {
           addDocument(document, setAsCurrentDocument);
           resultingDocumentId = document.id
+          // Dispatch custom event for onboarding to detect upload completion
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('document-uploaded', { 
+              detail: { documentId: document.id } 
+            }))
+          }
         } else {
           logger.warn(
             'Not adding EPUB document to store because save failed',
@@ -833,6 +844,12 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
       // CRITICAL: Add document to store AFTER saving (so it has the correct database ID)
       // Document has OCR status set to 'pending'
       addDocument(document, setAsCurrentDocument);
+      // Dispatch custom event for onboarding to detect upload completion
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('document-uploaded', { 
+          detail: { documentId: document.id } 
+        }))
+      }
 
       // Call OCR API endpoint
       // This will be polled in PDFViewer component
@@ -902,6 +919,12 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
       // CRITICAL: Add document to store AFTER saving (so it has the correct database ID)
       // Document has OCR status set to 'user_declined' (with limited text)
       addDocument(document, setAsCurrentDocument);
+      // Dispatch custom event for onboarding to detect upload completion
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('document-uploaded', { 
+          detail: { documentId: document.id } 
+        }))
+      }
 
       setOcrPendingData(null);
       onClose();

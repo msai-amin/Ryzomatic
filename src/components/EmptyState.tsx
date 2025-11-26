@@ -22,8 +22,29 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
   }, [openCustomReadingWizard])
 
   return (
-    <div className="flex flex-col items-center justify-center py-16 px-4">
+    <div 
+      className="flex flex-col items-center justify-center py-16 px-4 relative min-h-screen"
+      style={{
+        backgroundImage: 'url(/onboarding-images/default-pdf-background.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundBlendMode: 'overlay',
+      }}
+    >
+      {/* Overlay to ensure text readability */}
       <div 
+        className="absolute inset-0"
+        style={{
+          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        }}
+      />
+      <div 
+        id="onboarding-welcome"
+        data-onboarding="onboarding-welcome"
+        className="flex flex-col items-center justify-center relative z-10"
+      >
+        <div 
         className="w-24 h-24 rounded-full flex items-center justify-center mb-6 animate-bounce-subtle"
         style={{
           background: 'linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-primary) 100%)',
@@ -41,6 +62,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
         Upload a document to get started. Our AI assistant can help you understand, 
         summarize, and answer questions about your content.
       </p>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-2xl">
         <div 
@@ -99,6 +121,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
         </div>
         
         <button
+          id="step-custom-reading-card"
           className="text-center p-6 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg"
           style={{
             backgroundColor: 'var(--color-surface)',

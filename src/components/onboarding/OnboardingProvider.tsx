@@ -1,30 +1,25 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react'
 import { useAppStore } from '../../store/appStore'
+import { TourStep } from './SpotlightTour'
+import { TTS_TOUR_STEPS, RELATED_DOCS_TOUR_STEPS, PEER_REVIEW_TOUR_STEPS, WELCOME_STEP } from './tourSteps'
+import { createMockDocument, createMockRelatedDocuments } from './mockDocument'
+import { Document } from '../../store/appStore'
+import { DocumentRelationshipWithDetails } from '../../../lib/supabase'
 
-export interface OnboardingStep {
-  id: string
-  title: string
-  description: string
-  target?: string
-  placement?: 'top' | 'bottom' | 'left' | 'right' | 'center'
-  action?: () => void
-  skipable?: boolean
-  required?: boolean
-  category: 'welcome' | 'document' | 'ai' | 'productivity' | 'advanced'
-}
+export type TourType = 'tts' | 'relatedDocs' | 'peerReview' | null
 
 export interface OnboardingContextType {
   isActive: boolean
   currentStep: number
-  steps: OnboardingStep[]
-  startOnboarding: (category?: string) => void
+  currentTour: TourType
+  tourSteps: TourStep[]
+  startTour: (tourType: TourType) => void
   nextStep: () => void
   previousStep: () => void
-  skipStep: () => void
-  completeOnboarding: () => void
-  closeOnboarding: () => void
-  isStepCompleted: (stepId: string) => boolean
-  markStepCompleted: (stepId: string) => void
+  skipTour: () => void
+  completeTour: () => void
+  closeTour: (dontShowAgain?: boolean) => void
+  handleTourAction: (action: string) => void
 }
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined)
@@ -42,179 +37,101 @@ interface OnboardingProviderProps {
 }
 
 export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children }) => {
-  const { user, currentDocument } = useAppStore()
+  const { 
+    user, 
+    currentDocument, 
+    setCurrentDocument, 
+    setRelatedDocuments,
+    setEditorialMode
+  } = useAppStore()
+  
   const [isActive, setIsActive] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
-  const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set())
-  const [steps, setSteps] = useState<OnboardingStep[]>([])
+  const [currentTour, setCurrentTour] = useState<TourType>(null)
+  const [tourSteps, setTourSteps] = useState<TourStep[]>([])
+  
+  // Store previous document state to restore after onboarding
+  const previousDocumentRef = useRef<Document | null>(null)
+  const previousRelatedDocsRef = useRef<DocumentRelationshipWithDetails[]>([])
 
-  // Define onboarding steps based on app features
-  const allSteps: OnboardingStep[] = [
-    // Welcome & Getting Started
-    {
-      id: 'welcome',
-      title: 'Welcome to ryzomatic! 🎓',
-      description: 'Let\'s take a quick tour to help you get the most out of your reading experience. We\'ll show you the key features step by step.',
-      placement: 'center',
-      category: 'welcome',
-      skipable: false,
-      required: true
-    },
-    {
-      id: 'upload-document',
-      title: 'Upload Your First Document 📄',
-      description: 'Click the "New Material" button to upload a PDF or text document. This is where your reading journey begins!',
-      target: '[data-tour="upload-button"]',
-      placement: 'bottom',
-      category: 'document',
-      skipable: true,
-      required: true
-    },
-    {
-      id: 'document-library',
-      title: 'Document Library 📚',
-      description: 'Access all your uploaded documents here. Organize them with tags, search through them, and track your reading progress.',
-      target: '[data-tour="library-button"]',
-      placement: 'bottom',
-      category: 'document',
-      skipable: true
-    },
-    
-    // AI Features
-    {
-      id: 'ai-chat',
-      title: 'AI Chat Assistant 🤖',
-      description: 'Click here to open the AI chat. Select text in your document and right-click to get AI explanations, summaries, or further reading suggestions.',
-      target: '[data-tour="chat-button"]',
-      placement: 'bottom',
-      category: 'ai',
-      skipable: true
-    },
-    {
-      id: 'text-selection',
-      title: 'Smart Text Selection ✨',
-      description: 'Select any text in your document and right-click to access AI features like clarification, further reading, or saving notes.',
-      target: 'body',
-      placement: 'center',
-      category: 'ai',
-      skipable: true
-    },
-    
-    // Productivity Features
-    {
-      id: 'pomodoro-timer',
-      title: 'Focus with Pomodoro Timer 🍅',
-      description: 'Boost your reading focus with our Pomodoro timer! Click here to start a 25-minute focused reading session, followed by a 5-minute break. Perfect for maintaining concentration during long study sessions.',
-      target: '[data-tour="pomodoro-button"]',
-      placement: 'bottom',
-      category: 'productivity',
-      skipable: true
-    },
-    {
-      id: 'pomodoro-stats',
-      title: 'Track Your Progress 📊',
-      description: 'View your reading statistics and Pomodoro sessions in the sidebar. See how much time you\'ve spent reading, your focus patterns, and celebrate your productivity achievements!',
-      target: '[data-tour="sidebar-stats"]',
-      placement: 'right',
-      category: 'productivity',
-      skipable: true
-    },
-    {
-      id: 'pomodoro-widget',
-      title: 'Floating Pomodoro Widget ⏱️',
-      description: 'See that floating timer in the corner? You can drag it anywhere on screen! Click the expand button to open the full Pomodoro dashboard with detailed controls and settings.',
-      target: 'body',
-      placement: 'center',
-      category: 'productivity',
-      skipable: true
-    },
-    {
-      id: 'highlighting',
-      title: 'Smart Highlighting & Annotations 🎨',
-      description: 'Highlight important text with different colors to organize your thoughts. Each color has a special meaning: yellow for interesting points, blue for key concepts, red for critiques, green for evidence, and teal for questions.',
-      target: 'body',
-      placement: 'center',
-      category: 'productivity',
-      skipable: true
-    },
-    {
-      id: 'annotation-colors',
-      title: 'Color-Coded Annotations 📝',
-      description: 'Right-click on highlighted text to add notes, edit annotations, or change colors. This helps you build a personal knowledge base as you read.',
-      target: 'body',
-      placement: 'center',
-      category: 'productivity',
-      skipable: true
-    },
-    
-    // Advanced Features
-    {
-      id: 'settings',
-      title: 'Customize Your Experience ⚙️',
-      description: 'Adjust typography, themes, and reading preferences to match your style. Make the app truly yours!',
-      target: '[data-tour="settings-button"]',
-      placement: 'bottom',
-      category: 'advanced',
-      skipable: true
-    },
-    {
-      id: 'keyboard-shortcuts',
-      title: 'Keyboard Shortcuts ⌨️',
-      description: 'Use keyboard shortcuts for faster navigation. Press Ctrl+/ (or Cmd+/) to see all available shortcuts.',
-      target: 'body',
-      placement: 'center',
-      category: 'advanced',
-      skipable: true
-    }
-  ]
-
-  // Filter steps based on context
+  // Auto-start welcome screen for new users
   useEffect(() => {
-    let filteredSteps = allSteps
-
-    // If no document is loaded, prioritize document-related steps
-    if (!currentDocument) {
-      filteredSteps = allSteps.filter(step => 
-        step.category === 'welcome' || 
-        step.category === 'document' ||
-        step.id === 'ai-chat' // Show AI chat even without document
-      )
-    }
-
-    setSteps(filteredSteps)
-  }, [currentDocument])
-
-  // Auto-start onboarding for new users
-  useEffect(() => {
-    if (user && !isActive && steps.length > 0) {
+    if (user && !isActive) {
       const hasCompletedOnboarding = localStorage.getItem('onboarding-completed')
       const hasDismissedOnboarding = localStorage.getItem('onboarding-dismissed')
-      // Only start onboarding if user hasn't completed it AND hasn't dismissed it
       if (!hasCompletedOnboarding && !hasDismissedOnboarding) {
-        // Small delay to ensure UI is rendered
+        // Show welcome screen after brief delay
         const timer = setTimeout(() => {
-          startOnboarding()
+          setIsActive(true)
+          setTourSteps([WELCOME_STEP])
+          setCurrentStep(0)
         }, 1500)
         return () => clearTimeout(timer)
       }
     }
-  }, [user, isActive, steps.length])
+  }, [user, isActive])
 
-  const startOnboarding = (category?: string) => {
-    let filteredSteps = steps
-    if (category) {
-      filteredSteps = steps.filter(step => step.category === category)
+  const loadMockDocument = () => {
+    // Save current state
+    previousDocumentRef.current = currentDocument
+    previousRelatedDocsRef.current = useAppStore.getState().relatedDocuments
+    
+    // Load mock document
+    const mockDoc = createMockDocument()
+    setCurrentDocument(mockDoc)
+    
+    // Load mock related documents
+    const mockRelatedDocs = createMockRelatedDocuments()
+    setRelatedDocuments(mockRelatedDocs)
+  }
+
+  const restorePreviousState = () => {
+    // Restore previous document or clear if none
+    if (previousDocumentRef.current) {
+      setCurrentDocument(previousDocumentRef.current)
+      setRelatedDocuments(previousRelatedDocsRef.current)
+    } else {
+      setCurrentDocument(null)
+      setRelatedDocuments([])
     }
-    setSteps(filteredSteps)
+    
+    // Clear refs
+    previousDocumentRef.current = null
+    previousRelatedDocsRef.current = []
+  }
+
+  const startTour = (tourType: TourType) => {
+    if (!tourType) return
+
+    // Load mock document for the tour (except for peer review which loads it after first step)
+    if (tourType !== 'peerReview') {
+      loadMockDocument()
+    }
+
+    // Set tour steps based on type
+    let steps: TourStep[] = []
+    switch (tourType) {
+      case 'tts':
+        steps = TTS_TOUR_STEPS
+        break
+      case 'relatedDocs':
+        steps = RELATED_DOCS_TOUR_STEPS
+        break
+      case 'peerReview':
+        steps = PEER_REVIEW_TOUR_STEPS
+        // For peer review, load document after first step
+        break
+    }
+
+    setTourSteps(steps)
+    setCurrentTour(tourType)
     setCurrentStep(0)
     setIsActive(true)
   }
 
   const nextStep = () => {
-    if (currentStep < steps.length - 1) {
+    if (currentStep < tourSteps.length - 1) {
       setCurrentStep(currentStep + 1)
-    } else {
-      completeOnboarding()
     }
   }
 
@@ -224,52 +141,118 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     }
   }
 
-  const skipStep = () => {
-    const currentStepData = steps[currentStep]
-    if (currentStepData) {
-      markStepCompleted(currentStepData.id)
+  const skipTour = () => {
+    restorePreviousState()
+    setIsActive(false)
+    setCurrentStep(0)
+    setCurrentTour(null)
+    setTourSteps([])
+  }
+
+  const completeTour = () => {
+    // Return to welcome menu instead of closing
+    restorePreviousState()
+    setEditorialMode(false) // Ensure editorial mode is off
+    setTourSteps([WELCOME_STEP])
+    setCurrentStep(0)
+    setCurrentTour(null)
+    setIsActive(true) // Keep onboarding active to show welcome menu
+  }
+
+  const closeTour = (dontShowAgain: boolean = false) => {
+    if (dontShowAgain) {
+      localStorage.setItem('onboarding-completed', 'true')
+    } else {
+      localStorage.setItem('onboarding-dismissed', 'true')
     }
-    nextStep()
-  }
-
-  const completeOnboarding = () => {
-    localStorage.setItem('onboarding-completed', 'true')
+    restorePreviousState()
     setIsActive(false)
     setCurrentStep(0)
+    setCurrentTour(null)
+    setTourSteps([])
   }
 
-  const closeOnboarding = () => {
-    // Save dismissal flag so it doesn't pop up again
-    localStorage.setItem('onboarding-dismissed', 'true')
-    setIsActive(false)
-    setCurrentStep(0)
+  const handleTourAction = (action: string) => {
+    switch (action) {
+      case 'startTTSTour':
+        startTour('tts')
+        break
+      case 'startRelatedDocsTour':
+        startTour('relatedDocs')
+        break
+      case 'startPeerReviewTour':
+        startTour('peerReview')
+        break
+      case 'openRelevanceAnalysis':
+        // For now, just advance to next step (relevance analysis would open a modal)
+        // In a real implementation, this would open the relevance analysis view
+        setTimeout(() => {
+          nextStep()
+        }, 500)
+        break
+      case 'openGraph':
+        // Trigger graph modal via button click
+        const graphButton = document.querySelector('[data-onboarding="graph-button"]') as HTMLElement
+        if (graphButton) {
+          graphButton.click()
+        }
+        // Auto-advance after graph opens
+        setTimeout(() => {
+          nextStep()
+        }, 500)
+        break
+      case 'closeGraph':
+        // Find and click close button in graph modal
+        const closeButton = document.querySelector('[data-onboarding="close-graph"], .modal-close, [aria-label="Close"]') as HTMLElement
+        if (closeButton) {
+          closeButton.click()
+        }
+        // Auto-advance after graph closes
+        setTimeout(() => {
+          nextStep()
+        }, 300)
+        break
+      case 'waitForDocument':
+        // Load mock document and wait for it to be ready
+        loadMockDocument()
+        // Wait a bit for document to load, then advance
+        setTimeout(() => {
+          nextStep()
+        }, 800)
+        break
+      case 'openPeerReview':
+        setEditorialMode(true)
+        // Auto-advance after editorial mode opens
+        setTimeout(() => {
+          nextStep()
+        }, 500)
+        break
+      case 'finishTour':
+        completeTour()
+        break
+      default:
+        console.warn(`Unknown tour action: ${action}`)
+    }
   }
 
-  const isStepCompleted = (stepId: string) => {
-    return completedSteps.has(stepId)
-  }
-
-  const markStepCompleted = (stepId: string) => {
-    setCompletedSteps(prev => new Set([...prev, stepId]))
-  }
-
-  const contextValue: OnboardingContextType = {
+  const value: OnboardingContextType = {
     isActive,
     currentStep,
-    steps,
-    startOnboarding,
+    currentTour,
+    tourSteps,
+    startTour,
     nextStep,
     previousStep,
-    skipStep,
-    completeOnboarding,
-    closeOnboarding,
-    isStepCompleted,
-    markStepCompleted
+    skipTour,
+    completeTour,
+    closeTour,
+    handleTourAction,
   }
 
   return (
-    <OnboardingContext.Provider value={contextValue}>
+    <OnboardingContext.Provider value={value}>
       {children}
     </OnboardingContext.Provider>
   )
 }
+

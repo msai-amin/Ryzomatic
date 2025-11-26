@@ -26,7 +26,7 @@ import { highlightService, Highlight as HighlightType } from '../services/highli
 import { useTheme } from '../../themes/ThemeProvider'
 import { getPDFWorkerSrc, configurePDFWorker } from '../utils/pdfjsConfig'
 import { parseTextWithBreaks, TextSegment } from '../utils/readingModeUtils'
-import { Eye, BookOpen, FileText, Type, Highlighter, Sparkles, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ZoomIn, ZoomOut, RotateCw, Search, Palette, Moon, Sun, Maximize2, StickyNote, Library, Upload, MousePointer, Save, MessageSquare, Lightbulb, X, PenTool } from 'lucide-react'
+import { Eye, BookOpen, FileText, Type, Highlighter, Sparkles, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ZoomIn, ZoomOut, RotateCw, Search, Palette, Moon, Sun, Maximize2, StickyNote, Library, Upload, MousePointer, Save, MessageSquare, Lightbulb, X, PenTool, ChevronUp, ChevronDown } from 'lucide-react'
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { notesService } from '../services/notesService'
@@ -175,7 +175,13 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const [showLibrary, setShowLibrary] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(isEditorialMode)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Sync header collapsed state with editorial mode
+  useEffect(() => {
+    setIsHeaderCollapsed(isEditorialMode)
+  }, [isEditorialMode])
   const [selectionEnabled, setSelectionEnabled] = useState(true)
 
   // CRITICAL: Update color state when safeAnnotationColors changes
@@ -2243,44 +2249,32 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       >
         {/* Custom Toolbar */}
         <div 
-          className="flex flex-wrap items-center justify-center gap-4 px-4 py-3 border-b"
+          className="flex flex-wrap items-center justify-center gap-4 px-4 py-3 border-b transition-all duration-300"
           style={{ 
             backgroundColor: 'var(--color-surface)', 
             borderColor: 'var(--color-border)',
-            minHeight: '60px'
+            minHeight: isHeaderCollapsed ? '48px' : '60px',
+            overflow: isHeaderCollapsed ? 'hidden' : 'visible',
+            maxHeight: isHeaderCollapsed ? '48px' : 'none'
           }}
           onContextMenu={handleContextMenu}
         >
-          {/* Download (replaces Library in viewer header) */}
+          {/* Collapse/Expand Button */}
           <button
-            onClick={handleDownload}
-            className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
-            style={{ 
-              color: 'var(--color-text-primary)', 
-              backgroundColor: 'transparent',
-              border: '1px solid var(--color-border)'
-            }}
-            title="Download PDF"
-          >
-            <Download className="w-5 h-5" />
-          </button>
-          
-          {/* Upload */}
-          <button
-            onClick={() => setShowUpload(true)}
+            onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
             className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
             style={{ 
               color: 'var(--color-text-primary)', 
               backgroundColor: 'transparent'
             }}
-            title="Upload Document"
+            title={isHeaderCollapsed ? 'Expand Header' : 'Collapse Header'}
+            aria-label={isHeaderCollapsed ? 'Expand Header' : 'Collapse Header'}
           >
-            <Upload className="w-5 h-5" />
+            {isHeaderCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
           </button>
           
-          {/* Separator */}
-          <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
-          
+          {!isHeaderCollapsed && (
+            <>
           {/* Fullscreen */}
           <button
             onClick={toggleFullscreen}
@@ -2556,7 +2550,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           >
             <MousePointer className="w-5 h-5" />
           </button>
-          
+          </>
+          )}
         </div>
         
         

@@ -6,7 +6,6 @@ import {
   User,
   LogOut,
   Sparkles,
-  Timer,
   HelpCircle,
   ChevronDown,
   X,
@@ -14,7 +13,8 @@ import {
   Volume2,
   StickyNote,
   Library,
-  PenTool
+  PenTool,
+  Timer
 } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { TypographySettings } from '../src/components/TypographySettings'
@@ -22,7 +22,6 @@ import { GeneralSettings } from '../src/components/GeneralSettings'
 import { LibraryModal } from '../src/components/LibraryModal'
 import { AuthModal } from '../src/components/AuthModal'
 import { Tooltip } from '../src/components/Tooltip'
-import { timerService, TimerState } from '../src/services/timerService'
 import { UnsavedChangesDialog } from '../src/components/UnsavedChangesDialog'
 
 interface ThemedHeaderProps {
@@ -34,7 +33,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
   const headerRef = useRef<HTMLDivElement>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const userButtonRef = useRef<HTMLButtonElement>(null)
-  const [timerState, setTimerState] = useState<TimerState>(timerService.getState())
   const {
     toggleChat,
     currentDocument,
@@ -109,11 +107,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
   }
 
   useEffect(() => {
-    const unsubscribe = timerService.subscribe(setTimerState)
-    return unsubscribe
-  }, [])
-
-  useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') {
       return
     }
@@ -176,12 +169,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     }
   }, [])
 
-  const workDurationSeconds = timerState.settings.workDuration * 60
-  const isTimerPristine =
-    !timerState.isRunning &&
-    timerState.mode === 'work' &&
-    timerState.timeLeft === workDurationSeconds
-
   const openLibrary = () => {
     if (user) {
       setShowLibrary(true)
@@ -234,23 +221,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                 <Library className="h-4 w-4" />
                 <span>Library</span>
               </button>
-              
-              {/* Navigation: Peer Review */}
-              {currentDocument && (
-                <button
-                  onClick={() => setEditorialMode(!isEditorialMode)}
-                  className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)]"
-                  style={{ 
-                    color: isEditorialMode ? 'var(--color-primary)' : 'var(--color-text-primary)',
-                    backgroundColor: isEditorialMode ? 'var(--color-surface-hover)' : 'transparent',
-                  }}
-                  aria-label="Toggle Peer Review Mode"
-                  title="Open Peer Review Panel"
-                >
-                  <PenTool className="h-4 w-4" />
-                  <span>Peer Review</span>
-                </button>
-              )}
             </nav>
           </div>
 
@@ -299,25 +269,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                 </>
               )}
               
-              {user && currentDocument && isTimerPristine && (
-                <Tooltip content="Start Pomodoro timer" position="bottom">
-                  <button
-                    data-tour="pomodoro-button"
-                    onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
-                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all"
-                    style={{ 
-                      backgroundColor: 'transparent', 
-                      border: '1px solid var(--color-border)',
-                      color: 'var(--color-text-primary)',
-                      fontSize: '1.35rem' 
-                    }}
-                    aria-label="Toggle Pomodoro timer"
-                  >
-                    🍅
-                  </button>
-                </Tooltip>
-              )}
-
               <Tooltip content="Ask the AI Assistant" position="bottom">
                 <button
                   data-tour="ai-assistant-button"
@@ -349,6 +300,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
               <div className="flex items-center gap-2">
                 <Tooltip content="Upload new material" position="bottom">
                   <button
+                    id="step-new-material-btn"
                     data-tour="upload-button"
                     onClick={onUploadClick}
                     className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors hover:opacity-90"
@@ -561,6 +513,26 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                 >
                   <StickyNote className="h-4 w-4" />
                   <span>{isRightSidebarOpen ? 'Hide Panel' : 'Notes & Highlights'}</span>
+                </button>
+              </Tooltip>
+
+              {/* Peer Review */}
+              <Tooltip content="Toggle Peer Review Mode" position="bottom">
+                <button
+                  id="onboarding-peer-review-btn"
+                  data-onboarding="onboarding-peer-review-btn"
+                  onClick={() => setEditorialMode(!isEditorialMode)}
+                  className="flex items-center gap-2 rounded-lg border px-3 py-1 text-sm font-medium transition-colors"
+                  style={{
+                    color: isEditorialMode ? 'var(--color-primary)' : 'var(--color-primary)',
+                    borderColor: isEditorialMode ? 'var(--color-primary)' : 'var(--color-primary)',
+                    backgroundColor: isEditorialMode ? 'var(--color-primary-light)' : 'transparent'
+                  }}
+                  aria-label="Toggle Peer Review Mode"
+                  title="Open Peer Review Panel"
+                >
+                  <PenTool className="h-4 w-4" />
+                  <span>Peer Review</span>
                 </button>
               </Tooltip>
             </div>
