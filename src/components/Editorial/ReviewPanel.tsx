@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Bold, Italic, List, ListOrdered, Quote, LayoutTemplate, Sun, Moon, Sparkles, Loader2, Download, Type, Menu, X } from 'lucide-react'
+import { Bold, Italic, List, ListOrdered, Quote, LayoutTemplate, Sun, Moon, Sparkles, Loader2, Download, Type, Menu, X, MessageSquare } from 'lucide-react'
 import { autoReviewService } from '../../services/ai/autoReviewService'
 import { peerReviewService } from '../../services/peerReviewService'
 import { useAppStore } from '../../store/appStore'
@@ -106,7 +106,10 @@ export const ReviewPanel: React.FC = () => {
     setReviewFontSize,
     setReviewTheme,
     currentDocument, 
-    user 
+    user,
+    toggleChat,
+    addChatMessage,
+    isChatOpen
   } = useAppStore()
   const [showTemplates, setShowTemplates] = useState(false)
   const [isAutoReviewing, setIsAutoReviewing] = useState(false)
@@ -196,6 +199,51 @@ export const ReviewPanel: React.FC = () => {
     } finally {
         setIsAutoReviewing(false)
     }
+  }
+
+  // Send review to AI Assistant
+  const handleSendToAIAssistant = () => {
+    // Get the latest content directly from the editor
+    const currentContent = editor?.getHTML() || reviewContent || ''
+    
+    // Convert HTML to plain text for better AI processing
+    const tempDiv = document.createElement('div')
+    tempDiv.innerHTML = currentContent
+    const textContent = tempDiv.textContent || tempDiv.innerText || ''
+    const hasContent = textContent.trim().length > 0
+
+    if (!currentContent || !hasContent) {
+      alert('Review content is empty. Please write your review before sending to AI Assistant.')
+      return
+    }
+
+    if (!currentDocument) {
+      alert('No document is open. Please open a document first.')
+      return
+    }
+
+    // Open chat if it's not already open
+    if (!isChatOpen) {
+      toggleChat()
+    }
+
+    // Add a system message indicating the review is now in context
+    const contextMessageId = `review-context-${Date.now()}`
+    addChatMessage({
+      role: 'assistant',
+      content: `✅ Your peer review has been added to the chat context. You can now ask me questions about your review, request feedback, or ask for suggestions to improve it.\n\nReview length: ${textContent.trim().split(/\s+/).length} words`,
+      id: contextMessageId
+    })
+
+    // Store the review text in a way that it can be used as context for future messages
+    // We'll add it as a special user message that provides context
+    // The review text will be available when the user asks questions
+    const reviewContextId = `review-text-${Date.now()}`
+    addChatMessage({
+      role: 'user',
+      content: `[Review Context Added]\n\n${textContent.trim()}`,
+      id: reviewContextId
+    })
   }
 
   // Download as DOCX and submit review
@@ -838,15 +886,30 @@ export const ReviewPanel: React.FC = () => {
             <div className={`w-2 h-2 rounded-full ${isSaving ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`}></div>
             {isSaving ? 'Saving...' : 'Auto-saved'}
           </span>
-          <button 
-            id="onboarding-download-review"
-            data-onboarding="onboarding-download-review"
-            onClick={handleDownloadReview}
-            className="px-4 py-2 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-hover)] font-medium shadow-lg shadow-[var(--color-primary)]/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2"
-          >
-            <Download size={16} />
-                    Download Review
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={handleSendToAIAssistant}
+              className="px-4 py-2 border rounded hover:bg-[var(--color-surface-hover)] font-medium transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2"
+              style={{
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)',
+                backgroundColor: 'var(--color-surface)'
+              }}
+              title="Send review to AI Assistant for feedback"
+            >
+              <MessageSquare size={16} />
+              Send to AI Assistant
+            </button>
+            <button 
+              id="onboarding-download-review"
+              data-onboarding="onboarding-download-review"
+              onClick={handleDownloadReview}
+              className="px-4 py-2 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-hover)] font-medium shadow-lg shadow-[var(--color-primary)]/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2"
+            >
+              <Download size={16} />
+              Download Review
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -290,7 +290,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                   aria-label="Toggle AI assistant"
                 >
                   <Sparkles className="h-4 w-4" />
-                  <span>AI Chat</span>
+                  <span>AI Assistant</span>
                 </button>
               </Tooltip>
             </div>

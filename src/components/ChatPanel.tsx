@@ -137,6 +137,16 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ onClose }) => {
         documentContext = currentDocument.content
       }
 
+      // Check for review context in chat messages and include it
+      const reviewContextMessage = chatMessages.find(
+        msg => msg.role === 'user' && msg.content.startsWith('[Review Context Added]')
+      )
+      if (reviewContextMessage) {
+        // Extract review text (remove the prefix)
+        const reviewText = reviewContextMessage.content.replace('[Review Context Added]\n\n', '')
+        documentContext = `Peer Review Context:\n${reviewText}\n\n---\n\nDocument Content:\n${documentContext}`
+      }
+
       if (includeNotes) {
         const relevantNotes = notesIntegrationService.getRelevantNotes(
           currentDocument.id,
@@ -234,7 +244,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ onClose }) => {
   return (
     <div className="flex h-full flex-col">
       <div
-        className="flex items-center justify-between gap-3 pb-4"
+        className="flex items-center justify-between gap-3 px-6 pb-4"
         data-chat-header
         style={{ borderBottom: '1px solid var(--color-border)' }}
       >
@@ -309,7 +319,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ onClose }) => {
         </div>
       </div>
 
-      <div className="flex-1 space-y-6 overflow-y-auto py-6 pr-1">
+      <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
         {showEmptyState ? (
           <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
             <div
@@ -358,7 +368,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ onClose }) => {
           <>
             {chatMessages.length === 0 && currentDocument && (
               <div
-                className="rounded-lg border p-4 text-sm"
+                className="rounded-lg border px-6 py-4 text-sm"
                 style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
               >
                 Ask anything about "{currentDocument.name}" or select text in the document for
