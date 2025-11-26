@@ -445,7 +445,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                 // Only fixes canvases that are clearly under-resolved (internal resolution < style * DPR)
                 if (typeof window !== 'undefined' && window.MutationObserver) {
                     const fixCanvasResolution = (canvas: HTMLCanvasElement) => {
-                        if (canvas._dprFixed) return // Already fixed
+                        if ((canvas as any)._dprFixed) return // Already fixed
                         
                         const rect = canvas.getBoundingClientRect()
                         if (!rect.width || !rect.height) return
@@ -464,17 +464,21 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                             currentHeight < expectedHeight * (1 - tolerance)) {
                             
                             // Store original style dimensions
-                            const originalStyleWidth = canvas.style.width || styleWidth + 'px'
-                            const originalStyleHeight = canvas.style.height || styleHeight + 'px'
+                            const originalStyleWidth = canvas.style.width || `${styleWidth}px`
+                            const originalStyleHeight = canvas.style.height || `${styleHeight}px`
                             
                             // Set internal resolution to match DPR
                             canvas.width = expectedWidth
                             canvas.height = expectedHeight
-                            canvas.style.width = originalStyleWidth
-                            canvas.style.height = originalStyleHeight
+                            if (originalStyleWidth) {
+                              canvas.style.width = originalStyleWidth
+                            }
+                            if (originalStyleHeight) {
+                              canvas.style.height = originalStyleHeight
+                            }
                             
                             // Mark as fixed to prevent re-processing
-                            canvas._dprFixed = true
+                            (canvas as any)._dprFixed = true
                             
                             console.log('✅ PDFViewerV2: Fixed canvas resolution', {
                                 dpr,
@@ -512,7 +516,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                     
                     // Also check existing canvases
                     const checkExistingCanvases = () => {
-                        const canvases = document.querySelectorAll('.pdf-viewer-container canvas, .rpv-core__canvas-layer canvas')
+                        const canvases = window.document.querySelectorAll('.pdf-viewer-container canvas, .rpv-core__canvas-layer canvas')
                         canvases.forEach((canvas) => {
                             if (canvas instanceof HTMLCanvasElement) {
                                 requestAnimationFrame(() => {
@@ -523,8 +527,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                     }
                     
                     // Start observing when DOM is ready
-                    if (document.body) {
-                        canvasObserver.observe(document.body, {
+                    if (window.document.body) {
+                        canvasObserver.observe(window.document.body, {
                             childList: true,
                             subtree: true
                         })
@@ -532,7 +536,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                         setTimeout(checkExistingCanvases, 100)
                     } else {
                         window.addEventListener('DOMContentLoaded', () => {
-                            canvasObserver.observe(document.body, {
+                            canvasObserver.observe(window.document.body, {
                                 childList: true,
                                 subtree: true
                             })
@@ -704,6 +708,18 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     }
     setContextMenu(null)
   }, [normalizedDocumentId, normalizedUserId, normalizedCurrentPage, pageTextsLength, userId]) // Use length (number) instead of array - document?.id is same as normalizedDocumentId
+
+  const handleIncludeInReview = useCallback(() => {
+    // Access normalizedPageTexts from closure - it's guaranteed to be an array
+    const pageText = normalizedPageTexts[normalizedCurrentPage - 1]
+    const context = getPDFTextSelectionContext(normalizedCurrentPage, pageText)
+    if (context && context.selectedText) {
+      const citation = `> "${context.selectedText}" (Page ${normalizedCurrentPage})`
+      addReviewCitation(citation)
+      console.log('Citation added to review')
+    }
+    setContextMenu(null)
+  }, [normalizedCurrentPage, pageTextsLength, addReviewCitation]) // Use length (number) instead of array
 
   // Sync highlights ref with state
   // CRITICAL: Use array length instead of array reference to prevent React comparison issues

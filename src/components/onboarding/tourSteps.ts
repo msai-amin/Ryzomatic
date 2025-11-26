@@ -12,6 +12,7 @@ export const TTS_TOUR_STEPS: TourStep[] = [
     buttonLabel: 'Next',
     icon: '🔊',
     visualHint: 'audio',
+    image: '/onboarding-images/02.tts-audio-widget-detail.png',
   },
   {
     targetId: 'onboarding-tts-play',
@@ -40,7 +41,7 @@ export const TTS_TOUR_STEPS: TourStep[] = [
     body: 'Select how much to read using the tabs at the top: "Paragraph" for current paragraph, "Page" for the entire page, or "Continue" to read from your last position. Perfect for resuming long reading sessions.',
     buttonLabel: 'Continue to Related Documents',
     icon: '📖',
-    image: '/onboarding-images/tts-audio-widget-full-document.png',
+    image: '/onboarding-images/03-main-UI-after-upload.png',
   },
 ]
 
@@ -56,7 +57,7 @@ export const RELATED_DOCS_TOUR_STEPS: TourStep[] = [
     buttonLabel: 'Next',
     icon: '🔗',
     visualHint: 'document',
-    image: '/onboarding-images/related-docs-empty.png',
+    image: '/onboarding-images/04-related-documents1.png',
   },
   {
     targetId: 'onboarding-related-doc-card',
@@ -65,16 +66,16 @@ export const RELATED_DOCS_TOUR_STEPS: TourStep[] = [
     buttonLabel: 'View Analysis',
     action: 'openRelevanceAnalysis',
     icon: '📋',
-    image: '/onboarding-images/related-docs-with-document.png',
+    image: '/onboarding-images/05-related-documents2.png',
   },
   {
     targetId: 'onboarding-relevance-analysis',
     title: 'Relevance Analysis',
-    body: 'Click on any related document card to see a detailed relevance analysis. The analysis shows overall relevance percentage and breaks it down by keywords (40%), topics (30%), themes (20%), and summary (10%). Higher percentages indicate stronger connections between documents.',
+    body: 'Click on any related document card to see a detailed relevance analysis. The analysis shows overall relevance percentage and breaks it down by keywords, topics, themes, and summary. Higher percentages indicate stronger connections between documents.',
     buttonLabel: 'View Graph',
     action: 'openGraph',
     icon: '📊',
-    image: '/onboarding-images/relevance-analysis.png',
+    image: '/onboarding-images/06-related-documents3.png',
   },
   {
     targetId: 'onboarding-document-graph',
@@ -84,7 +85,7 @@ export const RELATED_DOCS_TOUR_STEPS: TourStep[] = [
     action: 'closeGraph',
     icon: '📊',
     visualHint: 'graph',
-    image: '/onboarding-images/document-relationship-graph.png',
+    image: '/onboarding-images/07-related-documents4.png',
   },
   {
     targetId: 'onboarding-graph-navigation',
@@ -107,6 +108,7 @@ export const PEER_REVIEW_TOUR_STEPS: TourStep[] = [
     buttonLabel: 'Continue',
     action: 'waitForDocument',
     icon: '📄',
+    image: '/onboarding-images/03-main-UI-after-upload.png',
   },
   {
     targetId: 'onboarding-peer-review-btn',
@@ -123,7 +125,7 @@ export const PEER_REVIEW_TOUR_STEPS: TourStep[] = [
     buttonLabel: 'Next',
     icon: '👁️',
     visualHint: 'editor',
-    image: '/onboarding-images/peer-review-split-view.png',
+    image: '/onboarding-images/08.Peer-review-before-applying-AI-Referee.jpeg',
   },
   {
     targetId: 'onboarding-ai-auto-review',
@@ -131,7 +133,7 @@ export const PEER_REVIEW_TOUR_STEPS: TourStep[] = [
     body: 'Click the sparkles icon to generate an AI-powered peer review automatically. The AI analyzes the document and creates a structured review with strengths, weaknesses, and recommendations.',
     buttonLabel: 'Next',
     icon: '✨',
-    image: '/onboarding-images/peer-review-ai-generated.png',
+    image: '/onboarding-images/09.peer-review-ai-referee.png',
   },
   {
     targetId: 'onboarding-review-editor',
@@ -155,6 +157,7 @@ export const PEER_REVIEW_TOUR_STEPS: TourStep[] = [
     buttonLabel: 'Complete Tour',
     action: 'finishTour',
     icon: '📥',
+    image: '/onboarding-images/10. peer-review-final-step.png',
   },
 ]
 
@@ -167,5 +170,6 @@ export const WELCOME_STEP: TourStep = {
   body: 'Your intelligent research companion. Let\'s explore the key features that make Ryzomatic powerful for academic research. Choose a tour to get started, or skip to explore on your own.',
   buttonLabel: 'Get Started',
   icon: '📚',
+  image: '/onboarding-images/01-main-UI.png',
 }
 

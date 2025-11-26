@@ -135,7 +135,7 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
         logger.info('RelatedDocumentsPanel: Extracting text from EPUB', { fileName: file.name });
         const extractionResult = await extractEpub(file);
         fileData = file;
-        pageTexts = extractionResult.pageTexts || [];
+        pageTexts = extractionResult.sections || [];
         logger.info('RelatedDocumentsPanel: EPUB text extracted', { 
           fileName: file.name, 
           chapters: pageTexts.length 

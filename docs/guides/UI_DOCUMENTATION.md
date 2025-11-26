@@ -841,21 +841,24 @@ Various Modals & Panels:
 ### 21. OnboardingSystem
 **Location:** `/src/components/onboarding/`
 
-**Purpose:** User tutorial and help system
+**Purpose:** Interactive tutorial and help system with spotlight tours
 
 **Components:**
-- `OnboardingProvider`: Context provider
-- `OnboardingOverlay`: Tutorial overlays
-- `ContextualHelp`: Context-aware help bubbles
+- `OnboardingProvider`: Context provider managing tour state
+- `SpotlightTour`: Visual tour component with spotlight highlighting
+- `PeerReviewPreview`: Preview component for peer review features
 
-**Tour Steps:**
-- Welcome
-- Upload document
-- Navigate sidebar
-- Use AI chat
-- Start Pomodoro
-- Create highlights
-- Manage library
+**Tour Types:**
+- **TTS Tour**: Text-to-Speech audio widget features (5 steps)
+- **Related Documents Tour**: Document relationships and graph visualization (5 steps)
+- **Peer Review Tour**: Editorial mode and review features (7 steps)
+
+**Features:**
+- Auto-starts welcome screen for new users
+- Returns to main menu after each tour completion
+- Uses numbered screenshots for visual guidance
+- Mock document loading for demonstration
+- Keyboard navigation support
 
 ---
 

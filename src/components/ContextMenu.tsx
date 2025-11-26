@@ -124,22 +124,37 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, options, onClose
 export const createAIContextMenuOptions = (
   onClarification: () => void,
   onFurtherReading: () => void,
-  onSaveNote: () => void
-): ContextMenuOption[] => [
-  {
-    label: 'Ask AI for Clarification',
-    icon: <Sparkles className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />,
-    onClick: onClarification,
-  },
-  {
-    label: 'Get Further Reading',
-    icon: <BookOpen className="w-4 h-4" style={{ color: 'var(--color-secondary, #10b981)' }} />,
-    onClick: onFurtherReading,
-  },
-  {
-    label: 'Save as Note',
-    icon: <FileText className="w-4 h-4" style={{ color: 'var(--color-text-secondary)' }} />,
-    onClick: onSaveNote,
-  },
-]
+  onSaveNote: () => void,
+  onIncludeInReview?: () => void,
+  isEditorialMode?: boolean
+): ContextMenuOption[] => {
+  const options: ContextMenuOption[] = [
+    {
+      label: 'Ask AI for Clarification',
+      icon: <Sparkles className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />,
+      onClick: onClarification,
+    },
+    {
+      label: 'Get Further Reading',
+      icon: <BookOpen className="w-4 h-4" style={{ color: 'var(--color-secondary, #10b981)' }} />,
+      onClick: onFurtherReading,
+    },
+    {
+      label: 'Save as Note',
+      icon: <FileText className="w-4 h-4" style={{ color: 'var(--color-text-secondary)' }} />,
+      onClick: onSaveNote,
+    },
+  ];
+
+  // Add "Include in Review" option if in editorial mode and handler is provided
+  if (isEditorialMode && onIncludeInReview) {
+    options.push({
+      label: 'Include in Review',
+      icon: <FileText className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />,
+      onClick: onIncludeInReview,
+    });
+  }
+
+  return options;
+};
 

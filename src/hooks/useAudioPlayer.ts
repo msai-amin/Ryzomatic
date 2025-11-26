@@ -7,12 +7,12 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { ttsManager } from '../services/ttsManager'
-import { TTSState } from '../store/appStore'
+import { TTSSettings } from '../store/appStore'
 import { ttsCacheService, TTSCacheQuery } from '../services/ttsCacheService'
 
 export interface AudioPlayerOptions {
-  tts: TTSState
-  updateTTS: (updates: Partial<TTSState>) => void
+  tts: TTSSettings
+  updateTTS: (updates: Partial<TTSSettings>) => void
   documentId: string | null
   userId: string | null
   currentPage: number

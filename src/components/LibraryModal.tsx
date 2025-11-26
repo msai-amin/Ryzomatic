@@ -906,7 +906,13 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
               text_content: fullBook.text_content ?? workingBook.text_content,
             };
             console.log('Supabase book data loaded:', {
-              byteLength: fullBook.fileData.byteLength,
+              byteLength: fullBook.fileData instanceof ArrayBuffer 
+                ? fullBook.fileData.byteLength 
+                : fullBook.fileData instanceof Blob 
+                  ? fullBook.fileData.size 
+                  : typeof fullBook.fileData === 'string' 
+                    ? fullBook.fileData.length 
+                    : 0,
               totalPages: fullBook.totalPages,
               hasPageTexts: !!fullBook.pageTexts?.length
             });
@@ -1084,7 +1090,15 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         type: doc.type,
         hasPdfData: !!doc.pdfData,
         pdfDataType: doc.pdfData ? doc.pdfData.constructor.name : 'undefined',
-        pdfDataLength: doc.pdfData ? doc.pdfData.byteLength : 0,
+        pdfDataLength: (() => {
+          const pdfData = doc.pdfData;
+          if (!pdfData) return 0;
+          if (pdfData instanceof ArrayBuffer) return pdfData.byteLength;
+          if (pdfData instanceof Blob) return pdfData.size;
+          const strData = pdfData as string;
+          if (typeof strData === 'string') return strData.length;
+          return 0;
+        })(),
         hasPageTexts: !!doc.pageTexts,
         pageTextsLength: Array.isArray(doc.pageTexts) ? doc.pageTexts.length : 0,
         pageTextsPreview: Array.isArray(doc.pageTexts) ? doc.pageTexts.slice(0, 2).map((text, i) => {
@@ -1459,31 +1473,30 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         }}
       >
         <div className="relative">
+          {/* Header */}
+          <div className="px-6 pt-6 pb-4 border-b relative" style={{ borderColor: 'rgba(148,163,184,0.12)', paddingRight: '3.5rem' }}>
             <button 
               onClick={onClose} 
-            className="absolute top-6 right-6 p-2 rounded-xl transition-colors"
-            style={{
-              color: 'var(--color-text-tertiary)',
-              backgroundColor: 'rgba(148,163,184,0.08)',
-              border: '1px solid rgba(148,163,184,0.12)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(148,163,184,0.18)';
-              e.currentTarget.style.color = 'var(--color-text-secondary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(148,163,184,0.08)';
-              e.currentTarget.style.color = 'var(--color-text-tertiary)';
-            }}
-            aria-label="Close library"
+              className="absolute top-6 right-6 p-2 rounded-xl transition-colors z-10"
+              style={{
+                color: 'var(--color-text-tertiary)',
+                backgroundColor: 'rgba(148,163,184,0.08)',
+                border: '1px solid rgba(148,163,184,0.12)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(148,163,184,0.18)';
+                e.currentTarget.style.color = 'var(--color-text-secondary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(148,163,184,0.08)';
+                e.currentTarget.style.color = 'var(--color-text-tertiary)';
+              }}
+              aria-label="Close library"
             >
-            <X className="w-5 h-5" />
+              <X className="w-5 h-5" />
             </button>
-
-          {/* Header */}
-          <div className="px-8 pt-8 pb-6 border-b" style={{ borderColor: 'rgba(148,163,184,0.12)' }}>
-            <div className="flex flex-col gap-6">
-              <div className="flex flex-wrap items-center justify-between gap-6">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div
                     className="h-14 w-14 rounded-2xl flex items-center justify-center shadow-lg"
@@ -1538,7 +1551,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
           </div>
 
           {/* Tabs */}
-          <div className="px-8 pt-4">
+          <div className="px-6 pt-3">
             <div
               className="flex items-center gap-2 rounded-full p-1"
               style={{
@@ -1586,9 +1599,9 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
           </div>
 
           {/* Content */}
-          <div className="px-8 py-6 max-h-[60vh] overflow-y-auto">
+          <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
             {activeTab === 'documents' && (
-              <div className="flex flex-col gap-4 lg:flex-row">
+              <div className="flex flex-col gap-3 lg:flex-row">
                 <aside className="w-full lg:w-72 xl:w-80 flex-shrink-0">
                   <div
                     className="rounded-2xl border p-4"
@@ -1648,7 +1661,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                   </div>
                 </aside>
 
-                <div className="flex-1 space-y-5">
+                <div className="flex-1 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-sm md:text-base" style={{ color: 'var(--color-text-secondary)' }}>
                       Showing <span style={{ color: 'var(--color-text-primary)' }}>{totalDocuments}</span>{' '}
@@ -1703,14 +1716,14 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                       </p>
                     </div>
                   ) : viewMode === 'list' ? (
-                    <div className="space-y-4">
+                    <div className="space-y-2">
                       {displayedBooks.map(book => {
                       const progress = getDocumentProgress(book);
                         const isRenaming = renameBusyIds.includes(book.id);
                       return (
                         <div
                           key={book.id}
-                          className="group relative overflow-hidden rounded-2xl border transition-all duration-300 hover:-translate-y-[2px] hover:shadow-[0_25px_50px_rgba(15,23,42,0.45)]"
+                          className="group relative overflow-hidden rounded-xl border transition-all duration-300 hover:-translate-y-[1px] hover:shadow-[0_15px_30px_rgba(15,23,42,0.35)]"
                           style={{
                             borderColor: 'rgba(148,163,184,0.14)',
                             background: 'linear-gradient(145deg, rgba(30,41,59,0.92), rgba(15,23,42,0.92))'
@@ -1723,15 +1736,15 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                                 'radial-gradient(120% 140% at 0% 0%, rgba(99,102,241,0.12), rgba(15,23,42,0))'
                             }}
                           />
-                          <div className="relative space-y-4 p-6">
-                            <div className="flex flex-wrap items-start justify-between gap-4">
+                          <div className="relative space-y-2 p-3">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
                               <div
-                                className="flex-1 cursor-pointer space-y-2"
+                                className="flex-1 cursor-pointer space-y-1"
                                 onClick={() => handleOpenBook(book)}
                               >
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
                                   <span
-                                    className="rounded-full px-3 py-1 text-xs font-medium uppercase tracking-wide"
+                                    className="rounded-full px-2 py-0.5 text-xs font-medium uppercase tracking-wide"
                                     style={{
                                       backgroundColor: 'rgba(148,163,184,0.12)',
                                       color: 'var(--color-text-secondary)'
@@ -1741,7 +1754,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                                   </span>
                                   {book.isFavorite && (
                                     <span
-                                      className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
+                                      className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
                                       style={{
                                         backgroundColor: 'rgba(250,204,21,0.18)',
                                         color: '#facc15'
@@ -1752,7 +1765,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                                   )}
                                   {reviews.has(book.id) && (
                                     <span
-                                      className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
+                                      className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
                                       style={{
                                         backgroundColor: 'rgba(59,130,246,0.18)',
                                         color: '#3b82f6'
@@ -1762,10 +1775,10 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
                                     </span>
                                   )}
                                 </div>
-                                <h3 className="text-lg leading-snug" style={{ color: 'var(--color-text-primary)' }}>
+                                <h3 className="text-base leading-tight" style={{ color: 'var(--color-text-primary)' }}>
                                   {book.title}
                                 </h3>
-                                <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+                                <p className="text-xs leading-snug" style={{ color: 'var(--color-text-secondary)' }}>
                                   {book.totalPages ? `${book.totalPages} pages` : 'Text file'}
                                   {book.lastReadPage ? ` • Last read page ${book.lastReadPage}` : ''}
                                   {' • Saved '}

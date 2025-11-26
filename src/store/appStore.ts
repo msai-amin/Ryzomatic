@@ -164,7 +164,7 @@ export interface TTSSettings {
   isEnabled: boolean
   isPlaying: boolean
   isPaused: boolean
-  provider: 'native' | 'azure'
+  provider: 'native' | 'azure' | 'google-cloud'
   rate: number
   pitch: number
   volume: number
@@ -336,6 +336,10 @@ interface AppState {
   // Feature tour actions
   setHasSeenPomodoroTour: (seen: boolean) => void
   
+  // Unsaved changes tracking actions
+  setHasUnsavedChanges: (hasChanges: boolean) => void
+  closeDocumentWithoutSaving: () => void
+  
   // Pomodoro widget actions
   setPomodoroWidgetPosition: (position: { x: number; y: number }) => void
   setShowPomodoroDashboard: (show: boolean) => void
@@ -399,6 +403,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   isRightSidebarOpen: false,
   rightSidebarTab: readRightSidebarTabPreference('notes'),
   rightSidebarWidth: readNumberPreference('rightSidebarWidth', 360),
+  isEditorialMode: false,
   chatWindowPosition: {
     top: readNumberPreference('chatWindowTop', 120),
     left: readNumberPreference('chatWindowLeft', 80)

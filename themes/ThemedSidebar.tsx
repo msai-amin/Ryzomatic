@@ -315,19 +315,54 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           className={`flex items-center ${isOpen ? 'justify-between px-4' : 'justify-center px-2'} py-3 border-b`}
           style={{ borderColor: 'var(--color-border)', minHeight: '60px' }}
         >
-          <button
-            onClick={onToggle}
-            className="p-2 rounded-lg transition-colors"
-            style={{
-              backgroundColor: 'var(--color-surface-hover)',
-              color: 'var(--color-text-primary)',
-              border: '1px solid var(--color-border)'
-            }}
-            aria-label={isOpen ? 'Collapse navigation' : 'Expand navigation'}
-            title={isOpen ? 'Collapse navigation' : 'Expand navigation'}
-          >
-            {isOpen ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-          </button>
+          {isOpen ? (
+            <>
+              {user && currentDocument && (
+                <Tooltip content="Start Pomodoro timer" position="bottom">
+                  <button
+                    onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
+                    className="p-2 rounded-lg transition-colors"
+                    style={{
+                      backgroundColor: 'var(--color-surface)',
+                      color: 'var(--color-text-secondary)',
+                      border: '1px solid var(--color-border)'
+                    }}
+                    aria-label="Pomodoro"
+                    title="Pomodoro"
+                  >
+                    🍅
+                  </button>
+                </Tooltip>
+              )}
+              <button
+                onClick={onToggle}
+                className="p-2 rounded-lg transition-colors"
+                style={{
+                  backgroundColor: 'var(--color-surface-hover)',
+                  color: 'var(--color-text-primary)',
+                  border: '1px solid var(--color-border)'
+                }}
+                aria-label="Collapse navigation"
+                title="Collapse navigation"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={onToggle}
+              className="p-2 rounded-lg transition-colors"
+              style={{
+                backgroundColor: 'var(--color-surface-hover)',
+                color: 'var(--color-text-primary)',
+                border: '1px solid var(--color-border)'
+              }}
+              aria-label="Expand navigation"
+              title="Expand navigation"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-hidden relative">

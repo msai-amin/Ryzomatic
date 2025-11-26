@@ -187,7 +187,18 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         // For now, just advance to next step (relevance analysis would open a modal)
         // In a real implementation, this would open the relevance analysis view
         setTimeout(() => {
-          nextStep()
+          // Use functional updates to get current state for both step and steps
+          setTourSteps((steps) => {
+            setCurrentStep((step) => {
+              const nextStep = step + 1
+              if (nextStep >= steps.length) {
+                completeTour()
+                return step // Keep current step since we're completing
+              }
+              return nextStep
+            })
+            return steps
+          })
         }, 500)
         break
       case 'openGraph':
@@ -198,7 +209,18 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         }
         // Auto-advance after graph opens
         setTimeout(() => {
-          nextStep()
+          // Use functional updates to get current state for both step and steps
+          setTourSteps((steps) => {
+            setCurrentStep((step) => {
+              const nextStep = step + 1
+              if (nextStep >= steps.length) {
+                completeTour()
+                return step // Keep current step since we're completing
+              }
+              return nextStep
+            })
+            return steps
+          })
         }, 500)
         break
       case 'closeGraph':
@@ -209,7 +231,18 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         }
         // Auto-advance after graph closes
         setTimeout(() => {
-          nextStep()
+          // Use functional updates to get current state for both step and steps
+          setTourSteps((steps) => {
+            setCurrentStep((step) => {
+              const nextStep = step + 1
+              if (nextStep >= steps.length) {
+                completeTour()
+                return step // Keep current step since we're completing
+              }
+              return nextStep
+            })
+            return steps
+          })
         }, 300)
         break
       case 'waitForDocument':
@@ -217,14 +250,36 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         loadMockDocument()
         // Wait a bit for document to load, then advance
         setTimeout(() => {
-          nextStep()
+          // Use functional updates to get current state for both step and steps
+          setTourSteps((steps) => {
+            setCurrentStep((step) => {
+              const nextStep = step + 1
+              if (nextStep >= steps.length) {
+                completeTour()
+                return step // Keep current step since we're completing
+              }
+              return nextStep
+            })
+            return steps
+          })
         }, 800)
         break
       case 'openPeerReview':
         setEditorialMode(true)
         // Auto-advance after editorial mode opens
         setTimeout(() => {
-          nextStep()
+          // Use functional updates to get current state for both step and steps
+          setTourSteps((steps) => {
+            setCurrentStep((step) => {
+              const nextStep = step + 1
+              if (nextStep >= steps.length) {
+                completeTour()
+                return step // Keep current step since we're completing
+              }
+              return nextStep
+            })
+            return steps
+          })
         }, 500)
         break
       case 'finishTour':

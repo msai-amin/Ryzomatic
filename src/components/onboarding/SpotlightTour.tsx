@@ -280,7 +280,7 @@ export const SpotlightTour: React.FC<SpotlightTourProps> = ({ steps = [], onActi
         <div 
           className="absolute inset-0"
           style={{ backgroundColor: 'rgba(0, 0, 0, 0.75)' }}
-          onClick={closeTour}
+          onClick={() => closeTour()}
         />
         
         {/* Welcome Modal */}
@@ -510,7 +510,7 @@ export const SpotlightTour: React.FC<SpotlightTourProps> = ({ steps = [], onActi
                 STEP {String(currentStep + 1).padStart(2, '0')} / {String(steps.length).padStart(2, '0')}
               </span>
               <button
-                onClick={closeTour}
+                onClick={() => closeTour()}
                 className="p-1 rounded transition-colors hover:bg-[var(--color-surface-hover)]"
                 style={{ color: 'var(--color-text-secondary)' }}
                 aria-label="Close tour"
@@ -561,7 +561,7 @@ export const SpotlightTour: React.FC<SpotlightTourProps> = ({ steps = [], onActi
               {currentStepData.title}
             </h3>
 
-            {/* Image Preview with Blur Filter - Display BEFORE body text */}
+            {/* Image Preview - Display BEFORE body text */}
             {currentStepData.image && (
               <div className="mb-4 rounded-lg overflow-hidden border" style={{ borderColor: 'var(--color-border)' }}>
                 <img 
@@ -572,8 +572,6 @@ export const SpotlightTour: React.FC<SpotlightTourProps> = ({ steps = [], onActi
                     maxHeight: '300px', 
                     width: '100%',
                     objectFit: 'contain',
-                    filter: 'blur(4px)',
-                    WebkitFilter: 'blur(4px)',
                     display: 'block',
                   }}
                   onError={(e) => {
