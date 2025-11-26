@@ -109,7 +109,6 @@ const LandingPage: React.FC = () => {
       name: "Custom",
       price: "Contact Us",
       period: "Custom plans",
-      popular: true,
       features: [
         "Unlimited or custom limits",
         "Priority support",
@@ -160,19 +159,19 @@ const LandingPage: React.FC = () => {
             </div>
           </a>
           
-          <nav className="hidden items-center gap-8 text-sm font-medium text-slate-600 lg:flex">
-            {navigation.map((item) => (
-              <a
-                key={item.name}
-                href={item.href}
-                className="transition hover:text-slate-900"
-              >
-                {item.name}
-              </a>
-            ))}
-          </nav>
-          
-          <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-8 text-sm">
+            <nav className="flex items-center gap-8 text-sm font-medium text-slate-600">
+              {navigation.map((item) => (
+                <a
+                  key={item.name}
+                  href={item.href}
+                  className="transition hover:text-slate-900"
+                >
+                  {item.name}
+                </a>
+              ))}
+            </nav>
+            
             {isAuthenticated ? (
               <>
                 <span className="text-sm text-slate-600 hidden lg:inline-flex">
@@ -189,7 +188,7 @@ const LandingPage: React.FC = () => {
               <>
                 <button 
                   onClick={handleSignIn}
-                  className="hidden rounded-full px-4 py-2 text-slate-600 transition hover:text-slate-900 lg:inline-flex"
+                  className="rounded-full px-4 py-2 text-slate-600 transition hover:text-slate-900"
                 >
                   Sign in
                 </button>
@@ -217,14 +216,8 @@ const LandingPage: React.FC = () => {
           </h1>
           
           <p className="max-w-2xl text-xl md:text-2xl text-slate-700 leading-relaxed font-medium">
-            The AI-powered research workspace that transforms your PDFs into an interconnected knowledge network.
+            The AI workspace that turns your paper into a living web of knowledge and generates rigorous peer reviews.
           </p>
-          
-          <div className="flex flex-col items-center gap-3 text-center mt-8">
-            <p className="text-lg text-slate-600 max-w-xl">
-              Upload a paper. Instantly see how it connects to everything you've ever added.
-            </p>
-          </div>
           
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
             <button 
@@ -408,14 +401,14 @@ const LandingPage: React.FC = () => {
               ].map((pillar, index) => (
                 <div
                   key={pillar.title}
-                  className="relative group"
+                  className="relative group h-full"
                 >
                   {/* Animated background circle */}
                   <div className={`absolute inset-0 bg-gradient-to-br ${pillar.gradient} opacity-0 group-hover:opacity-10 rounded-3xl blur-2xl transition-opacity duration-500`} />
                   
-                  <div className="relative bg-white/80 backdrop-blur-sm border-2 border-slate-200 rounded-2xl p-8 text-center transition-all duration-300 group-hover:border-slate-300 group-hover:shadow-xl">
+                  <div className="relative bg-white/80 backdrop-blur-sm border-2 border-slate-200 rounded-2xl p-8 text-center transition-all duration-300 group-hover:border-slate-300 group-hover:shadow-xl h-[320px] flex flex-col">
                     {/* Icon with gradient background */}
-                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-6 bg-gradient-to-br from-slate-50 to-slate-100 group-hover:scale-110 transition-transform duration-300">
+                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-6 bg-gradient-to-br from-slate-50 to-slate-100 group-hover:scale-110 transition-transform duration-300 mx-auto">
                       <span className="text-4xl">{pillar.icon}</span>
                     </div>
                     
@@ -423,7 +416,7 @@ const LandingPage: React.FC = () => {
                       {pillar.title}
                     </h4>
                     
-                    <p className="text-sm text-slate-600 leading-relaxed">
+                    <p className="text-sm text-slate-600 leading-relaxed flex-grow">
                       {pillar.description}
                     </p>
                   </div>
@@ -446,46 +439,63 @@ const LandingPage: React.FC = () => {
             </p>
           </div>
           
-          <div className="mt-16 grid gap-8 md:grid-cols-3">
+          <div className="mt-16 flex flex-wrap justify-center gap-8">
             {pricingTiers.map((tier) => (
-              <div 
+              <div
                 key={tier.name}
-                className={`flex flex-col rounded-2xl p-8 text-left ${
-                  tier.popular 
-                    ? 'relative border-2 border-slate-800 shadow-2xl shadow-slate-200' 
-                    : 'border-2 border-slate-200'
-                }`}
+                className="relative group"
               >
-                {tier.popular && (
-                  <div className="absolute right-6 top-6 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-slate-700">
-                    Most Popular
+                {/* Animated background gradient on hover */}
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-indigo-500/10 opacity-0 group-hover:opacity-100 rounded-2xl blur-2xl transition-opacity duration-500" />
+                
+                <div 
+                  className={`relative flex flex-col rounded-2xl p-8 text-left w-full max-w-sm h-[520px] bg-white/80 backdrop-blur-sm border-2 border-slate-200 shadow transition-all duration-300 group-hover:shadow-md group-hover:-translate-y-1 group-hover:scale-[1.02] group-hover:border-slate-300`}
+                >
+                  {tier.popular && (
+                    <div className="absolute right-6 top-6 rounded-full bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-slate-700">
+                      Most Popular
+                    </div>
+                  )}
+                  
+                  <div className="flex-grow">
+                    <p className="text-sm font-semibold uppercase tracking-widest text-slate-500">{tier.name}</p>
+                    <h3 className="mt-4 text-4xl font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
+                      {tier.price}
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-500">per {tier.period}</p>
+                    <ul className="mt-6 space-y-3 text-sm text-slate-600">
+                      {tier.features.map((feature, index) => (
+                        <li key={index}>• {feature}</li>
+                      ))}
+                    </ul>
                   </div>
-                )}
-                
-                <div className="flex-grow">
-                  <p className="text-sm font-semibold uppercase tracking-widest text-slate-500">{tier.name}</p>
-                  <h3 className="mt-4 text-4xl font-semibold text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
-                    {tier.price}
-                  </h3>
-                  <p className="mt-1 text-sm text-slate-500">per {tier.period}</p>
-                  <ul className="mt-6 space-y-3 text-sm text-slate-600">
-                    {tier.features.map((feature, index) => (
-                      <li key={index}>• {feature}</li>
-                    ))}
-                  </ul>
-                </div>
-                
-                <div className="pt-8">
-                  <button
-                    onClick={tier.name === 'Custom' ? () => window.location.href = 'mailto:info@ryzomatic.net?subject=Custom Plan Inquiry' : handleGetStarted}
-                    className={`w-full rounded-full px-4 py-3 text-sm font-semibold transition ${
-                      tier.popular
-                        ? 'bg-slate-800 text-white shadow-lg shadow-slate-800/20 hover:bg-slate-700'
-                        : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    {tier.name === 'Free' ? 'Get Started Free' : tier.name === 'Custom' ? 'Contact Us' : `Choose ${tier.name}`}
-                  </button>
+                  
+                  {tier.name !== 'Free' && (
+                    <div className="mt-auto pt-8">
+                    <button
+                      onClick={() => {
+                        if (tier.name === 'Custom') {
+                          window.location.href = 'mailto:info@ryzomatic.net?subject=Custom Plan Inquiry';
+                        } else {
+                          handleGetStarted();
+                        }
+                      }}
+                      className={`w-full rounded-full px-4 py-3 text-sm font-semibold transition ${
+                        tier.popular
+                          ? 'bg-slate-800 text-white shadow-lg shadow-slate-800/20 hover:bg-slate-700'
+                          : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {tier.name === 'Custom' ? 'Contact Us' : `Choose ${tier.name}`}
+                    </button>
+                    </div>
+                  )}
+                  
+                  {/* Hover effect indicator */}
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 rounded-b-2xl" />
+                  
+                  {/* Shine effect on hover */}
+                  <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none bg-gradient-to-br from-blue-50/50 via-transparent to-purple-50/50" />
                 </div>
               </div>
             ))}
