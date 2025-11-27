@@ -112,18 +112,20 @@ class TTSManager {
       getDuration: () => azureTTSService.getDuration()
     })
 
-    // Set default provider - prioritize Google Cloud TTS for better voice quality
+    // Set default provider - prioritize Google Cloud TTS (working reliably)
+    // Azure TTS is experiencing timeout issues, so it's kept as a fallback option
     const nativeProvider = this.providers.get('native')
     const googleCloudProvider = this.providers.get('google-cloud')
     const azureProvider = this.providers.get('azure')
     
-    // Temporarily prioritize Azure TTS for testing the proxy endpoint
-    if (azureProvider && azureProvider.isAvailable && azureProvider.isConfigured) {
-      this.currentProvider = azureProvider
-      console.log('TTSManager: Using Azure TTS as default provider (premium voices)')
-    } else if (googleCloudProvider && googleCloudProvider.isAvailable && googleCloudProvider.isConfigured) {
+    // Use Google Cloud TTS as default (reliable, working)
+    if (googleCloudProvider && googleCloudProvider.isAvailable && googleCloudProvider.isConfigured) {
       this.currentProvider = googleCloudProvider
-      console.log('TTSManager: Using Google Cloud TTS as default provider (premium voices)')
+      console.log('TTSManager: Using Google Cloud TTS as default provider (premium voices, reliable)')
+    } else if (azureProvider && azureProvider.isAvailable && azureProvider.isConfigured) {
+      // Azure TTS as fallback (currently experiencing timeout issues)
+      this.currentProvider = azureProvider
+      console.log('TTSManager: Using Azure TTS as fallback provider (premium voices, may have timeout issues)')
     } else if (nativeProvider && nativeProvider.isAvailable) {
       this.currentProvider = nativeProvider
       console.log('TTSManager: Using Native TTS as fallback provider (supports word boundaries and progress)')

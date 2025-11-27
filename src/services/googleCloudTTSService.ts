@@ -471,12 +471,12 @@ class GoogleCloudTTSService {
   }
 
   async speak(text: string, onEnd?: () => void, onWord?: (word: string, charIndex: number) => void): Promise<void> {
-    // Skip TTS if on landing page (temporarily disabled for testing)
-    // if (this.isOnLandingPage()) {
-    //   console.log('Google Cloud TTS skipped: on landing page');
-    //   if (onEnd) onEnd();
-    //   return;
-    // }
+    // Skip TTS if on landing page (to avoid unnecessary API calls)
+    if (this.isOnLandingPage()) {
+      console.log('Google Cloud TTS skipped: on landing page');
+      if (onEnd) onEnd();
+      return;
+    }
 
     try {
       // CRITICAL: Reset stop flag FIRST before any async operations
