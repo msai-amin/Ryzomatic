@@ -117,12 +117,13 @@ class TTSManager {
     const googleCloudProvider = this.providers.get('google-cloud')
     const azureProvider = this.providers.get('azure')
     
-    if (googleCloudProvider && googleCloudProvider.isAvailable && googleCloudProvider.isConfigured) {
-      this.currentProvider = googleCloudProvider
-      console.log('TTSManager: Using Google Cloud TTS as default provider (premium voices)')
-    } else if (azureProvider && azureProvider.isAvailable && azureProvider.isConfigured) {
+    // Temporarily prioritize Azure TTS for testing the proxy endpoint
+    if (azureProvider && azureProvider.isAvailable && azureProvider.isConfigured) {
       this.currentProvider = azureProvider
       console.log('TTSManager: Using Azure TTS as default provider (premium voices)')
+    } else if (googleCloudProvider && googleCloudProvider.isAvailable && googleCloudProvider.isConfigured) {
+      this.currentProvider = googleCloudProvider
+      console.log('TTSManager: Using Google Cloud TTS as default provider (premium voices)')
     } else if (nativeProvider && nativeProvider.isAvailable) {
       this.currentProvider = nativeProvider
       console.log('TTSManager: Using Native TTS as fallback provider (supports word boundaries and progress)')
