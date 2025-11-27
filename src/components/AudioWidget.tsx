@@ -914,6 +914,9 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           let cachedAudio: ArrayBuffer | null = null
           
           if (currentDocument && currentDocument.id) {
+            // Get current provider type for cache query
+            const providerType = currentProvider?.type || 'google-cloud'
+            
             const cacheQuery: TTSCacheQuery = {
               bookId: currentDocument.id,
               text,
@@ -924,9 +927,15 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                 voiceName: tts.voiceName || 'default',
                 speakingRate: tts.rate,
                 pitch: tts.pitch,
-                provider: 'google-cloud' // Use current provider
+                provider: providerType as 'google-cloud' | 'azure' // Use current provider
               }
             }
+            
+            console.log('AudioWidget: Cache query', {
+              provider: providerType,
+              textLength: text.length,
+              playbackMode
+            })
             
             cachedAudio = await ttsCacheService.getCachedAudio(cacheQuery)
             
