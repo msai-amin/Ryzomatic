@@ -1,0 +1,55 @@
+name: Stale Issue Management
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:  # Allow manual triggering
+
+# Security: Restrict permissions to minimum required
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    name: Mark Stale Issues and PRs
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        # Security: Pin to specific commit SHA instead of version tag for supply chain security
+        # Example: uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+        uses: actions/checkout@v4
+
+      - name: Mark Stale Issues and Pull Requests
+        # Security: Pin to specific commit SHA instead of version tag for supply chain security
+        # Example: uses: actions/stale@<commit-sha>
+        uses: actions/stale@v9
+        with:
+          # Mark as stale after 30 days of inactivity
+          days-before-stale: 30
+          # Close after 14 days of being stale (generous to avoid frustrating contributors)
+          days-before-close: 14
+          # Apply to both issues and pull requests
+          stale-issue-message: |
+            This issue has been automatically marked as stale because it has not had recent activity. 
+            It will be closed if no further activity occurs within 14 days. Thank you for your contributions!
+          stale-pr-message: |
+            This pull request has been automatically marked as stale because it has not had recent activity. 
+            It will be closed if no further activity occurs within 14 days. Thank you for your contributions!
+          close-issue-message: |
+            This issue was automatically closed due to inactivity. If you believe this was done in error, 
+            please feel free to reopen it or create a new issue.
+          close-pr-message: |
+            This pull request was automatically closed due to inactivity. If you believe this was done in error, 
+            please feel free to reopen it or create a new pull request.
+          # Exempt labels to prevent closing important items
+          exempt-issue-labels: 'pinned,security,documentation,good first issue'
+          exempt-pr-labels: 'pinned,security,documentation'
+          # Only mark items with no activity (no comments, no commits)
+          only-issue-labels: ''
+          only-pr-labels: ''
+          # Operations per run limit
+          operations-per-run: 30
+

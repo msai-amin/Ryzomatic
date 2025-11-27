@@ -1,0 +1,31 @@
+name: Dependency Review
+
+on:
+  pull_request:
+    branches: [ main ]
+
+# Security: Restrict permissions to minimum required
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dependency-review:
+    name: Review Dependencies
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        # Security: Pin to specific commit SHA instead of version tag for supply chain security
+        # Example: uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        # Security: Pin to specific commit SHA instead of version tag for supply chain security
+        # Example: uses: actions/dependency-review-action@<commit-sha>
+        uses: actions/dependency-review-action@v4
+        with:
+          # Fail the workflow if vulnerabilities are found
+          fail-on-severity: moderate
+          deny-licenses: GPL-2.0, GPL-3.0
+

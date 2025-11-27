@@ -1,0 +1,46 @@
+name: CodeQL Analysis
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Weekly scan on Sundays at 00:00 UTC to catch zero-day vulnerabilities
+    - cron: '0 0 * * 0'
+
+jobs:
+  analyze:
+    name: Analyze (JavaScript/TypeScript)
+    runs-on: ubuntu-latest
+    
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    
+    steps:
+      - name: Checkout repository
+        # Security: Pin to specific commit SHA instead of version tag for supply chain security
+        # Example: uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        # Security: Pin to specific commit SHA instead of version tag for supply chain security
+        # Example: uses: github/codeql-action/init@<commit-sha>
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - name: Autobuild
+        # Security: Pin to specific commit SHA instead of version tag for supply chain security
+        # Example: uses: github/codeql-action/autobuild@<commit-sha>
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        # Security: Pin to specific commit SHA instead of version tag for supply chain security
+        # Example: uses: github/codeql-action/analyze@<commit-sha>
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:javascript-typescript'
+

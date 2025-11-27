@@ -134,6 +134,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const [duration, setDuration] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [pauseRequestedDuringBuffering, setPauseRequestedDuringBuffering] = useState(false)
+  const pauseRequestedDuringBufferingRef = useRef(false)
   const [isExpanded, setIsExpanded] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true
     const stored = window.localStorage.getItem('audioWidgetExpanded')
@@ -922,7 +924,25 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     
     lastClickTimeRef.current = now
     
-    if (isProcessing) {
+    // Allow pause during buffering
+    if (isProcessing && (tts.isPlaying || ttsManager.isSpeaking())) {
+      // User wants to pause during buffering
+      // Set flag to pause once buffering completes
+      // Buffering will continue in background, but playback will be paused when ready
+      pauseRequestedDuringBufferingRef.current = true
+      setPauseRequestedDuringBuffering(true)
+      if (currentDocument?.id) {
+        await saveCurrentPosition(currentDocument.id)
+      }
+      ttsManager.pause()
+      updateTTS({ isPlaying: false, isPaused: true })
+      // Don't return - allow buffering to continue, but keep playback paused
+      // The speak() promise will continue, but audio will be paused when it starts
+      return
+    }
+    
+    // Don't allow starting new playback if already processing
+    if (isProcessing && !tts.isPlaying && !ttsManager.isSpeaking()) {
       return
     }
     
@@ -933,8 +953,12 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       }
       ttsManager.pause()
       updateTTS({ isPlaying: false, isPaused: true }) // SET PAUSED FLAG
+      pauseRequestedDuringBufferingRef.current = false
+      setPauseRequestedDuringBuffering(false)
     } else if (tts.isPaused || ttsManager.isPausedState()) { // CHECK STORE PAUSED STATE OR TTS MANAGER STATE
       // Resume
+      pauseRequestedDuringBufferingRef.current = false
+      setPauseRequestedDuringBuffering(false)
       try {
         await ttsManager.resume()
         updateTTS({ isPlaying: true, isPaused: false }) // CLEAR PAUSED FLAG
@@ -1044,11 +1068,17 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           // Reset playback started flag
           playbackStartedRef.current = false
           
-          // Set playing state AFTER we've verified the provider is ready and text is valid
-          updateTTS({ isPlaying: true, isPaused: false })
+          // Set initial state - will be updated after buffering completes
+          // Don't set playing state yet if pause was requested
+          if (!pauseRequestedDuringBufferingRef.current) {
+            updateTTS({ isPlaying: true, isPaused: false })
+          } else {
+            updateTTS({ isPlaying: false, isPaused: true })
+          }
           
           try {
             // Start speak() but don't await it yet - we need to check if playback started
+            // The speak() call will continue buffering even if pause was requested
             const speakPromise = ttsManager.speak(
               text,
               () => {
@@ -1132,14 +1162,32 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             // speak() only completes when audio finishes, so we check during playback
             await new Promise(resolve => setTimeout(resolve, 200))
             
-            // Check if TTS is actually speaking after the delay
-            if (ttsManager.isSpeaking()) {
-              playbackStartedRef.current = true
-              console.log('AudioWidget: Playback confirmed active')
-            } else {
-              console.warn('AudioWidget: speak() called but TTS is not speaking after 200ms - audio may have ended immediately or failed to start')
-              // Don't reset state here - let onEnd handle it if it fires
+            // Check if pause was requested during buffering
+            // Use ref to get current value since state updates are async
+            if (pauseRequestedDuringBufferingRef.current) {
+              // Pause was requested during buffering - ensure it stays paused
+              ttsManager.pause()
+              updateTTS({ isPlaying: false, isPaused: true })
+              pauseRequestedDuringBufferingRef.current = false
+              setPauseRequestedDuringBuffering(false)
               playbackStartedRef.current = false
+              setIsProcessing(false)
+              // Don't return - let speak() continue in background (buffering continues)
+              // But playback will remain paused
+            } else {
+              // Check if TTS is actually speaking after the delay
+              if (ttsManager.isSpeaking()) {
+                playbackStartedRef.current = true
+                console.log('AudioWidget: Playback confirmed active')
+                // Update state to playing if not already set
+                if (!tts.isPlaying) {
+                  updateTTS({ isPlaying: true, isPaused: false })
+                }
+              } else {
+                console.warn('AudioWidget: speak() called but TTS is not speaking after 200ms - audio may have ended immediately or failed to start')
+                // Don't reset state here - let onEnd handle it if it fires
+                playbackStartedRef.current = false
+              }
             }
             
             // Now await the speak promise (which will complete when audio finishes)
@@ -1364,12 +1412,13 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                   : "Play"
             }
           >
+            {/* Always show Play/Pause icon - never show loading spinner */}
             {(tts.isPaused || ttsManager.isPausedState()) ? (
-              <Play className="w-5 h-5" />  // Show play when paused
+              <Play className="w-5 h-5" />
             ) : tts.isPlaying ? (
-              <Pause className="w-5 h-5" />  // Show pause when playing
+              <Pause className="w-5 h-5" />
             ) : (
-              <Play className="w-5 h-5" />  // Show play when stopped
+              <Play className="w-5 h-5" />
             )}
           </button>
 
@@ -1394,7 +1443,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
           {/* Status Indicator */}
           <div className="flex items-center gap-2 min-w-0">
-            {isProcessing ? (
+            {isProcessing && !tts.isPaused && !ttsManager.isPausedState() ? (
               <>
                 <div className="w-2 h-2 rounded-full flex-shrink-0 animate-pulse" style={{ backgroundColor: 'var(--color-primary)' }} />
                 <span className="text-xs truncate max-w-24" style={{ color: 'var(--color-primary)' }}>
@@ -1408,7 +1457,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                   style={{ 
                     backgroundColor: tts.isPlaying 
                       ? 'var(--color-success)' 
-                      : ttsManager.isPausedState() 
+                      : ttsManager.isPausedState() || tts.isPaused
                         ? 'var(--color-warning)' 
                         : 'var(--color-text-tertiary)' 
                   }}
@@ -1417,7 +1466,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                   className="text-xs truncate max-w-24"
                   style={{ color: 'var(--color-text-secondary)' }}
                 >
-                  {tts.isPlaying ? 'Playing' : ttsManager.isPausedState() ? 'Paused' : 'Ready'}
+                  {tts.isPlaying ? 'Playing' : (ttsManager.isPausedState() || tts.isPaused) ? 'Paused' : 'Ready'}
                 </span>
               </>
             )}

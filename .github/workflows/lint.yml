@@ -1,0 +1,41 @@
+name: Super-Linter
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Security: Restrict permissions to minimum required
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  super-linter:
+    name: Lint Code Base
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        # Security: Pin to specific commit SHA instead of version tag for supply chain security
+        # Example: uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history needed to detect changed files
+
+      - name: Run Super-Linter
+        # Security: Pin to specific commit SHA instead of version tag for supply chain security
+        # Example: uses: github/super-linter@<commit-sha>
+        uses: github/super-linter@v5
+        env:
+          # Only enable JavaScript and TypeScript linters for performance
+          VALIDATE_JAVASCRIPT_ES: true
+          VALIDATE_TYPESCRIPT_ES: true
+          # Disable all other linters to reduce runtime
+          VALIDATE_ALL_CODEBASE: false  # Only scan changed files
+          DEFAULT_BRANCH: main
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Performance: Only run on changed files
+          FILTER_REGEX_EXCLUDE: '(dist|node_modules|coverage|playwright-report|\.cache)/.*'
+

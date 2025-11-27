@@ -1,0 +1,94 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Security: Restrict permissions to minimum required
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  e2e-tests:
+    name: Run E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    steps:
+      - name: Checkout code
+        # Security: Pin to specific commit SHA instead of version tag for supply chain security
+        # Example: uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        # Security: Pin to specific commit SHA instead of version tag for supply chain security
+        # Example: uses: actions/setup-node@<commit-sha>
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'  # Automatically handles key generation and restore
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Build application
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://mock.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'mock-anon-key' }}
+          NODE_ENV: production
+
+      - name: Start preview server
+        run: |
+          npm run preview &
+          echo $! > server.pid
+          sleep 15
+        env:
+          PORT: 3001
+
+      - name: Wait for server to be ready
+        run: |
+          timeout 120 bash -c 'until curl -f http://localhost:3001 > /dev/null 2>&1; do sleep 3; done' || exit 1
+          echo "Server is ready!"
+
+      - name: Run E2E tests
+        run: npm run test:e2e:ci
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: http://localhost:3001
+          CI: true
+          NODE_ENV: test
+
+      - name: Stop preview server
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            kill $(cat server.pid) || true
+            rm server.pid
+          fi
+
+      - name: Upload Playwright report
+        if: always()
+        # Security: Pin to specific commit SHA instead of version tag for supply chain security
+        # Example: uses: actions/upload-artifact@<commit-sha>
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+

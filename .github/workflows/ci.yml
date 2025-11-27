@@ -41,7 +41,10 @@ jobs:
         run: npm run type-check
 
       - name: Unit tests
-        run: npm run test:coverage
+        run: npm run test:ci
+
+      - name: E2E tests
+        run: npm run test:e2e:ci
 
       - name: Build
         env:
