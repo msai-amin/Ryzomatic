@@ -21,7 +21,7 @@
     "test:ci": "vitest run --coverage",
     "test:e2e:ci": "playwright test --reporter=json",
     "check-env": "node scripts/check-env.js",
-    "postinstall": "node -e \"const fs = require('fs'); const path = require('path'); const rollupPath = path.join(process.cwd(), 'node_modules', '@rollup', 'rollup-linux-x64-gnu'); if (!fs.existsSync(rollupPath)) { console.log('Installing Rollup optional dependency @rollup/rollup-linux-x64-gnu...'); require('child_process').execSync('npm install --no-save --no-audit @rollup/rollup-linux-x64-gnu', {stdio: 'inherit'}); } else { console.log('Rollup optional dependency already installed'); }\""
+    "postinstall": "node scripts/ensure-rollup.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.901.0",
