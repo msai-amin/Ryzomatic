@@ -277,7 +277,6 @@ $$;
 
 -- Attach trigger to document_descriptions table
 DROP TRIGGER IF EXISTS auto_generate_relationships_trigger ON document_descriptions;
-DROP TRIGGER IF EXISTS auto_generate_relationships_trigger ON document_descriptions;
 CREATE TRIGGER auto_generate_relationships_trigger
   AFTER INSERT OR UPDATE OF description_embedding ON document_descriptions
   FOR EACH ROW
