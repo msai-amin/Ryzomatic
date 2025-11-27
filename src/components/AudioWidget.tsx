@@ -852,6 +852,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   // Handle stop (declared early to avoid circular dependencies)
   const handleStopRef = useRef<() => void>(() => {})
   
+  // Handle next/previous paragraph refs (declared early to avoid circular dependencies)
+  const handleNextParagraphRef = useRef<() => void>(() => {})
+  const handlePrevParagraphRef = useRef<() => void>(() => {})
+  
   const handleStop = useCallback(async () => {
     // Save position before stopping (only if actually playing)
     if (currentDocument?.id && tts.isPlaying) {
@@ -1066,7 +1070,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                 updateTTS({ isPlaying: false, isPaused: false, currentWordIndex: null })
                 
                 if (tts.autoAdvanceParagraph && playbackMode === 'paragraph') {
-                  handleNextParagraph()
+                  handleNextParagraphRef.current()
                 }
               }
             },
@@ -1152,6 +1156,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       }
     }
   }, [tts.currentParagraphIndex, tts.paragraphs.length, tts.isPlaying, tts.autoAdvanceParagraph, updateTTS])
+  
+  handleNextParagraphRef.current = handleNextParagraph
 
   // Handle previous paragraph
   const handlePrevParagraph = useCallback(() => {
@@ -1166,6 +1172,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       }
     }
   }, [tts.currentParagraphIndex, tts.isPlaying, updateTTS])
+  
+  handlePrevParagraphRef.current = handlePrevParagraph
 
   // Handle volume toggle
   const handleVolumeToggle = useCallback(() => {
