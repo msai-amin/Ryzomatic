@@ -71,6 +71,12 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
 
   // Handle logo click to return to main UI
   const handleLogoClick = () => {
+    // If in Peer Review mode, exit editorial mode first (return to PDF viewer)
+    if (isEditorialMode) {
+      setEditorialMode(false)
+      return
+    }
+
     if (!currentDocument) {
       // No document open, nothing to do
       return
