@@ -55,12 +55,15 @@ CREATE INDEX idx_peer_reviews_content_fts ON peer_reviews USING gin(to_tsvector(
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_peer_reviews_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Trigger to auto-update updated_at
 CREATE TRIGGER peer_reviews_updated_at_trigger
