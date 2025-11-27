@@ -375,31 +375,37 @@ class AzureTTSService {
         console.log(`✅ Azure TTS Request SUCCEEDED! (attempt ${attempt})`);
         
         // Read the response body with error handling
-        // Try multiple methods to work around HTTP/2 protocol errors
+        // Use blob() method which sometimes handles HTTP/2 protocol errors better
         let audioData: ArrayBuffer;
         try {
-          // Method 1: Try reading as blob first (sometimes handles HTTP/2 better)
-          try {
-            const blob = await response.blob();
-            audioData = await blob.arrayBuffer();
-            console.log(`Successfully read response as blob (${audioData.byteLength} bytes)`);
-          } catch (blobError) {
-            console.warn(`Blob read failed, trying direct arrayBuffer():`, blobError);
-            // Method 2: Fallback to direct arrayBuffer
-            audioData = await response.arrayBuffer();
-            console.log(`Successfully read response as arrayBuffer (${audioData.byteLength} bytes)`);
-          }
+          // Clone response before reading to avoid "body stream already read" errors
+          const clonedResponse = response.clone();
+          const blob = await clonedResponse.blob();
+          audioData = await blob.arrayBuffer();
+          console.log(`Successfully read response (${audioData.byteLength} bytes)`);
         } catch (bodyError) {
           console.error(`Failed to read response body (attempt ${attempt}):`, bodyError);
           
-          // Retry if it's a network/protocol error
-          if (attempt < maxRetries && (bodyError instanceof TypeError || bodyError instanceof DOMException)) {
-            lastError = bodyError as Error;
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-            continue;
+          // If blob read fails, try XMLHttpRequest as fallback (different HTTP handling)
+          if (attempt === maxRetries && (bodyError instanceof TypeError || bodyError instanceof DOMException)) {
+            console.log('Attempting XMLHttpRequest fallback for Azure TTS...');
+            try {
+              audioData = await this.synthesizeWithXHR(endpoint, ssml);
+              console.log(`XMLHttpRequest fallback succeeded (${audioData.byteLength} bytes)`);
+            } catch (xhrError) {
+              console.error('XMLHttpRequest fallback also failed:', xhrError);
+              throw new Error(`Failed to read audio data: ${bodyError instanceof Error ? bodyError.message : 'Unknown error'}`);
+            }
+          } else {
+            // Retry if it's a network/protocol error and we have retries left
+            if (attempt < maxRetries && (bodyError instanceof TypeError || bodyError instanceof DOMException)) {
+              lastError = bodyError as Error;
+              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+              continue;
+            }
+            
+            throw new Error(`Failed to read audio data: ${bodyError instanceof Error ? bodyError.message : 'Unknown error'}`);
           }
-          
-          throw new Error(`Failed to read audio data: ${bodyError instanceof Error ? bodyError.message : 'Unknown error'}`);
         }
         
         console.log('AzureTTSService.synthesize: Received audio buffer', {
@@ -444,6 +450,47 @@ class AzureTTSService {
     
     // If we get here, all retries failed
     throw lastError || new Error('Azure TTS synthesis failed after all retries');
+  }
+
+  /**
+   * Fallback method using XMLHttpRequest instead of fetch
+   * This may work around HTTP/2 protocol errors in some browsers
+   */
+  private async synthesizeWithXHR(endpoint: string, ssml: string): Promise<ArrayBuffer> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', endpoint, true);
+      xhr.setRequestHeader('Ocp-Apim-Subscription-Key', this.subscriptionKey!);
+      xhr.setRequestHeader('Content-Type', 'application/ssml+xml');
+      xhr.setRequestHeader('X-Microsoft-OutputFormat', this.settings.audioFormat);
+      xhr.setRequestHeader('User-Agent', 'SmartReader');
+      
+      xhr.responseType = 'arraybuffer';
+      
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const audioData = xhr.response as ArrayBuffer;
+          if (!audioData || audioData.byteLength === 0) {
+            reject(new Error('Received empty audio buffer from Azure TTS API (XHR)'));
+          } else {
+            resolve(audioData);
+          }
+        } else {
+          reject(new Error(`TTS synthesis failed: ${xhr.status} ${xhr.statusText}`));
+        }
+      };
+      
+      xhr.onerror = () => {
+        reject(new Error(`XHR request failed: ${xhr.statusText || 'Network error'}`));
+      };
+      
+      xhr.ontimeout = () => {
+        reject(new Error('XHR request timeout'));
+      };
+      
+      xhr.timeout = 30000; // 30 second timeout
+      xhr.send(ssml);
+    });
   }
 
   private escapeXml(text: string): string {
