@@ -16,9 +16,9 @@ export default defineConfig(({ mode }) => ({
       },
       includeAssets: ['favicon.ico'],
       manifest: {
-        name: 'Smart Reader',
-        short_name: 'SmartReader',
-        description: 'Your intelligent document reading assistant',
+        name: 'ryzomatic | Smart Research Platform',
+        short_name: 'ryzomatic',
+        description: 'Smart research platform for academics',
         theme_color: '#667eea',
         background_color: '#ffffff',
         display: 'standalone',

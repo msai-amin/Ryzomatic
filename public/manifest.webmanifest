@@ -1,7 +1,7 @@
 {
-  "name": "ryzome",
-  "short_name": "ryzome",
-  "description": "Intelligent reading platform for academics",
+  "name": "ryzomatic | Smart Research Platform",
+  "short_name": "ryzomatic",
+  "description": "Smart research platform for academics",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

@@ -11,7 +11,7 @@ test.describe('Authentication Flow', () => {
   });
 
   test('should display landing page with sign in option', async ({ page }) => {
-    await expect(page).toHaveTitle(/ryzomatic|Smart Reader|Immersive Reader/);
+    await expect(page).toHaveTitle(/ryzomatic.*Smart Research Platform/);
     
     // Check for sign in button or link (more flexible selectors)
     const signInButton = page.getByRole('button', { name: /sign in|get started|start free trial|log in/i });
