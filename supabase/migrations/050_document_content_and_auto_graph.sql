@@ -31,15 +31,21 @@ CREATE TABLE IF NOT EXISTS document_content (
 );
 
 -- Indexes for performance
-CREATE INDEX idx_doc_content_book_id ON document_content(book_id);
-CREATE INDEX idx_doc_content_user_id ON document_content(user_id);
-CREATE INDEX idx_doc_content_chunk ON document_content(book_id, chunk_index);
+CREATE INDEX IF NOT EXISTS idx_doc_content_book_id ON document_content(book_id);
+CREATE INDEX IF NOT EXISTS idx_doc_content_user_id ON document_content(user_id);
+CREATE INDEX IF NOT EXISTS idx_doc_content_chunk ON document_content(book_id, chunk_index);
 
 -- Full-text search index for content
-CREATE INDEX idx_doc_content_fts ON document_content USING gin(to_tsvector('english', content));
+CREATE INDEX IF NOT EXISTS idx_doc_content_fts ON document_content USING gin(to_tsvector('english', content));
 
 -- Row Level Security
 ALTER TABLE document_content ENABLE ROW LEVEL SECURITY;
+
+-- Drop policies if they exist (idempotent)
+DROP POLICY IF EXISTS "Users can read own document content" ON document_content;
+DROP POLICY IF EXISTS "Users can create own document content" ON document_content;
+DROP POLICY IF EXISTS "Users can update own document content" ON document_content;
+DROP POLICY IF EXISTS "Users can delete own document content" ON document_content;
 
 CREATE POLICY "Users can read own document content" ON document_content
   FOR SELECT USING (auth.uid() = user_id);
@@ -54,6 +60,7 @@ CREATE POLICY "Users can delete own document content" ON document_content
   FOR DELETE USING (auth.uid() = user_id);
 
 -- Trigger for updated_at
+DROP TRIGGER IF EXISTS update_document_content_updated_at ON document_content;
 CREATE TRIGGER update_document_content_updated_at 
   BEFORE UPDATE ON document_content
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -269,6 +276,7 @@ END;
 $$;
 
 -- Attach trigger to document_descriptions table
+DROP TRIGGER IF EXISTS auto_generate_relationships_trigger ON document_descriptions;
 DROP TRIGGER IF EXISTS auto_generate_relationships_trigger ON document_descriptions;
 CREATE TRIGGER auto_generate_relationships_trigger
   AFTER INSERT OR UPDATE OF description_embedding ON document_descriptions
