@@ -1206,8 +1206,9 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       }
     }
   }, [tts.currentParagraphIndex, tts.isPlaying, updateTTS])
-  
+
   // Update all refs in useEffect to avoid initialization order issues
+  // This MUST be after all function definitions
   useEffect(() => {
     handlePlayPauseRef.current = handlePlayPause
     handleNextParagraphRef.current = handleNextParagraph
