@@ -3,6 +3,8 @@
  * Provides high-quality neural voices for PDF documents
  */
 
+import { HowlerAudioPlayer } from './howlerAudioPlayer'
+
 export interface AzureVoice {
   name: string;
   locale: string;
@@ -102,22 +104,14 @@ class AzureTTSService {
     pitch: '0%',
     volume: '0%',
   };
-  private audioContext: AudioContext | null = null;
-  private currentAudio: AudioBufferSourceNode | null = null;
-  private isPaused = false;
+  private audioPlayer: HowlerAudioPlayer = new HowlerAudioPlayer();
   private speakingActive = false;
-  private pauseTime = 0;
-  private startTime = 0;
-  private currentAudioBuffer: AudioBuffer | null = null;
-  private audioStartTime = 0;
-  private audioPauseTime = 0;
-  private onEndCallback: (() => void) | null = null;
-  private onWordCallback: ((word: string, charIndex: number) => void) | null = null;
   private stopRequested: boolean = false;
   private pausedChunkIndex: number = -1;
   private currentChunks: string[] = [];
   private currentOnEnd: (() => void) | undefined = undefined;
   private currentOnWord: ((word: string, charIndex: number) => void) | undefined = undefined;
+  private currentText: string = ''; // Store current text for word tracking
 
   constructor() {
     // Get subscription key and region from environment
@@ -139,11 +133,6 @@ class AzureTTSService {
       console.warn('⚠️  Azure TTS subscription key appears to be a placeholder');
       console.warn('   TTS will fall back to native browser TTS');
       console.warn('   To enable Azure TTS, update VITE_AZURE_TTS_KEY and VITE_AZURE_TTS_REGION in .env.local');
-    }
-    
-    // Initialize audio context
-    if (typeof window !== 'undefined' && window.AudioContext) {
-      this.audioContext = new AudioContext();
     }
     
     // Set default voice only if properly configured
@@ -207,7 +196,15 @@ class AzureTTSService {
         console.log('Set default Azure TTS voice:', voices[0].name);
       }
     } catch (error) {
-      console.warn('Failed to set default Azure TTS voice:', error);
+      console.warn('Failed to set default Azure TTS voice from API, using hardcoded fallback:', error);
+      // Fallback to a known working voice when API call fails
+      this.settings.voice = {
+        name: 'en-US-AriaNeural',
+        locale: 'en-US',
+        gender: 'Female',
+        voiceType: 'Neural'
+      };
+      console.log('Using fallback Azure TTS voice: en-US-AriaNeural');
     }
   }
 
@@ -287,6 +284,11 @@ class AzureTTSService {
     this.settings.volume = volumeToAzurePercentage(Math.max(-96.0, Math.min(16.0, volume)));
   }
 
+  setVolume(volume: number) {
+    // Convert 0-1 volume to Howler volume (0-1)
+    this.audioPlayer.setVolume(Math.max(0, Math.min(1, volume)));
+  }
+
   setAudioFormat(format: 'audio-24khz-48kbitrate-mono-mp3' | 'audio-16khz-32kbitrate-mono-mp3' | 'audio-16khz-128kbitrate-mono-mp3' | 'audio-16khz-64kbitrate-mono-mp3' | 'raw-16khz-16bit-mono-pcm') {
     this.settings.audioFormat = format;
   }
@@ -312,52 +314,163 @@ class AzureTTSService {
       </voice>
     </speak>`;
 
-    const endpoint = `https://${this.region}.tts.speech.microsoft.com/cognitiveservices/v1`;
+    // Use server-side proxy endpoint to avoid HTTP/2 protocol errors
+    const proxyEndpoint = '/api/azure-tts';
 
-    console.log('Azure TTS Request Details:', {
-      endpoint,
+    console.log('Azure TTS Request Details (via proxy):', {
+      endpoint: proxyEndpoint,
       textLength: text.length,
       voice: officialVoiceName,
       locale: voice.locale
     });
 
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Ocp-Apim-Subscription-Key': this.subscriptionKey!,
-          'Content-Type': 'application/ssml+xml',
-          'X-Microsoft-OutputFormat': this.settings.audioFormat,
-          'User-Agent': 'SmartReader',
-        },
-        body: ssml,
-      });
+    // Retry logic for network errors
+    const maxRetries = 3;
+    let lastError: Error | null = null;
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Azure TTS API Error:', errorText);
-        throw new Error(`TTS synthesis failed: ${response.statusText}`);
-      }
-
-      console.log('✅ Azure TTS Request SUCCEEDED!');
-      const audioData = await response.arrayBuffer();
-      console.log('AzureTTSService.synthesize: Received audio buffer', {
-        size: audioData.byteLength,
-        contentType: response.headers.get('content-type'),
-        status: response.status
-      });
-      
-      if (!audioData || audioData.byteLength === 0) {
-        console.error('AzureTTSService.synthesize: Received empty audio buffer from API!');
-        throw new Error('Received empty audio buffer from Azure TTS API');
-      }
-      
-      return audioData;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Azure TTS Request via proxy (attempt ${attempt}/${maxRetries})...`);
         
-    } catch (error) {
-      console.error('Azure TTS Error:', error);
-      throw error;
+        // Create abort controller for timeout
+        // Increased to 60 seconds for longer TTS synthesis requests
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          console.warn(`Azure TTS Proxy Request timeout after 60s (attempt ${attempt})`);
+          controller.abort();
+        }, 60000); // 60 second timeout
+        
+        try {
+          // Call our server-side proxy endpoint
+          const response = await fetch(proxyEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              ssml: ssml,
+              voice: officialVoiceName,
+              locale: voice.locale,
+              region: this.region,
+            }),
+            signal: controller.signal,
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            console.error(`Azure TTS Proxy Error (attempt ${attempt}):`, {
+              status: response.status,
+              statusText: response.statusText,
+              error: errorData.error || errorData.message
+            });
+            
+            // Don't retry on client errors (4xx)
+            if (response.status >= 400 && response.status < 500) {
+              throw new Error(`TTS synthesis failed: ${errorData.error || response.statusText}`);
+            }
+            
+            // Retry on server errors (5xx)
+            if (response.status >= 500 && attempt < maxRetries) {
+              lastError = new Error(`TTS synthesis failed: ${errorData.error || response.statusText}`);
+              await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+              continue;
+            }
+            
+            throw new Error(`TTS synthesis failed: ${errorData.error || response.statusText}`);
+          }
+
+          console.log(`✅ Azure TTS Proxy Request SUCCEEDED! (attempt ${attempt})`);
+          
+          // Read the audio data from the proxy response
+          const audioData = await response.arrayBuffer();
+          
+          console.log('AzureTTSService.synthesize: Received audio buffer from proxy', {
+            size: audioData.byteLength,
+            contentType: response.headers.get('content-type'),
+            status: response.status
+          });
+          
+          if (!audioData || audioData.byteLength === 0) {
+            console.error('AzureTTSService.synthesize: Received empty audio buffer from proxy!');
+            throw new Error('Received empty audio buffer from Azure TTS proxy');
+          }
+          
+          return audioData;
+        } finally {
+          // Always clear timeout, even if there's an error
+          clearTimeout(timeoutId);
+        }
+          
+      } catch (error) {
+        lastError = error as Error;
+        console.error(`Azure TTS Proxy Error (attempt ${attempt}/${maxRetries}):`, error);
+        
+        // Don't retry on certain errors
+        if (error instanceof Error) {
+          // Don't retry on abort/timeout errors
+          if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+            throw new Error(`Request timeout: ${error.message}`);
+          }
+          
+          // Don't retry on authentication errors
+          if (error.message.includes('401') || error.message.includes('403')) {
+            throw error;
+          }
+        }
+        
+        // Retry with exponential backoff
+        if (attempt < maxRetries) {
+          const delay = 1000 * attempt; // 1s, 2s, 3s
+          console.log(`Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+      }
     }
+    
+    // If we get here, all retries failed
+    throw lastError || new Error('Azure TTS synthesis failed after all retries');
+  }
+
+  /**
+   * Fallback method using XMLHttpRequest instead of fetch
+   * This may work around HTTP/2 protocol errors in some browsers
+   */
+  private async synthesizeWithXHR(endpoint: string, ssml: string): Promise<ArrayBuffer> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', endpoint, true);
+      xhr.setRequestHeader('Ocp-Apim-Subscription-Key', this.subscriptionKey!);
+      xhr.setRequestHeader('Content-Type', 'application/ssml+xml');
+      xhr.setRequestHeader('X-Microsoft-OutputFormat', this.settings.audioFormat);
+      // Note: User-Agent cannot be set in XMLHttpRequest (unsafe header)
+      
+      xhr.responseType = 'arraybuffer';
+      
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const audioData = xhr.response as ArrayBuffer;
+          if (!audioData || audioData.byteLength === 0) {
+            reject(new Error('Received empty audio buffer from Azure TTS API (XHR)'));
+          } else {
+            resolve(audioData);
+          }
+        } else {
+          reject(new Error(`TTS synthesis failed: ${xhr.status} ${xhr.statusText}`));
+        }
+      };
+      
+      xhr.onerror = () => {
+        reject(new Error(`XHR request failed: ${xhr.statusText || 'Network error'}`));
+      };
+      
+      xhr.ontimeout = () => {
+        reject(new Error('XHR request timeout'));
+      };
+      
+      xhr.timeout = 30000; // 30 second timeout
+      xhr.send(ssml);
+    });
   }
 
   private escapeXml(text: string): string {
@@ -373,7 +486,7 @@ class AzureTTSService {
     try {
       this.stopRequested = false;
       
-      if (this.currentAudio || this.isPaused) {
+      if (this.audioPlayer.isSpeaking() || this.audioPlayer.isPausedState()) {
         this.stop();
         this.stopRequested = false;
       }
@@ -383,6 +496,16 @@ class AzureTTSService {
 
       if (!this.settings.voice) {
         await this.setDefaultVoice();
+        // If still no voice after setDefaultVoice, use hardcoded fallback
+        if (!this.settings.voice) {
+          console.warn('AzureTTSService: No voice available, using hardcoded fallback');
+          this.settings.voice = {
+            name: 'en-US-AriaNeural',
+            locale: 'en-US',
+            gender: 'Female',
+            voiceType: 'Neural'
+          };
+        }
       }
 
       // Azure TTS limit is 10,000 characters per request
@@ -390,6 +513,7 @@ class AzureTTSService {
       
       if (text.length <= MAX_TEXT_LENGTH) {
         console.log('AzureTTSService.speak: Synthesizing audio for text length:', text.length);
+        this.currentText = text; // Store text for word tracking
         const audioBuffer = await this.synthesize(text);
         console.log('AzureTTSService.speak: Audio buffer received, size:', audioBuffer.byteLength, 'bytes');
         
@@ -399,7 +523,7 @@ class AzureTTSService {
           throw new Error('Received empty audio buffer from Azure TTS');
         }
         
-        await this.playAudio(audioBuffer, onEnd, onWord);
+        await this.playAudio(audioBuffer, onEnd, onWord, text);
       } else {
         console.log(`Text too long (${text.length} chars), splitting into chunks...`);
         await this.speakInChunks(text, MAX_TEXT_LENGTH, onEnd, onWord);
@@ -441,7 +565,7 @@ class AzureTTSService {
         return;
       }
       
-      if (this.isPaused) {
+      if (this.audioPlayer.isPausedState()) {
         console.log(`Chunk playback paused at ${i + 1}/${chunks.length}`);
         this.pausedChunkIndex = i;
         this.currentChunks = chunks;
@@ -462,10 +586,8 @@ class AzureTTSService {
         return;
       }
       
-      if (this.isPaused) {
+      if (this.audioPlayer.isPausedState()) {
         console.log(`Chunk paused after synthesis ${i + 1}/${chunks.length}`);
-        const decodedAudio = await this.audioContext!.decodeAudioData(audioBuffer);
-        this.currentAudioBuffer = decodedAudio;
         this.pausedChunkIndex = i;
         this.currentChunks = chunks;
         this.currentOnEnd = onEnd;
@@ -475,240 +597,49 @@ class AzureTTSService {
       }
       
       const isLastChunk = i === chunks.length - 1;
-      await this.playAudio(audioBuffer, isLastChunk ? onEnd : undefined, onWord);
+      await this.playAudio(audioBuffer, isLastChunk ? onEnd : undefined, onWord, chunk);
     }
     
     this.speakingActive = false;
   }
 
-  private async playAudio(audioBuffer: ArrayBuffer, onEnd?: () => void, onWord?: (word: string, charIndex: number) => void): Promise<void> {
-    if (!this.audioContext) {
-      throw new Error('Audio context not available');
+  private async playAudio(audioBuffer: ArrayBuffer, onEnd?: () => void, onWord?: (word: string, charIndex: number) => void, text?: string): Promise<void> {
+    if (this.stopRequested) {
+      console.log('AzureTTSService.playAudio: Stop requested before starting playback');
+      return;
     }
 
     try {
-      if (this.audioContext.state === 'suspended') {
-        console.log('AudioContext is suspended, attempting to resume...');
-        try {
-          await this.audioContext.resume();
-          console.log('AudioContext resumed successfully');
-        } catch (resumeError) {
-          console.error('Failed to resume AudioContext:', resumeError);
-          throw new Error('Cannot play audio: AudioContext is suspended and cannot be resumed. Please interact with the page first.');
-        }
-      }
-
-      if (this.audioContext.state !== 'running') {
-        console.warn('AudioContext state is not running:', this.audioContext.state);
-        try {
-          await this.audioContext.resume();
-        } catch (resumeError) {
-          console.error('Failed to resume AudioContext before playback:', resumeError);
-          throw new Error('Cannot play audio: AudioContext is not running');
-        }
-      }
-
-      console.log('AzureTTSService.playAudio: Decoding audio buffer, size:', audioBuffer.byteLength);
-      const decodedAudio = await this.audioContext.decodeAudioData(audioBuffer);
-      console.log('AzureTTSService.playAudio: Audio decoded successfully', {
-        duration: decodedAudio.duration,
-        sampleRate: decodedAudio.sampleRate,
-        numberOfChannels: decodedAudio.numberOfChannels,
-        length: decodedAudio.length
-      });
-      
-      // CRITICAL: Check for zero-duration audio before starting playback
-      // Zero-duration audio will cause onended to fire immediately
-      if (decodedAudio.duration === 0 || decodedAudio.length === 0) {
-        console.warn('AzureTTSService.playAudio: Decoded audio has zero duration. Playback will not occur.');
-        if (onEnd) {
-          // Call onEnd immediately if audio is empty
-          onEnd();
-        }
-        return;
-      }
-      
-      if (this.stopRequested) {
-        console.log('AzureTTSService.playAudio: Stop requested before starting playback');
-        return;
-      }
-      
-      const source = this.audioContext.createBufferSource();
-      source.buffer = decodedAudio;
-      source.connect(this.audioContext.destination);
-      
-      this.currentAudio = source;
-      this.currentAudioBuffer = decodedAudio;
-      
-      this.onEndCallback = onEnd || null;
-      this.onWordCallback = onWord || null;
-      
-      const audioEndPromise = new Promise<void>((resolve, reject) => {
-        source.onended = () => {
-          console.log('AzureTTSService.playAudio: Audio ended, duration was:', decodedAudio.duration);
-          this.isPaused = false;
-          this.pauseTime = 0;
-          this.startTime = 0;
-          this.audioStartTime = 0;
-          this.audioPauseTime = 0;
-          this.currentAudioBuffer = null;
-          this.currentAudio = null;
-          if (onEnd) {
-            console.log('AzureTTSService.playAudio: Calling onEnd callback');
-            onEnd();
-          }
-          this.onEndCallback = null;
-          this.onWordCallback = null;
-          resolve();
-        };
-        
-        source.addEventListener('error', (event) => {
-          console.error('Audio source error:', event);
-          this.isPaused = false;
-          this.pauseTime = 0;
-          this.startTime = 0;
-          this.audioStartTime = 0;
-          this.audioPauseTime = 0;
-          this.currentAudioBuffer = null;
-          this.currentAudio = null;
-          this.onEndCallback = null;
-          this.onWordCallback = null;
-          reject(new Error('Audio playback error'));
-        });
-      });
-
-      this.audioStartTime = this.audioContext.currentTime;
-      this.startTime = this.audioContext.currentTime;
-      
-      try {
-        source.start();
-        console.log('AzureTTSService.playAudio: Audio playback started successfully', {
-          audioContextState: this.audioContext.state,
-          audioDuration: decodedAudio.duration,
-          currentTime: this.audioContext.currentTime,
-          isSpeaking: this.isSpeaking(),
-          hasCurrentAudio: !!this.currentAudio,
-          speakingActive: this.speakingActive
-        });
-        
-        // CRITICAL: Verify playback actually started
-        // Wait a small amount to ensure audio context is processing
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
-        // Check if audio is still playing after start
-        if (!this.isSpeaking() && decodedAudio.duration > 0) {
-          console.warn('AzureTTSService.playAudio: Audio started but isSpeaking() returns false. Audio may have ended immediately.');
-        }
-      } catch (startError) {
-        console.error('AzureTTSService.playAudio: Failed to start audio playback:', startError);
-        throw new Error('Failed to start audio playback: ' + (startError instanceof Error ? startError.message : String(startError)));
-      }
-      
-      console.log('AzureTTSService.playAudio: Waiting for audio to complete...');
-      await audioEndPromise;
-      console.log('AzureTTSService.playAudio: Audio playback completed', {
-        finalDuration: decodedAudio.duration,
-        isSpeaking: this.isSpeaking()
-      });
-      
+      console.log('AzureTTSService.playAudio: Starting playback with Howler, buffer size:', audioBuffer.byteLength);
+      await this.audioPlayer.playAudio(audioBuffer, onEnd, onWord, text);
+      console.log('AzureTTSService.playAudio: Audio playback completed');
     } catch (error) {
       console.error('Error playing audio:', error);
-      this.currentAudio = null;
-      this.currentAudioBuffer = null;
-      this.onEndCallback = null;
-      this.onWordCallback = null;
       throw error;
     }
   }
 
   pause() {
-    if ((this.currentAudio || this.speakingActive) && this.audioContext && !this.isPaused) {
-      if (this.currentAudio) {
-        this.pauseTime = this.audioContext.currentTime - this.audioStartTime;
-        try {
-          this.currentAudio.stop();
-          this.currentAudio.disconnect();
-        } catch (e) {
-          // Ignore errors if already stopped
-        }
-        this.currentAudio = null;
-      } else {
-        this.pauseTime = this.audioContext.currentTime - this.audioStartTime;
-      }
-      this.isPaused = true;
-      console.log('AzureTTSService: Paused at time:', this.pauseTime, 'speakingActive:', this.speakingActive);
+    if (this.audioPlayer.isSpeaking() || this.speakingActive) {
+      this.audioPlayer.pause();
+      console.log('AzureTTSService: Paused, speakingActive:', this.speakingActive);
     } else {
-      console.log('AzureTTSService: Cannot pause - currentAudio:', !!this.currentAudio, 'speakingActive:', this.speakingActive, 'isPaused:', this.isPaused);
+      console.log('AzureTTSService: Cannot pause - not speaking, speakingActive:', this.speakingActive);
     }
   }
 
   async resume() {
-    if (!this.isPaused) {
+    if (!this.audioPlayer.isPausedState()) {
       console.log('AzureTTSService: Not paused, cannot resume');
       return;
     }
     
-    console.log('AzureTTSService: Resume called, pauseTime:', this.pauseTime, 'pausedChunkIndex:', this.pausedChunkIndex);
+    console.log('AzureTTSService: Resume called, pausedChunkIndex:', this.pausedChunkIndex);
     
-    if (this.audioContext && this.audioContext.state === 'suspended') {
-      console.log('AudioContext is suspended during resume, attempting to resume...');
-      try {
-        await this.audioContext.resume();
-        console.log('AudioContext resumed successfully during resume');
-      } catch (resumeError) {
-        console.error('Failed to resume AudioContext during resume:', resumeError);
-        throw new Error('Cannot resume audio: AudioContext is suspended');
-      }
-    }
-    
-    if (this.audioContext && this.currentAudioBuffer) {
-      console.log('AzureTTSService: Resuming from mid-chunk at time:', this.pauseTime);
-      
-      const source = this.audioContext.createBufferSource();
-      source.buffer = this.currentAudioBuffer;
-      source.connect(this.audioContext.destination);
-      
-      source.onended = () => {
-        console.log('AzureTTSService: Chunk ended, continuing to next chunk if any');
-        this.currentAudioBuffer = null;
-        this.currentAudio = null;
-        
-        if (this.currentChunks.length > 0 && this.pausedChunkIndex >= 0 && this.pausedChunkIndex < this.currentChunks.length - 1) {
-          const nextIndex = this.pausedChunkIndex + 1;
-          console.log(`Continuing to chunk ${nextIndex + 1}/${this.currentChunks.length}`);
-          this.speakInChunks(
-            this.currentChunks.slice(nextIndex).join(' '),
-            9000,
-            this.currentOnEnd,
-            this.currentOnWord
-          ).catch(err => {
-            console.error('Error continuing chunk playback:', err);
-          });
-        } else if (this.onEndCallback) {
-          this.onEndCallback();
-          this.onEndCallback = null;
-        }
-        
-        this.pauseTime = 0;
-        this.startTime = 0;
-        this.audioStartTime = 0;
-        this.audioPauseTime = 0;
-        this.pausedChunkIndex = -1;
-        this.currentChunks = [];
-        this.currentOnEnd = undefined;
-        this.currentOnWord = undefined;
-      };
-      
-      this.currentAudio = source;
-      this.audioStartTime = this.audioContext.currentTime - this.pauseTime;
-      source.start(0, this.pauseTime);
-      
-      this.isPaused = false;
-      console.log('AzureTTSService: Resumed successfully from', this.pauseTime, 'seconds');
-    } else if (this.currentChunks.length > 0 && this.pausedChunkIndex >= 0) {
+    // If we have chunks to resume, continue from where we left off
+    if (this.currentChunks.length > 0 && this.pausedChunkIndex >= 0) {
       console.log('AzureTTSService: Resuming chunk playback from index:', this.pausedChunkIndex);
       this.speakingActive = true;
-      this.isPaused = false;
       
       this.speakInChunks(
         this.currentChunks.slice(this.pausedChunkIndex).join(' '),
@@ -720,8 +651,9 @@ class AzureTTSService {
         this.speakingActive = false;
       });
     } else {
-      console.warn('AzureTTSService: Resume called but no valid resume state');
-      this.isPaused = false;
+      // Resume current playback
+      this.audioPlayer.resume();
+      console.log('AzureTTSService: Resumed current playback');
     }
   }
 
@@ -730,77 +662,39 @@ class AzureTTSService {
     this.stopRequested = true;
     console.log('AzureTTSService.stop() set stopRequested to:', this.stopRequested)
     
-    if (this.currentAudio) {
-      console.log('AzureTTSService: Stopping current audio')
-      try {
-        this.currentAudio.stop();
-        this.currentAudio.disconnect();
-      } catch (e) {
-        // Ignore errors if already stopped
-      }
-      this.currentAudio = null;
-    }
-    this.isPaused = false;
+    this.audioPlayer.stop();
     this.speakingActive = false;
-    this.pauseTime = 0;
-    this.startTime = 0;
-    this.audioStartTime = 0;
-    this.audioPauseTime = 0;
-    this.currentAudioBuffer = null;
-    this.onEndCallback = null;
-    this.onWordCallback = null;
     this.pausedChunkIndex = -1;
     this.currentChunks = [];
     this.currentOnEnd = undefined;
     this.currentOnWord = undefined;
+    this.currentText = '';
     console.log('AzureTTSService: Stop completed, stopRequested =', this.stopRequested)
   }
 
   isSpeaking(): boolean {
-    return (this.currentAudio !== null || this.speakingActive) && !this.isPaused;
+    return this.audioPlayer.isSpeaking() || this.speakingActive;
   }
 
   isPausedState(): boolean {
-    return this.isPaused;
+    return this.audioPlayer.isPausedState();
   }
 
   getProgress(): number {
-    if (!this.audioContext || !this.currentAudioBuffer || !this.isSpeaking()) {
-      return 0;
-    }
-    
-    const currentTime = this.audioContext.currentTime;
-    const elapsedTime = currentTime - this.audioStartTime;
-    const duration = this.currentAudioBuffer.duration;
-    
-    if (duration === 0) {
-      return 0;
-    }
-    
-    return Math.min(elapsedTime / duration, 1);
+    return this.audioPlayer.getProgress();
   }
 
   getCurrentTime(): number {
-    if (!this.audioContext || !this.currentAudioBuffer || !this.isSpeaking()) {
-      return 0;
-    }
-    
-    const currentTime = this.audioContext.currentTime;
-    return Math.min(currentTime - this.audioStartTime, this.currentAudioBuffer.duration);
+    return this.audioPlayer.getCurrentTime();
   }
 
   getDuration(): number {
-    if (!this.currentAudioBuffer) {
-      return 0;
-    }
-    
-    return this.currentAudioBuffer.duration;
+    return this.audioPlayer.getDuration();
   }
 
   isSupported(): boolean {
     return this.isConfigured() && 
-           typeof window !== 'undefined' && 
-           window.AudioContext !== undefined;
+           typeof window !== 'undefined';
   }
 
   cleanText(text: string): string {
