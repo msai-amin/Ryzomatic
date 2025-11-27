@@ -558,7 +558,11 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     }
     
     ensurePDFjs()
-  }, [document?.id, document?.pdfData])
+    // CRITICAL: Only depend on document?.id, not document?.pdfData
+    // pdfData is a Blob which is compared by reference, causing infinite loops
+    // when new Blob instances are created (even with same content)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedDocumentId])
 
   // NOTE: High-DPI patch moved to ensurePDFjs function to fix race condition
   // The patch is now applied BEFORE setIsPDFjsReady(true), ensuring it's active

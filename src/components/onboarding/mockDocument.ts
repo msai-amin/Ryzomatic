@@ -7,97 +7,88 @@ import { DocumentRelationshipWithDetails } from '../../../lib/supabase'
  * without uploading their own documents
  */
 export const createMockDocument = (): Document => {
-  const sampleContent = `
-# Machine Learning in Academic Research
-
-## Abstract
-
-This paper explores the application of machine learning techniques in academic research settings. 
-We present a comprehensive analysis of how modern AI systems can enhance scholarly workflows, 
-from literature review to peer review processes.
-
-## Introduction
-
-Academic research has undergone significant transformation with the advent of machine learning technologies. 
-Researchers now have access to powerful tools that can assist with data analysis, literature synthesis, 
-and knowledge discovery.
-
-## Methodology
-
-Our study employed a mixed-methods approach, combining quantitative analysis of publication patterns 
-with qualitative interviews of researchers using AI-assisted tools. We analyzed over 10,000 research papers 
-across multiple disciplines to identify common patterns and challenges.
-
-## Results
-
-The findings reveal that researchers who integrate AI tools into their workflow report:
-- 40% reduction in time spent on literature review
-- 60% improvement in citation accuracy
-- 35% increase in cross-disciplinary connections discovered
-
-## Discussion
-
-These results suggest that AI-assisted research tools can significantly enhance academic productivity 
-while maintaining research quality. However, careful consideration must be given to ethical implications 
-and the need for human oversight in critical research decisions.
-
-## Conclusion
-
-Machine learning technologies offer promising opportunities for enhancing academic research workflows. 
-Future work should focus on developing more sophisticated tools that can better understand research context 
-and provide more nuanced assistance to researchers.
-`.trim()
-
-  // Create more realistic page content for better visualization
+  // Create a minimal valid PDF as a blob
+  // This PDF will display a simple page with text
+  const pdfContent = `%PDF-1.4
+1 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
+2 0 obj
+<<
+/Type /Pages
+/Kids [3 0 R]
+/Count 1
+>>
+endobj
+3 0 obj
+<<
+/Type /Page
+/Parent 2 0 R
+/MediaBox [0 0 612 792]
+/Contents 4 0 R
+/Resources <<
+/Font <<
+/F1 5 0 R
+>>
+>>
+>>
+endobj
+4 0 obj
+<<
+/Length 44
+>>
+stream
+BT
+/F1 12 Tf
+70 700 Td
+(Onboarding Demo Document) Tj
+ET
+endstream
+endobj
+5 0 obj
+<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Helvetica
+>>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000123 00000 n 
+0000000208 00000 n 
+0000000373 00000 n 
+trailer
+<<
+/Size 6
+/Root 1 0 R
+>>
+startxref
+458
+%%EOF`
+  
+  const pdfBlob = new Blob([pdfContent], { type: 'application/pdf' })
+  
+  // Create page texts for TTS
   const pageTexts = [
-    `# Machine Learning in Academic Research
-
-## Abstract
-
-This paper explores the application of machine learning techniques in academic research settings. We present a comprehensive analysis of how modern AI systems can enhance scholarly workflows, from literature review to peer review processes.
-
-## Introduction
-
-Academic research has undergone significant transformation with the advent of machine learning technologies. Researchers now have access to powerful tools that can assist with data analysis, literature synthesis, and knowledge discovery.
-
-Our study employed a mixed-methods approach, combining quantitative analysis of publication patterns with qualitative interviews of researchers using AI-assisted tools.`,
-    `## Methodology
-
-We analyzed over 10,000 research papers across multiple disciplines to identify common patterns and challenges. The methodology included:
-
-1. Systematic literature review
-2. Survey of active researchers
-3. Case studies of AI tool adoption
-4. Statistical analysis of publication trends
-
-## Results
-
-The findings reveal that researchers who integrate AI tools into their workflow report significant improvements in productivity and research quality.`,
-    `Key metrics include:
-- 40% reduction in time spent on literature review
-- 60% improvement in citation accuracy
-- 35% increase in cross-disciplinary connections discovered
-
-## Discussion
-
-These results suggest that AI-assisted research tools can significantly enhance academic productivity while maintaining research quality. However, careful consideration must be given to ethical implications and the need for human oversight in critical research decisions.`,
-    `## Conclusion
-
-Machine learning technologies offer promising opportunities for enhancing academic research workflows. Future work should focus on developing more sophisticated tools that can better understand research context and provide more nuanced assistance to researchers.
-
-## References
-
-1. Smith, J. (2023). AI in Academic Research. Journal of Digital Scholarship.
-2. Doe, A. (2024). Machine Learning Applications. Conference on Academic Technology.`
-  ].filter(text => text.length > 0)
+    'Onboarding Demo Document. This is a sample document used to demonstrate Ryzomatic features during the onboarding tour.',
+    'Page 2: Additional content for demonstration purposes.',
+    'Page 3: More sample content to show multi-page document handling.'
+  ]
 
   return {
     id: 'mock-document-onboarding',
-    name: 'Machine Learning in Academic Research (Demo)',
-    content: sampleContent,
+    name: 'Onboarding Demo Document',
+    content: 'Mock document content for onboarding demonstration',
     type: 'pdf' as const,
     uploadedAt: new Date(),
-    totalPages: pageTexts.length,
+    pdfData: pdfBlob, // Use PDF blob to render in PDF viewer (no markdown background)
+    totalPages: 3,
     pageTexts: pageTexts,
     cleanedPageTexts: pageTexts,
     currentPage: 1,

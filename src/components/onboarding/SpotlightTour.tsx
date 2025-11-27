@@ -97,14 +97,16 @@ export const SpotlightTour: React.FC<SpotlightTourProps> = ({ steps = [], onActi
     // Responsive tooltip dimensions
     const windowWidth = window.innerWidth
     const windowHeight = window.innerHeight
-    const MARGIN = 16 // Consistent margin on all sides
+    const MARGIN = 20 // Increased margin for better spacing
     const GAP = 24
     
     // Calculate actual tooltip width (responsive)
-    const baseTooltipWidth = 400
+    const baseTooltipWidth = 420
     const maxTooltipWidth = windowWidth - (MARGIN * 2)
     const TOOLTIP_WIDTH = Math.min(baseTooltipWidth, maxTooltipWidth)
-    const TOOLTIP_HEIGHT = 280
+    // Dynamic height based on content (image increases height)
+    const baseTooltipHeight = currentStepData.image ? 520 : 340
+    const TOOLTIP_HEIGHT = Math.min(baseTooltipHeight, windowHeight - (MARGIN * 2))
 
     let top = 0
     let left = 0
@@ -489,12 +491,14 @@ export const SpotlightTour: React.FC<SpotlightTourProps> = ({ steps = [], onActi
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="absolute pointer-events-auto bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-2xl p-6 flex flex-col"
+            className="absolute pointer-events-auto bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-2xl p-4 sm:p-5 flex flex-col"
             style={{ 
               top: `${tooltipPos.top}px`, 
               left: `${tooltipPos.left}px`,
-              width: '400px',
-              maxWidth: 'calc(100vw - 32px)',
+              width: `${Math.min(420, window.innerWidth - 40)}px`,
+              maxWidth: 'calc(100vw - 40px)',
+              maxHeight: 'calc(100vh - 40px)',
+              overflowY: 'auto',
               zIndex: 100003,
             }}
           >
@@ -569,7 +573,7 @@ export const SpotlightTour: React.FC<SpotlightTourProps> = ({ steps = [], onActi
                   alt={currentStepData.title}
                   className="w-full h-auto"
                   style={{ 
-                    maxHeight: '300px', 
+                    maxHeight: '280px', 
                     width: '100%',
                     objectFit: 'contain',
                     display: 'block',

@@ -25,11 +25,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
     <div 
       className="flex flex-col items-center justify-center py-16 px-4 relative min-h-screen"
       style={{
-        backgroundImage: 'url(/onboarding-images/default-pdf-background.png)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        backgroundBlendMode: 'overlay',
+        backgroundColor: 'var(--color-background)',
       }}
     >
       {/* Overlay to ensure text readability */}
