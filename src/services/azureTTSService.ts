@@ -323,43 +323,116 @@ class AzureTTSService {
       locale: voice.locale
     });
 
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Ocp-Apim-Subscription-Key': this.subscriptionKey!,
-          'Content-Type': 'application/ssml+xml',
-          'X-Microsoft-OutputFormat': this.settings.audioFormat,
-          'User-Agent': 'SmartReader',
-        },
-        body: ssml,
-      });
+    // Retry logic for network errors
+    const maxRetries = 3;
+    let lastError: Error | null = null;
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Azure TTS API Error:', errorText);
-        throw new Error(`TTS synthesis failed: ${response.statusText}`);
-      }
-
-      console.log('✅ Azure TTS Request SUCCEEDED!');
-      const audioData = await response.arrayBuffer();
-      console.log('AzureTTSService.synthesize: Received audio buffer', {
-        size: audioData.byteLength,
-        contentType: response.headers.get('content-type'),
-        status: response.status
-      });
-      
-      if (!audioData || audioData.byteLength === 0) {
-        console.error('AzureTTSService.synthesize: Received empty audio buffer from API!');
-        throw new Error('Received empty audio buffer from Azure TTS API');
-      }
-      
-      return audioData;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Azure TTS Request (attempt ${attempt}/${maxRetries})...`);
         
-    } catch (error) {
-      console.error('Azure TTS Error:', error);
-      throw error;
+        // Create abort controller for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Ocp-Apim-Subscription-Key': this.subscriptionKey!,
+            'Content-Type': 'application/ssml+xml',
+            'X-Microsoft-OutputFormat': this.settings.audioFormat,
+            'User-Agent': 'SmartReader',
+          },
+          body: ssml,
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => 'Unable to read error response');
+          console.error(`Azure TTS API Error (attempt ${attempt}):`, {
+            status: response.status,
+            statusText: response.statusText,
+            errorText: errorText.substring(0, 200) // Limit error text length
+          });
+          
+          // Don't retry on client errors (4xx)
+          if (response.status >= 400 && response.status < 500) {
+            throw new Error(`TTS synthesis failed: ${response.status} ${response.statusText}`);
+          }
+          
+          // Retry on server errors (5xx)
+          if (response.status >= 500 && attempt < maxRetries) {
+            lastError = new Error(`TTS synthesis failed: ${response.status} ${response.statusText}`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+            continue;
+          }
+          
+          throw new Error(`TTS synthesis failed: ${response.status} ${response.statusText}`);
+        }
+
+        console.log(`✅ Azure TTS Request SUCCEEDED! (attempt ${attempt})`);
+        
+        // Read the response body with error handling
+        let audioData: ArrayBuffer;
+        try {
+          audioData = await response.arrayBuffer();
+        } catch (bodyError) {
+          console.error(`Failed to read response body (attempt ${attempt}):`, bodyError);
+          
+          // Retry if it's a network/protocol error
+          if (attempt < maxRetries && (bodyError instanceof TypeError || bodyError instanceof DOMException)) {
+            lastError = bodyError as Error;
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            continue;
+          }
+          
+          throw new Error(`Failed to read audio data: ${bodyError instanceof Error ? bodyError.message : 'Unknown error'}`);
+        }
+        
+        console.log('AzureTTSService.synthesize: Received audio buffer', {
+          size: audioData.byteLength,
+          contentType: response.headers.get('content-type'),
+          status: response.status
+        });
+        
+        if (!audioData || audioData.byteLength === 0) {
+          console.error('AzureTTSService.synthesize: Received empty audio buffer from API!');
+          throw new Error('Received empty audio buffer from Azure TTS API');
+        }
+        
+        return audioData;
+          
+      } catch (error) {
+        lastError = error as Error;
+        console.error(`Azure TTS Error (attempt ${attempt}/${maxRetries}):`, error);
+        
+        // Don't retry on certain errors
+        if (error instanceof Error) {
+          // Don't retry on abort/timeout errors
+          if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+            throw new Error(`Request timeout: ${error.message}`);
+          }
+          
+          // Don't retry on authentication errors
+          if (error.message.includes('401') || error.message.includes('403')) {
+            throw error;
+          }
+        }
+        
+        // Retry with exponential backoff
+        if (attempt < maxRetries) {
+          const delay = 1000 * attempt; // 1s, 2s, 3s
+          console.log(`Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+      }
     }
+    
+    // If we get here, all retries failed
+    throw lastError || new Error('Azure TTS synthesis failed after all retries');
   }
 
   private escapeXml(text: string): string {
