@@ -97,8 +97,38 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifact
+          path: dist
+
+      - name: Start preview server
+        run: |
+          npm run preview &
+          echo $! > server.pid
+          sleep 10
+        env:
+          PORT: 3001
+
+      - name: Wait for server to be ready
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:3001 > /dev/null 2>&1; do sleep 2; done' || exit 1
+          echo "Server is ready!"
+
       - name: Run Playwright tests
         run: npm run test:e2e:ci
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: http://localhost:3001
+          CI: true
+
+      - name: Stop preview server
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            kill $(cat server.pid) || true
+            rm server.pid
+          fi
 
       - name: Upload Playwright report
         if: always()
