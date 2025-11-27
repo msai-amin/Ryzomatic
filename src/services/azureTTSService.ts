@@ -385,6 +385,16 @@ class AzureTTSService {
 
       if (!this.settings.voice) {
         await this.setDefaultVoice();
+        // If still no voice after setDefaultVoice, use hardcoded fallback
+        if (!this.settings.voice) {
+          console.warn('AzureTTSService: No voice available, using hardcoded fallback');
+          this.settings.voice = {
+            name: 'en-US-AriaNeural',
+            locale: 'en-US',
+            gender: 'Female',
+            voiceType: 'Neural'
+          };
+        }
       }
 
       // Azure TTS limit is 10,000 characters per request
