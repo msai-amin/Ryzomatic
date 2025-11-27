@@ -275,12 +275,21 @@ BEGIN
 END;
 $$;
 
--- Attach trigger to document_descriptions table
-DROP TRIGGER IF EXISTS auto_generate_relationships_trigger ON document_descriptions;
-CREATE TRIGGER auto_generate_relationships_trigger
-  AFTER INSERT OR UPDATE OF description_embedding ON document_descriptions
-  FOR EACH ROW
-  EXECUTE FUNCTION trigger_auto_generate_relationships();
+-- Attach trigger to document_descriptions table (only if table exists)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_schema = 'public' 
+    AND table_name = 'document_descriptions'
+  ) THEN
+    DROP TRIGGER IF EXISTS auto_generate_relationships_trigger ON document_descriptions;
+    CREATE TRIGGER auto_generate_relationships_trigger
+      AFTER INSERT OR UPDATE OF description_embedding ON document_descriptions
+      FOR EACH ROW
+      EXECUTE FUNCTION trigger_auto_generate_relationships();
+  END IF;
+END $$;
 
 -- ============================================================================
 -- ENHANCED SEARCH FUNCTIONS
