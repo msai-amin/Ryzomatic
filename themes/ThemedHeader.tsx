@@ -319,7 +319,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
             )}
 
             {isAuthenticated && user ? (
-              <div className="relative">
+              <div className="relative z-[100]">
                 <button
                   ref={userButtonRef}
                   onClick={() => setIsUserMenuOpen((prev) => !prev)}
@@ -337,7 +337,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                 {isUserMenuOpen && (
                   <div
                     ref={userMenuRef}
-                    className="absolute right-0 mt-2 w-64 rounded-lg border shadow-lg"
+                    className="absolute right-0 mt-2 w-64 rounded-lg border shadow-lg z-[100]"
                     style={{
                       backgroundColor: 'var(--color-surface)',
                       borderColor: 'var(--color-border)'
