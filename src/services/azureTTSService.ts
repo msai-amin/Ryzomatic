@@ -341,6 +341,17 @@ class AzureTTSService {
 
       console.log('✅ Azure TTS Request SUCCEEDED!');
       const audioData = await response.arrayBuffer();
+      console.log('AzureTTSService.synthesize: Received audio buffer', {
+        size: audioData.byteLength,
+        contentType: response.headers.get('content-type'),
+        status: response.status
+      });
+      
+      if (!audioData || audioData.byteLength === 0) {
+        console.error('AzureTTSService.synthesize: Received empty audio buffer from API!');
+        throw new Error('Received empty audio buffer from Azure TTS API');
+      }
+      
       return audioData;
         
     } catch (error) {
@@ -378,7 +389,16 @@ class AzureTTSService {
       const MAX_TEXT_LENGTH = 9000; // Use 9000 to be safe
       
       if (text.length <= MAX_TEXT_LENGTH) {
+        console.log('AzureTTSService.speak: Synthesizing audio for text length:', text.length);
         const audioBuffer = await this.synthesize(text);
+        console.log('AzureTTSService.speak: Audio buffer received, size:', audioBuffer.byteLength, 'bytes');
+        
+        if (!audioBuffer || audioBuffer.byteLength === 0) {
+          console.error('AzureTTSService.speak: Received empty audio buffer!');
+          this.speakingActive = false;
+          throw new Error('Received empty audio buffer from Azure TTS');
+        }
+        
         await this.playAudio(audioBuffer, onEnd, onWord);
       } else {
         console.log(`Text too long (${text.length} chars), splitting into chunks...`);
@@ -488,9 +508,17 @@ class AzureTTSService {
         }
       }
 
+      console.log('AzureTTSService.playAudio: Decoding audio buffer, size:', audioBuffer.byteLength);
       const decodedAudio = await this.audioContext.decodeAudioData(audioBuffer);
+      console.log('AzureTTSService.playAudio: Audio decoded successfully', {
+        duration: decodedAudio.duration,
+        sampleRate: decodedAudio.sampleRate,
+        numberOfChannels: decodedAudio.numberOfChannels,
+        length: decodedAudio.length
+      });
       
       if (this.stopRequested) {
+        console.log('AzureTTSService.playAudio: Stop requested before starting playback');
         return;
       }
       
@@ -506,6 +534,7 @@ class AzureTTSService {
       
       const audioEndPromise = new Promise<void>((resolve, reject) => {
         source.onended = () => {
+          console.log('AzureTTSService.playAudio: Audio ended, duration was:', decodedAudio.duration);
           this.isPaused = false;
           this.pauseTime = 0;
           this.startTime = 0;
@@ -513,7 +542,10 @@ class AzureTTSService {
           this.audioPauseTime = 0;
           this.currentAudioBuffer = null;
           this.currentAudio = null;
-          if (onEnd) onEnd();
+          if (onEnd) {
+            console.log('AzureTTSService.playAudio: Calling onEnd callback');
+            onEnd();
+          }
           this.onEndCallback = null;
           this.onWordCallback = null;
           resolve();
@@ -539,13 +571,19 @@ class AzureTTSService {
       
       try {
         source.start();
-        console.log('Audio playback started successfully, AudioContext state:', this.audioContext.state);
+        console.log('AzureTTSService.playAudio: Audio playback started successfully', {
+          audioContextState: this.audioContext.state,
+          audioDuration: decodedAudio.duration,
+          currentTime: this.audioContext.currentTime
+        });
       } catch (startError) {
-        console.error('Failed to start audio playback:', startError);
+        console.error('AzureTTSService.playAudio: Failed to start audio playback:', startError);
         throw new Error('Failed to start audio playback: ' + (startError instanceof Error ? startError.message : String(startError)));
       }
       
+      console.log('AzureTTSService.playAudio: Waiting for audio to complete...');
       await audioEndPromise;
+      console.log('AzureTTSService.playAudio: Audio playback completed');
       
     } catch (error) {
       console.error('Error playing audio:', error);

@@ -939,11 +939,27 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           
           // Check if TTS provider is configured before starting playback
           const currentProvider = ttsManager.getCurrentProvider()
+          const allProviders = ttsManager.getProviders()
+          const configuredProviders = ttsManager.getConfiguredProviders()
+          
+          console.log('AudioWidget: TTS Provider Status', {
+            currentProvider: currentProvider ? {
+              name: currentProvider.name,
+              type: currentProvider.type,
+              isAvailable: currentProvider.isAvailable,
+              isConfigured: currentProvider.isConfigured
+            } : null,
+            allProviders: allProviders.map(p => ({ name: p.name, type: p.type, isAvailable: p.isAvailable, isConfigured: p.isConfigured })),
+            configuredProviders: configuredProviders.map(p => ({ name: p.name, type: p.type }))
+          })
+          
           if (!currentProvider || !currentProvider.isConfigured) {
             console.error('AudioWidget: No TTS provider configured', {
               hasProvider: !!currentProvider,
               isConfigured: currentProvider?.isConfigured,
-              providerType: currentProvider?.type
+              providerType: currentProvider?.type,
+              allProvidersCount: allProviders.length,
+              configuredProvidersCount: configuredProviders.length
             })
             setIsProcessing(false)
             updateTTS({ isPlaying: false, isPaused: false })
