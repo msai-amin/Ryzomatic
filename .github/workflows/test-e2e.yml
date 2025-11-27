@@ -29,10 +29,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'  # Automatically handles key generation and restore
+          # Don't use cache to avoid issues with optional dependencies
+          # cache: 'npm'
 
       - name: Install dependencies
-        run: npm install --prefer-offline --no-audit
+        run: |
+          # Remove node_modules to ensure clean install of optional dependencies
+          rm -rf node_modules
+          # Install dependencies fresh (this ensures optional dependencies are installed)
+          npm install --no-audit
+          # Verify rollup optional dependency is present (needed for build)
+          if [ ! -d "node_modules/@rollup/rollup-linux-x64-gnu" ]; then
+            echo "Rollup optional dependency missing, installing explicitly..."
+            npm install --no-save --no-audit --force @rollup/rollup-linux-x64-gnu
+          fi
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
