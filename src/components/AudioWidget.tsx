@@ -1209,11 +1209,13 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
   // Update all refs in useEffect to avoid initialization order issues
   // This MUST be after all function definitions
+  // Note: We don't include functions in dependency array to avoid circular dependency issues
+  // Refs are updated on every render, which is fine since they're just references
   useEffect(() => {
     handlePlayPauseRef.current = handlePlayPause
     handleNextParagraphRef.current = handleNextParagraph
     handlePrevParagraphRef.current = handlePrevParagraph
-  }, [handlePlayPause, handleNextParagraph, handlePrevParagraph])
+  })
 
   // Handle volume toggle
   const handleVolumeToggle = useCallback(() => {
