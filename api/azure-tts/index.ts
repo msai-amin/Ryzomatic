@@ -114,9 +114,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         reject(error);
       });
 
-      req.setTimeout(30000, () => {
+      // Increased timeout to 60 seconds for longer TTS synthesis requests
+      req.setTimeout(60000, () => {
         req.destroy();
-        reject(new Error('Request timeout'));
+        reject(new Error('Request timeout after 60 seconds'));
       });
 
       req.write(ssmlContent);
