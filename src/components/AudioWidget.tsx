@@ -1110,7 +1110,11 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                 updateTTS({ isPlaying: false, isPaused: false, currentWordIndex: null })
                 
                 if (tts.autoAdvanceParagraph && playbackMode === 'paragraph') {
-                  handleNextParagraphRef.current()
+                  // Inline next paragraph logic to avoid circular dependency
+                  const currentIndex = tts.currentParagraphIndex ?? 0
+                  if (currentIndex < tts.paragraphs.length - 1) {
+                    updateTTS({ currentParagraphIndex: currentIndex + 1 })
+                  }
                 }
               }
             },
@@ -1186,10 +1190,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       updateTTS({ currentParagraphIndex: currentIndex + 1 })
       
       // If playing and auto-advance enabled, start playing new paragraph
-      if (tts.isPlaying && tts.autoAdvanceParagraph) {
-        handleStopRef.current()
-        setTimeout(() => handlePlayPauseRef.current(), 100)
-      }
+      // Note: We don't auto-play here to avoid circular dependency
+      // User can manually press play if they want to continue
     }
   }, [tts.currentParagraphIndex, tts.paragraphs.length, tts.isPlaying, tts.autoAdvanceParagraph, updateTTS])
 
@@ -1199,10 +1201,12 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     if (currentIndex > 0) {
       updateTTS({ currentParagraphIndex: currentIndex - 1 })
       
-      // If playing, restart with new paragraph
+      // If playing, stop playback
+      // Note: We don't auto-restart here to avoid circular dependency
+      // User can manually press play if they want to continue
       if (tts.isPlaying) {
-        handleStopRef.current()
-        setTimeout(() => handlePlayPauseRef.current(), 100)
+        ttsManager.stop()
+        updateTTS({ isPlaying: false, isPaused: false })
       }
     }
   }, [tts.currentParagraphIndex, tts.isPlaying, updateTTS])
