@@ -6,6 +6,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import https from 'https';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Only allow POST requests
@@ -59,40 +60,74 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       locale: locale || 'en-US'
     });
 
-    // Call Azure TTS API
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Ocp-Apim-Subscription-Key': subscriptionKey,
-        'Content-Type': 'application/ssml+xml',
-        'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
-      },
-      body: ssmlContent,
+    // Call Azure TTS API using Node.js https module to force HTTP/1.1
+    // This avoids HTTP/2 protocol errors that occur with fetch/undici
+    const audioBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+      const url = new URL(endpoint);
+      const options = {
+        hostname: url.hostname,
+        port: 443,
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          'Ocp-Apim-Subscription-Key': subscriptionKey,
+          'Content-Type': 'application/ssml+xml',
+          'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
+          'Connection': 'close', // Force HTTP/1.1
+          'Cache-Control': 'no-cache',
+          'Content-Length': Buffer.byteLength(ssmlContent),
+        },
+        // Force HTTP/1.1 by disabling ALPN (Application-Layer Protocol Negotiation)
+        ALPNProtocols: [],
+      };
+
+      const req = https.request(options, (res) => {
+        if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
+          let errorData = '';
+          res.on('data', (chunk) => { errorData += chunk.toString(); });
+          res.on('end', () => {
+            console.error('Azure TTS API Error:', {
+              status: res.statusCode,
+              statusText: res.statusMessage,
+              error: errorData.substring(0, 200)
+            });
+            reject(new Error(`Azure TTS API error: ${res.statusCode} ${res.statusMessage}`));
+          });
+          return;
+        }
+
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk) => chunks.push(chunk));
+        res.on('end', () => {
+          const buffer = Buffer.concat(chunks);
+          if (buffer.length === 0) {
+            reject(new Error('Received empty audio buffer from Azure TTS'));
+            return;
+          }
+          resolve(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
+        });
+      });
+
+      req.on('error', (error) => {
+        console.error('Azure TTS HTTPS Request Error:', error);
+        reject(error);
+      });
+
+      req.setTimeout(30000, () => {
+        req.destroy();
+        reject(new Error('Request timeout'));
+      });
+
+      req.write(ssmlContent);
+      req.end();
     });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      console.error('Azure TTS API Error:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorText.substring(0, 200)
-      });
-      return res.status(response.status).json({ 
-        error: `Azure TTS API error: ${response.statusText}`,
-        details: errorText.substring(0, 200)
-      });
-    }
-
-    // Get the audio data as ArrayBuffer
-    const audioBuffer = await response.arrayBuffer();
 
     if (!audioBuffer || audioBuffer.byteLength === 0) {
       return res.status(500).json({ error: 'Received empty audio buffer from Azure TTS' });
     }
 
     console.log('Azure TTS Proxy Success:', {
-      audioSize: audioBuffer.byteLength,
-      contentType: response.headers.get('content-type')
+      audioSize: audioBuffer.byteLength
     });
 
     // Return the audio as binary data
@@ -100,6 +135,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Content-Length', audioBuffer.byteLength.toString());
     res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
     return res.send(Buffer.from(audioBuffer));
+
 
   } catch (error) {
     console.error('Azure TTS Proxy Error:', error);
