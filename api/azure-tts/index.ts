@@ -73,6 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           'Ocp-Apim-Subscription-Key': subscriptionKey,
           'Content-Type': 'application/ssml+xml',
           'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
+          'User-Agent': 'SmartReader/1.0', // Required by Azure TTS
           'Connection': 'close', // Force HTTP/1.1
           'Cache-Control': 'no-cache',
           'Content-Length': Buffer.byteLength(ssmlContent),
