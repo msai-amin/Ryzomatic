@@ -21,13 +21,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Get Azure TTS credentials from environment
-    // Try both VITE_ and non-VITE_ versions for compatibility
+    // Note: VITE_ prefixed vars are NOT available in serverless functions
+    // They need to be set without VITE_ prefix for serverless functions
     const subscriptionKey = process.env.AZURE_TTS_KEY || process.env.VITE_AZURE_TTS_KEY;
     const azureRegion = region || process.env.AZURE_TTS_REGION || process.env.VITE_AZURE_TTS_REGION || 'eastus';
 
+    console.log('Azure TTS Proxy: Environment check', {
+      hasAZURE_TTS_KEY: !!process.env.AZURE_TTS_KEY,
+      hasVITE_AZURE_TTS_KEY: !!process.env.VITE_AZURE_TTS_KEY,
+      subscriptionKeyLength: subscriptionKey?.length || 0,
+      azureRegion
+    });
+
     if (!subscriptionKey) {
       console.error('Azure TTS subscription key not configured');
-      return res.status(500).json({ error: 'Azure TTS not configured' });
+      console.error('Available env vars with AZURE or TTS:', 
+        Object.keys(process.env).filter(k => k.includes('AZURE') || k.includes('TTS')));
+      return res.status(500).json({ 
+        error: 'Azure TTS not configured',
+        hint: 'Set AZURE_TTS_KEY (without VITE_ prefix) in environment variables'
+      });
     }
 
     // Build the SSML if not provided
