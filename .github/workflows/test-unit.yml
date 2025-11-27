@@ -34,11 +34,18 @@ jobs:
 
       - name: Install dependencies
         run: |
+          # Remove node_modules to ensure clean install of optional dependencies
+          # This fixes the Rollup native module issue (@rollup/rollup-linux-x64-gnu)
+          rm -rf node_modules
+          # Install dependencies fresh (this ensures optional dependencies are installed)
           npm install --no-audit
-          # Explicitly install Rollup optional dependency for Linux x64
-          # This is required for Vitest which uses Rollup internally
-          echo "Installing Rollup optional dependency for Linux..."
-          npm install --no-save --no-audit @rollup/rollup-linux-x64-gnu || echo "Warning: Failed to install rollup optional dependency, but continuing..."
+          # Verify rollup optional dependency is present
+          if [ ! -d "node_modules/@rollup/rollup-linux-x64-gnu" ]; then
+            echo "Rollup optional dependency missing, installing explicitly..."
+            npm install --no-save --no-audit --force @rollup/rollup-linux-x64-gnu
+          fi
+          # Final verification
+          ls -la node_modules/@rollup/rollup-linux-x64-gnu || echo "Warning: Rollup optional dependency still missing"
 
       - name: Run unit tests with coverage
         run: npm run test:ci
