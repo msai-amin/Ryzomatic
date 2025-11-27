@@ -95,6 +95,7 @@ export interface SignUpData {
   email: string;
   password: string;
   fullName?: string;
+  captchaToken?: string;
 }
 
 export interface SignInData {
@@ -113,9 +114,9 @@ class SupabaseAuthService {
       );
     }
     
-    const { email, password, fullName } = data;
+    const { email, password, fullName, captchaToken } = data;
     
-    const { data: authData, error } = await supabase.auth.signUp({
+    const signUpOptions: any = {
       email,
       password,
       options: {
@@ -123,11 +124,46 @@ class SupabaseAuthService {
           full_name: fullName,
         },
       },
+    };
+
+    // Add CAPTCHA token if provided - Supabase expects it directly in options
+    if (captchaToken) {
+      // Try the simpler format first: options.captchaToken
+      signUpOptions.options.captchaToken = captchaToken;
+      console.log('🔐 Sending CAPTCHA token to Supabase:', {
+        hasToken: !!captchaToken,
+        tokenLength: captchaToken.length,
+        tokenPrefix: captchaToken.substring(0, 20) + '...',
+        format: 'options.captchaToken'
+      });
+    } else {
+      console.warn('⚠️ No CAPTCHA token provided for signup');
+    }
+    
+    console.log('📤 Signup request options:', {
+      email,
+      hasPassword: !!password,
+      hasFullName: !!fullName,
+      hasCaptchaToken: !!captchaToken,
+      options: signUpOptions.options
     });
+    
+    const { data: authData, error } = await supabase.auth.signUp(signUpOptions);
 
     if (error) {
-      throw new Error(error.message);
+      console.error('❌ Supabase signup error:', {
+        message: error.message,
+        status: error.status,
+        error: error
+      });
+      throw new Error(error.message || 'Signup failed. Please try again.');
     }
+
+    console.log('✅ Signup successful:', {
+      userId: authData.user?.id,
+      email: authData.user?.email,
+      needsConfirmation: !authData.session
+    });
 
     return authData;
   }

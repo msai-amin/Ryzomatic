@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { X, Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { X, Mail, Lock, User, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { authService, supabase } from '../services/supabaseAuthService';
+import Turnstile from 'react-turnstile';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -12,7 +13,9 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -26,12 +29,14 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
       [e.target.name]: e.target.value,
     }));
     setError('');
+    setSuccessMessage('');
   };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setSuccessMessage('');
 
     try {
       if (isSignUp) {
@@ -42,13 +47,29 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
           throw new Error('Password must be at least 6 characters');
         }
 
+        // Check for CAPTCHA token if Turnstile is configured
+        const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+        if (turnstileSiteKey && !captchaToken) {
+          throw new Error('Please complete the CAPTCHA verification');
+        }
+
         await authService.signUp({
           email: formData.email,
           password: formData.password,
           fullName: formData.fullName,
+          captchaToken: captchaToken || undefined,
         });
         
-        setError('Check your email for a confirmation link!');
+        // Show success message in green
+        setSuccessMessage('Check your email for a confirmation link!');
+        // Clear form after successful signup
+        setFormData({
+          email: '',
+          password: '',
+          fullName: '',
+          confirmPassword: '',
+        });
+        setCaptchaToken(null);
       } else {
         await authService.signIn({
           email: formData.email,
@@ -60,6 +81,8 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred');
+      // Reset CAPTCHA on error
+      setCaptchaToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -96,6 +119,8 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
       confirmPassword: '',
     });
     setError('');
+    setSuccessMessage('');
+    setCaptchaToken(null);
     setIsSignUp(false);
   };
 
@@ -128,8 +153,15 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
 
         <div className="p-6">
           {error && (
-            <div className="mb-4 p-3 rounded-md" style={{ backgroundColor: 'rgba(248, 113, 113, 0.1)', border: '1px solid var(--color-error)' }}>
+            <div className="mb-4 p-3 rounded-md flex items-start gap-2" style={{ backgroundColor: 'rgba(248, 113, 113, 0.1)', border: '1px solid var(--color-error)' }}>
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--color-error)' }} />
               <p className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>
+            </div>
+          )}
+          {successMessage && (
+            <div className="mb-4 p-3 rounded-md flex items-start gap-2" style={{ backgroundColor: 'rgba(34, 197, 94, 0.1)', border: '1px solid var(--color-success)' }}>
+              <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--color-success)' }} />
+              <p className="text-sm" style={{ color: 'var(--color-success)' }}>{successMessage}</p>
             </div>
           )}
 
@@ -262,16 +294,42 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
               </div>
             )}
 
+            {/* Turnstile CAPTCHA - Only show for sign up */}
+            {isSignUp && import.meta.env.VITE_TURNSTILE_SITE_KEY && 
+             import.meta.env.VITE_TURNSTILE_SITE_KEY.length > 10 && 
+             !import.meta.env.VITE_TURNSTILE_SITE_KEY.includes('#') && (
+              <div className="flex justify-center">
+                <Turnstile
+                  sitekey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+                  onSuccess={(token) => {
+                    console.log('✅ Turnstile CAPTCHA success, token received:', token.substring(0, 20) + '...');
+                    setCaptchaToken(token);
+                    setError('');
+                  }}
+                  onError={(error) => {
+                    console.error('❌ Turnstile CAPTCHA error:', error);
+                    setCaptchaToken(null);
+                    setError('CAPTCHA verification failed. Please try again.');
+                  }}
+                  onExpire={() => {
+                    console.warn('⚠️ Turnstile CAPTCHA expired');
+                    setCaptchaToken(null);
+                  }}
+                  theme="auto"
+                />
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={isLoading || !supabase}
+              disabled={isLoading || !supabase || (isSignUp && import.meta.env.VITE_TURNSTILE_SITE_KEY && !captchaToken)}
               className="w-full py-2 px-4 rounded-md focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold flex items-center justify-center"
               style={{
                 backgroundColor: 'var(--color-primary)',
                 color: 'var(--color-text-inverse)',
                 borderRadius: 'var(--border-radius-md)',
               }}
-              title={!supabase ? 'Authentication is not configured. Please update .env.local' : ''}
+              title={!supabase ? 'Authentication is not configured. Please update .env.local' : (isSignUp && import.meta.env.VITE_TURNSTILE_SITE_KEY && !captchaToken) ? 'Please complete the CAPTCHA verification' : ''}
             >
               {isLoading && (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -365,7 +423,12 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
 
           <div className="mt-6 text-center">
             <button
-              onClick={() => setIsSignUp(!isSignUp)}
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setError('');
+                setSuccessMessage('');
+                setCaptchaToken(null);
+              }}
               className="text-sm focus:outline-none focus:underline"
               style={{ color: 'var(--color-primary)' }}
             >
