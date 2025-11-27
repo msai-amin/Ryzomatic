@@ -29,19 +29,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          # Don't use cache to avoid issues with optional dependencies
+          # cache: 'npm'
 
       - name: Install dependencies
         run: |
           # Use npm install to ensure optional dependencies are installed
           # This fixes the Rollup native module issue (@rollup/rollup-linux-x64-gnu)
-          # Don't use --prefer-offline to ensure fresh install of optional deps
           npm install --no-audit
-          # Verify rollup optional dependency is installed, install if missing
-          if ! npm list @rollup/rollup-linux-x64-gnu > /dev/null 2>&1; then
-            echo "Installing missing Rollup optional dependency..."
-            npm install --no-save --no-audit @rollup/rollup-linux-x64-gnu
-          fi
+          # Explicitly install Rollup optional dependency for Linux x64
+          # This is required for Vitest which uses Rollup internally
+          echo "Installing Rollup optional dependency for Linux..."
+          npm install --no-save --no-audit @rollup/rollup-linux-x64-gnu || echo "Warning: Failed to install rollup optional dependency, but continuing..."
 
       - name: Lint
         run: npm run lint

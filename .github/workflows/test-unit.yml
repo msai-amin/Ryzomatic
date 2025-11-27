@@ -29,10 +29,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'  # Automatically handles key generation and restore
+          # Don't use cache to avoid issues with optional dependencies
+          # cache: 'npm'
 
       - name: Install dependencies
-        run: npm install --prefer-offline --no-audit
+        run: |
+          npm install --no-audit
+          # Explicitly install Rollup optional dependency for Linux x64
+          # This is required for Vitest which uses Rollup internally
+          echo "Installing Rollup optional dependency for Linux..."
+          npm install --no-save --no-audit @rollup/rollup-linux-x64-gnu || echo "Warning: Failed to install rollup optional dependency, but continuing..."
 
       - name: Run unit tests with coverage
         run: npm run test:ci
