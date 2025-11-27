@@ -936,11 +936,47 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             }
           }
           
+          // Check if TTS provider is configured before starting playback
+          const currentProvider = ttsManager.getCurrentProvider()
+          if (!currentProvider || !currentProvider.isConfigured) {
+            console.error('AudioWidget: No TTS provider configured', {
+              hasProvider: !!currentProvider,
+              isConfigured: currentProvider?.isConfigured,
+              providerType: currentProvider?.type
+            })
+            setIsProcessing(false)
+            updateTTS({ isPlaying: false, isPaused: false })
+            // Show user-friendly error message
+            alert('Text-to-speech is not configured. Please check your TTS settings.')
+            return
+          }
+          
+          // Validate text before attempting to speak
+          if (!text || text.trim().length === 0) {
+            console.warn('AudioWidget: No text available for playback', {
+              textLength: text?.length || 0,
+              playbackMode,
+              hasParagraphs: tts.paragraphs.length > 0
+            })
+            setIsProcessing(false)
+            updateTTS({ isPlaying: false, isPaused: false })
+            return
+          }
+          
+          console.log('AudioWidget: Starting playback', {
+            textLength: text.length,
+            playbackMode,
+            provider: currentProvider.type,
+            voiceName: tts.voiceName
+          })
+          
+          // Set playing state AFTER we've verified the provider is ready and text is valid
           updateTTS({ isPlaying: true, isPaused: false })
           
-          await ttsManager.speak(
-            text,
-            () => {
+          try {
+            await ttsManager.speak(
+              text,
+              () => {
               // On end callback - save final position
               if (currentDocument?.id) {
                 saveCurrentPosition(currentDocument.id)
@@ -996,9 +1032,18 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               const wordIndex = words.length - 1
               updateTTS({ currentWordIndex: wordIndex })
             }
-          )
-          
-          setIsProcessing(false)
+            )
+            
+            console.log('AudioWidget: Playback started successfully')
+            setIsProcessing(false)
+          } catch (speakError) {
+            // If speak() fails, reset state immediately
+            console.error('AudioWidget: speak() failed:', speakError)
+            updateTTS({ isPlaying: false, isPaused: false })
+            setIsProcessing(false)
+            // Re-throw to be caught by outer catch block for additional logging
+            throw speakError
+          }
         } else {
           console.warn('No text available for playback')
           setIsProcessing(false)
