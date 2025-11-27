@@ -38,4 +38,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Performance: Only run on changed files
           FILTER_REGEX_EXCLUDE: '(dist|node_modules|coverage|playwright-report|\.cache)/.*'
+          # Disable other language validators to speed up
+          VALIDATE_ALL: false
 

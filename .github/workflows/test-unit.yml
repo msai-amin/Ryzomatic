@@ -32,7 +32,7 @@ jobs:
           cache: 'npm'  # Automatically handles key generation and restore
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --prefer-offline --no-audit
 
       - name: Run unit tests with coverage
         run: npm run test:ci
