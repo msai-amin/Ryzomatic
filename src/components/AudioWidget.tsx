@@ -978,7 +978,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           updateTTS({ isPlaying: true, isPaused: false })
           
           try {
-            await ttsManager.speak(
+            // Start speak() but don't await it yet - we need to check if playback started
+            const speakPromise = ttsManager.speak(
               text,
               () => {
                 console.log('AudioWidget: onEnd callback fired', {
@@ -1053,20 +1054,22 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             }
             )
             
-            // Verify that playback actually started
-            // Wait a moment to ensure audio context has started playing
-            await new Promise(resolve => setTimeout(resolve, 300))
+            // CRITICAL: Check if playback started WHILE speak() is running, not after it completes
+            // speak() only completes when audio finishes, so we check during playback
+            await new Promise(resolve => setTimeout(resolve, 200))
             
             // Check if TTS is actually speaking after the delay
             if (ttsManager.isSpeaking()) {
               playbackStartedRef.current = true
-              console.log('AudioWidget: Playback confirmed active, onEnd will be allowed to reset state')
+              console.log('AudioWidget: Playback confirmed active')
             } else {
-              console.warn('AudioWidget: speak() completed but TTS is not speaking, playback may have failed')
-              // Reset state since playback didn't start
-              updateTTS({ isPlaying: false, isPaused: false })
+              console.warn('AudioWidget: speak() called but TTS is not speaking after 200ms - audio may have ended immediately or failed to start')
+              // Don't reset state here - let onEnd handle it if it fires
               playbackStartedRef.current = false
             }
+            
+            // Now await the speak promise (which will complete when audio finishes)
+            await speakPromise
             
             console.log('AudioWidget: speak() call completed')
             setIsProcessing(false)
