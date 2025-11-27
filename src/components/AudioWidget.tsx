@@ -1210,7 +1210,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             }
           >
             {isProcessing ? (
-              <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-text-inverse)' }} />
+              <div className="relative w-5 h-5">
+                <div className="absolute inset-0 border-2 border-[var(--color-primary)]/30 rounded-full" />
+                <div className="absolute inset-0 border-2 border-t-[var(--color-primary)] rounded-full animate-spin" />
+              </div>
             ) : (tts.isPaused || ttsManager.isPausedState()) ? (
               <Play className="w-5 h-5" />  // Show play when paused
             ) : tts.isPlaying ? (
@@ -1241,22 +1244,33 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
           {/* Status Indicator */}
           <div className="flex items-center gap-2 min-w-0">
-            <div 
-              className={`w-2 h-2 rounded-full flex-shrink-0 ${tts.isPlaying ? 'animate-pulse' : ''}`}
-              style={{ 
-                backgroundColor: tts.isPlaying 
-                  ? 'var(--color-success)' 
-                  : ttsManager.isPausedState() 
-                    ? 'var(--color-warning)' 
-                    : 'var(--color-text-tertiary)' 
-              }}
-            />
-            <span 
-              className="text-xs truncate max-w-24"
-              style={{ color: 'var(--color-text-secondary)' }}
-            >
-              {tts.isPlaying ? 'Playing' : ttsManager.isPausedState() ? 'Paused' : 'Ready'}
-            </span>
+            {isProcessing ? (
+              <>
+                <div className="w-2 h-2 rounded-full flex-shrink-0 animate-pulse" style={{ backgroundColor: 'var(--color-primary)' }} />
+                <span className="text-xs truncate max-w-24" style={{ color: 'var(--color-primary)' }}>
+                  Buffering...
+                </span>
+              </>
+            ) : (
+              <>
+                <div 
+                  className={`w-2 h-2 rounded-full flex-shrink-0 ${tts.isPlaying ? 'animate-pulse' : ''}`}
+                  style={{ 
+                    backgroundColor: tts.isPlaying 
+                      ? 'var(--color-success)' 
+                      : ttsManager.isPausedState() 
+                        ? 'var(--color-warning)' 
+                        : 'var(--color-text-tertiary)' 
+                  }}
+                />
+                <span 
+                  className="text-xs truncate max-w-24"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                >
+                  {tts.isPlaying ? 'Playing' : ttsManager.isPausedState() ? 'Paused' : 'Ready'}
+                </span>
+              </>
+            )}
           </div>
 
           {/* Expand/Collapse Toggle */}
