@@ -1340,43 +1340,31 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           <button
             data-onboarding="onboarding-tts-play"
             onClick={() => handlePlayPauseRef.current()}
-            disabled={isProcessing}
             className="p-2 rounded-full transition-all shadow-md"
             style={{
-              backgroundColor: isProcessing ? 'var(--color-text-tertiary)' : 'var(--color-primary)',
+              backgroundColor: 'var(--color-primary)',
               color: 'var(--color-text-inverse)',
-              cursor: isProcessing ? 'not-allowed' : 'pointer',
+              cursor: 'pointer',
               boxShadow: 'var(--shadow-md)'
             }}
-            aria-label={isProcessing ? 'Processing' : (tts.isPlaying ? 'Pause' : 'Play')}
+            aria-label={tts.isPlaying ? 'Pause' : 'Play'}
             onMouseEnter={(e) => {
-              if (!isProcessing) {
-                e.currentTarget.style.transform = 'scale(1.05)'
-                e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.2)'
-              }
+              e.currentTarget.style.transform = 'scale(1.05)'
+              e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.2)'
             }}
             onMouseLeave={(e) => {
-              if (!isProcessing) {
-                e.currentTarget.style.transform = 'scale(1)'
-                e.currentTarget.style.boxShadow = 'var(--shadow-md)'
-              }
+              e.currentTarget.style.transform = 'scale(1)'
+              e.currentTarget.style.boxShadow = 'var(--shadow-md)'
             }}
             title={
-              isProcessing 
-                ? "Processing..." 
-                : (tts.isPaused || ttsManager.isPausedState())
-                  ? "Resume"
-                  : tts.isPlaying
-                    ? "Pause"
-                    : "Play"
+              (tts.isPaused || ttsManager.isPausedState())
+                ? "Resume"
+                : tts.isPlaying
+                  ? "Pause"
+                  : "Play"
             }
           >
-            {isProcessing ? (
-              <div className="relative w-5 h-5">
-                <div className="absolute inset-0 border-2 border-[var(--color-primary)]/30 rounded-full" />
-                <div className="absolute inset-0 border-2 border-t-[var(--color-primary)] rounded-full animate-spin" />
-              </div>
-            ) : (tts.isPaused || ttsManager.isPausedState()) ? (
+            {(tts.isPaused || ttsManager.isPausedState()) ? (
               <Play className="w-5 h-5" />  // Show play when paused
             ) : tts.isPlaying ? (
               <Pause className="w-5 h-5" />  // Show pause when playing
