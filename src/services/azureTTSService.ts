@@ -196,7 +196,15 @@ class AzureTTSService {
         console.log('Set default Azure TTS voice:', voices[0].name);
       }
     } catch (error) {
-      console.warn('Failed to set default Azure TTS voice:', error);
+      console.warn('Failed to set default Azure TTS voice from API, using hardcoded fallback:', error);
+      // Fallback to a known working voice when API call fails
+      this.settings.voice = {
+        name: 'en-US-AriaNeural',
+        locale: 'en-US',
+        gender: 'Female',
+        voiceType: 'Neural'
+      };
+      console.log('Using fallback Azure TTS voice: en-US-AriaNeural');
     }
   }
 
