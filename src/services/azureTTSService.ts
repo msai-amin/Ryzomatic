@@ -517,6 +517,17 @@ class AzureTTSService {
         length: decodedAudio.length
       });
       
+      // CRITICAL: Check for zero-duration audio before starting playback
+      // Zero-duration audio will cause onended to fire immediately
+      if (decodedAudio.duration === 0 || decodedAudio.length === 0) {
+        console.warn('AzureTTSService.playAudio: Decoded audio has zero duration. Playback will not occur.');
+        if (onEnd) {
+          // Call onEnd immediately if audio is empty
+          onEnd();
+        }
+        return;
+      }
+      
       if (this.stopRequested) {
         console.log('AzureTTSService.playAudio: Stop requested before starting playback');
         return;

@@ -642,6 +642,17 @@ class GoogleCloudTTSService {
       // Decode audio data
       const decodedAudio = await this.audioContext.decodeAudioData(audioBuffer);
       
+      // CRITICAL: Check for zero-duration audio before starting playback
+      // Zero-duration audio will cause onended to fire immediately
+      if (decodedAudio.duration === 0 || decodedAudio.length === 0) {
+        console.warn('GoogleCloudTTSService.playAudio: Decoded audio has zero duration. Playback will not occur.');
+        if (onEnd) {
+          // Call onEnd immediately if audio is empty
+          onEnd();
+        }
+        return;
+      }
+      
       // Check stop flag before starting
       if (this.stopRequested) {
         return;
