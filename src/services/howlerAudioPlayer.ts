@@ -43,15 +43,40 @@ export class HowlerAudioPlayer {
     this.pausedAt = 0
     this.totalPauseDuration = 0
 
+    // Validate audio buffer
+    if (!audioBuffer || audioBuffer.byteLength === 0) {
+      throw new Error('Empty audio buffer provided')
+    }
+
+    // Check if it looks like MP3 (starts with ID3 tag or MP3 sync word)
+    const view = new Uint8Array(audioBuffer.slice(0, 4))
+    const isID3 = view[0] === 0x49 && view[1] === 0x44 && view[2] === 0x33 // "ID3"
+    const isMP3 = view[0] === 0xFF && (view[1] === 0xFB || view[1] === 0xF3) // MP3 sync word
+    
+    console.log('HowlerAudioPlayer: Audio buffer validation', {
+      size: audioBuffer.byteLength,
+      firstBytes: Array.from(view).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '),
+      isID3,
+      isMP3,
+      looksValid: isID3 || isMP3
+    })
+
     // Convert ArrayBuffer to Blob URL
-    const blob = new Blob([audioBuffer], { type: 'audio/mp3' })
+    // Use audio/mpeg (standard MIME type) instead of audio/mp3
+    const blob = new Blob([audioBuffer], { type: 'audio/mpeg' })
     this.blobUrl = URL.createObjectURL(blob)
+
+    console.log('HowlerAudioPlayer: Created blob URL', {
+      blobSize: audioBuffer.byteLength,
+      blobType: blob.type,
+      blobUrl: this.blobUrl.substring(0, 50) + '...'
+    })
 
     return new Promise((resolve, reject) => {
       this.currentSound = new Howl({
         src: [this.blobUrl!],
-        format: ['mp3'],
-        html5: false, // Use Web Audio API (not HTML5 audio)
+        format: ['mp3', 'mpeg'], // Try both formats
+        html5: true, // Use HTML5 audio for better blob URL support
         autoplay: true,
         volume: 1.0,
         
