@@ -853,8 +853,18 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const handleStopRef = useRef<() => void>(() => {})
   
   // Handle next/previous paragraph refs (declared early to avoid circular dependencies)
-  const handleNextParagraphRef = useRef<() => void>(() => {})
-  const handlePrevParagraphRef = useRef<() => void>(() => {})
+  // Initialize with no-op functions to prevent "before initialization" errors
+  const handleNextParagraphRef = useRef<() => void>(() => {
+    console.warn('handleNextParagraph called before initialization')
+  })
+  const handlePrevParagraphRef = useRef<() => void>(() => {
+    console.warn('handlePrevParagraph called before initialization')
+  })
+  
+  // Handle play/pause ref (declared early to avoid circular dependencies)
+  const handlePlayPauseRef = useRef<() => Promise<void>>(async () => {
+    console.warn('handlePlayPause called before initialization')
+  })
   
   const handleStop = useCallback(async () => {
     // Save position before stopping (only if actually playing)
@@ -1139,8 +1149,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     // This follows industry standards (e.g., Spotify, Audible)
   }, [tts.isPlaying, updateTTS])
 
-  // Store playPause for use in other callbacks
-  const handlePlayPauseRef = useRef<() => Promise<void>>(async () => {})
+  // Update playPause ref (ref was declared earlier)
   handlePlayPauseRef.current = handlePlayPause
 
   // Handle next paragraph
