@@ -463,7 +463,7 @@ class AzureTTSService {
       xhr.setRequestHeader('Ocp-Apim-Subscription-Key', this.subscriptionKey!);
       xhr.setRequestHeader('Content-Type', 'application/ssml+xml');
       xhr.setRequestHeader('X-Microsoft-OutputFormat', this.settings.audioFormat);
-      xhr.setRequestHeader('User-Agent', 'SmartReader');
+      // Note: User-Agent cannot be set in XMLHttpRequest (unsafe header)
       
       xhr.responseType = 'arraybuffer';
       

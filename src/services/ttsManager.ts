@@ -309,6 +309,25 @@ class TTSManager {
       console.log('TTSManager.speak: Provider.speak completed successfully')
     } catch (error) {
       console.error('TTSManager.speak: Provider.speak failed:', error)
+      
+      // Automatic fallback: If Azure TTS fails, try Google Cloud TTS
+      if (this.currentProvider?.type === 'azure') {
+        const googleCloudProvider = this.providers.get('google-cloud')
+        if (googleCloudProvider && googleCloudProvider.isAvailable && googleCloudProvider.isConfigured) {
+          console.warn('TTSManager: Azure TTS failed, falling back to Google Cloud TTS')
+          try {
+            await googleCloudProvider.speak(text, onEnd, onWord)
+            console.log('TTSManager: Google Cloud TTS fallback succeeded')
+            return // Success with fallback
+          } catch (fallbackError) {
+            console.error('TTSManager: Google Cloud TTS fallback also failed:', fallbackError)
+            // Continue to throw original error
+          }
+        } else {
+          console.warn('TTSManager: Google Cloud TTS not available for fallback')
+        }
+      }
+      
       throw error
     }
   }
