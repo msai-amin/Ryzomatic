@@ -1331,7 +1331,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           {/* Play/Pause Button - Main Control */}
           <button
             data-onboarding="onboarding-tts-play"
-            onClick={handlePlayPause}
+            onClick={() => handlePlayPauseRef.current()}
             disabled={isProcessing}
             className="p-2 rounded-full transition-all shadow-md"
             style={{
@@ -1379,7 +1379,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
           {/* Stop Button - Always visible in collapsed state */}
           <button
-            onClick={handleStop}
+            onClick={() => handleStopRef.current()}
             className="p-2 rounded-full transition-all"
             style={{ color: 'var(--color-text-primary)' }}
             aria-label="Stop"
@@ -1562,7 +1562,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
               {/* Stop */}
               <button
-                onClick={handleStop}
+                onClick={() => handleStopRef.current()}
                 className="p-2 rounded-full transition-all"
                 style={{ color: 'var(--color-text-primary)' }}
                 onMouseEnter={(e) => {
