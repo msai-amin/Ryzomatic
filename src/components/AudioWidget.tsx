@@ -163,6 +163,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const lastClickTimeRef = useRef<number>(0)
   const previousDocumentIdRef = useRef<string | null>(null)
   const isSavingRef = useRef(false)
+  const playbackStartedRef = useRef<boolean>(false)
 
   const clampPosition = useCallback(
     (pos: { x: number; y: number }) => {
@@ -970,6 +971,9 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             voiceName: tts.voiceName
           })
           
+          // Reset playback started flag
+          playbackStartedRef.current = false
+          
           // Set playing state AFTER we've verified the provider is ready and text is valid
           updateTTS({ isPlaying: true, isPaused: false })
           
@@ -977,13 +981,28 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             await ttsManager.speak(
               text,
               () => {
-              // On end callback - save final position
-              if (currentDocument?.id) {
-                saveCurrentPosition(currentDocument.id)
-              }
-              
-              // Gapless mode: Auto-advance without stopping
-              if (gaplessMode && tts.autoAdvanceParagraph && playbackMode === 'paragraph') {
+                console.log('AudioWidget: onEnd callback fired', {
+                  playbackStarted: playbackStartedRef.current,
+                  isSpeaking: ttsManager.isSpeaking(),
+                  wasPlaying: tts.isPlaying,
+                  playbackMode
+                })
+                
+                // Only update state if playback actually started
+                // This prevents bounce-back if onEnd fires immediately due to errors
+                if (!playbackStartedRef.current) {
+                  console.warn('AudioWidget: onEnd fired before playback started, ignoring to prevent bounce-back')
+                  updateTTS({ isPlaying: false, isPaused: false })
+                  return
+                }
+                
+                // On end callback - save final position
+                if (currentDocument?.id) {
+                  saveCurrentPosition(currentDocument.id)
+                }
+                
+                // Gapless mode: Auto-advance without stopping
+                if (gaplessMode && tts.autoAdvanceParagraph && playbackMode === 'paragraph') {
                 const currentIndex = tts.currentParagraphIndex ?? 0
                 if (currentIndex < tts.paragraphs.length - 1) {
                   // Move to next paragraph
@@ -1034,7 +1053,22 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             }
             )
             
-            console.log('AudioWidget: Playback started successfully')
+            // Verify that playback actually started
+            // Wait a moment to ensure audio context has started playing
+            await new Promise(resolve => setTimeout(resolve, 300))
+            
+            // Check if TTS is actually speaking after the delay
+            if (ttsManager.isSpeaking()) {
+              playbackStartedRef.current = true
+              console.log('AudioWidget: Playback confirmed active, onEnd will be allowed to reset state')
+            } else {
+              console.warn('AudioWidget: speak() completed but TTS is not speaking, playback may have failed')
+              // Reset state since playback didn't start
+              updateTTS({ isPlaying: false, isPaused: false })
+              playbackStartedRef.current = false
+            }
+            
+            console.log('AudioWidget: speak() call completed')
             setIsProcessing(false)
           } catch (speakError) {
             // If speak() fails, reset state immediately
