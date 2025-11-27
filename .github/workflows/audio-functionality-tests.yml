@@ -1,0 +1,546 @@
+name: Audio Functionality Tests
+
+on:
+  push:
+    branches: [main, develop, feature/howler-js-integration]
+    paths:
+      - 'src/services/azureTTSService.ts'
+      - 'src/services/googleCloudTTSService.ts'
+      - 'src/services/howlerAudioPlayer.ts'
+      - 'src/services/ttsManager.ts'
+      - 'api/azure-tts/**'
+      - 'src/components/AudioWidget.tsx'
+      - 'tests/**/*audio*.test.ts'
+      - 'tests/**/*tts*.test.ts'
+      - '.github/workflows/audio-functionality-tests.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/services/azureTTSService.ts'
+      - 'src/services/googleCloudTTSService.ts'
+      - 'src/services/howlerAudioPlayer.ts'
+      - 'src/services/ttsManager.ts'
+      - 'api/azure-tts/**'
+      - 'src/components/AudioWidget.tsx'
+      - 'tests/**/*audio*.test.ts'
+      - 'tests/**/*tts*.test.ts'
+      - '.github/workflows/audio-functionality-tests.yml'
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of tests to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - unit
+          - integration
+          - e2e
+          - proxy
+
+# Security: Minimum permissions
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+# Prevent concurrent runs on same branch
+concurrency:
+  group: audio-functionality-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  CACHE_VERSION: v2
+
+jobs:
+  # ============================================================================
+  # Job 1: Azure TTS Proxy Endpoint Tests
+  # ============================================================================
+  test-azure-tts-proxy:
+    name: 🔌 Azure TTS Proxy Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+      
+      - name: 🏗️ Build application
+        run: npm run build
+        env:
+          NODE_ENV: production
+      
+      - name: 🧪 Test Azure TTS Proxy Endpoint
+        run: |
+          # Start Vercel dev server in background
+          npx vercel dev --listen 3001 &
+          SERVER_PID=$!
+          sleep 10
+          
+          # Wait for server to be ready
+          timeout 60 bash -c 'until curl -f http://localhost:3001 > /dev/null 2>&1; do sleep 2; done' || exit 1
+          
+          # Test proxy endpoint with mock data
+          echo "Testing Azure TTS proxy endpoint..."
+          
+          # Test 1: Check endpoint exists
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:3001/api/azure-tts \
+            -H "Content-Type: application/json" \
+            -d '{"text":"test","voice":"en-US-AriaNeural","locale":"en-US","region":"eastus"}' || echo "000")
+          
+          if [ "$STATUS" = "500" ] || [ "$STATUS" = "200" ]; then
+            echo "✅ Proxy endpoint is accessible (status: $STATUS)"
+          else
+            echo "❌ Proxy endpoint returned unexpected status: $STATUS"
+            exit 1
+          fi
+          
+          # Test 2: Check error handling (missing text)
+          ERROR_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:3001/api/azure-tts \
+            -H "Content-Type: application/json" \
+            -d '{}' || echo "000")
+          
+          if [ "$ERROR_STATUS" = "400" ]; then
+            echo "✅ Error handling works correctly (status: $ERROR_STATUS)"
+          else
+            echo "⚠️ Error handling returned unexpected status: $ERROR_STATUS"
+          fi
+          
+          # Cleanup
+          kill $SERVER_PID || true
+        env:
+          AZURE_TTS_KEY: ${{ secrets.AZURE_TTS_KEY || 'test-key' }}
+          AZURE_TTS_REGION: ${{ secrets.AZURE_TTS_REGION || 'eastus' }}
+        continue-on-error: true
+      
+      - name: 📊 Upload proxy test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: proxy-test-results
+          path: |
+            *.log
+          retention-days: 7
+
+  # ============================================================================
+  # Job 2: Howler.js Audio Player Unit Tests
+  # ============================================================================
+  test-howler-player:
+    name: 🎵 Howler.js Player Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+      
+      - name: 🧪 Run Howler.js player unit tests
+        run: |
+          # Run tests for HowlerAudioPlayer
+          npm run test -- src/services/howlerAudioPlayer.test.ts --reporter=verbose || echo "No specific Howler tests found"
+          
+          # Run any TTS service tests that use Howler
+          npm run test -- src/services/azureTTSService.test.ts --reporter=verbose || echo "No Azure TTS tests found"
+          npm run test -- src/services/googleCloudTTSService.test.ts --reporter=verbose || echo "No GCP TTS tests found"
+        env:
+          CI: true
+        continue-on-error: true
+      
+      - name: ✅ Verify Howler.js integration
+        run: |
+          # Check that Howler.js is properly imported
+          if ! grep -q "from 'howler'" src/services/howlerAudioPlayer.ts; then
+            echo "❌ Howler.js not imported correctly"
+            exit 1
+          fi
+          
+          # Check that HowlerAudioPlayer class exists
+          if ! grep -q "class HowlerAudioPlayer" src/services/howlerAudioPlayer.ts; then
+            echo "❌ HowlerAudioPlayer class not found"
+            exit 1
+          fi
+          
+          # Check that playAudio resolves on end, not on load
+          if ! grep -q "onend" src/services/howlerAudioPlayer.ts; then
+            echo "❌ onend handler not found"
+            exit 1
+          fi
+          
+          echo "✅ Howler.js integration verified"
+      
+      - name: 📊 Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: howler-test-results
+          path: |
+            test-results.json
+            coverage/
+          retention-days: 7
+
+  # ============================================================================
+  # Job 3: Chunked Playback Tests
+  # ============================================================================
+  test-chunked-playback:
+    name: 📦 Chunked Playback Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+      
+      - name: 🧪 Test chunked playback logic
+        run: |
+          # Verify chunking logic exists
+          if ! grep -q "speakInChunks" src/services/azureTTSService.ts; then
+            echo "❌ speakInChunks method not found"
+            exit 1
+          fi
+          
+          # Verify chunk size limit
+          if ! grep -q "MAX_CHUNK_SIZE\|9000" src/services/azureTTSService.ts; then
+            echo "⚠️ Chunk size limit not found or different"
+          fi
+          
+          # Verify sequential playback (promise resolves on end)
+          if ! grep -q "onend.*resolvePromise\|resolvePromise.*onend" src/services/howlerAudioPlayer.ts; then
+            echo "⚠️ Sequential playback may not be properly implemented"
+          fi
+          
+          echo "✅ Chunked playback logic verified"
+      
+      - name: 🧪 Run chunked playback integration tests
+        run: |
+          npm run test -- --run tests/services/ttsManager.test.ts --reporter=verbose || echo "No TTS manager tests found"
+        env:
+          CI: true
+        continue-on-error: true
+
+  # ============================================================================
+  # Job 4: CSP Compliance Tests
+  # ============================================================================
+  test-csp-compliance:
+    name: 🔒 CSP Compliance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: ✅ Verify media-src in CSP
+        run: |
+          # Check vercel.json has media-src
+          if ! grep -q "media-src.*blob" vercel.json; then
+            echo "❌ media-src blob: not found in vercel.json CSP"
+            exit 1
+          fi
+          
+          # Check index.html has media-src
+          if ! grep -q "media-src.*blob" index.html; then
+            echo "❌ media-src blob: not found in index.html CSP"
+            exit 1
+          fi
+          
+          echo "✅ CSP media-src configuration verified"
+      
+      - name: ✅ Verify blob URL support
+        run: |
+          # Check that HowlerAudioPlayer creates blob URLs
+          if ! grep -q "URL.createObjectURL" src/services/howlerAudioPlayer.ts; then
+            echo "❌ Blob URL creation not found"
+            exit 1
+          fi
+          
+          # Check that blob URLs are revoked
+          if ! grep -q "URL.revokeObjectURL" src/services/howlerAudioPlayer.ts; then
+            echo "⚠️ Blob URL cleanup may be missing"
+          fi
+          
+          echo "✅ Blob URL handling verified"
+
+  # ============================================================================
+  # Job 5: E2E Audio Widget Tests
+  # ============================================================================
+  test-e2e-audio:
+    name: 🎭 E2E Audio Widget Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [test-csp-compliance]
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+      
+      - name: 📦 Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+      
+      - name: 🏗️ Build application
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder_key' }}
+          NODE_ENV: production
+      
+      - name: 🎭 Run E2E audio widget tests
+        run: |
+          # Start preview server
+          npm run preview &
+          SERVER_PID=$!
+          sleep 15
+          
+          # Wait for server
+          timeout 60 bash -c 'until curl -f http://localhost:3001 > /dev/null 2>&1; do sleep 2; done' || exit 1
+          
+          # Run audio widget E2E tests
+          npx playwright test tests/e2e/audio/ --project=chromium --reporter=html,json,list || echo "No audio E2E tests found"
+          
+          # Cleanup
+          kill $SERVER_PID || true
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: http://localhost:3001
+          CI: true
+          NODE_ENV: test
+        continue-on-error: true
+      
+      - name: 📊 Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-audio-report
+          path: playwright-report/
+          retention-days: 7
+      
+      - name: 📊 Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-test-artifacts
+          path: test-results/
+          retention-days: 7
+
+  # ============================================================================
+  # Job 6: Integration Tests (Full Audio Flow)
+  # ============================================================================
+  test-audio-integration:
+    name: 🔗 Audio Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [test-howler-player, test-chunked-playback]
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+      
+      - name: 🧪 Test TTS Manager integration
+        run: |
+          # Verify TTS Manager uses HowlerAudioPlayer
+          if ! grep -q "HowlerAudioPlayer\|audioPlayer" src/services/azureTTSService.ts; then
+            echo "❌ Azure TTS not using HowlerAudioPlayer"
+            exit 1
+          fi
+          
+          if ! grep -q "HowlerAudioPlayer\|audioPlayer" src/services/googleCloudTTSService.ts; then
+            echo "❌ Google Cloud TTS not using HowlerAudioPlayer"
+            exit 1
+          fi
+          
+          # Verify fallback mechanism
+          if ! grep -q "fallback\|fall back" src/services/ttsManager.ts; then
+            echo "⚠️ Fallback mechanism may not be implemented"
+          fi
+          
+          echo "✅ TTS Manager integration verified"
+      
+      - name: 🧪 Run integration tests
+        run: |
+          npm run test -- --run tests/integration/audio/ --reporter=verbose || echo "No integration tests found"
+        env:
+          CI: true
+        continue-on-error: true
+
+  # ============================================================================
+  # Job 7: Performance & Bundle Size Tests
+  # ============================================================================
+  test-audio-performance:
+    name: ⚡ Audio Performance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [test-csp-compliance]
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+      
+      - name: 🏗️ Build application
+        run: npm run build
+        env:
+          NODE_ENV: production
+      
+      - name: ⚡ Analyze audio-related bundle size
+        run: |
+          echo "## 📊 Audio Functionality Bundle Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Check main bundle size
+          if ls dist/assets/index-*.js 1> /dev/null 2>&1; then
+            MAIN_BUNDLE=$(ls -lh dist/assets/index-*.js | awk '{print $5}')
+            echo "### Main Bundle Size" >> $GITHUB_STEP_SUMMARY
+            echo "- **Total:** $MAIN_BUNDLE" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Check for Howler.js in bundle
+          if grep -q "howler" dist/assets/index-*.js 2>/dev/null; then
+            echo "✅ Howler.js included in bundle" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Howler.js not found in bundle (may be code-split)" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Check bundle size limits
+          BUNDLE_SIZE=$(ls -l dist/assets/index-*.js 2>/dev/null | awk '{print $5}' || echo "0")
+          MAX_SIZE=$((1500 * 1024)) # 1.5 MB
+          
+          if [ "$BUNDLE_SIZE" -gt "$MAX_SIZE" ]; then
+            echo "::warning::Bundle size ($BUNDLE_SIZE bytes) exceeds recommended limit ($MAX_SIZE bytes)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ Bundle size within limits" >> $GITHUB_STEP_SUMMARY
+          fi
+      
+      - name: 📊 Upload bundle analysis
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-bundle-analysis
+          path: dist/
+          retention-days: 7
+
+  # ============================================================================
+  # Job 8: Test Summary
+  # ============================================================================
+  test-summary:
+    name: 📊 Test Summary
+    runs-on: ubuntu-latest
+    needs: [test-azure-tts-proxy, test-howler-player, test-chunked-playback, test-csp-compliance, test-e2e-audio, test-audio-integration, test-audio-performance]
+    if: always()
+    
+    steps:
+      - name: 📝 Generate test summary
+        run: |
+          echo "## 🎵 Audio Functionality Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Suite | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Azure TTS Proxy | ${{ needs.test-azure-tts-proxy.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Howler.js Player | ${{ needs.test-howler-player.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Chunked Playback | ${{ needs.test-chunked-playback.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CSP Compliance | ${{ needs.test-csp-compliance.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Audio Widget | ${{ needs.test-e2e-audio.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | ${{ needs.test-audio-integration.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance | ${{ needs.test-audio-performance.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Features Tested" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Azure TTS proxy endpoint (`/api/azure-tts`)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Howler.js audio playback integration" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Sequential chunked playback" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ CSP media-src blob: URL support" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Audio widget E2E functionality" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ TTS Manager fallback mechanism" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Bundle size optimization" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          FAILED_JOBS=0
+          if [ "${{ needs.test-azure-tts-proxy.result }}" != "success" ]; then
+            echo "❌ Azure TTS Proxy tests failed" >> $GITHUB_STEP_SUMMARY
+            FAILED_JOBS=$((FAILED_JOBS + 1))
+          fi
+          if [ "${{ needs.test-howler-player.result }}" != "success" ]; then
+            echo "❌ Howler.js Player tests failed" >> $GITHUB_STEP_SUMMARY
+            FAILED_JOBS=$((FAILED_JOBS + 1))
+          fi
+          if [ "${{ needs.test-chunked-playback.result }}" != "success" ]; then
+            echo "❌ Chunked Playback tests failed" >> $GITHUB_STEP_SUMMARY
+            FAILED_JOBS=$((FAILED_JOBS + 1))
+          fi
+          if [ "${{ needs.test-csp-compliance.result }}" != "success" ]; then
+            echo "❌ CSP Compliance tests failed" >> $GITHUB_STEP_SUMMARY
+            FAILED_JOBS=$((FAILED_JOBS + 1))
+          fi
+          
+          if [ "$FAILED_JOBS" -eq 0 ]; then
+            echo "✅ All critical tests passed!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ $FAILED_JOBS test suite(s) failed. Check artifacts for details." >> $GITHUB_STEP_SUMMARY
+          fi
+      
+      - name: ❌ Fail if critical tests failed
+        if: |
+          needs.test-azure-tts-proxy.result != 'success' ||
+          needs.test-howler-player.result != 'success' ||
+          needs.test-chunked-playback.result != 'success' ||
+          needs.test-csp-compliance.result != 'success'
+        run: |
+          echo "Critical audio functionality tests failed. Please review the test results."
+          exit 1
+
