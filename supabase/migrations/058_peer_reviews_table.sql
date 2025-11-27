@@ -44,14 +44,14 @@ CREATE TABLE IF NOT EXISTS peer_reviews (
 );
 
 -- Indexes for performance
-CREATE INDEX idx_peer_reviews_user_id ON peer_reviews(user_id);
-CREATE INDEX idx_peer_reviews_book_id ON peer_reviews(book_id);
-CREATE INDEX idx_peer_reviews_status ON peer_reviews(status);
-CREATE INDEX idx_peer_reviews_created_at ON peer_reviews(created_at DESC);
-CREATE INDEX idx_peer_reviews_updated_at ON peer_reviews(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_peer_reviews_user_id ON peer_reviews(user_id);
+CREATE INDEX IF NOT EXISTS idx_peer_reviews_book_id ON peer_reviews(book_id);
+CREATE INDEX IF NOT EXISTS idx_peer_reviews_status ON peer_reviews(status);
+CREATE INDEX IF NOT EXISTS idx_peer_reviews_created_at ON peer_reviews(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_peer_reviews_updated_at ON peer_reviews(updated_at DESC);
 
 -- Full-text search index for review content
-CREATE INDEX idx_peer_reviews_content_fts ON peer_reviews USING gin(to_tsvector('english', review_content));
+CREATE INDEX IF NOT EXISTS idx_peer_reviews_content_fts ON peer_reviews USING gin(to_tsvector('english', review_content));
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_peer_reviews_updated_at()
@@ -66,6 +66,7 @@ END;
 $$;
 
 -- Trigger to auto-update updated_at
+DROP TRIGGER IF EXISTS peer_reviews_updated_at_trigger ON peer_reviews;
 CREATE TRIGGER peer_reviews_updated_at_trigger
   BEFORE UPDATE ON peer_reviews
   FOR EACH ROW
@@ -73,6 +74,12 @@ CREATE TRIGGER peer_reviews_updated_at_trigger
 
 -- Row Level Security
 ALTER TABLE peer_reviews ENABLE ROW LEVEL SECURITY;
+
+-- Drop policies if they exist (idempotent)
+DROP POLICY IF EXISTS "Users can read own peer reviews" ON peer_reviews;
+DROP POLICY IF EXISTS "Users can create own peer reviews" ON peer_reviews;
+DROP POLICY IF EXISTS "Users can update own peer reviews" ON peer_reviews;
+DROP POLICY IF EXISTS "Users can delete own peer reviews" ON peer_reviews;
 
 -- Policy: Users can read their own reviews
 CREATE POLICY "Users can read own peer reviews" ON peer_reviews
