@@ -335,6 +335,8 @@ class AzureTTSService {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
         
+        // Force HTTP/1.1 by adding Connection: close header
+        // This may help avoid HTTP/2 protocol errors
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
@@ -342,9 +344,13 @@ class AzureTTSService {
             'Content-Type': 'application/ssml+xml',
             'X-Microsoft-OutputFormat': this.settings.audioFormat,
             'User-Agent': 'SmartReader',
+            'Connection': 'close', // Force HTTP/1.1
+            'Cache-Control': 'no-cache',
           },
           body: ssml,
           signal: controller.signal,
+          // Try to avoid HTTP/2 by using keepalive: false
+          keepalive: false,
         });
         
         clearTimeout(timeoutId);
@@ -373,16 +379,30 @@ class AzureTTSService {
         }
 
         console.log(`✅ Azure TTS Request SUCCEEDED! (attempt ${attempt})`);
+        console.log('Response headers:', {
+          contentType: response.headers.get('content-type'),
+          contentLength: response.headers.get('content-length'),
+          status: response.status,
+          statusText: response.statusText
+        });
         
         // Read the response body with error handling
-        // Use blob() method which sometimes handles HTTP/2 protocol errors better
+        // Try multiple methods to work around HTTP/2 protocol errors
         let audioData: ArrayBuffer;
         try {
-          // Clone response before reading to avoid "body stream already read" errors
-          const clonedResponse = response.clone();
-          const blob = await clonedResponse.blob();
-          audioData = await blob.arrayBuffer();
-          console.log(`Successfully read response (${audioData.byteLength} bytes)`);
+          // Method 1: Try reading directly as arrayBuffer first (fastest)
+          try {
+            audioData = await response.arrayBuffer();
+            console.log(`Successfully read response as arrayBuffer (${audioData.byteLength} bytes)`);
+          } catch (directError) {
+            console.warn(`Direct arrayBuffer read failed, trying blob method:`, directError);
+            
+            // Method 2: Clone and read as blob (sometimes handles HTTP/2 better)
+            const clonedResponse = response.clone();
+            const blob = await clonedResponse.blob();
+            audioData = await blob.arrayBuffer();
+            console.log(`Successfully read response as blob (${audioData.byteLength} bytes)`);
+          }
         } catch (bodyError) {
           console.error(`Failed to read response body (attempt ${attempt}):`, bodyError);
           
