@@ -72,7 +72,14 @@ export class HowlerAudioPlayer {
       blobUrl: this.blobUrl.substring(0, 50) + '...'
     })
 
+    let resolvePromise: (() => void) | null = null
+    let rejectPromise: ((error: Error) => void) | null = null
+    let playbackStarted = false
+
     return new Promise((resolve, reject) => {
+      resolvePromise = resolve
+      rejectPromise = reject
+
       this.currentSound = new Howl({
         src: [this.blobUrl!],
         format: ['mp3', 'mpeg'], // Try both formats
@@ -84,17 +91,22 @@ export class HowlerAudioPlayer {
           console.log('HowlerAudioPlayer: Audio loaded successfully')
           this.startTime = Date.now()
           this.startWordTracking()
-          resolve()
+          // Don't resolve here - wait for playback to end
         },
         
         onloaderror: (id, error) => {
           console.error('HowlerAudioPlayer: Load error', error)
           this.cleanup()
-          reject(new Error(`Audio load failed: ${error}`))
+          if (rejectPromise) {
+            rejectPromise(new Error(`Audio load failed: ${error}`))
+            rejectPromise = null
+            resolvePromise = null
+          }
         },
         
         onplay: () => {
           console.log('HowlerAudioPlayer: Playback started')
+          playbackStarted = true
           this.isPaused = false
           // Adjust start time if we were paused
           if (this.pausedAt > 0) {
@@ -116,12 +128,24 @@ export class HowlerAudioPlayer {
           if (this.onEndCallback) {
             this.onEndCallback()
           }
+          // Resolve the promise when playback ends (for sequential chunk playback)
+          if (resolvePromise) {
+            resolvePromise()
+            resolvePromise = null
+            rejectPromise = null
+          }
           this.cleanup()
         },
         
         onstop: () => {
           console.log('HowlerAudioPlayer: Playback stopped')
           this.stopWordTracking()
+          // Resolve even if stopped (so next chunk can start)
+          if (resolvePromise) {
+            resolvePromise()
+            resolvePromise = null
+            rejectPromise = null
+          }
           this.cleanup()
         }
       })
