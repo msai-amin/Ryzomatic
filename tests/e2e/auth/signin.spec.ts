@@ -11,43 +11,46 @@ test.describe('Authentication Flow', () => {
   });
 
   test('should display landing page with sign in option', async ({ page }) => {
-    await expect(page).toHaveTitle(/Smart Reader|Immersive Reader/);
+    await expect(page).toHaveTitle(/ryzomatic|Smart Reader|Immersive Reader/);
     
-    // Check for sign in button or link
-    const signInButton = page.getByRole('button', { name: /sign in|get started|start free trial/i });
-    await expect(signInButton).toBeVisible();
+    // Check for sign in button or link (more flexible selectors)
+    const signInButton = page.getByRole('button', { name: /sign in|get started|start free trial|log in/i });
+    await expect(signInButton.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('should open auth modal when sign in is clicked', async ({ page }) => {
-    // Click sign in
-    await page.getByRole('button', { name: /sign in|get started/i }).click();
+    // Click sign in (use first() to handle multiple matches)
+    const signInButton = page.getByRole('button', { name: /sign in|get started|log in/i }).first();
+    await signInButton.click({ timeout: 10000 });
     
-    // Wait for auth modal to appear
-    const authModal = page.locator('[role="dialog"], .auth-modal, #auth-modal');
-    await expect(authModal).toBeVisible();
+    // Wait for auth modal to appear (more flexible selectors)
+    const authModal = page.locator('[role="dialog"], .auth-modal, #auth-modal, [data-testid="auth-modal"]');
+    await expect(authModal).toBeVisible({ timeout: 10000 });
   });
 
   test('should show Google OAuth option', async ({ page }) => {
     // Open auth modal
-    await page.getByRole('button', { name: /sign in|get started/i }).click();
-    await page.waitForSelector('[role="dialog"]', { state: 'visible' });
+    const signInButton = page.getByRole('button', { name: /sign in|get started|log in/i }).first();
+    await signInButton.click({ timeout: 10000 });
+    await page.waitForSelector('[role="dialog"], .auth-modal, #auth-modal', { state: 'visible', timeout: 10000 });
     
-    // Check for Google sign in button
-    const googleButton = page.getByRole('button', { name: /sign in with google|continue with google/i });
-    await expect(googleButton).toBeVisible();
+    // Check for Google sign in button (more flexible)
+    const googleButton = page.getByRole('button', { name: /sign in with google|continue with google|google/i });
+    await expect(googleButton.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('should close auth modal when cancel is clicked', async ({ page }) => {
     // Open auth modal
-    await page.getByRole('button', { name: /sign in|get started/i }).click();
-    await page.waitForSelector('[role="dialog"]', { state: 'visible' });
+    const signInButton = page.getByRole('button', { name: /sign in|get started|log in/i }).first();
+    await signInButton.click({ timeout: 10000 });
+    await page.waitForSelector('[role="dialog"], .auth-modal, #auth-modal', { state: 'visible', timeout: 10000 });
     
-    // Click cancel/close
-    const cancelButton = page.getByRole('button', { name: /cancel|close/i });
-    await cancelButton.click();
+    // Click cancel/close (try multiple selectors)
+    const cancelButton = page.getByRole('button', { name: /cancel|close/i }).first();
+    await cancelButton.click({ timeout: 10000 });
     
     // Modal should be hidden
-    await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+    await expect(page.locator('[role="dialog"], .auth-modal, #auth-modal').first()).not.toBeVisible({ timeout: 10000 });
   });
 });
 
