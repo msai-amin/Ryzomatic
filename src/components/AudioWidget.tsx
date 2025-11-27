@@ -906,7 +906,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     setIsProcessing(false)
   }, [updateTTS, normalizedDocumentId, tts.isPlaying, saveCurrentPosition])
   
-  handleStopRef.current = handleStop
+  // Update refs in useEffect to avoid initialization order issues
+  useEffect(() => {
+    handleStopRef.current = handleStop
+  }, [handleStop])
 
   // Handle play/pause
   const handlePlayPause = useCallback(async () => {
@@ -1176,9 +1179,6 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     // This follows industry standards (e.g., Spotify, Audible)
   }, [tts.isPlaying, updateTTS])
 
-  // Update playPause ref (ref was declared earlier)
-  handlePlayPauseRef.current = handlePlayPause
-
   // Handle next paragraph
   const handleNextParagraph = useCallback(() => {
     const currentIndex = tts.currentParagraphIndex ?? 0
@@ -1192,8 +1192,6 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       }
     }
   }, [tts.currentParagraphIndex, tts.paragraphs.length, tts.isPlaying, tts.autoAdvanceParagraph, updateTTS])
-  
-  handleNextParagraphRef.current = handleNextParagraph
 
   // Handle previous paragraph
   const handlePrevParagraph = useCallback(() => {
@@ -1209,7 +1207,12 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     }
   }, [tts.currentParagraphIndex, tts.isPlaying, updateTTS])
   
-  handlePrevParagraphRef.current = handlePrevParagraph
+  // Update all refs in useEffect to avoid initialization order issues
+  useEffect(() => {
+    handlePlayPauseRef.current = handlePlayPause
+    handleNextParagraphRef.current = handleNextParagraph
+    handlePrevParagraphRef.current = handlePrevParagraph
+  }, [handlePlayPause, handleNextParagraph, handlePrevParagraph])
 
   // Handle volume toggle
   const handleVolumeToggle = useCallback(() => {
