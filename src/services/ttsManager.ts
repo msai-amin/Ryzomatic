@@ -303,7 +303,10 @@ class TTSManager {
     // This prevents race conditions with stopRequested flags
     await new Promise(resolve => setTimeout(resolve, 50))
     
-    console.log('TTSManager.speak: Calling provider.speak...')
+    console.log('TTSManager.speak: Calling provider.speak...', {
+      providerType: this.currentProvider?.type,
+      providerName: this.currentProvider?.name
+    })
     try {
       await this.currentProvider.speak(text, onEnd, onWord)
       console.log('TTSManager.speak: Provider.speak completed successfully')
@@ -312,7 +315,14 @@ class TTSManager {
       
       // Automatic fallback: If Azure TTS fails, try Google Cloud TTS
       if (this.currentProvider?.type === 'azure') {
+        console.log('TTSManager: Checking for Google Cloud TTS fallback...')
         const googleCloudProvider = this.providers.get('google-cloud')
+        console.log('TTSManager: Google Cloud provider status:', {
+          exists: !!googleCloudProvider,
+          isAvailable: googleCloudProvider?.isAvailable,
+          isConfigured: googleCloudProvider?.isConfigured
+        })
+        
         if (googleCloudProvider && googleCloudProvider.isAvailable && googleCloudProvider.isConfigured) {
           console.warn('TTSManager: Azure TTS failed, falling back to Google Cloud TTS')
           try {
@@ -324,8 +334,16 @@ class TTSManager {
             // Continue to throw original error
           }
         } else {
-          console.warn('TTSManager: Google Cloud TTS not available for fallback')
+          console.warn('TTSManager: Google Cloud TTS not available for fallback', {
+            providerExists: !!googleCloudProvider,
+            isAvailable: googleCloudProvider?.isAvailable,
+            isConfigured: googleCloudProvider?.isConfigured
+          })
         }
+      } else {
+        console.log('TTSManager: Not Azure provider, no fallback attempted', {
+          currentProviderType: this.currentProvider?.type
+        })
       }
       
       throw error
