@@ -33,9 +33,15 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Use npm install instead of npm ci to ensure optional dependencies are installed
+          # Use npm install to ensure optional dependencies are installed
           # This fixes the Rollup native module issue (@rollup/rollup-linux-x64-gnu)
-          npm install --prefer-offline --no-audit
+          # Don't use --prefer-offline to ensure fresh install of optional deps
+          npm install --no-audit
+          # Verify rollup optional dependency is installed, install if missing
+          if ! npm list @rollup/rollup-linux-x64-gnu > /dev/null 2>&1; then
+            echo "Installing missing Rollup optional dependency..."
+            npm install --no-save --no-audit @rollup/rollup-linux-x64-gnu
+          fi
 
       - name: Lint
         run: npm run lint
