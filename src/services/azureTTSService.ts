@@ -585,8 +585,20 @@ class AzureTTSService {
         console.log('AzureTTSService.playAudio: Audio playback started successfully', {
           audioContextState: this.audioContext.state,
           audioDuration: decodedAudio.duration,
-          currentTime: this.audioContext.currentTime
+          currentTime: this.audioContext.currentTime,
+          isSpeaking: this.isSpeaking(),
+          hasCurrentAudio: !!this.currentAudio,
+          speakingActive: this.speakingActive
         });
+        
+        // CRITICAL: Verify playback actually started
+        // Wait a small amount to ensure audio context is processing
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Check if audio is still playing after start
+        if (!this.isSpeaking() && decodedAudio.duration > 0) {
+          console.warn('AzureTTSService.playAudio: Audio started but isSpeaking() returns false. Audio may have ended immediately.');
+        }
       } catch (startError) {
         console.error('AzureTTSService.playAudio: Failed to start audio playback:', startError);
         throw new Error('Failed to start audio playback: ' + (startError instanceof Error ? startError.message : String(startError)));
@@ -594,7 +606,10 @@ class AzureTTSService {
       
       console.log('AzureTTSService.playAudio: Waiting for audio to complete...');
       await audioEndPromise;
-      console.log('AzureTTSService.playAudio: Audio playback completed');
+      console.log('AzureTTSService.playAudio: Audio playback completed', {
+        finalDuration: decodedAudio.duration,
+        isSpeaking: this.isSpeaking()
+      });
       
     } catch (error) {
       console.error('Error playing audio:', error);
