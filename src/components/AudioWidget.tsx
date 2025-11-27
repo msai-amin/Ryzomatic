@@ -1450,7 +1450,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
           <Tooltip content="Close Audio Widget" position="top">
             <button
               onClick={() => {
-                handleStop()
+                handleStopRef.current()
                 setAudioWidgetVisible(false)
               }}
               className="p-2 rounded-full transition-all"
