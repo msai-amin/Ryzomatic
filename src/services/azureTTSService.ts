@@ -314,10 +314,11 @@ class AzureTTSService {
       </voice>
     </speak>`;
 
-    const endpoint = `https://${this.region}.tts.speech.microsoft.com/cognitiveservices/v1`;
+    // Use server-side proxy endpoint to avoid HTTP/2 protocol errors
+    const proxyEndpoint = '/api/azure-tts';
 
-    console.log('Azure TTS Request Details:', {
-      endpoint,
+    console.log('Azure TTS Request Details (via proxy):', {
+      endpoint: proxyEndpoint,
       textLength: text.length,
       voice: officialVoiceName,
       locale: voice.locale
@@ -329,121 +330,73 @@ class AzureTTSService {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`Azure TTS Request (attempt ${attempt}/${maxRetries})...`);
+        console.log(`Azure TTS Request via proxy (attempt ${attempt}/${maxRetries})...`);
         
         // Create abort controller for timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
         
-        // Force HTTP/1.1 by adding Connection: close header
-        // This may help avoid HTTP/2 protocol errors
-        const response = await fetch(endpoint, {
+        // Call our server-side proxy endpoint
+        const response = await fetch(proxyEndpoint, {
           method: 'POST',
           headers: {
-            'Ocp-Apim-Subscription-Key': this.subscriptionKey!,
-            'Content-Type': 'application/ssml+xml',
-            'X-Microsoft-OutputFormat': this.settings.audioFormat,
-            'User-Agent': 'SmartReader',
-            'Connection': 'close', // Force HTTP/1.1
-            'Cache-Control': 'no-cache',
+            'Content-Type': 'application/json',
           },
-          body: ssml,
+          body: JSON.stringify({
+            ssml: ssml,
+            voice: officialVoiceName,
+            locale: voice.locale,
+            region: this.region,
+          }),
           signal: controller.signal,
-          // Try to avoid HTTP/2 by using keepalive: false
-          keepalive: false,
         });
         
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          const errorText = await response.text().catch(() => 'Unable to read error response');
-          console.error(`Azure TTS API Error (attempt ${attempt}):`, {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error(`Azure TTS Proxy Error (attempt ${attempt}):`, {
             status: response.status,
             statusText: response.statusText,
-            errorText: errorText.substring(0, 200) // Limit error text length
+            error: errorData.error || errorData.message
           });
           
           // Don't retry on client errors (4xx)
           if (response.status >= 400 && response.status < 500) {
-            throw new Error(`TTS synthesis failed: ${response.status} ${response.statusText}`);
+            throw new Error(`TTS synthesis failed: ${errorData.error || response.statusText}`);
           }
           
           // Retry on server errors (5xx)
           if (response.status >= 500 && attempt < maxRetries) {
-            lastError = new Error(`TTS synthesis failed: ${response.status} ${response.statusText}`);
+            lastError = new Error(`TTS synthesis failed: ${errorData.error || response.statusText}`);
             await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
             continue;
           }
           
-          throw new Error(`TTS synthesis failed: ${response.status} ${response.statusText}`);
+          throw new Error(`TTS synthesis failed: ${errorData.error || response.statusText}`);
         }
 
-        console.log(`✅ Azure TTS Request SUCCEEDED! (attempt ${attempt})`);
-        console.log('Response headers:', {
-          contentType: response.headers.get('content-type'),
-          contentLength: response.headers.get('content-length'),
-          status: response.status,
-          statusText: response.statusText
-        });
+        console.log(`✅ Azure TTS Proxy Request SUCCEEDED! (attempt ${attempt})`);
         
-        // Read the response body with error handling
-        // Try multiple methods to work around HTTP/2 protocol errors
-        let audioData: ArrayBuffer;
-        try {
-          // Method 1: Try reading directly as arrayBuffer first (fastest)
-          try {
-            audioData = await response.arrayBuffer();
-            console.log(`Successfully read response as arrayBuffer (${audioData.byteLength} bytes)`);
-          } catch (directError) {
-            console.warn(`Direct arrayBuffer read failed, trying blob method:`, directError);
-            
-            // Method 2: Clone and read as blob (sometimes handles HTTP/2 better)
-            const clonedResponse = response.clone();
-            const blob = await clonedResponse.blob();
-            audioData = await blob.arrayBuffer();
-            console.log(`Successfully read response as blob (${audioData.byteLength} bytes)`);
-          }
-        } catch (bodyError) {
-          console.error(`Failed to read response body (attempt ${attempt}):`, bodyError);
-          
-          // If blob read fails, try XMLHttpRequest as fallback (different HTTP handling)
-          if (attempt === maxRetries && (bodyError instanceof TypeError || bodyError instanceof DOMException)) {
-            console.log('Attempting XMLHttpRequest fallback for Azure TTS...');
-            try {
-              audioData = await this.synthesizeWithXHR(endpoint, ssml);
-              console.log(`XMLHttpRequest fallback succeeded (${audioData.byteLength} bytes)`);
-            } catch (xhrError) {
-              console.error('XMLHttpRequest fallback also failed:', xhrError);
-              throw new Error(`Failed to read audio data: ${bodyError instanceof Error ? bodyError.message : 'Unknown error'}`);
-            }
-          } else {
-            // Retry if it's a network/protocol error and we have retries left
-            if (attempt < maxRetries && (bodyError instanceof TypeError || bodyError instanceof DOMException)) {
-              lastError = bodyError as Error;
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-              continue;
-            }
-            
-            throw new Error(`Failed to read audio data: ${bodyError instanceof Error ? bodyError.message : 'Unknown error'}`);
-          }
-        }
+        // Read the audio data from the proxy response
+        const audioData = await response.arrayBuffer();
         
-        console.log('AzureTTSService.synthesize: Received audio buffer', {
+        console.log('AzureTTSService.synthesize: Received audio buffer from proxy', {
           size: audioData.byteLength,
           contentType: response.headers.get('content-type'),
           status: response.status
         });
         
         if (!audioData || audioData.byteLength === 0) {
-          console.error('AzureTTSService.synthesize: Received empty audio buffer from API!');
-          throw new Error('Received empty audio buffer from Azure TTS API');
+          console.error('AzureTTSService.synthesize: Received empty audio buffer from proxy!');
+          throw new Error('Received empty audio buffer from Azure TTS proxy');
         }
         
         return audioData;
           
       } catch (error) {
         lastError = error as Error;
-        console.error(`Azure TTS Error (attempt ${attempt}/${maxRetries}):`, error);
+        console.error(`Azure TTS Proxy Error (attempt ${attempt}/${maxRetries}):`, error);
         
         // Don't retry on certain errors
         if (error instanceof Error) {
