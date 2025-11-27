@@ -28,10 +28,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          # Don't use cache to avoid issues with optional dependencies
+          # cache: 'npm'
       
       - name: Clean install
-        run: npm ci
+        run: |
+          # Remove node_modules to ensure clean install of optional dependencies
+          # This fixes the Rollup native module issue (@rollup/rollup-linux-x64-gnu)
+          rm -rf node_modules
+          # Install dependencies fresh (this ensures optional dependencies are installed)
+          npm install --no-audit
+          # Verify rollup optional dependency is present
+          if [ ! -d "node_modules/@rollup/rollup-linux-x64-gnu" ]; then
+            echo "Rollup optional dependency missing, installing explicitly..."
+            npm install --no-save --no-audit --force @rollup/rollup-linux-x64-gnu
+          fi
       
       - name: Run all checks
         run: |
