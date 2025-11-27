@@ -1,7 +1,6 @@
 import React from 'react'
 import { PDFViewerV2 } from '../PDFViewerV2'
 import { ReviewPanel } from './ReviewPanel'
-import { FigureDrawer } from './FigureDrawer'
 
 export const EditorialLayout: React.FC = () => {
   return (
@@ -10,9 +9,6 @@ export const EditorialLayout: React.FC = () => {
       <div className="w-1/2 h-full relative border-r border-[var(--color-border)]">
         {/* We pass specific props or context to PDFViewerV2 if needed, but it uses global store */}
         <PDFViewerV2 />
-        
-        {/* Figure Drawer lives on top of the PDF Viewer */}
-        <FigureDrawer />
       </div>
 
       {/* Right Pane: Review Editor */}
