@@ -196,9 +196,14 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     measure()
   }, [])
 
+  // Ref to prevent infinite loops from position updates
+  const isUpdatingPositionRef = useRef(false)
+  
   useEffect(() => {
     if (typeof window === 'undefined') return
+    if (isUpdatingPositionRef.current) return // Prevent infinite loops
     if (audioWidgetPosition.x === 0 && audioWidgetPosition.y === 0) {
+      isUpdatingPositionRef.current = true
       const widgetWidth = widgetRef.current?.offsetWidth ?? widgetSizeRef.current.width
       const widgetHeight = widgetRef.current?.offsetHeight ?? widgetSizeRef.current.height
       const sidebarGuard = isRightSidebarOpen ? (rightSidebarWidth || 280) + 24 : 24
@@ -208,12 +213,17 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       }
       const clamped = clampPosition(defaultPos)
       setPosition(clamped)
-      setAudioWidgetPosition(clamped)
+      // Only update store if position actually changed
+      if (Math.abs(clamped.x - audioWidgetPosition.x) > 0.5 || Math.abs(clamped.y - audioWidgetPosition.y) > 0.5) {
+        setAudioWidgetPosition(clamped)
+      }
+      isUpdatingPositionRef.current = false
     }
   }, [audioWidgetPosition.x, audioWidgetPosition.y, clampPosition, isRightSidebarOpen, rightSidebarWidth, setAudioWidgetPosition])
 
   useEffect(() => {
     if (isDragging) return
+    if (isUpdatingPositionRef.current) return // Prevent infinite loops
     if (audioWidgetPosition.x === 0 && audioWidgetPosition.y === 0) return
     setPosition(prev => {
       if (Math.abs(prev.x - audioWidgetPosition.x) < 0.5 && Math.abs(prev.y - audioWidgetPosition.y) < 0.5) {
@@ -252,12 +262,19 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     if (typeof window === 'undefined') return
 
     const handleResize = () => {
+      if (isUpdatingPositionRef.current) return // Prevent infinite loops
+      isUpdatingPositionRef.current = true
       setPosition(prev => {
         const clamped = clampPosition(prev)
         if (Math.abs(clamped.x - prev.x) < 0.5 && Math.abs(clamped.y - prev.y) < 0.5) {
+          isUpdatingPositionRef.current = false
           return prev
         }
-        setAudioWidgetPosition(clamped)
+        // Only update store if position actually changed significantly
+        if (Math.abs(clamped.x - prev.x) > 1 || Math.abs(clamped.y - prev.y) > 1) {
+          setAudioWidgetPosition(clamped)
+        }
+        isUpdatingPositionRef.current = false
         return clamped
       })
     }
@@ -289,12 +306,19 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   }, [isDragging])
 
   useEffect(() => {
+    if (isUpdatingPositionRef.current) return // Prevent infinite loops
+    isUpdatingPositionRef.current = true
     setPosition(prev => {
       const clamped = clampPosition(prev)
       if (Math.abs(clamped.x - prev.x) < 0.5 && Math.abs(clamped.y - prev.y) < 0.5) {
+        isUpdatingPositionRef.current = false
         return prev
       }
-      setAudioWidgetPosition(clamped)
+      // Only update store if position actually changed
+      if (Math.abs(clamped.x - prev.x) > 1 || Math.abs(clamped.y - prev.y) > 1) {
+        setAudioWidgetPosition(clamped)
+      }
+      isUpdatingPositionRef.current = false
       return clamped
     })
   }, [isRightSidebarOpen, rightSidebarWidth, clampPosition, setAudioWidgetPosition])
@@ -341,9 +365,12 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
   const handlePointerUp = useCallback(() => {
     if (!isDragging) return
     setIsDragging(false)
+    isUpdatingPositionRef.current = true
     setPosition(prev => {
       const clamped = clampPosition(prev)
+      // Always update store on drag end
       setAudioWidgetPosition(clamped)
+      isUpdatingPositionRef.current = false
       return clamped
     })
   }, [isDragging, clampPosition, setAudioWidgetPosition])
