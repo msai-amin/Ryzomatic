@@ -21,8 +21,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Get Azure TTS credentials from environment
-    const subscriptionKey = process.env.AZURE_TTS_KEY;
-    const azureRegion = region || process.env.AZURE_TTS_REGION || 'eastus';
+    // Try both VITE_ and non-VITE_ versions for compatibility
+    const subscriptionKey = process.env.AZURE_TTS_KEY || process.env.VITE_AZURE_TTS_KEY;
+    const azureRegion = region || process.env.AZURE_TTS_REGION || process.env.VITE_AZURE_TTS_REGION || 'eastus';
 
     if (!subscriptionKey) {
       console.error('Azure TTS subscription key not configured');
