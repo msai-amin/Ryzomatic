@@ -1,15 +1,16 @@
 /**
  * TTS Manager
- * Manages both native and Google Cloud TTS services
+ * Manages native, Google Cloud, and Azure TTS services
  */
 
 import { ttsService } from './ttsService'
 import { googleCloudTTSService } from './googleCloudTTSService'
+import { azureTTSService } from './azureTTSService'
 import { TTSSettings } from '../store/appStore'
 
 export interface TTSProvider {
   name: string
-  type: 'native' | 'google-cloud'
+  type: 'native' | 'google-cloud' | 'azure'
   isAvailable: boolean
   isConfigured: boolean
   getVoices: () => Promise<any[]>
@@ -87,13 +88,41 @@ class TTSManager {
       getDuration: () => googleCloudTTSService.getDuration()
     })
 
+    // Azure TTS Provider
+    this.providers.set('azure', {
+      name: 'Azure TTS',
+      type: 'azure',
+      isAvailable: azureTTSService.isSupported(),
+      isConfigured: azureTTSService.isConfigured(),
+      getVoices: async () => azureTTSService.getVoices(),
+      speak: async (text, onEnd, onWord) => azureTTSService.speak(text, onEnd, onWord),
+      pause: () => azureTTSService.pause(),
+      resume: () => azureTTSService.resume(),
+      stop: () => azureTTSService.stop(),
+      isSpeaking: () => azureTTSService.isSpeaking(),
+      isPausedState: () => azureTTSService.isPausedState(),
+      setRate: (rate) => azureTTSService.setSpeakingRate(rate),
+      setPitch: (pitch) => azureTTSService.setPitch(pitch),
+      setVolume: (volume) => azureTTSService.setVolumeGain(volume),
+      setVoice: (voice) => azureTTSService.setVoice(voice),
+      cleanText: (text) => azureTTSService.cleanText(text),
+      splitIntoSentences: (text) => azureTTSService.splitIntoSentences(text),
+      getProgress: () => azureTTSService.getProgress(),
+      getCurrentTime: () => azureTTSService.getCurrentTime(),
+      getDuration: () => azureTTSService.getDuration()
+    })
+
     // Set default provider - prioritize Google Cloud TTS for better voice quality
     const nativeProvider = this.providers.get('native')
     const googleCloudProvider = this.providers.get('google-cloud')
+    const azureProvider = this.providers.get('azure')
     
     if (googleCloudProvider && googleCloudProvider.isAvailable && googleCloudProvider.isConfigured) {
       this.currentProvider = googleCloudProvider
       console.log('TTSManager: Using Google Cloud TTS as default provider (premium voices)')
+    } else if (azureProvider && azureProvider.isAvailable && azureProvider.isConfigured) {
+      this.currentProvider = azureProvider
+      console.log('TTSManager: Using Azure TTS as default provider (premium voices)')
     } else if (nativeProvider && nativeProvider.isAvailable) {
       this.currentProvider = nativeProvider
       console.log('TTSManager: Using Native TTS as fallback provider (supports word boundaries and progress)')
@@ -119,7 +148,7 @@ class TTSManager {
     return this.currentProvider
   }
 
-  async setProvider(providerType: 'native' | 'google-cloud'): Promise<boolean> {
+  async setProvider(providerType: 'native' | 'google-cloud' | 'azure'): Promise<boolean> {
     const provider = this.providers.get(providerType)
     if (provider && provider.isAvailable && provider.isConfigured) {
       this.currentProvider = provider
@@ -181,6 +210,52 @@ class TTSManager {
           }
         } catch (error) {
           console.warn('Failed to set default voice for Google Cloud TTS:', error)
+        }
+      }
+      
+      // For Azure TTS, set a default voice if none is selected
+      if (providerType === 'azure') {
+        try {
+          const voices = await provider.getVoices()
+          console.log('Available Azure TTS voices:', voices.slice(0, 3)) // Show first 3 voices
+          if (voices.length > 0) {
+            // Prefer English neural voices
+            const englishVoices = voices.filter((voice: any) => {
+              if (!voice || typeof voice !== 'object') {
+                return false;
+              }
+              // Check if locale exists and starts with 'en-'
+              if (voice.locale && voice.locale.startsWith('en-')) {
+                return true;
+              }
+              // Fallback: check if voice name contains English language codes
+              if (voice.name && /en-[A-Z]{2}/.test(voice.name)) {
+                return true;
+              }
+              return false;
+            })
+            
+            let defaultVoice = null
+            
+            if (englishVoices.length > 0) {
+              // Prefer Aria (popular female voice) or any female neural voice
+              defaultVoice = englishVoices.find((voice: any) => 
+                voice && voice.name && voice.name.includes('Aria')
+              ) || englishVoices.find((voice: any) => 
+                voice && voice.gender === 'Female'
+              ) || englishVoices[0]
+            } else {
+              // Fallback to first available voice
+              defaultVoice = voices[0]
+            }
+            
+            if (defaultVoice) {
+              provider.setVoice(defaultVoice)
+              console.log('Set default Azure TTS voice:', defaultVoice.name, `(${defaultVoice.locale})`)
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to set default voice for Azure TTS:', error)
         }
       }
       
@@ -246,8 +321,8 @@ class TTSManager {
 
   async resume(): Promise<void> {
     if (this.currentProvider) {
-      // Resume can be async for Google Cloud TTS (to handle AudioContext resume)
-      if (this.currentProvider.type === 'google-cloud') {
+      // Resume can be async for Google Cloud TTS and Azure TTS (to handle AudioContext resume)
+      if (this.currentProvider.type === 'google-cloud' || this.currentProvider.type === 'azure') {
         await (this.currentProvider.resume() as Promise<void>)
       } else {
         this.currentProvider.resume()
@@ -358,19 +433,21 @@ class TTSManager {
   }
 
   // Get provider-specific settings
-  getProviderSettings(providerType: 'native' | 'google-cloud'): any {
+  getProviderSettings(providerType: 'native' | 'google-cloud' | 'azure'): any {
     switch (providerType) {
       case 'native':
         return ttsService.getSettings()
       case 'google-cloud':
         return googleCloudTTSService.getSettings()
+      case 'azure':
+        return azureTTSService.getSettings()
       default:
         return null
     }
   }
 
   // Update provider-specific settings
-  updateProviderSettings(providerType: 'native' | 'google-cloud', settings: any): void {
+  updateProviderSettings(providerType: 'native' | 'google-cloud' | 'azure', settings: any): void {
     switch (providerType) {
       case 'native':
         if (settings.rate !== undefined) ttsService.setRate(settings.rate)
@@ -384,13 +461,22 @@ class TTSManager {
         if (settings.volumeGainDb !== undefined) googleCloudTTSService.setVolumeGain(settings.volumeGainDb)
         if (settings.voice !== undefined) googleCloudTTSService.setVoice(settings.voice)
         break
+      case 'azure':
+        if (settings.speakingRate !== undefined) azureTTSService.setSpeakingRate(settings.speakingRate)
+        if (settings.pitch !== undefined) azureTTSService.setPitch(settings.pitch)
+        if (settings.volumeGainDb !== undefined) azureTTSService.setVolumeGain(settings.volumeGainDb)
+        if (settings.voice !== undefined) azureTTSService.setVoice(settings.voice)
+        break
     }
   }
 
-  // Get estimated cost for Google Cloud TTS
+  // Get estimated cost for premium TTS providers
   getEstimatedCost(text: string): number {
     if (this.currentProvider?.type === 'google-cloud') {
       return googleCloudTTSService.getEstimatedCost(text)
+    }
+    if (this.currentProvider?.type === 'azure') {
+      return azureTTSService.getEstimatedCost(text)
     }
     return 0 // Native TTS is free
   }

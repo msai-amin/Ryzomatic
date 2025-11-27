@@ -23,8 +23,8 @@ export function TTSControls() {
     const provider = providers.find(p => p.type === tts.provider) || providers[0];
     if (provider) {
       setCurrentProvider(provider);
-      ttsManager.setProvider(provider.type as 'native' | 'google-cloud');
-      updateTTS({ provider: provider.type as 'native' | 'google-cloud' });
+      ttsManager.setProvider(provider.type as 'native' | 'google-cloud' | 'azure');
+      updateTTS({ provider: provider.type as 'native' | 'google-cloud' | 'azure' });
     }
   }, []);
 
@@ -69,7 +69,7 @@ export function TTSControls() {
   }, [tts.rate, tts.pitch, tts.volume, tts.voice, currentProvider]);
 
 
-  const handleProviderChange = (providerType: 'native' | 'google-cloud') => {
+  const handleProviderChange = (providerType: 'native' | 'google-cloud' | 'azure') => {
     const provider = availableProviders.find(p => p.type === providerType);
     if (provider) {
       setCurrentProvider(provider);
@@ -202,7 +202,7 @@ export function TTSControls() {
               {availableProviders.map((provider) => (
                 <button
                   key={provider.type}
-                  onClick={() => handleProviderChange(provider.type as 'native' | 'google-cloud')}
+                  onClick={() => handleProviderChange(provider.type as 'native' | 'google-cloud' | 'azure')}
                   className={`p-3 rounded-lg border-2 transition-all ${
                     currentProvider?.type === provider.type
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
@@ -312,7 +312,7 @@ export function TTSControls() {
             </label>
           </div>
 
-          {/* Cost Estimation for Google Cloud TTS */}
+          {/* Cost Estimation for Premium TTS Providers */}
           {currentProvider?.type === 'google-cloud' && (
             <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
               <div className="text-sm text-blue-800 dark:text-blue-200">
@@ -320,6 +320,16 @@ export function TTSControls() {
               </div>
               <div className="text-xs text-blue-600 dark:text-blue-300 mt-1">
                 Typical document: ~$0.01-0.05 per reading
+              </div>
+            </div>
+          )}
+          {currentProvider?.type === 'azure' && (
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <div className="text-sm text-blue-800 dark:text-blue-200">
+                <strong>Azure TTS Pricing:</strong> $15.00 per 1M characters (Neural voices)
+              </div>
+              <div className="text-xs text-blue-600 dark:text-blue-300 mt-1">
+                Typical document: ~$0.03-0.15 per reading
               </div>
             </div>
           )}

@@ -182,7 +182,7 @@ BEGIN
       related_record.related_book_id,
       source_desc_id,
       related_record.related_desc_id,
-      ROUND(related_record.similarity * 100, 2),
+      ROUND((related_record.similarity * 100)::numeric, 2),
       'completed',
       jsonb_build_object(
         'method', 'vector_similarity',

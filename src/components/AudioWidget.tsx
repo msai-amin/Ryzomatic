@@ -1502,7 +1502,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             <div className="flex items-center justify-between gap-2">
               {/* Previous Paragraph */}
               <button
-                onClick={handlePrevParagraph}
+                onClick={() => handlePrevParagraphRef.current()}
                 disabled={currentParagraphIndex === 0}
                 className="p-2 rounded-full transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                 style={{ color: 'var(--color-text-primary)' }}
@@ -1543,7 +1543,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
               {/* Next Paragraph */}
               <button
-                onClick={handleNextParagraph}
+                onClick={() => handleNextParagraphRef.current()}
                 disabled={currentParagraphIndex >= totalParagraphs - 1}
                 className="p-2 rounded-full transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                 style={{ color: 'var(--color-text-primary)' }}

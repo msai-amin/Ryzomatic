@@ -156,7 +156,7 @@ BEGIN
       user_uuid,
       source_book_uuid,
       related_record.related_book_id,
-      ROUND(related_record.similarity * 100, 2),
+      ROUND((related_record.similarity * 100)::numeric, 2),
       'completed',
       jsonb_build_object(
         'method', 'vector_similarity',

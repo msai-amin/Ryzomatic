@@ -11,6 +11,14 @@
 !docs/SMART_READER_DATABASE_GUIDE.pdf
 !docs/SMART_READER_DATABASE_GUIDE.tex
 
+# Lecture notes (case study)
+lecture-notes-case-study.tex
+lecture-notes-case-study.pdf
+lecture-notes-case-study.aux
+lecture-notes-case-study.out
+lecture-notes-case-study.toc
+lecture-notes-case-study.log
+
 # Dependencies
 node_modules
 /.pnp

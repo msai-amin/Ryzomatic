@@ -20,7 +20,7 @@ export interface TTSCacheEntry {
   speaking_rate: number;
   pitch: number;
   volume_gain: number;
-  provider: 'native' | 'google-cloud';
+  provider: 'native' | 'google-cloud' | 'azure';
 }
 
 export interface TTSCacheQuery {
@@ -33,7 +33,7 @@ export interface TTSCacheQuery {
     voiceName: string;
     speakingRate: number;
     pitch: number;
-    provider: 'native' | 'google-cloud';
+    provider: 'native' | 'google-cloud' | 'azure';
   };
 }
 

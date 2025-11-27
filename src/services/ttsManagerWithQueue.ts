@@ -266,7 +266,7 @@ class TTSManagerWithQueue {
   /**
    * Set provider
    */
-  async setProvider(providerType: 'native' | 'google-cloud'): Promise<boolean> {
+  async setProvider(providerType: 'native' | 'google-cloud' | 'azure'): Promise<boolean> {
     return baseTTSManager.setProvider(providerType)
   }
   
