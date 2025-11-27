@@ -375,9 +375,20 @@ class AzureTTSService {
         console.log(`✅ Azure TTS Request SUCCEEDED! (attempt ${attempt})`);
         
         // Read the response body with error handling
+        // Try multiple methods to work around HTTP/2 protocol errors
         let audioData: ArrayBuffer;
         try {
-          audioData = await response.arrayBuffer();
+          // Method 1: Try reading as blob first (sometimes handles HTTP/2 better)
+          try {
+            const blob = await response.blob();
+            audioData = await blob.arrayBuffer();
+            console.log(`Successfully read response as blob (${audioData.byteLength} bytes)`);
+          } catch (blobError) {
+            console.warn(`Blob read failed, trying direct arrayBuffer():`, blobError);
+            // Method 2: Fallback to direct arrayBuffer
+            audioData = await response.arrayBuffer();
+            console.log(`Successfully read response as arrayBuffer (${audioData.byteLength} bytes)`);
+          }
         } catch (bodyError) {
           console.error(`Failed to read response body (attempt ${attempt}):`, bodyError);
           
