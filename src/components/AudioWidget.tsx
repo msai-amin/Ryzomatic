@@ -954,6 +954,12 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         const text = getTextForPlaybackMode(playbackMode)
         
         if (text.trim()) {
+          // Check if TTS provider is configured before starting playback
+          // CRITICAL: Declare currentProvider BEFORE using it to avoid initialization error
+          const currentProvider = ttsManager.getCurrentProvider()
+          const allProviders = ttsManager.getProviders()
+          const configuredProviders = ttsManager.getConfiguredProviders()
+          
           // Check cache first if available
           let cachedAudio: ArrayBuffer | null = null
           
@@ -989,11 +995,6 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               // For now, just proceed with generation
             }
           }
-          
-          // Check if TTS provider is configured before starting playback
-          const currentProvider = ttsManager.getCurrentProvider()
-          const allProviders = ttsManager.getProviders()
-          const configuredProviders = ttsManager.getConfiguredProviders()
           
           console.log('AudioWidget: TTS Provider Status', {
             currentProvider: currentProvider ? {
