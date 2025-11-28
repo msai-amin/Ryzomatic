@@ -1245,11 +1245,15 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               const words = safeText.slice(0, charIndex + 1).split(/\s+/)
               const wordIndexInText = words.length - 1
               
+              // CRITICAL FIX: Use playbackMode from state, with fallback to 'page' if undefined
+              // The closure might not capture playbackMode correctly, so we get it from the store/state
+              const currentPlaybackMode = playbackMode || 'page'
+              
               // Calculate global word index that matches PDF segment.wordIndex
               const currentPageText = getCurrentPageText()
               const globalWordIndex = calculateGlobalWordIndex(
                 wordIndexInText,
-                playbackMode,
+                currentPlaybackMode,
                 pdfViewer.currentPage || 1,
                 tts.currentParagraphIndex,
                 currentPageText
@@ -1259,7 +1263,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                 word,
                 wordIndexInText,
                 globalWordIndex,
-                playbackMode,
+                playbackMode: currentPlaybackMode,
                 currentParagraphIndex: tts.currentParagraphIndex,
                 currentPage: pdfViewer.currentPage
               })

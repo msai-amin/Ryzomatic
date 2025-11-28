@@ -201,6 +201,93 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     }
   }, [safeAnnotationColorsLength, currentHighlightColor, currentHighlightColorHex]) // Use length (number) instead of array - safeAnnotationColors accessed from closure
 
+  // Highlight words in PDF viewer's text layer (when not in reading mode)
+  useEffect(() => {
+    // Only highlight in PDF viewer mode, not reading mode (reading mode has its own highlighting)
+    if (normalizedReadingMode) {
+      return
+    }
+
+    // Use global document object (not the component's document prop)
+    // TypeScript workaround: window.document is typed as Document, but we need the DOM Document type
+    const globalDoc = typeof window !== 'undefined' && window.document ? (window.document as any as Document) : null
+    if (!globalDoc) {
+      return
+    }
+
+    // Only highlight if word tracking is enabled and we have a current word index
+    if (!tts.highlightCurrentWord || tts.currentWordIndex === null || tts.currentWordIndex === undefined) {
+      // Remove all highlights
+      const textLayers = (globalDoc as any).querySelectorAll('.rpv-core__text-layer')
+      textLayers.forEach((layer: Element) => {
+        const spans = layer.querySelectorAll('span[data-tts-highlight]')
+        spans.forEach(span => {
+          const spanEl = span as HTMLElement
+          spanEl.removeAttribute('data-tts-highlight')
+          spanEl.style.backgroundColor = ''
+          spanEl.style.borderRadius = ''
+          spanEl.style.padding = ''
+        })
+      })
+      return
+    }
+
+    // Find text layer for current page
+    const currentPage = normalizedCurrentPage
+    const pageContainer = (globalDoc as any).querySelector(`[data-page-number="${currentPage}"]`)
+    if (!pageContainer) {
+      return
+    }
+
+    const textLayer = pageContainer.querySelector('.rpv-core__text-layer')
+    if (!textLayer) {
+      return
+    }
+
+    // Get all text spans on this page
+    const spans = Array.from(textLayer.querySelectorAll('span.rpv-core__text-layer-text'))
+    
+    // Count words across all spans to find the matching one
+    let wordCount = 0
+    let targetSpan: HTMLElement | null = null
+    
+    for (const span of spans) {
+      const text = (span as HTMLElement).textContent || ''
+      const words = text.trim().split(/\s+/).filter(w => w.length > 0)
+      
+      // Check if the target word index falls within this span's words
+      if (tts.currentWordIndex !== null && 
+          tts.currentWordIndex >= wordCount && 
+          tts.currentWordIndex < wordCount + words.length) {
+        targetSpan = span as HTMLElement
+        break
+      }
+      
+      wordCount += words.length
+    }
+
+    // Remove previous highlights
+    spans.forEach(span => {
+      const spanEl = span as HTMLElement
+      spanEl.removeAttribute('data-tts-highlight')
+      spanEl.style.backgroundColor = ''
+      spanEl.style.borderRadius = ''
+      spanEl.style.padding = ''
+    })
+
+    // Add highlight to target span
+    if (targetSpan) {
+      targetSpan.setAttribute('data-tts-highlight', 'true')
+      targetSpan.style.backgroundColor = 'rgba(255, 235, 59, 0.4)' // Yellow highlight
+      targetSpan.style.borderRadius = '2px'
+      targetSpan.style.padding = '1px 2px'
+      targetSpan.style.transition = 'background-color 0.2s ease'
+      
+      // Scroll into view if needed
+      targetSpan.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+    }
+  }, [tts.currentWordIndex, tts.highlightCurrentWord, normalizedCurrentPage, normalizedReadingMode])
+
   // Log component mount
   console.log('🔍 PDFViewerV2: Component rendering', {
     hasDocument: !!document,
