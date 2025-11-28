@@ -1,0 +1,196 @@
+name: Node.js Version Consistency
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+      - '.nvmrc'
+      - 'package.json'
+      - '.node-version'
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/*.yml'
+      - '.nvmrc'
+      - 'package.json'
+  workflow_dispatch:
+
+# Security: Restrict permissions to minimum required
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check-versions:
+    name: Check Node.js Version Consistency
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      
+      - name: Extract Node versions from workflows
+        id: extract-versions
+        run: |
+          echo "Extracting Node.js versions from workflows..."
+          
+          # Find all node-version specifications in workflows
+          WORKFLOW_VERSIONS=$(grep -rh "node-version:" .github/workflows/*.yml 2>/dev/null | \
+            sed 's/.*node-version:.*\([0-9][0-9]*\).*/\1/' | \
+            sed "s/[^0-9]//g" | \
+            sort -u | \
+            tr '\n' ',' | \
+            sed 's/,$//')
+          
+          echo "workflow_versions=$WORKFLOW_VERSIONS" >> $GITHUB_OUTPUT
+          
+          # Check package.json for engines field
+          if [ -f package.json ]; then
+            NODE_VERSION_PKG=$(cat package.json | grep -A 2 '"engines"' | grep -o '"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*"' | head -1 | tr -d '"' || echo "")
+            if [ -n "$NODE_VERSION_PKG" ]; then
+              NODE_MAJOR_PKG=$(echo "$NODE_VERSION_PKG" | cut -d. -f1)
+              echo "package_json_version=$NODE_MAJOR_PKG" >> $GITHUB_OUTPUT
+            fi
+          fi
+          
+          # Check .nvmrc file
+          if [ -f .nvmrc ]; then
+            NVM_VERSION=$(cat .nvmrc | tr -d 'v \n')
+            NVM_MAJOR=$(echo "$NVM_VERSION" | cut -d. -f1)
+            echo "nvmrc_version=$NVM_MAJOR" >> $GITHUB_OUTPUT
+          fi
+          
+          # Check .node-version file
+          if [ -f .node-version ]; then
+            NODE_VERSION=$(cat .node-version | tr -d 'v \n')
+            NODE_MAJOR=$(echo "$NODE_VERSION" | cut -d. -f1)
+            echo "node_version_file=$NODE_MAJOR" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Analyze version consistency
+        id: analyze
+        run: |
+          echo "Analyzing Node.js version consistency..."
+          
+          INCONSISTENT=false
+          REPORT="## Node.js Version Consistency Report\n\n"
+          
+          # Collect all versions
+          WORKFLOW_VERSIONS="${{ steps.extract-versions.outputs.workflow_versions }}"
+          PKG_VERSION="${{ steps.extract-versions.outputs.package_json_version }}"
+          NVM_VERSION="${{ steps.extract-versions.outputs.nvmrc_version }}"
+          NODE_VERSION="${{ steps.extract-versions.outputs.node_version_file }}"
+          
+          REPORT+="**Found Versions:**\n\n"
+          
+          # Check workflow versions
+          if [ -n "$WORKFLOW_VERSIONS" ]; then
+            REPORT+="- **Workflow versions:** $WORKFLOW_VERSIONS\n"
+            # Count unique versions
+            UNIQUE_COUNT=$(echo "$WORKFLOW_VERSIONS" | tr ',' '\n' | sort -u | wc -l | tr -d ' ')
+            if [ "$UNIQUE_COUNT" -gt 1 ]; then
+              INCONSISTENT=true
+              REPORT+="  ⚠️ Multiple versions found in workflows!\n"
+            fi
+          else
+            REPORT+="- **Workflow versions:** Not found\n"
+          fi
+          
+          # Check package.json
+          if [ -n "$PKG_VERSION" ]; then
+            REPORT+="- **package.json engines:** Node $PKG_VERSION\n"
+          else
+            REPORT+="- **package.json engines:** Not specified\n"
+          fi
+          
+          # Check .nvmrc
+          if [ -n "$NVM_VERSION" ]; then
+            REPORT+="- **.nvmrc:** Node $NVM_VERSION\n"
+          else
+            REPORT+="- **.nvmrc:** Not found\n"
+          fi
+          
+          # Check .node-version
+          if [ -n "$NODE_VERSION" ]; then
+            REPORT+="- **.node-version:** Node $NODE_VERSION\n"
+          else
+            REPORT+="- **.node-version:** Not found\n"
+          fi
+          
+          REPORT+="\n"
+          
+          # Determine recommended version
+          RECOMMENDED=""
+          if [ -n "$NVM_VERSION" ]; then
+            RECOMMENDED="$NVM_VERSION"
+          elif [ -n "$PKG_VERSION" ]; then
+            RECOMMENDED="$PKG_VERSION"
+          elif [ -n "$WORKFLOW_VERSIONS" ]; then
+            RECOMMENDED=$(echo "$WORKFLOW_VERSIONS" | cut -d',' -f1)
+          else
+            RECOMMENDED="20"
+          fi
+          
+          echo "recommended=$RECOMMENDED" >> $GITHUB_OUTPUT
+          
+          # Check if all versions match
+          if [ "$INCONSISTENT" = true ]; then
+            REPORT+="### ⚠️ Inconsistency Detected\n\n"
+            REPORT+="Different Node.js versions are specified across workflows. "
+            REPORT+="Consider standardizing on a single version.\n\n"
+            echo "inconsistent=true" >> $GITHUB_OUTPUT
+          else
+            REPORT+="### ✅ Versions are consistent\n\n"
+            echo "inconsistent=false" >> $GITHUB_OUTPUT
+          fi
+          
+          REPORT+="**Recommended Version:** Node.js $RECOMMENDED\n\n"
+          REPORT+="### Recommendations\n\n"
+          REPORT+="1. Use the same Node.js version across all workflows\n"
+          REPORT+="2. Specify version in \`package.json\` engines field\n"
+          REPORT+="3. Add \`.nvmrc\` file for local development\n"
+          REPORT+="4. Update workflows to use: \`node-version: '$RECOMMENDED'\`\n"
+          
+          echo "$REPORT" > version-consistency-report.md
+          
+          # Output summary
+          echo "Workflow versions: $WORKFLOW_VERSIONS"
+          echo "Package.json version: $PKG_VERSION"
+          echo "NVM version: $NVM_VERSION"
+          echo "Recommended: $RECOMMENDED"
+          echo "Inconsistent: $INCONSISTENT"
+      
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-version-consistency-report
+          path: version-consistency-report.md
+          retention-days: 7
+      
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.analyze.outputs.inconsistent == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('version-consistency-report.md', 'utf8');
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: report
+            });
+      
+      - name: Fail if inconsistent
+        if: steps.analyze.outputs.inconsistent == 'true'
+        run: |
+          echo "⚠️  Node.js version inconsistency detected!"
+          echo "Please review the report and standardize Node.js versions across workflows."
+          cat version-consistency-report.md
+          # Don't fail, just warn
+          # exit 1

@@ -1,0 +1,152 @@
+name: Circular Dependency Check
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**/*.ts'
+      - 'src/**/*.tsx'
+      - 'lib/**/*.ts'
+      - 'api/**/*.ts'
+  workflow_dispatch:
+
+# Security: Restrict permissions to minimum required
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check-circular:
+    name: Check Circular Dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci --no-audit
+      
+      - name: Install madge
+        run: npm install -g madge
+      
+      - name: Check for circular dependencies
+        id: circular-check
+        continue-on-error: true
+        run: |
+          echo "Checking for circular dependencies..."
+          
+          # Check TypeScript/TSX files
+          CIRCULAR_FOUND=false
+          
+          # Check src directory
+          if [ -d "src" ]; then
+            echo "Checking src/ directory..."
+            madge --circular --extensions ts,tsx src/ > circular-deps.txt 2>&1 || {
+              CIRCULAR_FOUND=true
+            }
+          fi
+          
+          # Check lib directory if it exists
+          if [ -d "lib" ]; then
+            echo "Checking lib/ directory..."
+            madge --circular --extensions ts,tsx lib/ >> circular-deps.txt 2>&1 || {
+              CIRCULAR_FOUND=true
+            }
+          fi
+          
+          # Check api directory if it exists
+          if [ -d "api" ]; then
+            echo "Checking api/ directory..."
+            madge --circular --extensions ts,tsx api/ >> circular-deps.txt 2>&1 || {
+              CIRCULAR_FOUND=true
+            }
+          fi
+          
+          if [ "$CIRCULAR_FOUND" = true ]; then
+            echo "circular_found=true" >> $GITHUB_OUTPUT
+            echo "❌ Circular dependencies detected!"
+            echo ""
+            echo "Circular dependency chains:"
+            cat circular-deps.txt
+            exit 1
+          else
+            echo "circular_found=false" >> $GITHUB_OUTPUT
+            echo "✅ No circular dependencies found"
+          fi
+      
+      - name: Generate dependency graph
+        if: always()
+        run: |
+          echo "Generating dependency graph..."
+          
+          GRAPH_OUTPUT=""
+          
+          if [ -d "src" ]; then
+            madge --image graph.svg --extensions ts,tsx src/ 2>&1 || true
+            madge --json --extensions ts,tsx src/ > dependency-graph.json 2>&1 || true
+          fi
+          
+          # Generate text representation
+          if [ -d "src" ]; then
+            madge --extensions ts,tsx src/ > dependency-tree.txt 2>&1 || true
+          fi
+      
+      - name: Upload dependency graph artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-graph-${{ github.sha }}
+          path: |
+            dependency-graph.json
+            dependency-tree.txt
+            graph.svg
+            circular-deps.txt
+          retention-days: 30
+          if-no-files-found: ignore
+      
+      - name: Comment on PR if circular dependencies found
+        if: github.event_name == 'pull_request' && steps.circular-check.outputs.circular_found == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            let message = '## ⚠️ Circular Dependencies Detected\n\n';
+            message += 'Circular dependencies have been found in the codebase. ';
+            message += 'This can lead to issues with module loading and should be refactored.\n\n';
+            
+            if (fs.existsSync('circular-deps.txt')) {
+              const circularDeps = fs.readFileSync('circular-deps.txt', 'utf8');
+              message += '### Detected Circular Dependency Chains\n\n';
+              message += '```\n' + circularDeps + '\n```\n\n';
+            }
+            
+            message += '### Recommendations\n\n';
+            message += '1. Review the circular dependency chains above\n';
+            message += '2. Refactor to break the circular dependency\n';
+            message += '3. Consider extracting shared code to a separate module\n';
+            message += '4. Use dependency injection or factory patterns where appropriate\n';
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: message
+            });
+      
+      - name: Fail if circular dependencies found
+        if: steps.circular-check.outputs.circular_found == 'true'
+        run: |
+          echo "❌ Circular dependency check failed!"
+          echo "Please review and fix circular dependencies before merging."
+          exit 1

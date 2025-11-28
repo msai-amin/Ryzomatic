@@ -1,0 +1,278 @@
+name: Migration Dependency Validation
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/*.sql'
+  push:
+    branches: [ main ]
+    paths:
+      - 'supabase/migrations/*.sql'
+
+# Security: Restrict permissions to minimum required
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check-migrations:
+    name: Validate Migration Files
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0  # Need full history for diff checks
+      
+      - name: Validate migration file naming
+        id: naming
+        run: |
+          echo "Validating migration file naming convention..."
+          
+          INVALID_FILES=""
+          
+          # Check all SQL files in migrations directory
+          if [ -d "supabase/migrations" ]; then
+            for file in supabase/migrations/*.sql; do
+              if [ -f "$file" ]; then
+                filename=$(basename "$file")
+                
+                # Check naming convention: XXX_name.sql (3 digits, underscore, name)
+                if ! [[ "$filename" =~ ^[0-9]{3}_.+\.sql$ ]]; then
+                  INVALID_FILES="${INVALID_FILES}${filename}\n"
+                fi
+                
+                # Check for duplicate numbers
+                MIGRATION_NUM=$(echo "$filename" | cut -d'_' -f1)
+                
+                # Extract just the number part
+                if ! [[ "$MIGRATION_NUM" =~ ^[0-9]{3}$ ]]; then
+                  continue
+                fi
+              fi
+            done
+          fi
+          
+          if [ -n "$INVALID_FILES" ]; then
+            echo "invalid=true" >> $GITHUB_OUTPUT
+            echo "❌ Invalid migration file names found:"
+            echo -e "$INVALID_FILES"
+            exit 1
+          else
+            echo "invalid=false" >> $GITHUB_OUTPUT
+            echo "✅ All migration files follow naming convention (XXX_name.sql)"
+          fi
+      
+      - name: Check for duplicate migration numbers
+        id: duplicates
+        run: |
+          echo "Checking for duplicate migration numbers..."
+          
+          if [ ! -d "supabase/migrations" ]; then
+            echo "No migrations directory found, skipping check"
+            echo "duplicates=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Extract all migration numbers
+          MIGRATION_NUMS=$(find supabase/migrations -name "*.sql" -type f | \
+            xargs -I {} basename {} | \
+            grep -oE '^[0-9]{3}' | \
+            sort)
+          
+          # Check for duplicates
+          DUPLICATES=$(echo "$MIGRATION_NUMS" | uniq -d)
+          
+          if [ -n "$DUPLICATES" ]; then
+            echo "duplicates=true" >> $GITHUB_OUTPUT
+            echo "duplicate_numbers=$DUPLICATES" >> $GITHUB_OUTPUT
+            echo "❌ Duplicate migration numbers found:"
+            echo "$DUPLICATES"
+            
+            # List files with duplicate numbers
+            for num in $DUPLICATES; do
+              echo "Migration number $num:"
+              find supabase/migrations -name "${num}_*.sql" -type f
+            done
+            
+            exit 1
+          else
+            echo "duplicates=false" >> $GITHUB_OUTPUT
+            echo "✅ No duplicate migration numbers found"
+          fi
+      
+      - name: Validate SQL syntax (basic)
+        id: sql-syntax
+        continue-on-error: true
+        run: |
+          echo "Performing basic SQL syntax validation..."
+          
+          WARNINGS=""
+          ERRORS=""
+          
+          if [ ! -d "supabase/migrations" ]; then
+            echo "No migrations directory found, skipping SQL validation"
+            exit 0
+          fi
+          
+          for file in supabase/migrations/*.sql; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              
+              # Check for common dangerous patterns
+              if grep -qi "DROP TABLE.*CASCADE" "$file"; then
+                WARNINGS="${WARNINGS}⚠️  $filename: CASCADE drops detected\n"
+              fi
+              
+              if grep -qi "DROP DATABASE" "$file"; then
+                ERRORS="${ERRORS}❌ $filename: DROP DATABASE detected (dangerous!)\n"
+              fi
+              
+              if grep -qi "TRUNCATE TABLE" "$file"; then
+                WARNINGS="${WARNINGS}⚠️  $filename: TRUNCATE TABLE detected\n"
+              fi
+              
+              # Check for missing IF EXISTS on DROP statements
+              if grep -qi "^DROP" "$file" && ! grep -qi "IF EXISTS" "$file"; then
+                WARNINGS="${WARNINGS}⚠️  $filename: DROP statements without IF EXISTS\n"
+              fi
+              
+              # Check for transactions
+              if ! grep -qi "BEGIN\|COMMIT\|ROLLBACK" "$file"; then
+                WARNINGS="${WARNINGS}⚠️  $filename: No explicit transaction management\n"
+              fi
+            fi
+          done
+          
+          if [ -n "$WARNINGS" ]; then
+            echo "Warnings found:"
+            echo -e "$WARNINGS"
+          fi
+          
+          if [ -n "$ERRORS" ]; then
+            echo "Errors found:"
+            echo -e "$ERRORS"
+            echo "errors=true" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "errors=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Check migration sequence
+        id: sequence
+        run: |
+          echo "Checking migration sequence..."
+          
+          if [ ! -d "supabase/migrations" ]; then
+            echo "No migrations directory found, skipping sequence check"
+            exit 0
+          fi
+          
+          # Get all migration numbers, sorted
+          MIGRATION_NUMS=$(find supabase/migrations -name "*.sql" -type f | \
+            xargs -I {} basename {} | \
+            grep -oE '^[0-9]{3}' | \
+            sort -n)
+          
+          # Check for gaps in sequence
+          PREV_NUM=0
+          GAPS=""
+          
+          for num in $MIGRATION_NUMS; do
+            # Remove leading zeros for comparison
+            NUM_INT=$((10#$num))
+            PREV_INT=$((10#$PREV_NUM))
+            
+            if [ $NUM_INT -gt $((PREV_INT + 1)) ] && [ $PREV_INT -gt 0 ]; then
+              GAPS="${GAPS}Gap between $PREV_NUM and $num\n"
+            fi
+            
+            PREV_NUM=$num
+          done
+          
+          if [ -n "$GAPS" ]; then
+            echo "⚠️  Gaps in migration sequence detected:"
+            echo -e "$GAPS"
+            echo "This is usually fine, but may indicate skipped migrations."
+          else
+            echo "✅ Migration sequence looks good"
+          fi
+      
+      - name: Generate migration report
+        if: always()
+        run: |
+          echo "# 🔍 Migration Dependency Validation Report" > migration-report.md
+          echo "" >> migration-report.md
+          echo "**Generated:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> migration-report.md
+          echo "" >> migration-report.md
+          
+          echo "## Validation Results" >> migration-report.md
+          echo "" >> migration-report.md
+          
+          # Count migrations
+          if [ -d "supabase/migrations" ]; then
+            MIGRATION_COUNT=$(find supabase/migrations -name "*.sql" -type f | wc -l | tr -d ' ')
+            echo "- **Total Migrations:** $MIGRATION_COUNT" >> migration-report.md
+          fi
+          
+          echo "" >> migration-report.md
+          echo "### Checks Performed" >> migration-report.md
+          echo "" >> migration-report.md
+          echo "- ✅ File naming convention check" >> migration-report.md
+          echo "- ✅ Duplicate migration number check" >> migration-report.md
+          echo "- ✅ Basic SQL syntax validation" >> migration-report.md
+          echo "- ✅ Migration sequence check" >> migration-report.md
+          echo "" >> migration-report.md
+          
+          if [ "${{ steps.naming.outputs.invalid }}" = "true" ]; then
+            echo "### ❌ Issues Found" >> migration-report.md
+            echo "" >> migration-report.md
+            echo "Some migration files do not follow the naming convention." >> migration-report.md
+          elif [ "${{ steps.duplicates.outputs.duplicates }}" = "true" ]; then
+            echo "### ❌ Issues Found" >> migration-report.md
+            echo "" >> migration-report.md
+            echo "Duplicate migration numbers detected: ${{ steps.duplicates.outputs.duplicate_numbers }}" >> migration-report.md
+          elif [ "${{ steps.sql-syntax.outputs.errors }}" = "true" ]; then
+            echo "### ❌ Issues Found" >> migration-report.md
+            echo "" >> migration-report.md
+            echo "SQL syntax validation found errors." >> migration-report.md
+          else
+            echo "### ✅ All Checks Passed" >> migration-report.md
+            echo "" >> migration-report.md
+            echo "All migration files passed validation." >> migration-report.md
+          fi
+          
+          echo "" >> migration-report.md
+          echo "## Recommendations" >> migration-report.md
+          echo "" >> migration-report.md
+          echo "1. Follow naming convention: \`XXX_name.sql\` (3 digits, underscore, descriptive name)" >> migration-report.md
+          echo "2. Ensure migration numbers are sequential" >> migration-report.md
+          echo "3. Use transactions (\`BEGIN\`/\`COMMIT\`) in migrations" >> migration-report.md
+          echo "4. Use \`IF EXISTS\` with \`DROP\` statements" >> migration-report.md
+          echo "5. Test migrations in staging before production" >> migration-report.md
+      
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && (steps.naming.outputs.invalid == 'true' || steps.duplicates.outputs.duplicates == 'true' || steps.sql-syntax.outputs.errors == 'true')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('migration-report.md', 'utf8');
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: report
+            });
+      
+      - name: Upload migration report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-validation-report-${{ github.sha }}
+          path: migration-report.md
+          retention-days: 30

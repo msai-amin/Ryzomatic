@@ -1,0 +1,152 @@
+name: Deprecated Dependencies Check
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+  schedule:
+    - cron: '0 9 * * 1' # Monday 9 AM UTC
+  workflow_dispatch:
+
+# Security: Restrict permissions to minimum required
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check-deprecated:
+    name: Check Deprecated Dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci --no-audit
+      
+      - name: Check for deprecated packages
+        id: deprecated
+        run: |
+          echo "Checking for deprecated packages..."
+          
+          # Run npm ls and capture deprecated warnings
+          npm ls --depth=0 --json > dependency-tree.json 2>&1 || true
+          
+          # Check for deprecated packages
+          DEPRECATED_COUNT=0
+          DEPRECATED_PACKAGES=""
+          
+          # Parse npm ls output for deprecated packages
+          npm ls --depth=0 2>&1 | grep -i "deprecated" > deprecated-list.txt || true
+          
+          if [ -s deprecated-list.txt ]; then
+            DEPRECATED_COUNT=$(wc -l < deprecated-list.txt | tr -d ' ')
+            echo "⚠️  Found $DEPRECATED_COUNT potentially deprecated package(s)"
+            
+            # Extract package names
+            while IFS= read -r line; do
+              PACKAGE=$(echo "$line" | grep -oE '@?[a-zA-Z0-9][a-zA-Z0-9._-]*@[0-9.]+' | head -1 || echo "")
+              if [ -n "$PACKAGE" ]; then
+                DEPRECATED_PACKAGES="${DEPRECATED_PACKAGES}${PACKAGE}\n"
+              fi
+            done < deprecated-list.txt
+          fi
+          
+          # Also check using npm view for direct dependencies
+          echo "Checking direct dependencies for deprecation status..."
+          cat package.json | grep -E '^\s*"[^"]+":\s*"' | sed 's/.*"\([^"]*\)".*/\1/' | while read -r pkg; do
+            # Extract package name (handle scoped packages)
+            PKG_NAME=$(echo "$pkg" | sed 's/@[^@]*$//')
+            
+            # Check if deprecated
+            DEPRECATED=$(npm view "$PKG_NAME" deprecated 2>/dev/null || echo "")
+            if [ -n "$DEPRECATED" ] && [ "$DEPRECATED" != "null" ]; then
+              echo "DEPRECATED: $PKG_NAME - $DEPRECATED" >> deprecated-direct.txt
+              DEPRECATED_COUNT=$((DEPRECATED_COUNT + 1))
+            fi
+          done || true
+          
+          echo "count=$DEPRECATED_COUNT" >> $GITHUB_OUTPUT
+          
+          if [ $DEPRECATED_COUNT -gt 0 ]; then
+            echo "deprecated=true" >> $GITHUB_OUTPUT
+          else
+            echo "deprecated=false" >> $GITHUB_OUTPUT
+            echo "✅ No deprecated packages found"
+          fi
+      
+      - name: Generate deprecated packages report
+        if: steps.deprecated.outputs.deprecated == 'true'
+        run: |
+          echo "# ⚠️ Deprecated Dependencies Report" > deprecated-report.md
+          echo "" >> deprecated-report.md
+          echo "**Generated:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> deprecated-report.md
+          echo "**Found:** ${{ steps.deprecated.outputs.count }} deprecated package(s)" >> deprecated-report.md
+          echo "" >> deprecated-report.md
+          
+          if [ -f deprecated-list.txt ] && [ -s deprecated-list.txt ]; then
+            echo "## Deprecated Packages Detected" >> deprecated-report.md
+            echo "" >> deprecated-report.md
+            echo "\`\`\`" >> deprecated-report.md
+            cat deprecated-list.txt >> deprecated-report.md
+            echo "\`\`\`" >> deprecated-report.md
+          fi
+          
+          if [ -f deprecated-direct.txt ] && [ -s deprecated-direct.txt ]; then
+            echo "" >> deprecated-report.md
+            echo "## Direct Dependencies Deprecation Status" >> deprecated-report.md
+            echo "" >> deprecated-report.md
+            echo "\`\`\`" >> deprecated-report.md
+            cat deprecated-direct.txt >> deprecated-report.md
+            echo "\`\`\`" >> deprecated-report.md
+          fi
+          
+          echo "" >> deprecated-report.md
+          echo "## Recommendations" >> deprecated-report.md
+          echo "" >> deprecated-report.md
+          echo "1. Review deprecated packages and their deprecation notices" >> deprecated-report.md
+          echo "2. Find alternative packages if available" >> deprecated-report.md
+          echo "3. Plan migration timeline if the package is critical" >> deprecated-report.md
+          echo "4. Update or replace deprecated packages in a timely manner" >> deprecated-report.md
+      
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.deprecated.outputs.deprecated == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('deprecated-report.md')) {
+              const report = fs.readFileSync('deprecated-report.md', 'utf8');
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: report
+              });
+            }
+      
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deprecated-dependencies-report-${{ github.sha }}
+          path: |
+            deprecated-list.txt
+            deprecated-direct.txt
+            dependency-tree.json
+            deprecated-report.md
+          retention-days: 30
+          if-no-files-found: ignore

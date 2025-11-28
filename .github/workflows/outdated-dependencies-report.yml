@@ -1,0 +1,147 @@
+name: Outdated Dependencies Report
+
+on:
+  schedule:
+    - cron: '0 8 * * 1' # Monday 8 AM UTC
+  workflow_dispatch:
+
+# Security: Restrict permissions to minimum required
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  outdated-report:
+    name: Outdated Dependencies Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci --no-audit
+      
+      - name: Check outdated dependencies
+        id: outdated
+        run: |
+          echo "Checking for outdated dependencies..."
+          
+          # Run npm outdated and capture output
+          npm outdated --json > outdated.json 2>&1 || {
+            EXIT_CODE=$?
+            if [ $EXIT_CODE -eq 1 ]; then
+              # Exit code 1 means outdated packages found (this is expected)
+              echo "Outdated packages detected (this is expected)"
+            else
+              echo "Error checking outdated packages"
+              exit $EXIT_CODE
+            fi
+          }
+          
+          # Generate human-readable report
+          npm outdated --long > outdated-long.txt 2>&1 || true
+          
+          # Count outdated packages
+          if [ -f outdated.json ] && [ -s outdated.json ]; then
+            COUNT=$(cat outdated.json | grep -o '"[^"]*":\s*{' | wc -l || echo "0")
+            echo "count=$COUNT" >> $GITHUB_OUTPUT
+          else
+            echo "count=0" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Generate report
+        run: |
+          echo "# 📦 Outdated Dependencies Report" > report.md
+          echo "" >> report.md
+          echo "**Generated:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> report.md
+          echo "**Repository:** ${{ github.repository }}" >> report.md
+          echo "" >> report.md
+          
+          if [ -s outdated.json ] && [ "$(cat outdated.json | grep -o '"[^"]*":\s*{' | wc -l)" != "0" ]; then
+            echo "## Summary" >> report.md
+            echo "" >> report.md
+            echo "Found **${{ steps.outdated.count }}** outdated package(s) that can be updated." >> report.md
+            echo "" >> report.md
+            echo "### Detailed Report" >> report.md
+            echo "" >> report.md
+            echo "\`\`\`" >> report.md
+            cat outdated-long.txt >> report.md || echo "Unable to generate detailed report" >> report.md
+            echo "\`\`\`" >> report.md
+            echo "" >> report.md
+            echo "## Next Steps" >> report.md
+            echo "" >> report.md
+            echo "1. Review the outdated packages above" >> report.md
+            echo "2. Check for breaking changes in major version updates" >> report.md
+            echo "3. Test updates in a separate branch before merging" >> report.md
+            echo "4. Consider running \`npm update\` or updating specific packages" >> report.md
+            echo "5. Dependabot will automatically create PRs for some updates" >> report.md
+          else
+            echo "## ✅ All Dependencies Up to Date!" >> report.md
+            echo "" >> report.md
+            echo "No outdated packages found. All dependencies are at their latest compatible versions." >> report.md
+          fi
+      
+      - name: Create or update issue
+        if: github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('report.md', 'utf8');
+            
+            // Find existing issue
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'dependencies,automated-report',
+              sort: 'updated',
+              direction: 'desc'
+            });
+            
+            const existingIssue = issues.find(issue => 
+              issue.title.includes('Outdated Dependencies Report') &&
+              issue.user.type === 'Bot'
+            );
+            
+            const body = report + '\n\n---\n\n*This is an automated report generated weekly. It will be updated on the next run.*';
+            
+            if (existingIssue) {
+              // Update existing issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: report + '\n\n---\n\n*Report updated: ' + new Date().toISOString() + '*'
+              });
+            } else {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '📦 Outdated Dependencies Report - ' + new Date().toISOString().split('T')[0],
+                body: body,
+                labels: ['dependencies', 'automated-report']
+              });
+            }
+      
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: outdated-dependencies-report-${{ github.sha }}
+          path: |
+            report.md
+            outdated.json
+            outdated-long.txt
+          retention-days: 30

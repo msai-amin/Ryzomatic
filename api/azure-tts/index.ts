@@ -22,7 +22,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      const endpoint = `https://${azureRegion}.tts.speech.microsoft.com/cognitiveservices/v1/voices/list`;
+      // Azure TTS voices endpoint - Note: endpoint may vary based on Azure resource setup
+      // Standard format: https://<region>.tts.speech.microsoft.com/cognitiveservices/voices/list
+      const endpoint = `https://${azureRegion}.tts.speech.microsoft.com/cognitiveservices/voices/list`;
       
       console.log('Azure TTS Proxy: Fetching voices list', {
         endpoint,
@@ -41,11 +43,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.error('Azure TTS Proxy: Failed to fetch voices', {
           status: response.status,
           statusText: response.statusText,
-          error: errorText.substring(0, 200)
+          endpoint: endpoint,
+          region: azureRegion,
+          subscriptionKeyPresent: !!subscriptionKey,
+          error: errorText.substring(0, 500)
         });
+        
+        // Provide helpful error messages
+        let errorMessage = `Failed to fetch voices: ${response.statusText}`;
+        if (response.status === 404) {
+          errorMessage = `Azure TTS endpoint not found (404). Please verify:
+1. Your Azure Speech Services resource is in the '${azureRegion}' region
+2. Your subscription key is valid and has TTS access
+3. The endpoint format matches your Azure resource type`;
+        } else if (response.status === 401 || response.status === 403) {
+          errorMessage = `Azure TTS authentication failed (${response.status}). Please verify your subscription key is correct.`;
+        }
+        
         return res.status(response.status).json({ 
-          error: `Failed to fetch voices: ${response.statusText}`,
-          details: errorText
+          error: errorMessage,
+          details: errorText,
+          endpoint: endpoint,
+          region: azureRegion
         });
       }
 

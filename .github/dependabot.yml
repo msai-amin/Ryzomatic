@@ -15,5 +15,18 @@ updates:
     labels:
       - dependencies
       - automated
-
+    # Group dependency updates for better PR management
+    # Patch and minor updates are grouped together
+    # Major updates will still be created as individual PRs for review
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+        update-types:
+          - "patch"
+          - "minor"
+      development-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "patch"
+          - "minor"
 

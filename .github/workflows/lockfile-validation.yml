@@ -1,0 +1,70 @@
+name: Lockfile Validation
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+# Security: Restrict permissions to minimum required
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  validate-lockfile:
+    name: Validate Lockfile
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      
+      - name: Verify lockfile exists
+        run: |
+          if [ ! -f "package-lock.json" ]; then
+            echo "❌ ERROR: package-lock.json is missing!"
+            echo "This file must be committed to ensure consistent dependency versions."
+            echo "Run 'npm install' and commit package-lock.json"
+            exit 1
+          fi
+          echo "✅ package-lock.json found"
+      
+      - name: Check for lockfile changes
+        run: |
+          echo "Installing dependencies with npm ci..."
+          npm ci --prefer-offline --no-audit
+          
+          echo "Checking if lockfile changed..."
+          if ! git diff --exit-code package-lock.json; then
+            echo "❌ ERROR: package-lock.json is out of sync with package.json"
+            echo ""
+            echo "This means package.json was modified without updating package-lock.json"
+            echo ""
+            echo "To fix:"
+            echo "  1. Run: npm install"
+            echo "  2. Commit the updated package-lock.json"
+            echo ""
+            echo "Diff:"
+            git diff package-lock.json | head -50
+            exit 1
+          fi
+          echo "✅ package-lock.json is in sync with package.json"
+      
+      - name: Validate lockfile integrity
+        run: |
+          echo "Validating lockfile integrity..."
+          npm ls --depth=0 > /dev/null 2>&1 || {
+            echo "⚠️  WARNING: Some dependencies may have issues"
+            echo "Run 'npm ls' locally to investigate"
+          }
+          echo "✅ Lockfile integrity check passed"

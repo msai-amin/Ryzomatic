@@ -1,0 +1,145 @@
+name: Dependency Graph
+
+on:
+  schedule:
+    - cron: '0 0 1 * *' # First day of each month at midnight UTC
+  workflow_dispatch:
+
+# Security: Restrict permissions to minimum required
+permissions:
+  contents: read
+
+jobs:
+  generate-graph:
+    name: Generate Dependency Graph
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci --no-audit
+      
+      - name: Generate npm dependency tree
+        run: |
+          echo "Generating npm dependency tree..."
+          npm ls --all --json > npm-dependency-tree.json 2>&1 || true
+          npm ls --all --long > npm-dependency-tree-long.txt 2>&1 || true
+      
+      - name: Generate source code dependency graph
+        run: |
+          echo "Installing madge for source code dependency analysis..."
+          npm install -g madge
+          
+          GRAPH_GENERATED=false
+          
+          # Generate graph for src directory
+          if [ -d "src" ]; then
+            echo "Generating dependency graph for src/..."
+            madge --extensions ts,tsx --json src/ > source-dependency-graph.json 2>&1 || true
+            madge --extensions ts,tsx src/ > source-dependency-tree.txt 2>&1 || true
+            madge --image source-dependency-graph.svg --extensions ts,tsx src/ 2>&1 || true
+            GRAPH_GENERATED=true
+          fi
+          
+          # Generate graph for lib directory if exists
+          if [ -d "lib" ]; then
+            echo "Generating dependency graph for lib/..."
+            madge --extensions ts,tsx --json lib/ > lib-dependency-graph.json 2>&1 || true
+            madge --extensions ts,tsx lib/ > lib-dependency-tree.txt 2>&1 || true
+            madge --image lib-dependency-graph.svg --extensions ts,tsx lib/ 2>&1 || true
+          fi
+          
+          # Generate graph for api directory if exists
+          if [ -d "api" ]; then
+            echo "Generating dependency graph for api/..."
+            madge --extensions ts,tsx --json api/ > api-dependency-graph.json 2>&1 || true
+            madge --extensions ts,tsx api/ > api-dependency-tree.txt 2>&1 || true
+            madge --image api-dependency-graph.svg --extensions ts,tsx api/ 2>&1 || true
+          fi
+          
+          if [ "$GRAPH_GENERATED" = false ]; then
+            echo "⚠️  No source directories found to analyze"
+          fi
+      
+      - name: Generate summary report
+        run: |
+          echo "# 📊 Dependency Graph Report" > dependency-graph-report.md
+          echo "" >> dependency-graph-report.md
+          echo "**Generated:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> dependency-graph-report.md
+          echo "**Repository:** ${{ github.repository }}" >> dependency-graph-report.md
+          echo "" >> dependency-graph-report.md
+          
+          echo "## NPM Dependencies" >> dependency-graph-report.md
+          echo "" >> dependency-graph-report.md
+          
+          # Count dependencies
+          if [ -f npm-dependency-tree.json ]; then
+            TOTAL_DEPS=$(cat npm-dependency-tree.json | grep -o '"name":' | wc -l | tr -d ' ')
+            PROD_DEPS=$(cat package.json | grep -E '^\s*"[^"]+":\s*"' | grep -v devDependencies | wc -l | tr -d ' ')
+            DEV_DEPS=$(cat package.json | grep -A 1000 'devDependencies' | grep -E '^\s*"[^"]+":\s*"' | wc -l | tr -d ' ')
+            
+            echo "- **Total Dependencies:** $TOTAL_DEPS" >> dependency-graph-report.md
+            echo "- **Production Dependencies:** $PROD_DEPS" >> dependency-graph-report.md
+            echo "- **Development Dependencies:** $DEV_DEPS" >> dependency-graph-report.md
+            echo "" >> dependency-graph-report.md
+          fi
+          
+          echo "## Source Code Dependencies" >> dependency-graph-report.md
+          echo "" >> dependency-graph-report.md
+          
+          if [ -f source-dependency-tree.txt ]; then
+            echo "Dependency tree for \`src/\` directory:" >> dependency-graph-report.md
+            echo "" >> dependency-graph-report.md
+            echo "\`\`\`" >> dependency-graph-report.md
+            head -50 source-dependency-tree.txt >> dependency-graph-report.md
+            echo "\`\`\`" >> dependency-graph-report.md
+            echo "" >> dependency-graph-report.md
+            echo "*Full tree available in artifacts*" >> dependency-graph-report.md
+          else
+            echo "No source code dependency analysis available." >> dependency-graph-report.md
+          fi
+          
+          echo "" >> dependency-graph-report.md
+          echo "## Artifacts" >> dependency-graph-report.md
+          echo "" >> dependency-graph-report.md
+          echo "The following artifacts are available for download:" >> dependency-graph-report.md
+          echo "" >> dependency-graph-report.md
+          echo "- \`npm-dependency-tree.json\` - Full npm dependency tree in JSON format" >> dependency-graph-report.md
+          echo "- \`npm-dependency-tree-long.txt\` - Human-readable npm dependency tree" >> dependency-graph-report.md
+          if [ -f source-dependency-graph.svg ]; then
+            echo "- \`source-dependency-graph.svg\` - Visual dependency graph for src/ directory" >> dependency-graph-report.md
+          fi
+          if [ -f source-dependency-graph.json ]; then
+            echo "- \`source-dependency-graph.json\` - Source code dependency graph in JSON format" >> dependency-graph-report.md
+          fi
+      
+      - name: Upload dependency graph artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-graph-${{ github.run_number }}-$(date +%Y%m%d)
+          path: |
+            npm-dependency-tree.json
+            npm-dependency-tree-long.txt
+            source-dependency-graph.json
+            source-dependency-tree.txt
+            source-dependency-graph.svg
+            lib-dependency-graph.json
+            lib-dependency-tree.txt
+            lib-dependency-graph.svg
+            api-dependency-graph.json
+            api-dependency-tree.txt
+            api-dependency-graph.svg
+            dependency-graph-report.md
+          retention-days: 90
+          if-no-files-found: ignore

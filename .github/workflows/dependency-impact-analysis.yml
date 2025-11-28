@@ -1,0 +1,189 @@
+name: Dependency Update Impact Analysis
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+
+# Security: Restrict permissions to minimum required
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  analyze-impact:
+    name: Analyze Dependency Impact
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      
+      - name: Get changed packages
+        id: changes
+        run: |
+          echo "Analyzing dependency changes..."
+          
+          # Extract changed packages from package.json diff
+          git diff base/package.json package.json > package-diff.txt || true
+          
+          # Get added/modified packages
+          ADDED=$(grep -E '^\+.*"[^"]+":\s*"' package-diff.txt | grep -v '"version":' | sed 's/.*"\([^"]*\)".*/\1/' | sort -u | head -20 || echo "")
+          REMOVED=$(grep -E '^-.*"[^"]+":\s*"' package-diff.txt | grep -v '"version":' | sed 's/.*"\([^"]*\)".*/\1/' | sort -u | head -20 || echo "")
+          
+          echo "changed_packages<<EOF" >> $GITHUB_OUTPUT
+          echo "$ADDED" | grep -v "^$" >> $GITHUB_OUTPUT || echo "None" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "removed_packages<<EOF" >> $GITHUB_OUTPUT
+          echo "$REMOVED" | grep -v "^$" >> $GITHUB_OUTPUT || echo "None" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          COUNT=$(echo "$ADDED" | grep -c . || echo "0")
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          
+          echo "Found $COUNT changed package(s)"
+      
+      - name: Install base dependencies
+        working-directory: base
+        run: |
+          npm ci --no-audit || npm install --no-audit
+      
+      - name: Build base version
+        working-directory: base
+        continue-on-error: true
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://mock.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'mock-anon-key' }}
+        run: npm run build 2>&1 | tee base-build.log || echo "BASE_BUILD_FAILED=true" >> $GITHUB_ENV
+      
+      - name: Install updated dependencies
+        run: |
+          npm ci --no-audit || npm install --no-audit
+      
+      - name: Build updated version
+        continue-on-error: true
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://mock.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'mock-anon-key' }}
+        run: npm run build 2>&1 | tee updated-build.log || echo "UPDATED_BUILD_FAILED=true" >> $GITHUB_ENV
+      
+      - name: Run tests
+        continue-on-error: true
+        run: npm run test:ci 2>&1 | tee test-output.log || echo "TESTS_FAILED=true" >> $GITHUB_ENV
+      
+      - name: Check bundle size impact
+        continue-on-error: true
+        run: |
+          npx size-limit --json > bundle-impact.json 2>&1 || echo "[]" > bundle-impact.json
+      
+      - name: Generate impact summary
+        id: summary
+        run: |
+          echo "Generating impact summary..."
+          
+          BUILD_STATUS="✅ Success"
+          if [ "$UPDATED_BUILD_FAILED" = "true" ]; then
+            BUILD_STATUS="❌ Failed"
+          fi
+          
+          TEST_STATUS="✅ Passing"
+          if [ "$TESTS_FAILED" = "true" ]; then
+            TEST_STATUS="⚠️ Some tests failed"
+          fi
+          
+          echo "build_status=$BUILD_STATUS" >> $GITHUB_OUTPUT
+          echo "test_status=$TEST_STATUS" >> $GITHUB_OUTPUT
+      
+      - name: Comment impact summary on PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const fs = require('fs');
+            
+            const changedPackages = `${{ steps.changes.outputs.changed_packages }}`.split('\n').filter(p => p && p !== 'None');
+            const removedPackages = `${{ steps.changes.outputs.removed_packages }}`.split('\n').filter(p => p && p !== 'None');
+            const count = parseInt(`${{ steps.changes.outputs.count }}`) || 0;
+            
+            let bundleInfo = '';
+            try {
+              const bundleData = JSON.parse(fs.readFileSync('bundle-impact.json', 'utf8'));
+              if (Array.isArray(bundleData) && bundleData.length > 0) {
+                bundleInfo = bundleData.map(pkg => {
+                  const status = pkg.passed ? '✅' : '⚠️';
+                  const size = pkg.size ? `${(pkg.size / 1024).toFixed(2)} KB` : 'N/A';
+                  return `- ${status} ${pkg.name}: ${size}`;
+                }).join('\n');
+              } else {
+                bundleInfo = 'Unable to determine bundle size impact';
+              }
+            } catch (e) {
+              bundleInfo = 'Bundle size analysis unavailable';
+            }
+            
+            const body = `## 📊 Dependency Update Impact Analysis
+            
+            **Changed Packages:** ${count}
+            ${changedPackages.length > 0 ? `\n**Added/Updated:**\n${changedPackages.map(p => `- \`${p}\``).join('\n')}` : ''}
+            ${removedPackages.length > 0 ? `\n**Removed:**\n${removedPackages.map(p => `- \`${p}\``).join('\n')}` : ''}
+            
+            ### Build & Test Results
+            
+            - **Build Status:** ${{ steps.summary.outputs.build_status }}
+            - **Test Status:** ${{ steps.summary.outputs.test_status }}
+            
+            ### Bundle Size Impact
+            
+            ${bundleInfo}
+            
+            ---
+            
+            *This analysis was automatically generated. Review the changes carefully before merging.*
+            `;
+            
+            // Find existing comment
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.data.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('Dependency Update Impact Analysis')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }

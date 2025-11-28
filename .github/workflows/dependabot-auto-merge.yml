@@ -1,0 +1,157 @@
+name: Dependabot Auto-Merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  check_suite:
+    types: [completed]
+  status: {}
+
+# Security: Restrict permissions to minimum required
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Auto-Merge Dependabot PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    # Only run for Dependabot PRs
+    if: github.actor == 'dependabot[bot]'
+    
+    steps:
+      - name: Get PR information
+        id: pr-info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            
+            // Check if it's a patch or minor update
+            const title = pr.title.toLowerCase();
+            const isPatchOrMinor = title.includes('patch') || title.includes('minor') || 
+                                 title.includes('bump') || pr.labels.some(label => 
+                                   label.name === 'dependencies' || label.name === 'production-dependencies' || 
+                                   label.name === 'development-dependencies');
+            
+            // Check if PR is mergeable
+            const isMergeable = pr.mergeable === true && pr.state === 'open';
+            
+            // Get PR labels
+            const labels = pr.labels.map(l => l.name);
+            
+            return {
+              isPatchOrMinor,
+              isMergeable,
+              labels: labels.join(','),
+              title: pr.title,
+              number: pr.number
+            };
+      
+      - name: Check PR status
+        id: status
+        uses: actions/github-script@v7
+        if: steps.pr-info.outputs.isPatchOrMinor == 'true' && steps.pr-info.outputs.isMergeable == 'true'
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            
+            // Get all check runs
+            const { data: checks } = await github.rest.checks.listForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: pr.head.sha,
+            });
+            
+            // Get all status checks
+            const { data: status } = await github.rest.repos.getCombinedStatusForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: pr.head.sha,
+            });
+            
+            // Check if all checks passed
+            const allChecksPassed = status.state === 'success' || 
+              (checks.check_runs.every(check => check.conclusion === 'success' || check.conclusion === null) &&
+               checks.check_runs.length > 0);
+            
+            // Check for required statuses
+            const requiredChecks = [
+              'lockfile-validation',
+              'dependency-review',
+              'CI',
+              'Build'
+            ];
+            
+            const hasRequiredChecks = requiredChecks.some(checkName =>
+              checks.check_runs.some(check => check.name.toLowerCase().includes(checkName.toLowerCase())) ||
+              status.statuses.some(status => status.context.toLowerCase().includes(checkName.toLowerCase()))
+            );
+            
+            // Don't auto-merge if there are failed checks
+            const hasFailedChecks = checks.check_runs.some(check => check.conclusion === 'failure') ||
+              status.statuses.some(s => s.state === 'error' || s.state === 'failure');
+            
+            return {
+              allPassed: allChecksPassed && !hasFailedChecks,
+              hasRequiredChecks,
+              hasFailedChecks
+            };
+      
+      - name: Auto-merge PR
+        if: |
+          steps.pr-info.outputs.isPatchOrMinor == 'true' &&
+          steps.pr-info.outputs.isMergeable == 'true' &&
+          steps.status.outputs.allPassed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            
+            // Check if PR has been approved or doesn't require approval
+            // For auto-merge, we'll use auto-merge feature if available
+            // Otherwise, we'll enable auto-merge via GitHub API
+            
+            try {
+              // Try to enable auto-merge
+              await github.rest.pulls.enableAutomerge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                merge_method: 'squash'
+              });
+              
+              console.log('✅ Auto-merge enabled for PR #' + context.issue.number);
+            } catch (error) {
+              console.log('⚠️  Could not enable auto-merge:', error.message);
+              console.log('This might require repository settings or branch protection rules to allow auto-merge.');
+            }
+      
+      - name: Comment on PR
+        if: steps.pr-info.outputs.isPatchOrMinor == 'true' && steps.status.outputs.allPassed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '🤖 **Auto-merge enabled**\n\n' +
+                    'This PR appears to be a patch or minor dependency update that has passed all checks. ' +
+                    'Auto-merge has been enabled. The PR will be merged automatically once all required checks pass and approvals are met.\n\n' +
+                    '*This is an automated message from the Dependabot Auto-Merge workflow.*'
+            });

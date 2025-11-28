@@ -197,6 +197,14 @@ class AzureTTSService {
       }
     } catch (error) {
       console.warn('Failed to set default Azure TTS voice from API, using hardcoded fallback:', error);
+      
+      // Provide helpful diagnostic information
+      if (error instanceof Error && error.message.includes('not configured')) {
+        console.warn('💡 Hint: Azure TTS requires AZURE_TTS_KEY environment variable in Vercel (serverless functions need it without VITE_ prefix)');
+        console.warn('   - Client-side uses: VITE_AZURE_TTS_KEY');
+        console.warn('   - Server-side API uses: AZURE_TTS_KEY');
+        console.warn('   - Set both in Vercel Dashboard → Settings → Environment Variables');
+      }
       // Fallback to a known working voice when API call fails
       this.settings.voice = {
         name: 'en-US-AriaNeural',
@@ -246,12 +254,32 @@ class AzureTTSService {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: response.statusText }));
+        const errorText = await response.text().catch(() => response.statusText);
+        let errorData: any = {};
+        
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText, hint: 'Unable to parse error response' };
+        }
+        
         console.error('AzureTTSService.getVoices: Proxy error', {
           status: response.status,
-          error: errorData.error || errorData.message
+          statusText: response.statusText,
+          error: errorData.error || errorData.message,
+          hint: errorData.hint,
+          fullError: errorText.substring(0, 500)
         });
-        throw new Error(`Failed to fetch voices: ${errorData.error || response.statusText}`);
+        
+        // Provide helpful error messages based on status
+        if (response.status === 500) {
+          if (errorData.error && errorData.error.includes('not configured')) {
+            throw new Error(`Azure TTS not configured: ${errorData.hint || 'Set AZURE_TTS_KEY in Vercel environment variables (without VITE_ prefix)'}`);
+          }
+          throw new Error(`Azure TTS proxy error: ${errorData.error || errorData.message || response.statusText}`);
+        }
+        
+        throw new Error(`Failed to fetch voices: ${errorData.error || errorData.message || response.statusText}`);
       }
 
       const data = await response.json();
