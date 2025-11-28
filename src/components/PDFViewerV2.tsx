@@ -295,18 +295,84 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       return
     }
     
-    // Count words across all spans to find the matching one
+    // CRITICAL: Use the same text source as TTS (pageTexts) for word counting
+    // This ensures word indices match exactly between TTS and highlighting
+    const pageText = document?.pageTexts?.[currentPage - 1]?.text || ''
+    if (!pageText) {
+      console.log('🔍 PDFViewerV2: Word highlighting - No pageText found', {
+        currentPage,
+        hasDocument: !!document,
+        hasPageTexts: !!document?.pageTexts
+      })
+      return
+    }
+    
+    // Split pageText into words using the EXACT same logic as TTS
+    // TTS uses: safeText.slice(0, charIndex + 1).split(/\s+/) then words.length - 1
+    // This means word index is 0-based and counts words as split by whitespace
+    const pageTextWords = pageText.split(/\s+/).filter(w => w.length > 0)
+    
+    if (tts.currentWordIndex === null || tts.currentWordIndex < 0 || tts.currentWordIndex >= pageTextWords.length) {
+      console.log('🔍 PDFViewerV2: Word highlighting - Word index out of range', {
+        currentPage,
+        currentWordIndex: tts.currentWordIndex,
+        totalWords: pageTextWords.length,
+        pageTextPreview: pageText.substring(0, 100)
+      })
+      return
+    }
+    
+    // Get the target word from pageText (this is what TTS is speaking)
+    const targetWord = pageTextWords[tts.currentWordIndex]
+    
+    // Now reconstruct text from PDF text layer spans and find the matching word position
+    // We need to match the word index from pageText to the word index in PDF text layer
+    const pdfText = Array.from(spans).map(span => (span as HTMLElement).textContent || '').join(' ')
+    const pdfWords = pdfText.split(/\s+/).filter(w => w.length > 0)
+    
+    // The word index should match if pageTexts and PDF text layer are aligned
+    // But they might have slight differences, so we'll use the index directly
+    // and also try to find by word content as a fallback
+    let targetWordPosition = tts.currentWordIndex
+    
+    // If indices don't match, try to find the word by content
+    if (targetWordPosition >= pdfWords.length || pdfWords[targetWordPosition] !== targetWord) {
+      // Try to find the word at the same index or nearby
+      const normalizedTargetWord = targetWord.replace(/[^\w]/g, '').toLowerCase()
+      
+      // First try exact index
+      if (targetWordPosition < pdfWords.length) {
+        const normalizedPdfWord = pdfWords[targetWordPosition].replace(/[^\w]/g, '').toLowerCase()
+        if (normalizedPdfWord === normalizedTargetWord) {
+          // Exact match at expected position
+        } else {
+          // Search nearby positions (±3 words)
+          let found = false
+          for (let offset = -3; offset <= 3 && !found; offset++) {
+            const checkIndex = targetWordPosition + offset
+            if (checkIndex >= 0 && checkIndex < pdfWords.length) {
+              const normalizedCheckWord = pdfWords[checkIndex].replace(/[^\w]/g, '').toLowerCase()
+              if (normalizedCheckWord === normalizedTargetWord) {
+                targetWordPosition = checkIndex
+                found = true
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Now find which span contains the word at targetWordPosition
     let wordCount = 0
     let targetSpan: HTMLElement | null = null
     
     for (const span of spans) {
       const text = (span as HTMLElement).textContent || ''
+      // Use same splitting logic: split by whitespace, filter empty
       const words = text.trim().split(/\s+/).filter(w => w.length > 0)
       
-      // Check if the target word index falls within this span's words
-      if (tts.currentWordIndex !== null && 
-          tts.currentWordIndex >= wordCount && 
-          tts.currentWordIndex < wordCount + words.length) {
+      // Check if the target word position falls within this span's words
+      if (targetWordPosition >= wordCount && targetWordPosition < wordCount + words.length) {
         targetSpan = span as HTMLElement
         break
       }
@@ -348,10 +414,13 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         currentPage,
         currentWordIndex: tts.currentWordIndex,
         totalWordCount: wordCount,
-        spansCount: spans.length
+        spansCount: spans.length,
+        targetWordPosition,
+        pageTextWordsCount: pageTextWords.length,
+        pdfWordsCount: pdfWords.length
       })
     }
-  }, [tts.currentWordIndex, tts.highlightCurrentWord, normalizedCurrentPage, normalizedReadingMode])
+  }, [tts.currentWordIndex, tts.highlightCurrentWord, normalizedCurrentPage, normalizedReadingMode, document?.pageTexts])
 
   // Log component mount
   console.log('🔍 PDFViewerV2: Component rendering', {
