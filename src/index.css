@@ -1031,6 +1031,16 @@
   transform: none; /* Highlights use their own transforms from getCssProperties */
 }
 
+/* TTS Word Highlighting - Ensure highlights are always visible */
+.rpv-core__text-layer-text[data-tts-highlight="true"] {
+  background-color: rgba(255, 235, 59, 0.7) !important;
+  border-radius: 3px !important;
+  padding: 2px 3px !important;
+  box-shadow: 0 0 4px rgba(255, 235, 59, 0.6) !important;
+  z-index: 10 !important;
+  transition: background-color 0.2s ease !important;
+}
+
 /* Dark Mode for PDF Viewer - Invert colors for dark pages with bright text */
 .pdf-viewer-dark-mode .rpv-core__canvas-layer canvas {
   filter: invert(1) hue-rotate(180deg) !important;

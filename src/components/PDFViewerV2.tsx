@@ -326,10 +326,13 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     // Add highlight to target span
     if (targetSpan) {
       targetSpan.setAttribute('data-tts-highlight', 'true')
-      targetSpan.style.backgroundColor = 'rgba(255, 235, 59, 0.4)' // Yellow highlight
-      targetSpan.style.borderRadius = '2px'
-      targetSpan.style.padding = '1px 2px'
-      targetSpan.style.transition = 'background-color 0.2s ease'
+      // Use !important via setProperty to override any CSS rules
+      targetSpan.style.setProperty('background-color', 'rgba(255, 235, 59, 0.7)', 'important') // Brighter yellow highlight
+      targetSpan.style.setProperty('border-radius', '3px', 'important')
+      targetSpan.style.setProperty('padding', '2px 3px', 'important')
+      targetSpan.style.setProperty('transition', 'background-color 0.2s ease', 'important')
+      targetSpan.style.setProperty('box-shadow', '0 0 4px rgba(255, 235, 59, 0.6)', 'important') // Add glow effect
+      targetSpan.style.setProperty('z-index', '10', 'important') // Ensure it's above other elements
       
       // Scroll into view if needed
       targetSpan.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
