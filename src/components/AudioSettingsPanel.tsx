@@ -62,11 +62,23 @@ export const AudioSettingsPanel: React.FC<AudioSettingsPanelProps> = ({ isOpen, 
         // Stop any existing playback
         ttsManager.stop()
         
-        // Ensure voice is set before preview
-        console.log('AudioSettingsPanel: Setting voice for preview', tts.voice)
+        // CRITICAL: Ensure all settings are applied before preview
+        console.log('AudioSettingsPanel: Setting voice and TTS settings for preview', {
+          voice: tts.voice,
+          rate: tts.rate,
+          pitch: tts.pitch,
+          volume: tts.volume
+        })
+        
+        // Set voice first
         ttsManager.setVoice(tts.voice)
         
-        // Small delay to ensure voice is set
+        // Apply all TTS settings to ensure they're used in the preview
+        ttsManager.setRate(tts.rate)
+        ttsManager.setPitch(tts.pitch)
+        ttsManager.setVolume(tts.volume)
+        
+        // Small delay to ensure settings are applied
         await new Promise(resolve => setTimeout(resolve, 100))
         
         updateTTS({ isPlaying: true, isPaused: false })
@@ -88,7 +100,7 @@ export const AudioSettingsPanel: React.FC<AudioSettingsPanelProps> = ({ isOpen, 
       console.error('Error previewing voice:', error)
       updateTTS({ isPlaying: false, isPaused: false })
     }
-  }, [tts.voice, tts.isPlaying, updateTTS])
+  }, [tts.voice, tts.rate, tts.pitch, tts.volume, tts.isPlaying, updateTTS])
 
   if (!isOpen) return null
 

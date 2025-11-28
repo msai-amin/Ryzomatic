@@ -446,7 +446,11 @@ class AzureTTSService {
       endpoint: proxyEndpoint,
       textLength: text.length,
       voice: officialVoiceName,
-      locale: voice.locale
+      locale: voice.locale,
+      rate: this.settings.rate,
+      pitch: this.settings.pitch,
+      volume: this.settings.volume,
+      ssmlPreview: ssml.substring(0, 200) + (ssml.length > 200 ? '...' : '')
     });
 
     // Retry logic for network errors
