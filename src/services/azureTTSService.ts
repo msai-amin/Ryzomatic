@@ -293,12 +293,33 @@ class AzureTTSService {
         voiceType: voice.VoiceType === 'Neural' ? 'Neural' : 'Standard',
       }));
       
-      // Filter to only neural voices for better quality
-      const neuralVoices = voices.filter(v => v.voiceType === 'Neural');
+      // Filter to only premium voices specified by user
+      // These are the only voices that should appear in the audio settings
+      const premiumVoiceNames = [
+        'en-US-AriaNeural',
+        'en-US-GuyNeural',
+        'en-US-Ava',
+        'en-US-Andrew',
+        'en-GB-RyanNeural',
+        'en-GB-SoniaNeural',
+        'en-US-Brian', // Base name - matches "en-US-Brian" or "en-US-Brian:DragonHDLatestNeural"
+        'en-US-Emma',  // Base name - matches "en-US-Emma" or "en-US-Emma:DragonHDLatestNeural"
+        'en-US-AvaMultilingualNeural',
+        'en-US-BrianMultilingualNeural'
+      ];
       
-      console.log(`AzureTTSService.getVoices: Available voices: ${neuralVoices.length} neural voices`);
+      // Filter to only show premium voices
+      // Note: For voices with colons (e.g., "en-US-Brian:DragonHDLatestNeural"),
+      // we match by the base name (e.g., "en-US-Brian")
+      const premiumVoices = voices.filter(v => {
+        const baseName = v.name.split(':')[0]; // Extract base name before colon
+        // Check exact match or base name match
+        return premiumVoiceNames.includes(v.name) || premiumVoiceNames.includes(baseName);
+      });
       
-      return neuralVoices;
+      console.log(`AzureTTSService.getVoices: Filtered to ${premiumVoices.length} premium voices`);
+      
+      return premiumVoices;
     } catch (error) {
       console.error('Error fetching Azure voices:', error);
       throw error;

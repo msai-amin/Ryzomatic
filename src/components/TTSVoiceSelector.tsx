@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { ChevronDown, Volume2, Loader2 } from 'lucide-react'
+import { ChevronDown, Volume2, Loader2, Globe } from 'lucide-react'
 import { ttsManager } from '../services/ttsManager'
 
 interface Voice {
   name: string
-  languageCode: string
+  languageCode?: string
+  locale?: string
   gender: string
   type?: string
 }
@@ -13,6 +14,25 @@ interface TTSVoiceSelectorProps {
   currentVoice?: Voice | null
   onVoiceChange: (voice: Voice) => void
   disabled?: boolean
+}
+
+// Get flag emoji or globe icon for Azure TTS voices
+const getVoiceIcon = (voiceName: string): string | React.ReactNode => {
+  // Multilingual voices use globe icon
+  if (voiceName.includes('Multilingual')) {
+    return <Globe className="w-4 h-4" />
+  }
+  
+  // Map locales to flag emojis
+  if (voiceName.startsWith('en-US-')) {
+    return '🇺🇸' // US flag
+  }
+  if (voiceName.startsWith('en-GB-')) {
+    return '🇬🇧' // UK flag
+  }
+  
+  // Default: no icon
+  return null
 }
 
 export const TTSVoiceSelector: React.FC<TTSVoiceSelectorProps> = ({
@@ -24,6 +44,7 @@ export const TTSVoiceSelector: React.FC<TTSVoiceSelectorProps> = ({
   const [isLoading, setIsLoading] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isAzureProvider, setIsAzureProvider] = useState(false)
 
   const loadVoices = useCallback(async () => {
     if (voices.length > 0) return // Already loaded
@@ -32,6 +53,11 @@ export const TTSVoiceSelector: React.FC<TTSVoiceSelectorProps> = ({
     setError(null)
     
     try {
+      // Check if current provider is Azure
+      const currentProvider = ttsManager.getCurrentProvider()
+      const isAzure = currentProvider?.type === 'azure'
+      setIsAzureProvider(isAzure)
+      
       const availableVoices = await ttsManager.getVoices()
       setVoices(availableVoices)
     } catch (err) {
@@ -52,6 +78,12 @@ export const TTSVoiceSelector: React.FC<TTSVoiceSelectorProps> = ({
   }, [onVoiceChange])
 
   const getVoiceDisplayName = (voice: Voice) => {
+    // For Azure TTS, show only the voice name with flag/globe
+    if (isAzureProvider) {
+      return voice.name
+    }
+    
+    // For other providers, show full details
     const gender = voice.gender === 'FEMALE' ? '♀' : voice.gender === 'MALE' ? '♂' : ''
     const type = voice.type || (voice.name.includes('Neural') ? 'Neural' : 
                                voice.name.includes('Wavenet') ? 'Wavenet' : 
@@ -81,9 +113,16 @@ export const TTSVoiceSelector: React.FC<TTSVoiceSelectorProps> = ({
       >
         <div className="flex items-center space-x-2">
           <Volume2 className="w-4 h-4 text-gray-500" />
-          <span className="text-gray-700">
+          <span className="text-gray-700 flex items-center gap-2">
             {isLoading ? 'Loading voices...' : 
-             currentVoice ? getVoiceDisplayName(currentVoice) : 
+             currentVoice ? (
+               <>
+                 {isAzureProvider && getVoiceIcon(currentVoice.name) && (
+                   <span>{getVoiceIcon(currentVoice.name)}</span>
+                 )}
+                 <span>{getVoiceDisplayName(currentVoice)}</span>
+               </>
+             ) : 
              'Select voice'}
           </span>
         </div>
@@ -111,22 +150,30 @@ export const TTSVoiceSelector: React.FC<TTSVoiceSelectorProps> = ({
                   <div className="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wide bg-gray-50">
                     {quality} Quality
                   </div>
-                  {qualityVoices.map((voice) => (
-                    <button
-                      key={voice.name}
-                      onClick={() => handleVoiceSelect(voice)}
-                      className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 focus:outline-none focus:bg-gray-100 ${
-                        currentVoice?.name === voice.name ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span>{getVoiceDisplayName(voice)}</span>
-                        {currentVoice?.name === voice.name && (
-                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        )}
-                      </div>
-                    </button>
-                  ))}
+                  {qualityVoices.map((voice) => {
+                    const voiceIcon = isAzureProvider ? getVoiceIcon(voice.name) : null
+                    return (
+                      <button
+                        key={voice.name}
+                        onClick={() => handleVoiceSelect(voice)}
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 focus:outline-none focus:bg-gray-100 ${
+                          currentVoice?.name === voice.name ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            {voiceIcon && (
+                              <span className="flex-shrink-0">{voiceIcon}</span>
+                            )}
+                            <span className="truncate">{getVoiceDisplayName(voice)}</span>
+                          </div>
+                          {currentVoice?.name === voice.name && (
+                            <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
               ))}
             </div>
