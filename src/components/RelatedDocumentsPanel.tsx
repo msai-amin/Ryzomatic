@@ -6,7 +6,6 @@ import { useAppStore } from '../store/appStore';
 import { supabaseStorageService } from '../services/supabaseStorageService';
 import { authService } from '../services/supabaseAuthService';
 import { extractWithFallback } from '../services/pdfExtractionOrchestrator';
-import { extractEpub } from '../services/epubExtractionOrchestrator';
 import { documentContentService } from '../services/documentContentService';
 import { logger } from '../services/logger';
 
@@ -83,8 +82,8 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
 
   // Check if file format is compatible
   const isCompatibleFile = (file: File): boolean => {
-    const compatibleTypes = ['application/pdf', 'application/epub+zip', 'text/plain', 'text/markdown'];
-    const compatibleExtensions = ['.pdf', '.epub', '.txt', '.md'];
+    const compatibleTypes = ['application/pdf', 'text/plain', 'text/markdown'];
+    const compatibleExtensions = ['.pdf', '.txt', '.md'];
     return compatibleTypes.includes(file.type) || 
            compatibleExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
   };
@@ -98,7 +97,7 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
     }
 
     if (!isCompatibleFile(file)) {
-      alert('Unsupported file format. Please upload PDF, EPUB, or TXT files.');
+      alert('Unsupported file format. Please upload PDF or TXT files.');
       return;
     }
 
@@ -114,8 +113,7 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
       // Read file content
       let fileData: string | Blob;
       let pageTexts: string[] = [];
-      const fileType = file.type === 'application/pdf' ? 'pdf' : 
-                       file.type === 'application/epub+zip' ? 'epub' : 'text';
+      const fileType = file.type === 'application/pdf' ? 'pdf' : 'text';
 
       if (file.type === 'text/plain' || file.type === 'text/markdown') {
         fileData = await file.text();
@@ -129,16 +127,6 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
         logger.info('RelatedDocumentsPanel: PDF text extracted', { 
           fileName: file.name, 
           pages: pageTexts.length 
-        });
-      } else if (file.type === 'application/epub+zip') {
-        // Extract text from EPUB
-        logger.info('RelatedDocumentsPanel: Extracting text from EPUB', { fileName: file.name });
-        const extractionResult = await extractEpub(file);
-        fileData = file;
-        pageTexts = extractionResult.sections || [];
-        logger.info('RelatedDocumentsPanel: EPUB text extracted', { 
-          fileName: file.name, 
-          chapters: pageTexts.length 
         });
       } else {
         fileData = file;
@@ -162,7 +150,7 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
           documentId,
           user.id,
           fullText,
-          fileType === 'pdf' ? 'pdfjs' : fileType === 'epub' ? 'epub' : 'manual'
+          fileType === 'pdf' ? 'pdfjs' : 'manual'
         );
         logger.info('RelatedDocumentsPanel: Document content stored', { 
           documentId, 
@@ -305,7 +293,7 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
     const compatibleFiles = files.filter(isCompatibleFile);
 
     if (compatibleFiles.length === 0) {
-      alert('No compatible files found. Please upload PDF, EPUB, or TXT files.');
+      alert('No compatible files found. Please upload PDF or TXT files.');
       return;
     }
 
@@ -375,7 +363,7 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
               Drop files here to add related documents
             </p>
             <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-              PDF, EPUB, or TXT files supported
+              PDF or TXT files supported
             </p>
           </div>
         </div>
@@ -427,7 +415,7 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
             type="file"
             id="related-docs-file-input-header"
             multiple
-            accept=".pdf,.epub,.txt,.md"
+            accept=".pdf,.txt,.md"
             onChange={(e) => {
               const files = Array.from(e.target.files || []);
               files.forEach(file => handleFileUpload(file));
@@ -482,14 +470,14 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
             No related documents yet
           </p>
           <p className="text-xs mb-3" style={{ color: 'var(--color-text-tertiary)' }}>
-            Drag and drop PDF, EPUB, or TXT files here
+            Drag and drop PDF or TXT files here
           </p>
           {/* Hidden file input for touch devices */}
           <input
             type="file"
             id="related-docs-file-input"
             multiple
-            accept=".pdf,.epub,.txt,.md"
+            accept=".pdf,.txt,.md"
             onChange={(e) => {
               const files = Array.from(e.target.files || []);
               files.forEach(file => handleFileUpload(file));

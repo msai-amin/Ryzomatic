@@ -26,7 +26,7 @@ interface DocumentWithProgress {
   progress: number
   readingTime: string
   isActive: boolean
-  type: 'text' | 'pdf' | 'epub'
+  type: 'text' | 'pdf'
   uploadedAt: string
   totalPages?: number
   currentPage?: number
@@ -906,9 +906,6 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
                             uploadedAt: fullBook.savedAt,
                             pdfData: fullBook.type === 'pdf' && fullBook.fileData instanceof ArrayBuffer
                               ? new Blob([fullBook.fileData.slice(0)], { type: 'application/pdf' })
-                              : undefined,
-                            epubData: fullBook.type === 'epub' && fullBook.fileData instanceof ArrayBuffer
-                              ? new Blob([fullBook.fileData.slice(0)], { type: 'application/epub+zip' })
                               : undefined,
                             totalPages: fullBook.totalPages,
                             lastReadPage: fullBook.lastReadPage,

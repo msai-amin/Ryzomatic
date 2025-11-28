@@ -33,11 +33,10 @@ export interface Document {
   id: string
   name: string
   content: string
-  type: 'text' | 'pdf' | 'epub'
+  type: 'text' | 'pdf'
   uploadedAt: Date
   // PDF-specific properties
   pdfData?: ArrayBuffer | string | Blob // Support ArrayBuffer, blob URL, and Blob
-  epubData?: Blob
   totalPages?: number
   pageTexts?: string[]
   cleanedPageTexts?: string[] // Array of cleaned text for each page (for TTS in reading mode)
@@ -114,7 +113,7 @@ export interface PDFViewerSettings {
 
 export interface LibraryFilters {
   searchQuery?: string
-  fileType?: 'pdf' | 'text' | 'epub' | 'all'
+  fileType?: 'pdf' | 'text' | 'all'
   readingProgress?: { min: number; max: number }
   dateRange?: { start: Date; end: Date }
   collections?: string[]

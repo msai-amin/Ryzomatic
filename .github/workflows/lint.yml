@@ -37,7 +37,11 @@ jobs:
           DEFAULT_BRANCH: main
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Performance: Only run on changed files
-          FILTER_REGEX_EXCLUDE: '(dist|node_modules|coverage|playwright-report|\.cache)/.*'
+          # Exclude test files, build outputs, and dependencies
+          FILTER_REGEX_EXCLUDE: '(dist|node_modules|coverage|playwright-report|\.cache|tests)/.*'
           # Disable other language validators to speed up
           VALIDATE_ALL: false
+          # ESLint configuration file (Super-Linter will use project's eslint.config.js)
+          JAVASCRIPT_ES_CONFIG_FILE: 'eslint.config.js'
+          TYPESCRIPT_ES_CONFIG_FILE: 'eslint.config.js'
 

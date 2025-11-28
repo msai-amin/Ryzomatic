@@ -70,7 +70,7 @@ export interface UserBook {
   user_id: string;
   title: string;
   file_name: string;
-  file_type: 'pdf' | 'text' | 'epub';
+  file_type: 'pdf' | 'text';
   file_size: number;  // DEPRECATED: Use file_size_bytes instead
   file_size_bytes?: number;  // Canonical size field
   total_pages?: number;

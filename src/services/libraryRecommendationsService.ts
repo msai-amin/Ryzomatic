@@ -7,7 +7,7 @@ export interface BookRecommendation {
   id: string;
   title: string;
   file_name: string;
-  file_type: 'pdf' | 'text' | 'epub';
+  file_type: 'pdf' | 'text';
   score: number;
   reason: string;
 }

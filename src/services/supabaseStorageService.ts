@@ -10,7 +10,7 @@ export interface SavedBook {
   id: string;
   title: string;
   fileName: string;
-  type: 'pdf' | 'text' | 'epub';
+  type: 'pdf' | 'text';
   savedAt: Date;
   lastReadPage?: number;
   totalPages?: number;
@@ -155,7 +155,7 @@ class SupabaseStorageService {
       // NEW: Upload file to S3 instead of storing in database
       let s3Key: string | undefined;
       
-      if ((book.type === 'pdf' || book.type === 'epub') && book.fileData) {
+      if (book.type === 'pdf' && book.fileData) {
         logger.info('Uploading PDF to S3', context, {
           fileSize: fileSize / 1024 / 1024 + 'MB'
         });
@@ -165,7 +165,7 @@ class SupabaseStorageService {
         if (book.fileData instanceof Blob) {
           fileBlob = book.fileData;
         } else if (book.fileData instanceof ArrayBuffer) {
-          const contentType = book.type === 'pdf' ? 'application/pdf' : 'application/epub+zip';
+          const contentType = 'application/pdf';
           fileBlob = new Blob([book.fileData], { type: contentType });
         } else {
           throw new Error('Unsupported file data format for binary book upload');
@@ -462,7 +462,7 @@ class SupabaseStorageService {
       };
 
       // NEW: Download from S3 if s3_key exists for binary formats
-      if ((data.file_type === 'pdf' || data.file_type === 'epub') && data.s3_key) {
+      if (data.file_type === 'pdf' && data.s3_key) {
         try {
           logger.info('Downloading book from S3', context, { s3Key: data.s3_key, fileType: data.file_type });
           
@@ -574,10 +574,6 @@ class SupabaseStorageService {
               logger.warn('Failed to extract pageTexts, TTS will not be available', context, extractError as Error);
               book.pageTexts = []; // Empty array if extraction fails
             }
-          } else {
-            // EPUB extraction handled by dedicated pipeline; placeholder for now
-            book.pageTexts = [];
-          }
           
         } catch (error) {
           logger.error('Error downloading book from S3', context, error as Error);
@@ -595,7 +591,7 @@ class SupabaseStorageService {
           ? data.text_content 
           : String(data.text_content || '');
         book.pageTexts = [sanitizedTextContent];
-      } else if ((data.file_type === 'pdf' || data.file_type === 'epub') && !data.s3_key) {
+      } else if (data.file_type === 'pdf' && !data.s3_key) {
         logger.error('Binary book has no S3 key', context, undefined, { fileType: data.file_type });
         throw errorHandler.createError(
           'Book file not found. Please re-upload the book.',
@@ -1240,7 +1236,7 @@ class SupabaseStorageService {
   async searchLibrary(
     searchQuery: string,
     filters: {
-      fileType?: 'pdf' | 'text' | 'epub' | 'all';
+      fileType?: 'pdf' | 'text' | 'all';
       collections?: string[];
       tags?: string[];
       isFavorite?: boolean;

@@ -10,8 +10,7 @@ An intelligent reading platform for academics with AI chat capabilities, built w
 - **Scroll Modes**: Single page or continuous scroll viewing
 - **Large Text Viewer**: Customizable typography with multiple font families, sizes, and themes
 - **AI Chat Overlay**: Real-time AI interactions with document context
-- **Document Upload**: Support for text files, PDFs, and EPUBs with automatic content extraction
-- **EPUB Reader**: Chapter-aware reader with AI context menu, typography controls, and notes integration
+- **Document Upload**: Support for text files and PDFs with automatic content extraction
 - **Multiple View Modes**: Text-only, PDF view, or split view for optimal reading experience
 - **Progressive Web App**: Installable with offline capabilities
 - **Responsive Design**: Beautiful, modern UI that works on all devices

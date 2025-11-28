@@ -48,7 +48,7 @@ export interface BookTagAssignment {
 
 export interface LibraryFilters {
   searchQuery?: string;
-  fileType?: 'pdf' | 'text' | 'epub' | 'all';
+  fileType?: 'pdf' | 'text' | 'all';
   readingProgress?: { min: number; max: number };
   dateRange?: { start: Date; end: Date };
   collections?: string[];

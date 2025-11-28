@@ -54,18 +54,64 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'mock-anon-key' }}
           NODE_ENV: production
 
+      - name: Kill anything on port 3001
+        run: |
+          echo "Checking for processes on port 3001..."
+          # Try to kill any process using port 3001
+          lsof -iTCP:3001 -sTCP:LISTEN -t | xargs -r kill -9 || true
+          # Alternative: use kill-port if lsof doesn't work
+          npx -y kill-port 3001 || true
+          # Verify port is free
+          sleep 2
+          if lsof -i :3001 > /dev/null 2>&1; then
+            echo "⚠️  Warning: Port 3001 may still be in use"
+            lsof -i :3001 || true
+          else
+            echo "✅ Port 3001 is free"
+          fi
+
       - name: Start preview server
         run: |
-          npm run preview &
-          echo $! > server.pid
-          sleep 15
+          echo "Starting preview server on port 3001..."
+          # Start server in background with logging
+          npm run preview > server.log 2>&1 &
+          SERVER_PID=$!
+          echo $SERVER_PID > server.pid
+          echo "Started server with PID: $SERVER_PID"
+          
+          # Wait a moment for server to initialize
+          sleep 3
+          
+          # Check if process is still running
+          if ! kill -0 $SERVER_PID 2>/dev/null; then
+            echo "❌ Server process died immediately. Logs:"
+            cat server.log || true
+            exit 1
+          fi
+          echo "✅ Server process is running (PID: $SERVER_PID)"
         env:
           PORT: 3001
 
       - name: Wait for server to be ready
         run: |
-          timeout 120 bash -c 'until curl -f http://localhost:3001 > /dev/null 2>&1; do sleep 3; done' || exit 1
-          echo "Server is ready!"
+          echo "Waiting for server to be ready on http://localhost:3001..."
+          # Use wait-on for reliable waiting (installs if needed)
+          npx -y wait-on http://localhost:3001 --timeout 120000 --interval 2000 || {
+            echo "❌ Server failed to become ready. Checking status..."
+            if [ -f server.pid ]; then
+              SERVER_PID=$(cat server.pid)
+              if kill -0 $SERVER_PID 2>/dev/null; then
+                echo "Server process is still running (PID: $SERVER_PID)"
+              else
+                echo "Server process died. Logs:"
+                cat server.log || true
+              fi
+            fi
+            echo "Port status:"
+            lsof -i :3001 || echo "No process on port 3001"
+            exit 1
+          }
+          echo "✅ Server is ready and responding!"
 
       - name: Run E2E tests
         run: npm run test:e2e:ci
@@ -78,9 +124,16 @@ jobs:
         if: always()
         run: |
           if [ -f server.pid ]; then
-            kill $(cat server.pid) || true
-            rm server.pid
+            SERVER_PID=$(cat server.pid)
+            echo "Stopping server with PID: $SERVER_PID"
+            kill $SERVER_PID 2>/dev/null || true
+            # Wait a moment, then force kill if still running
+            sleep 2
+            kill -9 $SERVER_PID 2>/dev/null || true
+            rm -f server.pid
           fi
+          # Also kill any remaining vite processes
+          pkill -f "vite preview" || true
 
       - name: Upload Playwright report
         if: always()

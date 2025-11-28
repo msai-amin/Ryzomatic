@@ -634,6 +634,28 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     return () => clearInterval(interval)
   }, [tts.isPlaying])
 
+  // CRITICAL FIX: Sync TTS settings from store to TTS manager
+  // This ensures AudioSettingsPanel changes are applied to the player
+  useEffect(() => {
+    const currentProvider = ttsManager.getCurrentProvider()
+    if (currentProvider) {
+      // Apply all settings from store to TTS manager
+      if (tts.voice) {
+        ttsManager.setVoice(tts.voice)
+      }
+      ttsManager.setRate(tts.rate)
+      ttsManager.setPitch(tts.pitch)
+      ttsManager.setVolume(tts.volume)
+      
+      console.log('AudioWidget: Synced TTS settings', {
+        rate: tts.rate,
+        pitch: tts.pitch,
+        volume: tts.volume,
+        voiceName: tts.voiceName
+      })
+    }
+  }, [tts.rate, tts.pitch, tts.volume, tts.voice, tts.voiceName])
+
   // Get current paragraph text
   const getCurrentParagraphText = useCallback((): string => {
     if (tts.paragraphs.length === 0) {
@@ -1074,6 +1096,18 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
             updateTTS({ isPlaying: true, isPaused: false })
           } else {
             updateTTS({ isPlaying: false, isPaused: true })
+          }
+          
+          // CRITICAL FIX: Ensure TTS settings are applied before playback
+          // This ensures AudioSettingsPanel changes take effect immediately
+          // Note: currentProvider is already declared above, so we reuse it
+          if (currentProvider) {
+            if (tts.voice) {
+              ttsManager.setVoice(tts.voice)
+            }
+            ttsManager.setRate(tts.rate)
+            ttsManager.setPitch(tts.pitch)
+            ttsManager.setVolume(tts.volume)
           }
           
           try {

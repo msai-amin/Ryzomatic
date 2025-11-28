@@ -889,7 +889,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       // If the book was loaded from Supabase metadata and the binary data isn't loaded yet, fetch it now.
       if (
         isSupabaseData &&
-        (workingBook.type === 'pdf' || workingBook.type === 'epub') &&
+        workingBook.type === 'pdf' &&
         !workingBook.fileData
       ) {
         try {
@@ -926,10 +926,9 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         }
       }
 
-    // Ensure binary data is properly loaded for PDF/EPUB books
-    if (workingBook.type === 'pdf' || workingBook.type === 'epub') {
-      const isPdf = workingBook.type === 'pdf';
-      const formatLabel = isPdf ? 'PDF' : 'EPUB';
+    // Ensure binary data is properly loaded for PDF books
+    if (workingBook.type === 'pdf') {
+      const formatLabel = 'PDF';
 
       if (!workingBook.fileData && workingBook.pdfDataBase64) {
         console.log('Converting base64 to ArrayBuffer...');
@@ -1075,10 +1074,6 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         }
         return undefined;
       })(),
-      epubData:
-        workingBook.type === 'epub' && workingBook.fileData instanceof ArrayBuffer
-          ? new Blob([workingBook.fileData instanceof ArrayBuffer ? workingBook.fileData.slice(0) : workingBook.fileData], { type: 'application/epub+zip' })
-          : undefined,
       totalPages: workingBook.totalPages,
       lastReadPage: workingBook.lastReadPage,
       pageTexts: safePageTexts,

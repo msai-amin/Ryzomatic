@@ -17,7 +17,7 @@ export interface DocumentContent {
   content: string;
   chunk_index: number;
   chunk_count: number;
-  extraction_method: 'pdfjs' | 'epub' | 'manual' | 'ocr';
+  extraction_method: 'pdfjs' | 'manual' | 'ocr';
   word_count?: number;
   character_count?: number;
   created_at?: string;
@@ -52,7 +52,7 @@ class DocumentContentService {
     bookId: string,
     userId: string,
     content: string,
-    extractionMethod: 'pdfjs' | 'epub' | 'manual' | 'ocr' = 'pdfjs'
+    extractionMethod: 'pdfjs' | 'manual' | 'ocr' = 'pdfjs'
   ): Promise<{ success: boolean; chunks: number }> {
     try {
       const context = { bookId, userId, extractionMethod };

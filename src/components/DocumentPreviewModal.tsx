@@ -70,8 +70,6 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       if (document.file_type === 'pdf' && document.page_texts) {
         // Show first page or first few pages
         content = document.page_texts.slice(0, 2).join(' ');
-      } else if (document.file_type === 'epub' && document.page_texts) {
-        content = document.page_texts.slice(0, 2).join(' ');
       } else if (document.text_content) {
         // Show first part of text content
         content = document.text_content;
@@ -168,10 +166,6 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           }
           return undefined;
         })(),
-        epubData:
-          fullBook.type === 'epub' && fullBook.fileData instanceof ArrayBuffer
-            ? new Blob([fullBook.fileData instanceof ArrayBuffer ? fullBook.fileData.slice(0) : fullBook.fileData], { type: 'application/epub+zip' })
-            : undefined,
         totalPages: fullBook.totalPages,
         lastReadPage: fullBook.lastReadPage,
         pageTexts: cleanedPageTexts,

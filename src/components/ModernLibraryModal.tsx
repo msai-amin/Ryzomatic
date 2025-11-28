@@ -943,13 +943,9 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
         id: bookData.id,
         name: bookData.title,
         content: combinedContent,
-        type: bookData.type as 'text' | 'pdf' | 'epub',
+        type: bookData.type as 'text' | 'pdf',
         uploadedAt: bookData.savedAt,
         pdfData: bookData.type === 'pdf' ? bookData.fileData : undefined,
-        epubData:
-          bookData.type === 'epub' && bookData.fileData instanceof ArrayBuffer
-            ? new Blob([bookData.fileData], { type: 'application/epub+zip' })
-            : undefined,
         totalPages: bookData.totalPages,
         lastReadPage: bookData.lastReadPage,
         pageTexts: safePageTexts,

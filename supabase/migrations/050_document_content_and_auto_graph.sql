@@ -6,7 +6,7 @@
 -- DOCUMENT CONTENT TABLE
 -- ============================================================================
 
--- Store parsed text from PDFs/EPUBs to avoid re-parsing
+-- Store parsed text from PDFs to avoid re-parsing
 -- Supports chunking for large documents
 CREATE TABLE IF NOT EXISTS document_content (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS document_content (
   chunk_count INTEGER DEFAULT 1, -- Total chunks for this document
   
   -- Metadata
-  extraction_method TEXT CHECK (extraction_method IN ('pdfjs', 'epub', 'manual', 'ocr')),
+  extraction_method TEXT CHECK (extraction_method IN ('pdfjs', 'manual', 'ocr')),
   word_count INTEGER,
   character_count INTEGER,
   
@@ -385,7 +385,7 @@ COMMENT ON COLUMN document_content.chunk_index IS
   'Zero-based index of this chunk. 0 for single-chunk documents.';
 
 COMMENT ON COLUMN document_content.extraction_method IS 
-  'Method used to extract text: pdfjs, epub, manual, or ocr';
+  'Method used to extract text: pdfjs, manual, or ocr';
 
 COMMENT ON FUNCTION auto_generate_document_relationships IS 
   'Automatically finds and creates document relationships using vector similarity. Called when embeddings are added/updated.';

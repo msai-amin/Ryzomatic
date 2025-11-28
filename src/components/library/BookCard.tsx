@@ -54,7 +54,7 @@ export const BookCard: React.FC<BookCardProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const isBinaryFormat = book.file_type === 'pdf' || book.file_type === 'epub';
+  const isBinaryFormat = book.file_type === 'pdf';
   
   const { 
     toggleBookSelection, 

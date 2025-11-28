@@ -29,7 +29,7 @@ export const RecentBookCard: React.FC<RecentBookCardProps> = ({
     return date.toLocaleDateString();
   };
 
-  const isBinaryFormat = book.file_type === 'pdf' || book.file_type === 'epub';
+  const isBinaryFormat = book.file_type === 'pdf';
   const Icon = isBinaryFormat ? Book : FileText;
 
   return (

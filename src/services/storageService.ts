@@ -11,7 +11,7 @@ export interface SavedBook {
   id: string;
   title: string;
   fileName: string;
-  type: 'pdf' | 'text' | 'epub';
+  type: 'pdf' | 'text';
   savedAt: Date;
   lastReadPage?: number;
   totalPages?: number;
@@ -160,7 +160,7 @@ class StorageService {
       const corruptedBooks: string[] = [];
       
       books.forEach(book => {
-        if (book.type === 'pdf' || book.type === 'epub') {
+        if (book.type === 'pdf') {
           // Check if it's a corrupted legacy book
           if (book.fileData && 
               typeof book.fileData === 'object' && 
@@ -230,7 +230,7 @@ class StorageService {
       
       // Convert ArrayBuffer to base64 for storage if it's a PDF
       const bookToSave = { ...book };
-      if ((book.type === 'pdf' || book.type === 'epub') && book.fileData instanceof ArrayBuffer) {
+      if (book.type === 'pdf' && book.fileData instanceof ArrayBuffer) {
         safeConsole.log('Converting ArrayBuffer to base64 for storage:', {
           bookId: book.id,
           bookTitle: book.title,
@@ -387,7 +387,7 @@ class StorageService {
         }
         
         // Convert base64 back to ArrayBuffer for PDF files
-        if ((book.type === 'pdf' || book.type === 'epub') && book.pdfDataBase64) {
+        if (book.type === 'pdf' && book.pdfDataBase64) {
           console.log('Converting base64 to ArrayBuffer in getAllBooks:', {
             bookId: book.id,
             bookTitle: book.title,
@@ -419,7 +419,7 @@ class StorageService {
     const books = this.getAllBooks();
     const book = books.find(b => b.id === id);
     
-    if (book && (book.type === 'pdf' || book.type === 'epub') && book.pdfDataBase64) {
+    if (book && book.type === 'pdf' && book.pdfDataBase64) {
       // Ensure ArrayBuffer is properly converted
       book.fileData = this.base64ToArrayBuffer(book.pdfDataBase64);
     }

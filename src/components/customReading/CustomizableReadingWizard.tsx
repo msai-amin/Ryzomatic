@@ -228,7 +228,7 @@ export const CustomizableReadingWizard: React.FC = () => {
           Create a tailored reading session with typography presets, audio-ready text, and a synced TTS experience. We&apos;ll guide you through a short setup.
         </p>
         <ul className="space-y-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-          <li>• Upload your PDF or EPUB</li>
+          <li>• Upload your PDF</li>
           <li>• Optimise the text for natural Text-to-Speech playback</li>
           <li>• Launch directly into the reader with audio controls ready</li>
         </ul>
@@ -247,7 +247,7 @@ export const CustomizableReadingWizard: React.FC = () => {
     <div className="space-y-6">
       <div className="rounded-lg border p-4" style={{ borderColor: 'var(--color-border)' }}>
         <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-          Upload the document you want to prepare. We support PDF and EPUB files with advanced extraction and metadata handling.
+          Upload the document you want to prepare. We support PDF files with advanced extraction and metadata handling.
         </p>
       </div>
 
