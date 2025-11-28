@@ -32,10 +32,24 @@ test.describe('Authentication Flow', () => {
     // Wait for navigation to complete (auth modal opens via ?auth=true URL)
     await page.waitForURL(/\?auth=true/, { timeout: 10000 });
     
-    // Wait for auth modal to appear (more flexible selectors)
-    // Increased timeout to 20s to account for page load and modal animation
-    const authModal = page.locator('[role="dialog"], .auth-modal, #auth-modal, [data-testid="auth-modal"]');
+    // Wait for page to be fully loaded
+    await page.waitForLoadState('networkidle', { timeout: 15000 });
+    
+    // Wait for auth modal to appear using the specific data-testid
+    // This is the most reliable selector
+    const authModal = page.locator('[data-testid="auth-modal"]');
+    
+    // Wait for the modal to be visible with a generous timeout
     await expect(authModal).toBeVisible({ timeout: 20000 });
+    
+    // Also verify the dialog role is present (accessibility check)
+    const dialog = authModal.locator('[role="dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 5000 });
+    
+    // Verify modal content is visible (fallback check)
+    // Check for "Sign In" or "Create Account" heading
+    const modalHeading = page.getByRole('heading', { name: /sign in|create account/i });
+    await expect(modalHeading).toBeVisible({ timeout: 5000 });
   });
 
   test('should show Google OAuth option', async ({ page }) => {
@@ -46,8 +60,12 @@ test.describe('Authentication Flow', () => {
     // Wait for navigation to complete
     await page.waitForURL(/\?auth=true/, { timeout: 10000 });
     
-    // Wait for auth modal to appear
-    await page.waitForSelector('[role="dialog"], .auth-modal, #auth-modal, [data-testid="auth-modal"]', { state: 'visible', timeout: 20000 });
+    // Wait for page to be fully loaded
+    await page.waitForLoadState('networkidle', { timeout: 15000 });
+    
+    // Wait for auth modal to appear using the specific data-testid
+    const authModal = page.locator('[data-testid="auth-modal"]');
+    await expect(authModal).toBeVisible({ timeout: 20000 });
     
     // Check for Google sign in button (more flexible)
     const googleButton = page.getByRole('button', { name: /sign in with google|continue with google|google/i });
@@ -62,19 +80,24 @@ test.describe('Authentication Flow', () => {
     // Wait for navigation to complete
     await page.waitForURL(/\?auth=true/, { timeout: 10000 });
     
-    // Wait for auth modal to appear
-    await page.waitForSelector('[role="dialog"], .auth-modal, #auth-modal, [data-testid="auth-modal"]', { state: 'visible', timeout: 20000 });
+    // Wait for page to be fully loaded
+    await page.waitForLoadState('networkidle', { timeout: 15000 });
+    
+    // Wait for auth modal to appear using the specific data-testid
+    const authModal = page.locator('[data-testid="auth-modal"]');
+    await expect(authModal).toBeVisible({ timeout: 20000 });
     
     // Click cancel/close (the X button in the modal header)
     // The close button contains an X icon (lucide-react X component)
-    const closeButton = page.locator('[role="dialog"] button:has(svg), .auth-modal button:has(svg)').first();
+    // Find the button inside the modal that contains an SVG
+    const closeButton = authModal.locator('button:has(svg)').first();
     await closeButton.click({ timeout: 10000 });
     
     // Wait for navigation back to landing page (modal closes by navigating to /)
     await page.waitForURL(/^[^?]*$/, { timeout: 10000 });
     
     // Modal should be hidden (landing page should be visible)
-    await expect(page.locator('[role="dialog"], .auth-modal, #auth-modal, [data-testid="auth-modal"]').first()).not.toBeVisible({ timeout: 10000 });
+    await expect(authModal).not.toBeVisible({ timeout: 10000 });
   });
 });
 
