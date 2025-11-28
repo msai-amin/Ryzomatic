@@ -574,6 +574,7 @@ class SupabaseStorageService {
               logger.warn('Failed to extract pageTexts, TTS will not be available', context, extractError as Error);
               book.pageTexts = []; // Empty array if extraction fails
             }
+          }
           
         } catch (error) {
           logger.error('Error downloading book from S3', context, error as Error);
