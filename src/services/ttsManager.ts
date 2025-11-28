@@ -239,8 +239,10 @@ class TTSManager {
             let defaultVoice = null
             
             if (englishVoices.length > 0) {
-              // Prefer Aria (popular female voice) or any female neural voice
+              // Explicitly prefer en-US-AriaNeural as default (it's in our premium voices list)
               defaultVoice = englishVoices.find((voice: any) => 
+                voice && voice.name === 'en-US-AriaNeural'
+              ) || englishVoices.find((voice: any) => 
                 voice && voice.name && voice.name.includes('Aria')
               ) || englishVoices.find((voice: any) => 
                 voice && voice.gender === 'Female'

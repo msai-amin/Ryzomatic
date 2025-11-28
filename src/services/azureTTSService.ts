@@ -185,8 +185,9 @@ class AzureTTSService {
         v.locale && v.locale.startsWith('en-') && v.voiceType === 'Neural'
       );
       
-      // Prefer female voices (Aria is popular)
-      let selectedVoice = englishVoices.find(v => v.name.includes('Aria')) ||
+      // Explicitly prefer en-US-AriaNeural as default (it's in our premium voices list)
+      let selectedVoice = englishVoices.find(v => v.name === 'en-US-AriaNeural') ||
+                         englishVoices.find(v => v.name.includes('Aria')) ||
                          englishVoices.find(v => v.gender === 'Female') ||
                          englishVoices[0];
       
