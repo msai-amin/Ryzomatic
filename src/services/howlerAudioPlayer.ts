@@ -353,9 +353,12 @@ export class HowlerAudioPlayer {
       const elapsed = (now - trackingStartTime - this.totalPauseDuration) / 1000 // seconds
       
       // Calculate current word index based on elapsed time
-      const newWordIndex = Math.floor((elapsed * 1000) / millisecondsPerWord)
+      // Add a small offset (0.15 seconds) to compensate for lag and make highlighting more responsive
+      // This advances the word position slightly ahead to account for processing delays
+      const elapsedWithOffset = elapsed + 0.15
+      const newWordIndex = Math.floor((elapsedWithOffset * 1000) / millisecondsPerWord)
 
-      if (newWordIndex !== currentWordIndex && newWordIndex < words.length) {
+      if (newWordIndex !== currentWordIndex && newWordIndex < words.length && newWordIndex >= 0) {
         currentWordIndex = newWordIndex
         const word = words[currentWordIndex]
         
@@ -375,7 +378,7 @@ export class HowlerAudioPlayer {
         
         this.onWordCallback(word, charIndex)
       }
-    }, 100) // Check every 100ms
+    }, 50) // Check every 50ms for more responsive tracking
   }
 
   /**
