@@ -7,6 +7,7 @@ import { AudioSettingsPanel } from './AudioSettingsPanel'
 import { ttsCacheService, TTSCacheQuery } from '../services/ttsCacheService'
 import { supabase } from '../../lib/supabase'
 import { Tooltip } from './Tooltip'
+import { parseTextWithBreaks } from '../utils/readingModeUtils'
 import { 
   Play, 
   Pause, 
@@ -757,6 +758,49 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     return ''
   }, [normalizedDocumentId, pdfViewer.currentPage, pdfViewer.readingMode, pageTextsLengthPrimitive, cleanedPageTextsLengthPrimitive]) // Use length (number) instead of arrays
 
+  // Calculate global word index that matches PDF segment.wordIndex
+  const calculateGlobalWordIndex = useCallback((
+    wordIndexInText: number,
+    mode: 'paragraph' | 'page' | 'continue',
+    currentPage: number,
+    currentParagraphIndex: number | null,
+    pageText: string
+  ): number => {
+    // For page mode, word index matches directly if we're speaking the full page
+    if (mode === 'page') {
+      return wordIndexInText
+    }
+    
+    // For paragraph mode, need to count words in previous paragraphs
+    if (mode === 'paragraph' && pageText) {
+      try {
+        const segments = parseTextWithBreaks(pageText)
+        const wordSegments = segments.filter(s => s.type === 'word')
+        
+        // Count words in all previous paragraphs
+        let wordsBeforeCurrentParagraph = 0
+        const targetParagraphIndex = currentParagraphIndex ?? 0
+        
+        for (const segment of wordSegments) {
+          if (segment.paragraphIndex !== undefined && segment.paragraphIndex < targetParagraphIndex) {
+            wordsBeforeCurrentParagraph++
+          } else if (segment.paragraphIndex === targetParagraphIndex) {
+            // We've reached the current paragraph, stop counting
+            break
+          }
+        }
+        
+        return wordsBeforeCurrentParagraph + wordIndexInText
+      } catch (error) {
+        console.warn('AudioWidget: Error calculating global word index, using local index', error)
+        return wordIndexInText
+      }
+    }
+    
+    // For continue mode, treat as page mode for now
+    return wordIndexInText
+  }, [])
+
   // Get text based on playback mode
   const getTextForPlaybackMode = useCallback((mode: 'paragraph' | 'page' | 'continue'): string => {
     if (mode === 'paragraph') {
@@ -1159,8 +1203,20 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
                       (word, charIndex) => {
                         const safeText = typeof nextText === 'string' ? nextText : String(nextText || '')
                         const words = safeText.slice(0, charIndex + 1).split(/\s+/)
-                        const wordIndex = words.length - 1
-                        updateTTS({ currentWordIndex: wordIndex })
+                        const wordIndexInText = words.length - 1
+                        
+                        // Calculate global word index for the next paragraph (already incremented)
+                        const currentPageText = getCurrentPageText()
+                        const nextParagraphIndex = (tts.currentParagraphIndex ?? 0) + 1
+                        const globalWordIndex = calculateGlobalWordIndex(
+                          wordIndexInText,
+                          'paragraph',
+                          pdfViewer.currentPage || 1,
+                          nextParagraphIndex,
+                          currentPageText
+                        )
+                        
+                        updateTTS({ currentWordIndex: globalWordIndex })
                       }
                     )
                   } else {
@@ -1187,8 +1243,28 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
               // Ensure text is a string before splitting
               const safeText = typeof text === 'string' ? text : String(text || '')
               const words = safeText.slice(0, charIndex + 1).split(/\s+/)
-              const wordIndex = words.length - 1
-              updateTTS({ currentWordIndex: wordIndex })
+              const wordIndexInText = words.length - 1
+              
+              // Calculate global word index that matches PDF segment.wordIndex
+              const currentPageText = getCurrentPageText()
+              const globalWordIndex = calculateGlobalWordIndex(
+                wordIndexInText,
+                playbackMode,
+                pdfViewer.currentPage || 1,
+                tts.currentParagraphIndex,
+                currentPageText
+              )
+              
+              console.log('AudioWidget: Word tracking', {
+                word,
+                wordIndexInText,
+                globalWordIndex,
+                playbackMode,
+                currentParagraphIndex: tts.currentParagraphIndex,
+                currentPage: pdfViewer.currentPage
+              })
+              
+              updateTTS({ currentWordIndex: globalWordIndex })
             }
             )
             
