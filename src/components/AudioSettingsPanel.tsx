@@ -7,9 +7,12 @@ import { TTSVoiceSelector } from './TTSVoiceSelector'
 interface AudioSettingsPanelProps {
   isOpen: boolean
   onClose: () => void
+  widgetPosition?: { x: number; y: number }
+  widgetHeight?: number
+  widgetWidth?: number
 }
 
-export const AudioSettingsPanel: React.FC<AudioSettingsPanelProps> = ({ isOpen, onClose }) => {
+export const AudioSettingsPanel: React.FC<AudioSettingsPanelProps> = ({ isOpen, onClose, widgetPosition, widgetHeight = 160, widgetWidth = 260 }) => {
   const { tts, updateTTS } = useAppStore()
 
   // Handle speed change
@@ -87,12 +90,20 @@ export const AudioSettingsPanel: React.FC<AudioSettingsPanelProps> = ({ isOpen, 
       
       {/* Settings Panel */}
       <div 
-        className="fixed bottom-24 right-8 z-50 w-96 rounded-lg shadow-2xl animate-fadeIn"
+        className="fixed z-[100001] w-96 rounded-lg shadow-2xl animate-fadeIn"
         style={{
           backgroundColor: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
           maxHeight: '80vh',
-          overflowY: 'auto'
+          overflowY: 'auto',
+          // Position above the widget if widget position is provided, otherwise use default bottom-right
+          ...(widgetPosition && typeof window !== 'undefined' ? {
+            right: `${Math.max(16, window.innerWidth - widgetPosition.x - widgetWidth)}px`, // Align right edge with widget, min 16px from edge
+            bottom: `${window.innerHeight - widgetPosition.y - widgetHeight - 16}px`, // Position above widget with 16px gap
+          } : {
+            bottom: '96px', // Default: 24px (bottom-24) + 72px for widget height
+            right: '32px', // Default: 8px (right-8) * 4
+          })
         }}
         onClick={(e) => e.stopPropagation()}
       >

@@ -1753,7 +1753,10 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       {/* Settings Panel Popup */}
       <AudioSettingsPanel 
         isOpen={showSettings} 
-        onClose={() => setShowSettings(false)} 
+        onClose={() => setShowSettings(false)}
+        widgetPosition={position}
+        widgetHeight={widgetRef.current?.offsetHeight || 160}
+        widgetWidth={widgetRef.current?.offsetWidth || 260}
       />
     </>
   )
