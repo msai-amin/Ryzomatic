@@ -32,8 +32,15 @@ test.describe('Authentication Flow', () => {
     // Wait for navigation to complete (auth modal opens via ?auth=true URL)
     await page.waitForURL(/\?auth=true/, { timeout: 10000 });
     
-    // Wait for page to be fully loaded
+    // Wait for page to be fully loaded (app initialization completes)
     await page.waitForLoadState('networkidle', { timeout: 15000 });
+    
+    // Wait for the loading spinner to disappear (app has finished initializing)
+    // The loading spinner has text "Loading ryzomatic..."
+    await page.waitForFunction(
+      () => !document.body.textContent?.includes('Loading ryzomatic'),
+      { timeout: 20000 }
+    );
     
     // Wait for auth modal to appear using the specific data-testid
     // This is the most reliable selector
@@ -60,8 +67,14 @@ test.describe('Authentication Flow', () => {
     // Wait for navigation to complete
     await page.waitForURL(/\?auth=true/, { timeout: 10000 });
     
-    // Wait for page to be fully loaded
+    // Wait for page to be fully loaded (app initialization completes)
     await page.waitForLoadState('networkidle', { timeout: 15000 });
+    
+    // Wait for the loading spinner to disappear (app has finished initializing)
+    await page.waitForFunction(
+      () => !document.body.textContent?.includes('Loading ryzomatic'),
+      { timeout: 20000 }
+    );
     
     // Wait for auth modal to appear using the specific data-testid
     const authModal = page.locator('[data-testid="auth-modal"]');
@@ -80,8 +93,14 @@ test.describe('Authentication Flow', () => {
     // Wait for navigation to complete
     await page.waitForURL(/\?auth=true/, { timeout: 10000 });
     
-    // Wait for page to be fully loaded
+    // Wait for page to be fully loaded (app initialization completes)
     await page.waitForLoadState('networkidle', { timeout: 15000 });
+    
+    // Wait for the loading spinner to disappear (app has finished initializing)
+    await page.waitForFunction(
+      () => !document.body.textContent?.includes('Loading ryzomatic'),
+      { timeout: 20000 }
+    );
     
     // Wait for auth modal to appear using the specific data-testid
     const authModal = page.locator('[data-testid="auth-modal"]');
