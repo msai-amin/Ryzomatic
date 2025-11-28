@@ -32,8 +32,19 @@ export class HowlerAudioPlayer {
     onWord?: (word: string, charIndex: number) => void,
     text?: string
   ): Promise<void> {
-    // Clean up previous sound
+    // CRITICAL FIX: Stop and cleanup any existing sound FIRST
+    // This prevents multiple instances from playing simultaneously
+    if (this.currentSound) {
+      try {
+        this.currentSound.stop()
+      } catch (error) {
+        console.warn('HowlerAudioPlayer: Error stopping existing sound', error)
+      }
+    }
     this.cleanup()
+    
+    // Small delay to ensure cleanup completes before creating new instance
+    await new Promise(resolve => setTimeout(resolve, 50))
 
     // Store callbacks and text
     this.onEndCallback = onEnd || null
@@ -75,6 +86,7 @@ export class HowlerAudioPlayer {
     let resolvePromise: (() => void) | null = null
     let rejectPromise: ((error: Error) => void) | null = null
     let playbackStarted = false
+    let onloadCalled = false // Guard to prevent multiple onload calls
 
     return new Promise((resolve, reject) => {
       resolvePromise = resolve
@@ -88,6 +100,14 @@ export class HowlerAudioPlayer {
         volume: 1.0,
         
         onload: () => {
+          // CRITICAL FIX: Guard against multiple onload calls
+          // Howler can call onload multiple times, causing multiple play() calls
+          if (onloadCalled) {
+            console.warn('HowlerAudioPlayer: onload called multiple times, ignoring duplicate')
+            return
+          }
+          onloadCalled = true
+          
           console.log('HowlerAudioPlayer: Audio loaded successfully')
           this.startTime = Date.now()
           this.startWordTracking()
@@ -95,13 +115,14 @@ export class HowlerAudioPlayer {
           // CRITICAL FIX: Explicitly call play() to ensure playback starts
           // autoplay: true with html5: true may be blocked by browser policies
           // Explicit play() call ensures playback starts even if autoplay fails
-          if (this.currentSound) {
+          // But only if not already playing to prevent multiple instances
+          if (this.currentSound && !this.currentSound.playing()) {
             const playId = this.currentSound.play()
             if (playId === undefined) {
               console.warn('HowlerAudioPlayer: play() returned undefined, audio may be blocked')
               // Try again after a short delay in case it's a timing issue
               setTimeout(() => {
-                if (this.currentSound && !this.currentSound.playing()) {
+                if (this.currentSound && !this.currentSound.playing() && !playbackStarted) {
                   const retryId = this.currentSound.play()
                   if (retryId === undefined) {
                     console.error('HowlerAudioPlayer: play() failed after retry, audio may be blocked by browser policy')
@@ -112,12 +133,16 @@ export class HowlerAudioPlayer {
                     }
                   } else {
                     console.log('HowlerAudioPlayer: Playback started on retry')
+                    playbackStarted = true
                   }
                 }
               }, 100)
             } else {
               console.log('HowlerAudioPlayer: play() called successfully, playback should start')
+              playbackStarted = true
             }
+          } else if (this.currentSound?.playing()) {
+            console.warn('HowlerAudioPlayer: Audio already playing, skipping play() call')
           }
           // Don't resolve here - wait for playback to end
         },
@@ -132,14 +157,20 @@ export class HowlerAudioPlayer {
           }
         },
         
-        onplay: () => {
-          console.log('HowlerAudioPlayer: Playback started')
-          playbackStarted = true
-          this.isPaused = false
-          // Adjust start time if we were paused
-          if (this.pausedAt > 0) {
-            this.totalPauseDuration += Date.now() - this.pausedAt
-            this.pausedAt = 0
+        onplay: (id) => {
+          // CRITICAL FIX: Guard against multiple onplay calls
+          // Only log and update state once per actual playback start
+          if (!playbackStarted) {
+            console.log('HowlerAudioPlayer: Playback started', { soundId: id })
+            playbackStarted = true
+            this.isPaused = false
+            // Adjust start time if we were paused
+            if (this.pausedAt > 0) {
+              this.totalPauseDuration += Date.now() - this.pausedAt
+              this.pausedAt = 0
+            }
+          } else {
+            console.warn('HowlerAudioPlayer: onplay called multiple times, ignoring duplicate', { soundId: id })
           }
         },
         
