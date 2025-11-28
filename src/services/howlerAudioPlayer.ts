@@ -91,6 +91,34 @@ export class HowlerAudioPlayer {
           console.log('HowlerAudioPlayer: Audio loaded successfully')
           this.startTime = Date.now()
           this.startWordTracking()
+          
+          // CRITICAL FIX: Explicitly call play() to ensure playback starts
+          // autoplay: true with html5: true may be blocked by browser policies
+          // Explicit play() call ensures playback starts even if autoplay fails
+          if (this.currentSound) {
+            const playId = this.currentSound.play()
+            if (playId === undefined) {
+              console.warn('HowlerAudioPlayer: play() returned undefined, audio may be blocked')
+              // Try again after a short delay in case it's a timing issue
+              setTimeout(() => {
+                if (this.currentSound && !this.currentSound.playing()) {
+                  const retryId = this.currentSound.play()
+                  if (retryId === undefined) {
+                    console.error('HowlerAudioPlayer: play() failed after retry, audio may be blocked by browser policy')
+                    if (rejectPromise) {
+                      rejectPromise(new Error('Audio playback blocked by browser autoplay policy'))
+                      rejectPromise = null
+                      resolvePromise = null
+                    }
+                  } else {
+                    console.log('HowlerAudioPlayer: Playback started on retry')
+                  }
+                }
+              }, 100)
+            } else {
+              console.log('HowlerAudioPlayer: play() called successfully, playback should start')
+            }
+          }
           // Don't resolve here - wait for playback to end
         },
         
@@ -285,14 +313,30 @@ export class HowlerAudioPlayer {
   private cleanup(): void {
     this.stopWordTracking()
     
+    if (this.currentSound) {
+      // CRITICAL FIX: Stop and unload properly to prevent HTML5 audio pool exhaustion
+      // Stop the sound first to release the audio element immediately
+      try {
+        if (this.currentSound.playing()) {
+          this.currentSound.stop()
+        }
+      } catch (error) {
+        console.warn('HowlerAudioPlayer: Error stopping sound during cleanup', error)
+      }
+      
+      // Unload to release all resources
+      try {
+        this.currentSound.unload()
+      } catch (error) {
+        console.warn('HowlerAudioPlayer: Error unloading sound during cleanup', error)
+      }
+      
+      this.currentSound = null
+    }
+    
     if (this.blobUrl) {
       URL.revokeObjectURL(this.blobUrl)
       this.blobUrl = null
-    }
-    
-    if (this.currentSound) {
-      this.currentSound.unload()
-      this.currentSound = null
     }
     
     this.isPaused = false
