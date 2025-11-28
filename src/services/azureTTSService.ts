@@ -218,20 +218,35 @@ class AzureTTSService {
     }
 
     try {
-      const endpoint = `https://${this.region}.tts.speech.microsoft.com/cognitiveservices/v1/voices/list`;
-      const response = await fetch(endpoint, {
+      // CRITICAL FIX: Use server-side proxy endpoint to avoid CORS and authentication issues
+      // The proxy endpoint handles authentication and CORS headers properly
+      const proxyEndpoint = '/api/azure-tts';
+      const url = new URL(proxyEndpoint, window.location.origin);
+      url.searchParams.set('region', this.region);
+
+      console.log('AzureTTSService.getVoices: Fetching voices via proxy', {
+        endpoint: proxyEndpoint,
+        region: this.region
+      });
+
+      const response = await fetch(url.toString(), {
         method: 'GET',
         headers: {
-          'Ocp-Apim-Subscription-Key': this.subscriptionKey,
+          'Content-Type': 'application/json',
         },
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch voices: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({ error: response.statusText }));
+        console.error('AzureTTSService.getVoices: Proxy error', {
+          status: response.status,
+          error: errorData.error || errorData.message
+        });
+        throw new Error(`Failed to fetch voices: ${errorData.error || response.statusText}`);
       }
 
       const data = await response.json();
-      const allVoices: any[] = data || [];
+      const allVoices: any[] = Array.isArray(data) ? data : [];
       
       // Map Azure voice format to our interface
       const voices: AzureVoice[] = allVoices.map((voice: any) => ({
@@ -244,7 +259,7 @@ class AzureTTSService {
       // Filter to only neural voices for better quality
       const neuralVoices = voices.filter(v => v.voiceType === 'Neural');
       
-      console.log(`Available voices: ${neuralVoices.length} neural voices`);
+      console.log(`AzureTTSService.getVoices: Available voices: ${neuralVoices.length} neural voices`);
       
       return neuralVoices;
     } catch (error) {

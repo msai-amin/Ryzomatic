@@ -8,7 +8,64 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Only allow POST requests
+  // Handle GET requests for fetching voices list
+  if (req.method === 'GET') {
+    try {
+      // Get Azure TTS credentials from environment
+      const subscriptionKey = process.env.AZURE_TTS_KEY || process.env.VITE_AZURE_TTS_KEY;
+      const azureRegion = req.query.region as string || process.env.AZURE_TTS_REGION || process.env.VITE_AZURE_TTS_REGION || 'eastus';
+
+      if (!subscriptionKey) {
+        return res.status(500).json({ 
+          error: 'Azure TTS not configured',
+          hint: 'Set AZURE_TTS_KEY (without VITE_ prefix) in environment variables'
+        });
+      }
+
+      const endpoint = `https://${azureRegion}.tts.speech.microsoft.com/cognitiveservices/v1/voices/list`;
+      
+      console.log('Azure TTS Proxy: Fetching voices list', {
+        endpoint,
+        region: azureRegion
+      });
+
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          'Ocp-Apim-Subscription-Key': subscriptionKey,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error('Azure TTS Proxy: Failed to fetch voices', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText.substring(0, 200)
+        });
+        return res.status(response.status).json({ 
+          error: `Failed to fetch voices: ${response.statusText}`,
+          details: errorText
+        });
+      }
+
+      const voicesData = await response.json();
+      
+      console.log('Azure TTS Proxy: Voices fetched successfully', {
+        count: Array.isArray(voicesData) ? voicesData.length : 0
+      });
+
+      return res.status(200).json(voicesData);
+    } catch (error) {
+      console.error('Azure TTS Proxy: Error fetching voices', error);
+      return res.status(500).json({ 
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  // Handle POST requests for synthesis
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
