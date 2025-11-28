@@ -30,6 +30,12 @@ const getVoiceIcon = (voiceName: string): string | React.ReactNode => {
   if (voiceName.startsWith('en-GB-')) {
     return '🇬🇧' // UK flag
   }
+  if (voiceName.startsWith('en-AU-')) {
+    return '🇦🇺' // Australia flag
+  }
+  if (voiceName.startsWith('en-IE-')) {
+    return '🇮🇪' // Ireland flag
+  }
   
   // Default: no icon
   return null

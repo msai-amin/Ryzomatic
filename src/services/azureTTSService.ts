@@ -316,6 +316,10 @@ class AzureTTSService {
         'en-US-Andrew',
         'en-GB-RyanNeural',
         'en-GB-SoniaNeural',
+        'en-GB-LibbyNeural',
+        'en-AU-WilliamNeural',
+        'en-AU-AnnetteNeural',
+        'en-IE-EmilyNeural',
         'en-US-Brian', // Base name - matches "en-US-Brian" or "en-US-Brian:DragonHDLatestNeural"
         'en-US-Emma',  // Base name - matches "en-US-Emma" or "en-US-Emma:DragonHDLatestNeural"
         'en-US-AvaMultilingualNeural',
