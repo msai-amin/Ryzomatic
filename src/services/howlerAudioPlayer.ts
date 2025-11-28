@@ -18,6 +18,8 @@ export class HowlerAudioPlayer {
   private startTime: number = 0
   private pausedAt: number = 0
   private totalPauseDuration: number = 0
+  private isPlaying: boolean = false // Guard to prevent multiple simultaneous playAudio calls
+  private playAudioPromise: Promise<void> | null = null // Track ongoing playAudio call
 
   /**
    * Play audio from ArrayBuffer
@@ -27,6 +29,50 @@ export class HowlerAudioPlayer {
    * @param text - The text being spoken (for word tracking)
    */
   async playAudio(
+    audioBuffer: ArrayBuffer,
+    onEnd?: () => void,
+    onWord?: (word: string, charIndex: number) => void,
+    text?: string
+  ): Promise<void> {
+    // CRITICAL FIX: Prevent multiple simultaneous playAudio calls
+    // This is the root cause of the "too many WebMediaPlayers" error
+    if (this.isPlaying || this.playAudioPromise) {
+      console.warn('HowlerAudioPlayer: playAudio called while already playing, stopping previous and starting new')
+      // Stop and cleanup existing playback
+      if (this.currentSound) {
+        try {
+          this.currentSound.stop()
+        } catch (error) {
+          console.warn('HowlerAudioPlayer: Error stopping existing sound', error)
+        }
+      }
+      this.cleanup()
+      // Wait for previous promise to complete or timeout
+      if (this.playAudioPromise) {
+        try {
+          await Promise.race([
+            this.playAudioPromise,
+            new Promise(resolve => setTimeout(resolve, 500)) // 500ms timeout
+          ])
+        } catch (error) {
+          // Ignore errors from previous playback
+        }
+      }
+    }
+    
+    // Set flag to prevent concurrent calls
+    this.isPlaying = true
+    this.playAudioPromise = this._playAudioInternal(audioBuffer, onEnd, onWord, text)
+    
+    try {
+      await this.playAudioPromise
+    } finally {
+      this.isPlaying = false
+      this.playAudioPromise = null
+    }
+  }
+
+  private async _playAudioInternal(
     audioBuffer: ArrayBuffer,
     onEnd?: () => void,
     onWord?: (word: string, charIndex: number) => void,
@@ -44,7 +90,7 @@ export class HowlerAudioPlayer {
     this.cleanup()
     
     // Small delay to ensure cleanup completes before creating new instance
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await new Promise(resolve => setTimeout(resolve, 100))
 
     // Store callbacks and text
     this.onEndCallback = onEnd || null
@@ -193,6 +239,7 @@ export class HowlerAudioPlayer {
             resolvePromise = null
             rejectPromise = null
           }
+          this.isPlaying = false
           this.cleanup()
         },
         
@@ -205,6 +252,7 @@ export class HowlerAudioPlayer {
             resolvePromise = null
             rejectPromise = null
           }
+          this.isPlaying = false
           this.cleanup()
         }
       })
@@ -232,6 +280,8 @@ export class HowlerAudioPlayer {
   }
 
   stop(): void {
+    this.isPlaying = false
+    this.playAudioPromise = null
     if (this.currentSound) {
       this.currentSound.stop()
     }
@@ -239,7 +289,7 @@ export class HowlerAudioPlayer {
   }
 
   isSpeaking(): boolean {
-    return this.currentSound?.playing() ?? false
+    return (this.currentSound?.playing() ?? false) || this.isPlaying
   }
 
   isPausedState(): boolean {
@@ -377,6 +427,7 @@ export class HowlerAudioPlayer {
     this.startTime = 0
     this.pausedAt = 0
     this.totalPauseDuration = 0
+    // Note: Don't reset isPlaying here - it's managed by playAudio/stop/onend/onstop
   }
 }
 
