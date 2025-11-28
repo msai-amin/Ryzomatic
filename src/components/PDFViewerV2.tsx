@@ -233,19 +233,67 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     }
 
     // Find text layer for current page
+    // react-pdf-viewer uses data-page-number attribute on the inner-page div
     const currentPage = normalizedCurrentPage
-    const pageContainer = (globalDoc as any).querySelector(`[data-page-number="${currentPage}"]`)
+    
+    // Try multiple selectors to find the page container
+    let pageContainer = (globalDoc as any).querySelector(`[data-page-number="${currentPage}"]`)
     if (!pageContainer) {
+      // Try finding by rpv-core__inner-page and check data-page-number
+      const allPages = (globalDoc as any).querySelectorAll('.rpv-core__inner-page')
+      for (let i = 0; i < allPages.length; i++) {
+        const page = allPages[i] as HTMLElement
+        const pageNum = page.getAttribute('data-page-number')
+        if (pageNum && parseInt(pageNum, 10) === currentPage) {
+          pageContainer = page
+          break
+        }
+      }
+    }
+    
+    // If still not found, try to find the visible page by checking which text layer is in viewport
+    if (!pageContainer) {
+      const allTextLayers = (globalDoc as any).querySelectorAll('.rpv-core__text-layer')
+      for (let i = 0; i < allTextLayers.length; i++) {
+        const layer = allTextLayers[i] as HTMLElement
+        const rect = layer.getBoundingClientRect()
+        // Check if this layer is visible in the viewport
+        if (rect.top < window.innerHeight && rect.bottom > 0) {
+          pageContainer = layer.closest('.rpv-core__inner-page') || layer.parentElement
+          if (pageContainer) break
+        }
+      }
+    }
+    
+    if (!pageContainer) {
+      console.log('🔍 PDFViewerV2: Word highlighting - Page container not found', {
+        currentPage,
+        normalizedCurrentPage,
+        highlightCurrentWord: tts.highlightCurrentWord,
+        currentWordIndex: tts.currentWordIndex
+      })
       return
     }
 
     const textLayer = pageContainer.querySelector('.rpv-core__text-layer')
     if (!textLayer) {
+      console.log('🔍 PDFViewerV2: Word highlighting - Text layer not found', {
+        currentPage,
+        hasPageContainer: !!pageContainer
+      })
       return
     }
 
     // Get all text spans on this page
     const spans = Array.from(textLayer.querySelectorAll('span.rpv-core__text-layer-text'))
+    
+    if (spans.length === 0) {
+      console.log('🔍 PDFViewerV2: Word highlighting - No text spans found', {
+        currentPage,
+        hasTextLayer: !!textLayer
+      })
+      return
+    }
     
     // Count words across all spans to find the matching one
     let wordCount = 0
@@ -285,6 +333,20 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       
       // Scroll into view if needed
       targetSpan.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+      
+      console.log('🔍 PDFViewerV2: Word highlighted', {
+        currentPage,
+        currentWordIndex: tts.currentWordIndex,
+        wordCount,
+        targetSpanText: targetSpan.textContent?.substring(0, 50)
+      })
+    } else {
+      console.log('🔍 PDFViewerV2: Word highlighting - Target span not found', {
+        currentPage,
+        currentWordIndex: tts.currentWordIndex,
+        totalWordCount: wordCount,
+        spansCount: spans.length
+      })
     }
   }, [tts.currentWordIndex, tts.highlightCurrentWord, normalizedCurrentPage, normalizedReadingMode])
 
