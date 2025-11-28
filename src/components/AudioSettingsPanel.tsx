@@ -59,8 +59,16 @@ export const AudioSettingsPanel: React.FC<AudioSettingsPanelProps> = ({ isOpen, 
 
       const currentProvider = ttsManager.getCurrentProvider()
       if (currentProvider && tts.voice) {
-        // Stop any existing playback and update store
+        // Stop any existing playback
         ttsManager.stop()
+        
+        // Ensure voice is set before preview
+        console.log('AudioSettingsPanel: Setting voice for preview', tts.voice)
+        ttsManager.setVoice(tts.voice)
+        
+        // Small delay to ensure voice is set
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
         updateTTS({ isPlaying: true, isPaused: false })
         
         // Preview the current voice with a sample text
@@ -69,6 +77,11 @@ export const AudioSettingsPanel: React.FC<AudioSettingsPanelProps> = ({ isOpen, 
           // Update store when preview ends
           console.log('Voice preview completed')
           updateTTS({ isPlaying: false, isPaused: false })
+        })
+      } else {
+        console.warn('AudioSettingsPanel: Cannot preview - no provider or voice', {
+          hasProvider: !!currentProvider,
+          hasVoice: !!tts.voice
         })
       }
     } catch (error) {

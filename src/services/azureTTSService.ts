@@ -47,14 +47,28 @@ const VOICE_NAME_MAPPING: Record<string, string> = {
 
 // Helper function to get the official API name for a voice
 function getOfficialVoiceName(voiceName: string): string {
+  if (!voiceName) {
+    return 'en-US-AriaNeural';
+  }
+  
   if (VOICE_NAME_MAPPING[voiceName]) {
     return VOICE_NAME_MAPPING[voiceName];
   }
-  // If it already looks like an official Azure voice name, return as-is
-  if (voiceName.match(/^[a-z]{2}-[A-Z]{2}-[A-Za-z]+Neural$/)) {
+  
+  // Handle voices with colons (e.g., "en-US-Brian:DragonHDLatestNeural")
+  // Azure TTS accepts the full name with colon
+  if (voiceName.includes(':')) {
     return voiceName;
   }
+  
+  // If it already looks like an official Azure voice name, return as-is
+  // Pattern: en-US-VoiceName or en-US-VoiceNameNeural or en-US-VoiceNameMultilingualNeural
+  if (voiceName.match(/^[a-z]{2}-[A-Z]{2}-[A-Za-z0-9]+(Neural|MultilingualNeural)?$/)) {
+    return voiceName;
+  }
+  
   // Default fallback to a known working voice
+  console.warn('Azure TTS: Unknown voice name format, using fallback:', voiceName);
   return 'en-US-AriaNeural';
 }
 
@@ -338,8 +352,42 @@ class AzureTTSService {
     return { ...this.settings };
   }
 
-  setVoice(voice: AzureVoice) {
-    this.settings.voice = voice;
+  setVoice(voice: AzureVoice | any) {
+    // Convert voice from store format to AzureVoice format if needed
+    if (voice && typeof voice === 'object') {
+      // Extract locale from voice name if not provided
+      let locale = voice.locale;
+      if (!locale && voice.name) {
+        // Extract locale from voice name (e.g., "en-US-AriaNeural" -> "en-US")
+        const match = voice.name.match(/^([a-z]{2}-[A-Z]{2})/);
+        if (match) {
+          locale = match[1];
+        } else {
+          locale = 'en-US'; // Default fallback
+        }
+      }
+      if (!locale) {
+        locale = 'en-US'; // Final fallback
+      }
+      
+      // Convert to AzureVoice format
+      this.settings.voice = {
+        name: voice.name || 'en-US-AriaNeural',
+        locale: locale,
+        gender: voice.gender === 'Male' || voice.gender === 'MALE' ? 'Male' : 
+                voice.gender === 'Female' || voice.gender === 'FEMALE' ? 'Female' : 'Neutral',
+        voiceType: voice.voiceType || (voice.name && voice.name.includes('Neural') ? 'Neural' : 'Standard')
+      };
+      
+      console.log('AzureTTSService.setVoice: Voice set', {
+        name: this.settings.voice.name,
+        locale: this.settings.voice.locale,
+        gender: this.settings.voice.gender,
+        voiceType: this.settings.voice.voiceType
+      });
+    } else {
+      console.warn('AzureTTSService.setVoice: Invalid voice object', voice);
+    }
   }
 
   setSpeakingRate(rate: number) {
