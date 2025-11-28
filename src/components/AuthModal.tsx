@@ -132,11 +132,21 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-start justify-center z-50 pt-20 pb-8 px-4 overflow-y-auto" style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}>
-      <div className="rounded-lg shadow-xl w-full max-w-md animate-scale-in my-auto" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+    <div 
+      className="fixed inset-0 flex items-start justify-center z-50 pt-20 pb-8 px-4 overflow-y-auto auth-modal" 
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
+      data-testid="auth-modal"
+    >
+      <div 
+        className="rounded-lg shadow-xl w-full max-w-md animate-scale-in my-auto" 
+        style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="auth-modal-title"
+      >
         <div className="flex items-center justify-between p-6" style={{ borderBottom: '1px solid var(--color-border)' }}>
           <div className="flex items-center space-x-3">
-            <h2 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            <h2 id="auth-modal-title" className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
               {isSignUp ? 'Create Account' : 'Sign In'}
             </h2>
           </div>
