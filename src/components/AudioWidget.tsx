@@ -1012,22 +1012,23 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       return
     }
     
-    // Check if paused first (before checking if playing)
-    // This ensures resume takes priority over pause
-    const isPaused = tts.isPaused || ttsManager.isPausedState()
-    const isActuallyPlaying = tts.isPlaying && !isPaused && (ttsManager.isSpeaking() && !ttsManager.isPausedState())
+    // Check state - prioritize paused state check
+    const ttsManagerIsPaused = ttsManager.isPausedState()
+    const ttsManagerIsSpeaking = ttsManager.isSpeaking()
+    const isPaused = tts.isPaused || ttsManagerIsPaused
+    const isPlaying = tts.isPlaying && !isPaused && ttsManagerIsSpeaking && !ttsManagerIsPaused
     
     console.log('AudioWidget: handlePlayPause called', {
       ttsIsPlaying: tts.isPlaying,
       ttsIsPaused: tts.isPaused,
-      ttsManagerIsSpeaking: ttsManager.isSpeaking(),
-      ttsManagerIsPaused: ttsManager.isPausedState(),
+      ttsManagerIsSpeaking,
+      ttsManagerIsPaused,
       isPaused,
-      isActuallyPlaying
+      isPlaying
     })
     
     if (isPaused) {
-      // Resume
+      // Resume - we're paused, so resume
       console.log('AudioWidget: Resuming playback')
       pauseRequestedDuringBufferingRef.current = false
       setPauseRequestedDuringBuffering(false)
@@ -1039,8 +1040,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         console.error('AudioWidget: Failed to resume playback:', error)
         updateTTS({ isPlaying: false, isPaused: false })
       }
-    } else if (isActuallyPlaying) {
-      // Pause (save position)
+    } else if (isPlaying) {
+      // Pause - we're playing, so pause
       console.log('AudioWidget: Pausing playback')
       if (currentDocument?.id) {
         await saveCurrentPosition(currentDocument.id)
