@@ -33,6 +33,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
         className="absolute inset-0"
         style={{
           backgroundColor: 'rgba(0, 0, 0, 0.4)',
+          pointerEvents: 'none', // Allow clicks to pass through to buttons below
         }}
       />
       <div 
@@ -60,7 +61,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
       </p>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-2xl">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-2xl relative z-10">
         <div 
           className="text-center p-6 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer"
           style={{
