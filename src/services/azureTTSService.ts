@@ -764,26 +764,51 @@ class AzureTTSService {
       return;
     }
     
-    console.log('AzureTTSService: Resume called, pausedChunkIndex:', this.pausedChunkIndex);
+    console.log('AzureTTSService: Resume called', {
+      pausedChunkIndex: this.pausedChunkIndex,
+      currentChunksLength: this.currentChunks.length,
+      audioPlayerPaused: this.audioPlayer.isPausedState(),
+      audioPlayerPlaying: this.audioPlayer.isSpeaking()
+    });
     
-    // If we have chunks to resume, continue from where we left off
-    if (this.currentChunks.length > 0 && this.pausedChunkIndex >= 0) {
+    // First, try to resume the current audio player (if it's paused but still has audio loaded)
+    // This handles the case where we paused during playback of a chunk
+    if (this.audioPlayer.isPausedState() && this.audioPlayer.isSpeaking()) {
+      console.log('AzureTTSService: Resuming current audio player');
+      this.audioPlayer.resume();
+      this.speakingActive = true;
+      return;
+    }
+    
+    // If audio player is not playing and we have chunks to resume, continue from where we left off
+    if (this.currentChunks.length > 0 && this.pausedChunkIndex >= 0 && this.pausedChunkIndex < this.currentChunks.length) {
       console.log('AzureTTSService: Resuming chunk playback from index:', this.pausedChunkIndex);
       this.speakingActive = true;
       
+      // Resume from the paused chunk index
+      const remainingChunks = this.currentChunks.slice(this.pausedChunkIndex);
+      const remainingText = remainingChunks.join(' ');
+      
+      // Reset pausedChunkIndex before resuming to avoid infinite loops
+      const savedPausedChunkIndex = this.pausedChunkIndex;
+      this.pausedChunkIndex = -1;
+      
       this.speakInChunks(
-        this.currentChunks.slice(this.pausedChunkIndex).join(' '),
+        remainingText,
         9000,
         this.currentOnEnd,
         this.currentOnWord
       ).catch(err => {
         console.error('Error resuming chunk playback:', err);
         this.speakingActive = false;
+        // Restore pausedChunkIndex on error
+        this.pausedChunkIndex = savedPausedChunkIndex;
       });
     } else {
-      // Resume current playback
+      // Resume current playback (fallback)
+      console.log('AzureTTSService: Resuming current playback (fallback)');
       this.audioPlayer.resume();
-      console.log('AzureTTSService: Resumed current playback');
+      this.speakingActive = true;
     }
   }
 
