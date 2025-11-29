@@ -394,11 +394,28 @@ export class HowlerAudioPlayer {
     const millisecondsPerWord = (estimatedDuration * 1000) / words.length
     let currentWordIndex = 0
     
-    // Calculate current word index based on elapsed time so far (for resume)
-    const elapsed = (Date.now() - this.trackingStartTime - this.totalPauseDuration) / 1000
-    if (elapsed > 0) {
-      const elapsedWithOffset = elapsed + 0.15
-      currentWordIndex = Math.max(0, Math.floor((elapsedWithOffset * 1000) / millisecondsPerWord))
+    // Calculate current word index based on actual audio position (for resume)
+    // Use Howler's seek position if available, otherwise fall back to elapsed time
+    let audioPosition = 0
+    try {
+      if (this.currentSound && this.currentSoundId !== null) {
+        audioPosition = this.currentSound.seek(this.currentSoundId) || 0
+      } else if (this.currentSound) {
+        audioPosition = this.currentSound.seek() || 0
+      } else {
+        // Fallback to elapsed time if sound not available yet
+        const elapsed = (Date.now() - this.trackingStartTime - this.totalPauseDuration) / 1000
+        audioPosition = elapsed
+      }
+    } catch (error) {
+      // Fallback to elapsed time if seek fails
+      const elapsed = (Date.now() - this.trackingStartTime - this.totalPauseDuration) / 1000
+      audioPosition = elapsed
+    }
+    
+    if (audioPosition > 0) {
+      const audioPositionWithOffset = audioPosition + 0.1
+      currentWordIndex = Math.max(0, Math.floor((audioPositionWithOffset * 1000) / millisecondsPerWord))
       if (currentWordIndex >= words.length) {
         currentWordIndex = words.length - 1
       }
@@ -410,16 +427,26 @@ export class HowlerAudioPlayer {
         return
       }
 
-      // Calculate elapsed time accounting for pauses
-      // Use the instance variable trackingStartTime (not a local variable)
-      const now = Date.now()
-      const elapsed = (now - this.trackingStartTime - this.totalPauseDuration) / 1000 // seconds
+      // Use Howler's actual seek position instead of elapsed time
+      // This is more accurate because it uses the actual audio playback position
+      let audioPosition = 0
+      try {
+        if (this.currentSoundId !== null) {
+          audioPosition = this.currentSound.seek(this.currentSoundId) || 0
+        } else {
+          audioPosition = this.currentSound.seek() || 0
+        }
+      } catch (error) {
+        // Fallback to elapsed time if seek fails
+        const now = Date.now()
+        audioPosition = (now - this.trackingStartTime - this.totalPauseDuration) / 1000
+      }
       
-      // Calculate current word index based on elapsed time
-      // Add a small offset (0.15 seconds) to compensate for lag and make highlighting more responsive
-      // This advances the word position slightly ahead to account for processing delays
-      const elapsedWithOffset = elapsed + 0.15
-      const newWordIndex = Math.floor((elapsedWithOffset * 1000) / millisecondsPerWord)
+      // Calculate current word index based on actual audio position
+      // Add a small offset (0.1 seconds) to compensate for rendering lag
+      // Reduced from 0.15 to 0.1 for better sync
+      const audioPositionWithOffset = audioPosition + 0.1
+      const newWordIndex = Math.floor((audioPositionWithOffset * 1000) / millisecondsPerWord)
 
       if (newWordIndex !== currentWordIndex && newWordIndex < words.length && newWordIndex >= 0) {
         currentWordIndex = newWordIndex
