@@ -26,7 +26,7 @@ import { highlightService, Highlight as HighlightType } from '../services/highli
 import { useTheme } from '../../themes/ThemeProvider'
 import { getPDFWorkerSrc, configurePDFWorker } from '../utils/pdfjsConfig'
 import { parseTextWithBreaks, TextSegment } from '../utils/readingModeUtils'
-import { Eye, BookOpen, FileText, Type, Highlighter, Sparkles, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ZoomIn, ZoomOut, RotateCw, Search, Palette, Moon, Sun, Maximize2, StickyNote, Library, Upload, MousePointer, Save, MessageSquare, Lightbulb, X, PenTool, ChevronUp, ChevronDown } from 'lucide-react'
+import { Eye, BookOpen, FileText, Type, Highlighter, Sparkles, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ZoomIn, ZoomOut, RotateCw, Search, Palette, Moon, Sun, Maximize2, StickyNote, Library, Upload, MousePointer, Save, MessageSquare, Lightbulb, X, PenTool, ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { notesService } from '../services/notesService'
@@ -1201,6 +1201,19 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         return null
       }
       
+      // Find if the selected text matches an existing highlight (for delete option)
+      const existingHighlight = Array.isArray(highlightsRef.current) 
+        ? highlightsRef.current.find(h => {
+            const pageNumber = (props.highlightAreas?.[0]?.pageIndex ?? 0) + 1
+            // Check if text matches and page matches
+            const textMatches = h.highlighted_text && props.selectedText 
+              ? h.highlighted_text.trim().toLowerCase() === props.selectedText.trim().toLowerCase()
+              : false
+            const pageMatches = h.page_number === pageNumber
+            return textMatches && pageMatches
+          })
+        : null
+      
       // Calculate responsive popup size based on viewport
       // Get viewport dimensions for responsive sizing
       const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
@@ -1330,7 +1343,38 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             </>
           )}
 
-          {/* Selected text preview - responsive spacing */}
+          {/* Highlight Color Indicator */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: isMobile ? '8px' : '10px',
+            padding: isMobile ? '6px 8px' : '8px 10px',
+            borderRadius: '6px',
+            backgroundColor: 'var(--color-background, #0f172a)',
+            border: '1px solid var(--color-border, #374151)',
+          }}>
+            <div
+              style={{
+                width: isMobile ? '16px' : '18px',
+                height: isMobile ? '16px' : '18px',
+                backgroundColor: colorHex,
+                border: '2px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '4px',
+                flexShrink: 0,
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+              }}
+            />
+            <span style={{
+              fontSize: isMobile ? '11px' : '12px',
+              color: 'var(--color-text-secondary, #d1d5db)',
+              fontWeight: '500',
+            }}>
+              {color?.name || 'Highlight Color'}
+            </span>
+          </div>
+
+          {/* Selected text preview - with scrolling */}
           <div style={{ 
             marginBottom: isMobile ? '10px' : '12px', 
             fontSize: isMobile ? '12px' : '13px', 
@@ -1339,12 +1383,13 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             padding: isMobile ? '8px 10px' : '10px 12px',
             borderRadius: '6px',
             backgroundColor: 'var(--color-background, #0f172a)',
-            maxHeight: isMobile ? '50px' : '60px',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
+            maxHeight: isMobile ? '80px' : '100px',
+            overflowY: 'auto',
+            overflowX: 'hidden',
             border: '1px solid var(--color-border, #374151)',
+            wordWrap: 'break-word',
           }}>
-            "{props.selectedText && props.selectedText.length > (isMobile ? 60 : 80) ? props.selectedText.substring(0, isMobile ? 60 : 80) + '...' : (props.selectedText || '')}"
+            "{props.selectedText || ''}"
           </div>
 
           {/* Primary Action - Save Highlight */}
@@ -1558,6 +1603,49 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
               <StickyNote className="w-3.5 h-3.5" />
               Save Note
             </button>
+            )}
+            {/* Delete Highlight button - only show if selection matches existing highlight */}
+            {existingHighlight && (
+              <button
+                style={{
+                  backgroundColor: 'transparent',
+                  border: '1px solid #ef4444',
+                  borderRadius: '6px',
+                  padding: '6px 10px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  color: '#ef4444',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'
+                  e.currentTarget.style.color = '#dc2626'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                  e.currentTarget.style.color = '#ef4444'
+                }}
+                onClick={async () => {
+                  if (existingHighlight && window.confirm('Delete this highlight?')) {
+                    try {
+                      await highlightService.deleteHighlight(existingHighlight.id)
+                      setHighlights(prev => prev.filter(h => h.id !== existingHighlight.id))
+                      setHasUnsavedChanges(true)
+                    } catch (error) {
+                      console.error('Error deleting highlight:', error)
+                      alert('Failed to delete highlight. Please try again.')
+                    }
+                  }
+                  props.cancel()
+                }}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete
+              </button>
             )}
             <button
               style={{
