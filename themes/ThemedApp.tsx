@@ -77,13 +77,30 @@ const ThemedAppContent: React.FC = () => {
           ? book.cleanedPageTexts.map((text: any) => typeof text === 'string' ? text : String(text || ''))
           : []
 
+        // Convert PDF data to Blob if it's an ArrayBuffer (prevents detachment issues)
+        let pdfData = book.fileData
+        if (book.type === 'pdf' && book.fileData instanceof ArrayBuffer) {
+          try {
+            // Check if ArrayBuffer is detached
+            if (book.fileData.byteLength === 0) {
+              throw new Error('PDF data is corrupted (detached ArrayBuffer)')
+            }
+            // Clone and convert to Blob for safety
+            const clonedBuffer = book.fileData.slice(0)
+            pdfData = new Blob([clonedBuffer], { type: 'application/pdf' })
+          } catch (error) {
+            console.error('ThemedApp: Error converting PDF data to Blob:', error)
+            throw new Error('PDF data is corrupted. Please try re-opening the document.')
+          }
+        }
+
         const doc = {
           id: book.id,
           name: book.title || book.name || 'Untitled',
           type: book.type || 'pdf',
           content: '',
           uploadedAt: book.uploadedAt || new Date(),
-          pdfData: book.fileData,
+          pdfData: pdfData,
           totalPages: book.totalPages,
           currentPage: book.lastReadPage || 1,
           pageTexts: safePageTexts,
