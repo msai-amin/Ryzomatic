@@ -720,10 +720,28 @@ export const useAppStore = create<AppState>((set, get) => ({
       
       // Add to recently viewed documents
       get().addToRecentlyViewed(sanitizedDocument);
+      
+      // Save document ID to localStorage for persistence across page refreshes
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem('currentDocumentId', sanitizedDocument.id);
+        } catch (error) {
+          console.warn('Failed to save current document ID to localStorage:', error);
+        }
+      }
     } else {
       // CRITICAL: When setting to null, ensure we're not leaving any components with stale undefined arrays
       // This prevents race conditions during state transitions
       set({ currentDocument: document });
+      
+      // Clear saved document ID from localStorage
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.removeItem('currentDocumentId');
+        } catch (error) {
+          console.warn('Failed to remove current document ID from localStorage:', error);
+        }
+      }
     }
   },
   

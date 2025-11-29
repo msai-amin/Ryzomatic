@@ -16,6 +16,7 @@ import { CustomizableReadingWizard } from '../src/components/customReading/Custo
 import { DocumentUpload } from '../src/components/DocumentUpload'
 import { AudioWidget } from '../src/components/AudioWidget'
 import { EditorialLayout } from '../src/components/Editorial/EditorialLayout'
+import { supabaseStorageService } from '../src/services/supabaseStorageService'
 
 // Wrapper component to use onboarding hook
 const SpotlightTourWrapper: React.FC = () => {
@@ -36,12 +37,82 @@ const ThemedAppContent: React.FC = () => {
     isChatOpen,
     openCustomReadingWizard,
     isEditorialMode,
-    audioWidgetVisible
+    audioWidgetVisible,
+    setCurrentDocument
   } = useAppStore()
   const { showAchievement, AchievementToastContainer } = useAchievementToasts()
   
   // Enable keyboard shortcuts
   useKeyboardShortcuts()
+
+  // Restore document from localStorage on page load
+  useEffect(() => {
+    const restoreDocument = async () => {
+      // Only restore if user is authenticated and no document is currently loaded
+      if (!user?.id || currentDocument) {
+        return
+      }
+
+      try {
+        const savedDocumentId = window.localStorage.getItem('currentDocumentId')
+        if (!savedDocumentId) {
+          return
+        }
+
+        console.log('ThemedApp: Restoring document from localStorage:', savedDocumentId)
+        
+        // Load the document from Supabase storage
+        const book = await supabaseStorageService.getBook(savedDocumentId)
+        if (!book) {
+          console.warn('ThemedApp: Saved document not found, clearing localStorage')
+          window.localStorage.removeItem('currentDocumentId')
+          return
+        }
+
+        // Convert the book to a document format
+        const safePageTexts = Array.isArray(book.pageTexts) 
+          ? book.pageTexts.map((text: any) => typeof text === 'string' ? text : String(text || ''))
+          : []
+        const safeCleanedPageTexts = Array.isArray(book.cleanedPageTexts)
+          ? book.cleanedPageTexts.map((text: any) => typeof text === 'string' ? text : String(text || ''))
+          : []
+
+        const doc = {
+          id: book.id,
+          name: book.title || book.name || 'Untitled',
+          type: book.type || 'pdf',
+          content: '',
+          uploadedAt: book.uploadedAt || new Date(),
+          pdfData: book.fileData,
+          totalPages: book.totalPages,
+          currentPage: book.lastReadPage || 1,
+          pageTexts: safePageTexts,
+          cleanedPageTexts: safeCleanedPageTexts
+        }
+
+        console.log('ThemedApp: Restored document:', {
+          id: doc.id,
+          name: doc.name,
+          type: doc.type,
+          hasPdfData: !!doc.pdfData,
+          totalPages: doc.totalPages,
+          currentPage: doc.currentPage
+        })
+
+        setCurrentDocument(doc as any)
+      } catch (error) {
+        console.error('ThemedApp: Failed to restore document:', error)
+        // Clear invalid document ID from localStorage
+        try {
+          window.localStorage.removeItem('currentDocumentId')
+        } catch (e) {
+          // Ignore localStorage errors
+        }
+      }
+    }
+
+    restoreDocument()
+  }, [user?.id, currentDocument, setCurrentDocument])
 
   // Start background processing service
   useEffect(() => {
