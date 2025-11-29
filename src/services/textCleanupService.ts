@@ -89,9 +89,10 @@ export const cleanupDocumentText = async ({
 
   const processedPages: number[] = []
 
-  // Process pages in parallel batches for better performance
-  // Batch size of 5 balances speed with API rate limits
-  const BATCH_SIZE = 5
+  // Use a sliding window approach with constant concurrency
+  // This maintains a pool of concurrent requests rather than waiting for entire batches
+  // MAX_CONCURRENT controls how many API calls run simultaneously
+  const MAX_CONCURRENT = 15 // Increased from batch size of 5 for much better performance
   
   const processPage = async (pageNumber: number, arrayIndex: number, globalIndex: number): Promise<void> => {
     const originalText = originalTexts[arrayIndex] ?? ''
@@ -131,28 +132,45 @@ export const cleanupDocumentText = async ({
     }
   }
 
-  // Process pages in batches
-  for (let batchStart = 0; batchStart < targetPages.length; batchStart += BATCH_SIZE) {
-    const batchEnd = Math.min(batchStart + BATCH_SIZE, targetPages.length)
-    const batch = targetPages.slice(batchStart, batchEnd)
+  // Sliding window: maintain MAX_CONCURRENT concurrent requests
+  // As soon as one completes, start the next one
+  let currentIndex = 0
+  const allPromises: Promise<void>[] = []
+  
+  const startNext = (): Promise<void> => {
+    if (currentIndex >= targetPages.length) {
+      return Promise.resolve()
+    }
     
-    // Process all pages in this batch in parallel
-    const batchPromises = batch.map((pageNumber, batchIndex) => {
-      const arrayIndex = pageNumber - 1
-      const globalIndex = batchStart + batchIndex
-      return processPage(pageNumber, arrayIndex, globalIndex)
-    })
+    const pageNumber = targetPages[currentIndex]
+    const arrayIndex = pageNumber - 1
+    const globalIndex = currentIndex
+    currentIndex++
     
-    // Wait for all pages in this batch to complete before starting next batch
-    await Promise.all(batchPromises)
-    
-    logger.info('Text cleanup batch completed', { 
-      component: 'textCleanupService', 
-      batch: Math.floor(batchStart / BATCH_SIZE) + 1,
-      pagesProcessed: batchEnd,
-      totalPages: targetPages.length
+    return processPage(pageNumber, arrayIndex, globalIndex).then(() => {
+      // Start next page as soon as this one completes
+      return startNext()
+    }).catch(() => {
+      // Even on error, continue with next page
+      return startNext()
     })
   }
+  
+  // Start initial batch of concurrent requests
+  const initialBatch = Math.min(MAX_CONCURRENT, targetPages.length)
+  for (let i = 0; i < initialBatch; i++) {
+    allPromises.push(startNext())
+  }
+  
+  // Wait for all requests to complete
+  await Promise.all(allPromises)
+  
+  logger.info('Text cleanup completed', { 
+    component: 'textCleanupService', 
+    totalPages: targetPages.length,
+    processedPages: processedPages.length,
+    maxConcurrent: MAX_CONCURRENT
+  })
 
   const finalCleanedTexts = cleanedTexts.map((text, index) =>
     text && text.length > 0 ? text : existingCleaned?.[index] ?? originalTexts[index] ?? ''
