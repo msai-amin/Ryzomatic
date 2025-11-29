@@ -981,14 +981,17 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
   // Handle play/pause
   const handlePlayPause = useCallback(async () => {
+    console.log('AudioWidget: handlePlayPause ENTRY - function called')
     const now = Date.now()
     const timeSinceLastClick = now - lastClickTimeRef.current
     
     if (timeSinceLastClick < 500) {
+      console.log('AudioWidget: handlePlayPause - debounced, returning early', { timeSinceLastClick })
       return
     }
     
     lastClickTimeRef.current = now
+    console.log('AudioWidget: handlePlayPause - passed debounce check')
     
     // Allow pause during buffering
     if (isProcessing && (tts.isPlaying || ttsManager.isSpeaking())) {
