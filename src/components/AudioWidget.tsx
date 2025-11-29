@@ -993,11 +993,16 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     lastClickTimeRef.current = now
     console.log('AudioWidget: handlePlayPause - passed debounce check')
     
-    // Allow pause during buffering
-    if (isProcessing && (tts.isPlaying || ttsManager.isSpeaking())) {
+    // Check if paused first - if paused, we want to resume, not pause during buffering
+    const ttsManagerIsPaused = ttsManager.isPausedState()
+    const isPaused = tts.isPaused || ttsManagerIsPaused
+    
+    // Allow pause during buffering (but only if NOT already paused - if paused, we want to resume)
+    if (isProcessing && !isPaused && (tts.isPlaying || ttsManager.isSpeaking())) {
       // User wants to pause during buffering
       // Set flag to pause once buffering completes
       // Buffering will continue in background, but playback will be paused when ready
+      console.log('AudioWidget: handlePlayPause - pause requested during buffering')
       pauseRequestedDuringBufferingRef.current = true
       setPauseRequestedDuringBuffering(true)
       if (currentDocument?.id) {
@@ -1012,13 +1017,12 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     
     // Don't allow starting new playback if already processing
     if (isProcessing && !tts.isPlaying && !ttsManager.isSpeaking()) {
+      console.log('AudioWidget: handlePlayPause - already processing, returning early', { isProcessing, ttsIsPlaying: tts.isPlaying, ttsManagerIsSpeaking: ttsManager.isSpeaking() })
       return
     }
     
-    // Check state - prioritize paused state check
-    const ttsManagerIsPaused = ttsManager.isPausedState()
+    // Check state - prioritize paused state check (already computed above)
     const ttsManagerIsSpeaking = ttsManager.isSpeaking()
-    const isPaused = tts.isPaused || ttsManagerIsPaused
     const isPlaying = tts.isPlaying && !isPaused && ttsManagerIsSpeaking && !ttsManagerIsPaused
     
     console.log('AudioWidget: handlePlayPause called', {
