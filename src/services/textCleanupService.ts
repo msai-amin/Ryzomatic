@@ -89,16 +89,18 @@ export const cleanupDocumentText = async ({
 
   const processedPages: number[] = []
 
-  for (let index = 0; index < targetPages.length; index += 1) {
-    const pageNumber = targetPages[index]
-    const arrayIndex = pageNumber - 1
+  // Process pages in parallel batches for better performance
+  // Batch size of 5 balances speed with API rate limits
+  const BATCH_SIZE = 5
+  
+  const processPage = async (pageNumber: number, arrayIndex: number, globalIndex: number): Promise<void> => {
     const originalText = originalTexts[arrayIndex] ?? ''
 
     if (!originalText.trim()) {
       cleanedTexts[arrayIndex] = originalText
       processedPages.push(pageNumber)
-      onProgress?.({ current: index + 1, total: targetPages.length })
-      continue
+      onProgress?.({ current: globalIndex + 1, total: targetPages.length })
+      return
     }
 
     try {
@@ -119,13 +121,37 @@ export const cleanupDocumentText = async ({
 
       const payload = await response.json() as { cleanedText?: string; success?: boolean }
       cleanedTexts[arrayIndex] = normalise(payload.cleanedText && payload.cleanedText.length > 0 ? payload.cleanedText : originalText)
+      processedPages.push(pageNumber)
+      onProgress?.({ current: globalIndex + 1, total: targetPages.length })
     } catch (error) {
       logger.error('Text cleanup failed', { component: 'textCleanupService', pageNumber }, error as Error)
       cleanedTexts[arrayIndex] = originalText
+      processedPages.push(pageNumber)
+      onProgress?.({ current: globalIndex + 1, total: targetPages.length })
     }
+  }
 
-    processedPages.push(pageNumber)
-    onProgress?.({ current: index + 1, total: targetPages.length })
+  // Process pages in batches
+  for (let batchStart = 0; batchStart < targetPages.length; batchStart += BATCH_SIZE) {
+    const batchEnd = Math.min(batchStart + BATCH_SIZE, targetPages.length)
+    const batch = targetPages.slice(batchStart, batchEnd)
+    
+    // Process all pages in this batch in parallel
+    const batchPromises = batch.map((pageNumber, batchIndex) => {
+      const arrayIndex = pageNumber - 1
+      const globalIndex = batchStart + batchIndex
+      return processPage(pageNumber, arrayIndex, globalIndex)
+    })
+    
+    // Wait for all pages in this batch to complete before starting next batch
+    await Promise.all(batchPromises)
+    
+    logger.info('Text cleanup batch completed', { 
+      component: 'textCleanupService', 
+      batch: Math.floor(batchStart / BATCH_SIZE) + 1,
+      pagesProcessed: batchEnd,
+      totalPages: targetPages.length
+    })
   }
 
   const finalCleanedTexts = cleanedTexts.map((text, index) =>
