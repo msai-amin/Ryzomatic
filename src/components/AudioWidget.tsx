@@ -1012,8 +1012,36 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       return
     }
     
-    if (tts.isPlaying || ttsManager.isSpeaking()) {
+    // Check if paused first (before checking if playing)
+    // This ensures resume takes priority over pause
+    const isPaused = tts.isPaused || ttsManager.isPausedState()
+    const isActuallyPlaying = tts.isPlaying && !isPaused && (ttsManager.isSpeaking() && !ttsManager.isPausedState())
+    
+    console.log('AudioWidget: handlePlayPause called', {
+      ttsIsPlaying: tts.isPlaying,
+      ttsIsPaused: tts.isPaused,
+      ttsManagerIsSpeaking: ttsManager.isSpeaking(),
+      ttsManagerIsPaused: ttsManager.isPausedState(),
+      isPaused,
+      isActuallyPlaying
+    })
+    
+    if (isPaused) {
+      // Resume
+      console.log('AudioWidget: Resuming playback')
+      pauseRequestedDuringBufferingRef.current = false
+      setPauseRequestedDuringBuffering(false)
+      try {
+        await ttsManager.resume()
+        updateTTS({ isPlaying: true, isPaused: false }) // CLEAR PAUSED FLAG
+        console.log('AudioWidget: Resume successful')
+      } catch (error) {
+        console.error('AudioWidget: Failed to resume playback:', error)
+        updateTTS({ isPlaying: false, isPaused: false })
+      }
+    } else if (isActuallyPlaying) {
       // Pause (save position)
+      console.log('AudioWidget: Pausing playback')
       if (currentDocument?.id) {
         await saveCurrentPosition(currentDocument.id)
       }
@@ -1021,17 +1049,6 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
       updateTTS({ isPlaying: false, isPaused: true }) // SET PAUSED FLAG
       pauseRequestedDuringBufferingRef.current = false
       setPauseRequestedDuringBuffering(false)
-    } else if (tts.isPaused || ttsManager.isPausedState()) { // CHECK STORE PAUSED STATE OR TTS MANAGER STATE
-      // Resume
-      pauseRequestedDuringBufferingRef.current = false
-      setPauseRequestedDuringBuffering(false)
-      try {
-        await ttsManager.resume()
-        updateTTS({ isPlaying: true, isPaused: false }) // CLEAR PAUSED FLAG
-      } catch (error) {
-        console.error('AudioWidget: Failed to resume playback:', error)
-        updateTTS({ isPlaying: false, isPaused: false })
-      }
     } else {
       // Start new playback with caching
       setIsProcessing(true)

@@ -335,8 +335,9 @@ export class HowlerAudioPlayer {
   }
 
   isSpeaking(): boolean {
-    // A sound is "speaking" if it's playing OR if it's paused (because it can be resumed)
-    return (this.currentSound?.playing() ?? false) || this.isPaused || this.isPlaying
+    // A sound is "speaking" if it's currently playing (not paused)
+    // Note: We check isPaused separately via isPausedState()
+    return (this.currentSound?.playing() ?? false) || (this.isPlaying && !this.isPaused)
   }
 
   isPausedState(): boolean {
