@@ -9,6 +9,7 @@ import { Howl } from 'howler'
 
 export class HowlerAudioPlayer {
   private currentSound: Howl | null = null
+  private currentSoundId: number | null = null // Track the sound ID for proper pause/resume
   private blobUrl: string | null = null
   private isPaused: boolean = false
   private onEndCallback: (() => void) | null = null
@@ -18,6 +19,7 @@ export class HowlerAudioPlayer {
   private startTime: number = 0
   private pausedAt: number = 0
   private totalPauseDuration: number = 0
+  private trackingStartTime: number = 0 // Track when word tracking started (for resume)
   private isPlaying: boolean = false // Guard to prevent multiple simultaneous playAudio calls
   private playAudioPromise: Promise<void> | null = null // Track ongoing playAudio call
 
@@ -99,6 +101,7 @@ export class HowlerAudioPlayer {
     this.startTime = Date.now()
     this.pausedAt = 0
     this.totalPauseDuration = 0
+    this.trackingStartTime = 0 // Reset for new playback
 
     // Validate audio buffer
     if (!audioBuffer || audioBuffer.byteLength === 0) {
@@ -179,12 +182,14 @@ export class HowlerAudioPlayer {
                     }
                   } else {
                     console.log('HowlerAudioPlayer: Playback started on retry')
+                    this.currentSoundId = retryId
                     playbackStarted = true
                   }
                 }
               }, 100)
             } else {
               console.log('HowlerAudioPlayer: play() called successfully, playback should start')
+              this.currentSoundId = playId
               playbackStarted = true
             }
           } else if (this.currentSound?.playing()) {
@@ -204,6 +209,9 @@ export class HowlerAudioPlayer {
         },
         
         onplay: (id) => {
+          // Store the sound ID for proper pause/resume
+          this.currentSoundId = id
+          
           // CRITICAL FIX: Guard against multiple onplay calls
           // Only log and update state once per actual playback start
           if (!playbackStarted) {
@@ -261,21 +269,58 @@ export class HowlerAudioPlayer {
 
   pause(): void {
     if (this.currentSound && this.currentSound.playing()) {
-      this.currentSound.pause()
+      // Use the stored sound ID if available, otherwise pause all instances
+      if (this.currentSoundId !== null) {
+        this.currentSound.pause(this.currentSoundId)
+      } else {
+        this.currentSound.pause()
+      }
       this.isPaused = true
+      this.pausedAt = Date.now()
     }
   }
 
   resume(): void {
     if (this.currentSound && this.isPaused) {
-      this.currentSound.play()
-      this.isPaused = false
-      // Adjust pause duration when resuming
+      // Adjust pause duration when resuming BEFORE calling play()
       if (this.pausedAt > 0) {
         this.totalPauseDuration += Date.now() - this.pausedAt
         this.pausedAt = 0
       }
-      this.startWordTracking()
+      
+      // Resume playback - use the stored sound ID if available
+      let playId: number | undefined
+      if (this.currentSoundId !== null) {
+        // Try to resume the specific sound instance
+        playId = this.currentSound.play(this.currentSoundId)
+      } else {
+        // Fallback: play new instance (shouldn't happen, but handle it)
+        playId = this.currentSound.play()
+        if (playId !== undefined) {
+          this.currentSoundId = playId
+        }
+      }
+      
+      if (playId === undefined) {
+        console.warn('HowlerAudioPlayer: resume() play() returned undefined, trying without ID')
+        // Try without ID as fallback
+        const fallbackId = this.currentSound.play()
+        if (fallbackId !== undefined) {
+          this.currentSoundId = fallbackId
+          playId = fallbackId
+        } else {
+          console.error('HowlerAudioPlayer: resume() failed completely')
+          return
+        }
+      }
+      
+      this.isPaused = false
+      
+      // Resume word tracking (don't reset trackingStartTime - it should continue from where it left off)
+      // Only restart if tracking was stopped
+      if (!this.wordTrackingInterval) {
+        this.startWordTracking()
+      }
     }
   }
 
@@ -285,6 +330,7 @@ export class HowlerAudioPlayer {
     if (this.currentSound) {
       this.currentSound.stop()
     }
+    this.stopWordTracking()
     this.cleanup()
   }
 
@@ -338,9 +384,23 @@ export class HowlerAudioPlayer {
       return
     }
 
+    // Only reset trackingStartTime if it's not already set (i.e., this is a new playback, not a resume)
+    if (this.trackingStartTime === 0) {
+      this.trackingStartTime = Date.now()
+    }
+
     const millisecondsPerWord = (estimatedDuration * 1000) / words.length
     let currentWordIndex = 0
-    const trackingStartTime = Date.now()
+    
+    // Calculate current word index based on elapsed time so far (for resume)
+    const elapsed = (Date.now() - this.trackingStartTime - this.totalPauseDuration) / 1000
+    if (elapsed > 0) {
+      const elapsedWithOffset = elapsed + 0.15
+      currentWordIndex = Math.max(0, Math.floor((elapsedWithOffset * 1000) / millisecondsPerWord))
+      if (currentWordIndex >= words.length) {
+        currentWordIndex = words.length - 1
+      }
+    }
 
     this.wordTrackingInterval = window.setInterval(() => {
       if (!this.currentSound || !this.currentSound.playing()) {
@@ -349,8 +409,9 @@ export class HowlerAudioPlayer {
       }
 
       // Calculate elapsed time accounting for pauses
+      // Use the instance variable trackingStartTime (not a local variable)
       const now = Date.now()
-      const elapsed = (now - trackingStartTime - this.totalPauseDuration) / 1000 // seconds
+      const elapsed = (now - this.trackingStartTime - this.totalPauseDuration) / 1000 // seconds
       
       // Calculate current word index based on elapsed time
       // Add a small offset (0.15 seconds) to compensate for lag and make highlighting more responsive
@@ -424,12 +485,14 @@ export class HowlerAudioPlayer {
     }
     
     this.isPaused = false
+    this.currentSoundId = null
     this.onEndCallback = null
     this.onWordCallback = null
     this.text = ''
     this.startTime = 0
     this.pausedAt = 0
     this.totalPauseDuration = 0
+    this.trackingStartTime = 0
     // Note: Don't reset isPlaying here - it's managed by playAudio/stop/onend/onstop
   }
 }
