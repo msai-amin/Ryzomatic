@@ -1022,6 +1022,18 @@
   text-rendering: optimizeLegibility;
 }
 
+/* Remove any text decorations (strikethrough, underline, etc.) from PDF text layer */
+.pdf-viewer-container .rpv-core__text-layer,
+.pdf-viewer-container .rpv-core__text-layer *,
+.pdf-viewer-container .rpv-core__text-layer-text,
+.pdf-viewer-container .rpv-core__text-layer-text * {
+  text-decoration: none !important;
+  text-decoration-line: none !important;
+  text-decoration-color: transparent !important;
+  text-decoration-style: none !important;
+  text-decoration-thickness: 0 !important;
+}
+
 /* Ensure highlight layer is NOT affected by canvas optimizations */
 /* Highlights use react-pdf-viewer's getCssProperties() which handles positioning independently */
 .pdf-viewer-container .rpv-highlight__area,
