@@ -904,34 +904,51 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
     }
   }, [user, updateTTS, loadTTSPosition])
 
-  // Detect document changes and stop audio
+  // Detect document changes and fully reset audio player
   useEffect(() => {
     if (currentDocument?.id !== previousDocumentIdRef.current) {
-      // Document switched - stop audio immediately
-      if (tts.isPlaying && previousDocumentIdRef.current) {
-        console.log('🔄 Document changed - stopping audio')
-        
-        // Save position before stopping
+      console.log('🔄 Document changed - resetting audio player', {
+        previousId: previousDocumentIdRef.current,
+        newId: currentDocument?.id,
+        wasPlaying: tts.isPlaying,
+        wasPaused: tts.isPaused
+      })
+      
+      // Save position for previous document before stopping
+      if (previousDocumentIdRef.current) {
         saveCurrentPosition(previousDocumentIdRef.current)
-        
-        // Stop audio
-        ttsManager.stop()
-        updateTTS({ isPlaying: false, currentWordIndex: null })
       }
       
-      // CRITICAL: Reset paragraphs immediately when document changes
-      // This ensures old paragraphs don't persist
-      updateTTS({ paragraphs: [], currentParagraphIndex: 0, currentWordIndex: null })
+      // Stop audio immediately and reset all TTS state
+      ttsManager.stop()
+      
+      // Fully reset all TTS state to initial values
+      updateTTS({
+        isPlaying: false,
+        isPaused: false,
+        currentWordIndex: null,
+        highlightCurrentWord: false,
+        paragraphs: [],
+        currentParagraphIndex: 0
+      })
+      
+      // Reset local state
+      setCurrentTime(0)
+      setDuration(0)
+      setIsProcessing(false)
+      setPauseRequestedDuringBuffering(false)
+      pauseRequestedDuringBufferingRef.current = false
+      playbackStartedRef.current = false
       
       // Update ref for next change
       previousDocumentIdRef.current = currentDocument?.id || null
       
-      // Load saved position for new document
+      // Load saved position for new document (if any)
       if (currentDocument?.id) {
         loadSavedPosition(currentDocument.id)
       }
     }
-  }, [normalizedDocumentId, tts.isPlaying, saveCurrentPosition, loadSavedPosition, updateTTS])
+  }, [normalizedDocumentId, saveCurrentPosition, loadSavedPosition, updateTTS])
 
   // Auto-save position every 5 seconds while playing
   useEffect(() => {
