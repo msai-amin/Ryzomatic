@@ -1023,15 +1023,50 @@
 }
 
 /* Remove any text decorations (strikethrough, underline, etc.) from PDF text layer */
+/* Apply to all possible text layer elements and their children */
 .pdf-viewer-container .rpv-core__text-layer,
 .pdf-viewer-container .rpv-core__text-layer *,
 .pdf-viewer-container .rpv-core__text-layer-text,
-.pdf-viewer-container .rpv-core__text-layer-text * {
+.pdf-viewer-container .rpv-core__text-layer-text *,
+.pdf-viewer-container .rpv-core__text-layer span,
+.pdf-viewer-container .rpv-core__text-layer span *,
+.pdf-viewer-container [class*="text-layer"],
+.pdf-viewer-container [class*="text-layer"] *,
+.pdf-viewer-container [class*="rpv-core__text-layer"],
+.pdf-viewer-container [class*="rpv-core__text-layer"] * {
   text-decoration: none !important;
   text-decoration-line: none !important;
   text-decoration-color: transparent !important;
   text-decoration-style: none !important;
   text-decoration-thickness: 0 !important;
+  -webkit-text-decoration: none !important;
+  -moz-text-decoration: none !important;
+  /* Remove any borders or outlines that might appear as strikethrough */
+  border-top: none !important;
+  border-bottom: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove red bounding boxes and debug overlays */
+.pdf-viewer-container [style*="border"][style*="red"],
+.pdf-viewer-container [style*="outline"][style*="red"],
+.pdf-viewer-container [style*="border-color: red"],
+.pdf-viewer-container [style*="outline-color: red"] {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove any selection preview styles that might show as red boxes */
+.pdf-viewer-container .rpv-highlight__selected-area,
+.pdf-viewer-container [class*="selected-area"],
+.pdf-viewer-container [class*="selection-preview"] {
+  border: none !important;
+  outline: none !important;
+  background-color: transparent !important;
 }
 
 /* Ensure highlight layer is NOT affected by canvas optimizations */

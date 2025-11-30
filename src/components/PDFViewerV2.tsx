@@ -2955,6 +2955,25 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             .pdf-viewer-container [data-highlight-id] {
               /* Let saved highlights use their assigned colors - don't override */
             }
+            
+            /* Remove strikethrough and red bounding boxes from PDF text layer */
+            .pdf-viewer-container .rpv-core__text-layer *,
+            .pdf-viewer-container .rpv-core__text-layer-text,
+            .pdf-viewer-container .rpv-core__text-layer-text * {
+              text-decoration: none !important;
+              text-decoration-line: none !important;
+              -webkit-text-decoration: none !important;
+              -moz-text-decoration: none !important;
+              border: none !important;
+              outline: none !important;
+            }
+            
+            /* Remove any red borders or outlines */
+            .pdf-viewer-container [style*="border"][style*="red"],
+            .pdf-viewer-container [style*="outline"][style*="red"] {
+              border: none !important;
+              outline: none !important;
+            }
           `}</style>
           {isPDFjsReady ? (
             <Worker workerUrl={getPDFWorkerSrc()}>
