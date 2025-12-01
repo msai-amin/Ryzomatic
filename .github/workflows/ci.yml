@@ -83,70 +83,12 @@ jobs:
             echo "✅ Port 3001 is free"
           fi
 
-      - name: Start preview server
-        run: |
-          echo "Starting preview server on port 3001..."
-          # Start server in background with logging
-          npm run preview > server.log 2>&1 &
-          SERVER_PID=$!
-          echo $SERVER_PID > server.pid
-          echo "Started server with PID: $SERVER_PID"
-          
-          # Wait a moment for server to initialize
-          sleep 3
-          
-          # Check if process is still running
-          if ! kill -0 $SERVER_PID 2>/dev/null; then
-            echo "❌ Server process died immediately. Logs:"
-            cat server.log || true
-            exit 1
-          fi
-          echo "✅ Server process is running (PID: $SERVER_PID)"
-        env:
-          PORT: 3001
-
-      - name: Wait for server to be ready
-        run: |
-          echo "Waiting for server to be ready on http://localhost:3001..."
-          # Use wait-on for reliable waiting (installs if needed)
-          npx -y wait-on http://localhost:3001 --timeout 120000 --interval 2000 || {
-            echo "❌ Server failed to become ready. Checking status..."
-            if [ -f server.pid ]; then
-              SERVER_PID=$(cat server.pid)
-              if kill -0 $SERVER_PID 2>/dev/null; then
-                echo "Server process is still running (PID: $SERVER_PID)"
-              else
-                echo "Server process died. Logs:"
-                cat server.log || true
-              fi
-            fi
-            echo "Port status:"
-            lsof -i :3001 || echo "No process on port 3001"
-            exit 1
-          }
-          echo "✅ Server is ready and responding!"
-
       - name: E2E tests
         run: npm run test:e2e:ci
         env:
-          PLAYWRIGHT_TEST_BASE_URL: http://localhost:3001
           CI: true
           NODE_ENV: test
-
-      - name: Stop preview server
-        if: always()
-        run: |
-          if [ -f server.pid ]; then
-            SERVER_PID=$(cat server.pid)
-            echo "Stopping server with PID: $SERVER_PID"
-            kill $SERVER_PID 2>/dev/null || true
-            # Wait a moment, then force kill if still running
-            sleep 2
-            kill -9 $SERVER_PID 2>/dev/null || true
-            rm -f server.pid
-          fi
-          # Also kill any remaining vite processes
-          pkill -f "vite preview" || true
+        # Note: Playwright's webServer will automatically start the preview server
 
       - name: Upload dist artifact
         if: success()
