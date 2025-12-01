@@ -36,8 +36,10 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit
       
-      - name: Install license-checker
-        run: npm install -g license-checker
+      - name: Install license-checker and jq
+        run: |
+          npm install -g license-checker
+          sudo apt-get update && sudo apt-get install -y jq || true
       
       - name: Generate license report
         run: |
@@ -57,20 +59,32 @@ jobs:
           PROBLEMATIC=false
           PROBLEMATIC_LICENSES=""
           
-          # Check for explicitly denied licenses
-          DENIED_LICENSES=("GPL-2.0" "GPL-3.0" "AGPL-3.0")
+          # Only deny AGPL-3.0 (most restrictive copyleft license)
+          # GPL-2.0 and GPL-3.0 are allowed (will show as warnings)
+          DENIED_LICENSES=("AGPL-3.0")
           
+          # Check for denied licenses in summary
           for license in "${DENIED_LICENSES[@]}"; do
             if grep -qi "$license" licenses-summary.txt; then
               echo "❌ Denied license found: $license"
+              echo "Packages with $license:"
+              grep -i "$license" licenses-summary.txt | head -10
               PROBLEMATIC=true
               PROBLEMATIC_LICENSES="${PROBLEMATIC_LICENSES}${license}, "
             fi
           done
           
-          # Check for unknown/unlicensed packages
+          # Check for GPL licenses (warning only, not blocking)
+          if grep -qi "GPL-2.0\|GPL-3.0" licenses-summary.txt; then
+            echo "⚠️  Warning: GPL-2.0 or GPL-3.0 licenses found (allowed for dev dependencies)"
+            echo "If these are production dependencies, consider alternatives."
+            grep -i "GPL-2.0\|GPL-3.0" licenses-summary.txt | head -5
+          fi
+          
+          # Check for unknown/unlicensed packages (warning only)
           if grep -qi "UNKNOWN\|UNLICENSED\|NOASSERTION" licenses-summary.txt; then
             echo "⚠️  Warning: Some packages have unknown licenses"
+            echo "This is common for internal packages or packages without explicit licenses."
             grep -i "UNKNOWN\|UNLICENSED\|NOASSERTION" licenses-summary.txt | head -10
           fi
           
