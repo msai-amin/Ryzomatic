@@ -91,8 +91,11 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
                   className={`p-3 rounded-lg border text-left transition-colors ${
                     typography.fontFamily === value
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-300 hover:border-gray-400 text-transparent'
+                      : 'border-gray-300 hover:border-gray-400'
                   }`}
+                  style={{
+                    color: typography.fontFamily === value ? undefined : 'var(--color-text-primary, #1f2937)'
+                  }}
                 >
                   <div className={`text-lg mb-1 ${value === 'serif' ? 'font-serif' : value === 'mono' ? 'font-mono' : 'font-sans'}`}>
                     {preview}
@@ -172,13 +175,13 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
                       : 'border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-500'
                   }`}
                   style={{
-                    color: typography.theme === value ? undefined : 'var(--color-text-primary)'
+                    color: typography.theme === value ? undefined : 'var(--color-text-primary, #1f2937)'
                   }}
                 >
-                  <div className="text-2xl mb-1">{preview}</div>
+                  <div className="text-2xl mb-1" style={{ color: typography.theme === value ? undefined : 'var(--color-text-primary, #1f2937)' }}>{preview}</div>
                   <div className="text-sm font-medium">{label}</div>
                   {description && (
-                    <div className="text-xs mt-1 opacity-70">{description}</div>
+                    <div className="text-xs mt-1 opacity-70" style={{ color: typography.theme === value ? undefined : 'var(--color-text-primary, #1f2937)' }}>{description}</div>
                   )}
                 </button>
               ))}
@@ -203,8 +206,11 @@ export const TypographySettings: React.FC<TypographySettingsProps> = ({ onClose 
                   className={`p-3 rounded-lg border text-center transition-colors ${
                     typography.textAlign === value
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-300 hover:border-gray-400 text-transparent'
+                      : 'border-gray-300 hover:border-gray-400'
                   }`}
+                  style={{
+                    color: typography.textAlign === value ? undefined : 'var(--color-text-primary, #1f2937)'
+                  }}
                 >
                   <Icon className="w-5 h-5 mx-auto mb-1" />
                   <div className="text-sm">{label}</div>

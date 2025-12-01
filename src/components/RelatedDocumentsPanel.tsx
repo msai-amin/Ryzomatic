@@ -179,7 +179,7 @@ export const RelatedDocumentsPanel: React.FC<RelatedDocumentsPanelProps> = ({
           throw new Error('Not authenticated. Please sign in and try again.');
         }
 
-        const response = await fetch('/api/documents/relationships', {
+        const response = await fetch('/api/documents', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

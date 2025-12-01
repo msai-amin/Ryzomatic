@@ -5,6 +5,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -12,6 +13,17 @@ const supabase = createClient(
 );
 
 const OPENALEX_BASE_URL = 'https://api.openalex.org';
+
+/**
+ * Initialize Gemini client
+ */
+function getGeminiClient() {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Gemini API key not configured');
+  }
+  return new GoogleGenerativeAI(apiKey);
+}
 
 /**
  * Main handler
@@ -294,85 +306,146 @@ async function handleUpdateFeedback(
 }
 
 /**
- * Get recommendations based on document content (for drafts/unpublished papers)
+ * Get recommendations based on document content using Gemini AI for intelligent analysis
  */
 async function getContentBasedRecommendations(
   document: { title?: string; content?: string },
   limit: number,
   email?: string
 ): Promise<any[]> {
-  // Extract search query from document
-  let searchQuery = '';
-  
-  // Use title if available
-  if (document.title && document.title.length > 10) {
-    searchQuery = document.title;
-  }
-  
-  // If we have content, extract key phrases (first 2000 chars usually contain abstract/intro)
-  if (document.content && document.content.length > 100) {
-    const contentPreview = document.content.substring(0, 2000);
-    
-    // Extract potential keywords (simple heuristic - can be improved with AI)
-    const words = contentPreview
-      .toLowerCase()
-      .replace(/[^\w\s]/g, ' ')
-      .split(/\s+/)
-      .filter(w => w.length > 4) // Filter short words
-      .filter(w => !['this', 'that', 'with', 'from', 'have', 'been', 'will', 'would', 'which', 'their', 'there', 'these', 'those'].includes(w));
-    
-    // Get most common words (simple keyword extraction)
-    const wordFreq: Record<string, number> = {};
-    words.forEach(w => {
-      wordFreq[w] = (wordFreq[w] || 0) + 1;
-    });
-    
-    const topKeywords = Object.entries(wordFreq)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([word]) => word);
-    
-    // Combine title and keywords for search
-    if (searchQuery) {
-      searchQuery = `${searchQuery} ${topKeywords.join(' ')}`;
-    } else {
-      searchQuery = topKeywords.join(' ');
-    }
-  }
-  
-  if (!searchQuery || searchQuery.length < 5) {
-    return []; // Can't search with empty query
-  }
-  
-  // Search OpenAlex
-  let url = `${OPENALEX_BASE_URL}/works?search=${encodeURIComponent(searchQuery)}&per-page=${limit}&sort=cited_by_count:desc`;
-  if (email) {
-    url += `&mailto=${encodeURIComponent(email)}`;
-  }
-  
-  const response = await fetch(url, {
-    headers: { Accept: 'application/json' },
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`OpenAlex API error: ${response.status} - ${errorText.substring(0, 100)}`);
-  }
-  
-  const responseText = await response.text();
-  if (!responseText || responseText.trim().length === 0) {
-    return []; // Return empty array if no content
-  }
-  
-  let data;
   try {
-    data = JSON.parse(responseText);
-  } catch (parseError) {
-    console.error('Failed to parse OpenAlex response:', responseText.substring(0, 200));
-    return []; // Return empty array on parse error
+    // Use Gemini to intelligently extract search queries from the document
+    const geminiClient = getGeminiClient();
+    const model = geminiClient.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+    // Prepare document content for analysis (first 10000 chars for context)
+    const contentPreview = document.content
+      ? document.content.substring(0, 10000)
+      : '';
+
+    const title = document.title || 'Untitled Document';
+
+    const prompt = `You are an expert academic research assistant. Analyze the following document and extract the most important search terms and concepts for finding related academic papers.
+
+Document Title: ${title}
+
+Document Content (preview):
+${contentPreview}
+
+Based on this document, generate 3-5 optimized search queries for finding related academic papers. Focus on:
+1. Core research concepts and methodologies
+2. Key technical terms and domain-specific vocabulary
+3. Research questions or problems addressed
+4. Important theoretical frameworks or models mentioned
+
+Return ONLY a JSON array of search query strings, like this:
+["query 1", "query 2", "query 3"]
+
+Each query should be 3-10 words and optimized for academic paper search.`;
+
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const text = response.text();
+
+    // Parse the JSON array from Gemini's response
+    let searchQueries: string[] = [];
+    try {
+      // Extract JSON array from response (handle markdown code blocks)
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        searchQueries = JSON.parse(jsonMatch[0]);
+      } else {
+        // Fallback: try to parse the whole response
+        searchQueries = JSON.parse(text);
+      }
+    } catch (parseError) {
+      console.error('Failed to parse Gemini response:', text);
+      // Fallback to simple keyword extraction
+      if (title && title.length > 10) {
+        searchQueries = [title];
+      } else if (contentPreview) {
+        const words = contentPreview
+          .toLowerCase()
+          .replace(/[^\w\s]/g, ' ')
+          .split(/\s+/)
+          .filter(w => w.length > 4)
+          .slice(0, 5);
+        searchQueries = [words.join(' ')];
+      }
+    }
+
+    if (!searchQueries || searchQueries.length === 0) {
+      return [];
+    }
+
+    // Search OpenAlex with each query and combine results
+    const allResults: any[] = [];
+    const seenIds = new Set<string>();
+
+    for (const query of searchQueries.slice(0, 3)) { // Limit to 3 queries to avoid too many API calls
+      if (!query || query.length < 5) continue;
+
+      let url = `${OPENALEX_BASE_URL}/works?search=${encodeURIComponent(query)}&per-page=${Math.ceil(limit / searchQueries.length)}&sort=cited_by_count:desc`;
+      if (email) {
+        url += `&mailto=${encodeURIComponent(email)}`;
+      }
+
+      try {
+        const response = await fetch(url, {
+          headers: { Accept: 'application/json' },
+        });
+
+        if (!response.ok) {
+          console.error(`OpenAlex API error for query "${query}": ${response.status}`);
+          continue;
+        }
+
+        const responseText = await response.text();
+        if (!responseText || responseText.trim().length === 0) {
+          continue;
+        }
+
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('Failed to parse OpenAlex response:', responseText.substring(0, 200));
+          continue;
+        }
+
+        // Add results, avoiding duplicates
+        if (data.results) {
+          for (const work of data.results) {
+            const workId = work.id?.split('/').pop() || work.id;
+            if (workId && !seenIds.has(workId)) {
+              seenIds.add(workId);
+              allResults.push(work);
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error searching OpenAlex with query "${query}":`, error);
+        continue;
+      }
+    }
+
+    // Sort by citation count and limit results
+    allResults.sort((a, b) => (b.cited_by_count || 0) - (a.cited_by_count || 0));
+
+    return transformWorks(allResults.slice(0, limit), 'semantic');
+  } catch (error: any) {
+    console.error('Error in Gemini-based recommendations:', error);
+    // Fallback to simple search if Gemini fails
+    if (document.title && document.title.length > 10) {
+      const url = `${OPENALEX_BASE_URL}/works?search=${encodeURIComponent(document.title)}&per-page=${limit}&sort=cited_by_count:desc${email ? `&mailto=${encodeURIComponent(email)}` : ''}`;
+      const response = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (response.ok) {
+        const data = await response.json();
+        return transformWorks(data.results || [], 'semantic');
+      }
+    }
+    return [];
   }
-  
-  return transformWorks(data.results || [], 'semantic');
 }
 
 /**

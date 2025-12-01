@@ -1,3 +1,8 @@
+/**
+ * Consolidated Utils API
+ * Handles text cleanup and formula conversion in a single endpoint
+ */
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { geminiService } from '../../lib/gemini.js';
 
@@ -13,12 +18,112 @@ interface CleanupPreferences {
 }
 
 /**
- * Text Cleanup API Endpoint
- * 
- * Uses Gemini 2.5 Flash Lite to organize and clean text based on user preferences
- * This endpoint doesn't require authentication as it's used internally in reading mode
+ * Preprocess text to remove publication metadata using regex patterns
+ * This improves accuracy and reduces token usage before sending to Gemini
  */
+function preprocessPublicationMetadata(text: string): string {
+  let cleaned = text;
+
+  // Remove lines containing DOI patterns
+  cleaned = cleaned.replace(/^.*DOI\s+[\d\.\/]+\s*$/gim, '');
+  
+  // Remove "In Journal of..." or "In [Journal Name]..." patterns
+  cleaned = cleaned.replace(/^In\s+(Journal\s+of\s+)?[A-Z][^\.]+\.?\s*\d{4}\/\d+\s+No\s+\d+.*$/gim, '');
+  
+  // Remove publisher lines (e.g., "PublisherCollège international de Philosophie")
+  cleaned = cleaned.replace(/^Publisher[A-Z][^\n]*$/gim, '');
+  
+  // Remove "pages X to Y" patterns
+  cleaned = cleaned.replace(/^.*pages?\s+\d+\s+to\s+\d+.*$/gim, '');
+  
+  // Remove full URL lines (http://, https://)
+  cleaned = cleaned.replace(/^https?:\/\/[^\s]+\s*$/gim, '');
+  
+  // Remove "Article available online at" lines
+  cleaned = cleaned.replace(/^Article\s+available\s+online\s+at.*$/gim, '');
+  
+  // Remove "Discover the contents..." lines
+  cleaned = cleaned.replace(/^Discover\s+the\s+contents.*$/gim, '');
+  
+  // Remove "follow the journal by email, subscribe..." lines
+  cleaned = cleaned.replace(/^.*follow\s+the\s+journal\s+by\s+email.*subscribe.*$/gim, '');
+  
+  // Remove QR code instructions
+  cleaned = cleaned.replace(/^Scan\s+this\s+QR\s+Code.*$/gim, '');
+  cleaned = cleaned.replace(/^.*QR\s+Code.*$/gim, '');
+  
+  // Remove "Downloaded on..." with IP addresses
+  cleaned = cleaned.replace(/^.*Downloaded\s+on\s+\d{1,2}\/\d{1,2}\/\d{4}.*$/gim, '');
+  cleaned = cleaned.replace(/^.*\(IP:\s+\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\).*$/gim, '');
+  
+  // Remove lines with IP addresses in parentheses
+  cleaned = cleaned.replace(/^.*\(IP:\s*[\d\.]+\).*$/gim, '');
+  
+  // Remove "from https://..." download references
+  cleaned = cleaned.replace(/^.*from\s+https?:\/\/[^\s]+.*$/gim, '');
+  
+  // Remove journal/publisher names at start of lines (common pattern)
+  cleaned = cleaned.replace(/^[A-Z][a-z]+\s+(international|de|du|des|la|le|les)\s+[A-Z][a-z]+.*$/gim, '');
+  
+  // Remove ISSN patterns
+  cleaned = cleaned.replace(/^.*ISSN\s+[\d\-X]+.*$/gim, '');
+  
+  // Remove "Cairn.info" references
+  cleaned = cleaned.replace(/^.*cairn\.info.*$/gim, '');
+  
+  // Remove lines that are mostly URLs or email-like patterns
+  cleaned = cleaned.replace(/^[^\s]*@[^\s]*\s*$/gim, '');
+  
+  // Remove standalone copyright symbols and notices
+  cleaned = cleaned.replace(/^[©©]\s*.*$/gim, '');
+  cleaned = cleaned.replace(/^Copyright\s+©.*$/gim, '');
+  cleaned = cleaned.replace(/^©\s+\d{4}.*$/gim, '');
+  
+  // Remove "All rights reserved" lines
+  cleaned = cleaned.replace(/^.*All\s+rights\s+reserved.*$/gim, '');
+  
+  // Remove "The Authors" attribution lines (at end of articles)
+  cleaned = cleaned.replace(/^.*The\s+Authors.*$/gim, '');
+  
+  // Remove "published by..." lines
+  cleaned = cleaned.replace(/^.*published\s+by\s+[A-Z].*$/gim, '');
+  
+  // Remove lines that are mostly numbers and special chars (likely metadata)
+  cleaned = cleaned.replace(/^[\d\s\.\/\-\:]+$/gm, '');
+  
+  // Remove empty lines that were created by removals (but preserve paragraph structure)
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+  
+  // Clean up leading/trailing whitespace on each line
+  cleaned = cleaned.split('\n').map(line => line.trim()).join('\n');
+  
+  // Remove completely empty paragraphs (double newlines with nothing between)
+  cleaned = cleaned.replace(/\n\s*\n\s*\n/g, '\n\n');
+  
+  return cleaned.trim();
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const action = (req.body?.action || req.query.action) as string;
+
+  // Route based on action
+  switch (action) {
+    case 'cleanup':
+      return handleTextCleanup(req, res);
+    case 'convert-formula':
+      return handleFormulaConversion(req, res);
+    default:
+      return res.status(400).json({ 
+        error: 'Invalid action', 
+        validActions: ['cleanup', 'convert-formula']
+      });
+  }
+}
+
+/**
+ * Handle text cleanup
+ */
+async function handleTextCleanup(req: VercelRequest, res: VercelResponse) {
   try {
     // Enable CORS
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -34,7 +139,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    // Parse body if needed (Vercel should auto-parse, but let's be safe)
+    // Parse body if needed
     let body = req.body;
     if (typeof body === 'string') {
       try {
@@ -60,7 +165,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Preferences object is required' });
     }
 
-    // Limit text length to prevent abuse (max 50000 characters per page)
+    // Limit text length to prevent abuse
     if (text.length > 50000) {
       return res.status(400).json({ error: 'Text too long (max 50000 characters per page)' });
     }
@@ -76,6 +181,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       reorganizationStyle: preferences.reorganizationStyle || 'logical',
       optimizeForTTS: Boolean(preferences.optimizeForTTS),
     };
+
+    // Preprocess text to remove publication metadata before sending to Gemini
+    // This improves accuracy and reduces token usage
+    let processedText = text;
+    if (cleanupPrefs.optimizeForTTS || cleanupPrefs.removeHeadersFooters) {
+      processedText = preprocessPublicationMetadata(text);
+      
+      // If preprocessing removed too much (more than 50%), use original text
+      // This prevents over-aggressive removal of actual content
+      if (processedText.length < text.length * 0.5) {
+        console.warn('Preprocessing removed too much text, using original');
+        processedText = text;
+      }
+    }
 
     // If TTS optimization is enabled, use specialized prompt
     if (cleanupPrefs.optimizeForTTS) {
@@ -115,15 +234,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
    - Remove citations in parentheses: (Smith, 2024) → remove or convert to "as noted by Smith"
    - Replace URLs with "[link]" or readable domain name
    - Replace email addresses with "[email]" or spell out
-   - **Remove publication metadata and copyright notices**:
-     * Copyright symbols and notices (©, Copyright, All rights reserved, "The Authors", "published by X", etc.)
-     * Publication information (journal names, publisher names, "published by Wiley Periodicals LLC", etc.)
-     * Editorial metadata ("This article is part of...", "Topic Editors", "Topic Editor", special issue information)
-     * References to other articles ("For a full listing, see [URL]", "see [journal] early view", etc.)
-     * ISSN numbers, DOI references, and similar publication identifiers
-     * Author attributions that are publication metadata (at the end of articles, not citations within content)
-     * "This article is part of" statements and related editorial information
-     * Any lines or paragraphs that primarily contain publication/editorial metadata rather than article content
+   - **Remove any remaining publication metadata and copyright notices**:
+     * Any remaining copyright symbols, publication information, or editorial metadata
+     * Any remaining URLs, DOI references, or publication identifiers
 
 6. **Format special content for speech**:
    - Acronyms: Decide whether to spell out (NASA → "N-A-S-A") or keep as word (NATO) based on common usage
@@ -157,36 +270,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 - Return ONLY the optimized text without any explanatory comments or metadata
 
 Text to optimize:
-${text}`;
+${processedText}`;
 
       // Check if Gemini API key is configured
       if (!process.env.GEMINI_API_KEY) {
         console.error('GEMINI_API_KEY not configured');
         return res.status(200).json({ 
-          cleanedText: text,
+          cleanedText: processedText,
           success: true,
           fallback: true,
           error: 'GEMINI_API_KEY not configured'
         });
       }
 
-      // Use Gemini service with free tier (gemini-2.5-flash)
+      // Use Gemini service with free tier
       let response: string;
       try {
         response = await geminiService.chat({
           message: ttsPrompt,
-          tier: 'free', // Uses gemini-2.5-flash
+          tier: 'free',
         });
       } catch (geminiError: any) {
         console.error('Gemini API error in TTS optimization:', geminiError);
-        console.error('Error details:', {
-          message: geminiError?.message,
-          stack: geminiError?.stack,
-          hasApiKey: !!process.env.GEMINI_API_KEY
-        });
-        // Return original text as fallback
         return res.status(200).json({ 
-          cleanedText: text,
+          cleanedText: processedText,
           success: true,
           fallback: true,
           error: geminiError?.message || 'Gemini API call failed'
@@ -196,7 +303,7 @@ ${text}`;
       if (!response) {
         console.error('Text cleanup (TTS optimization): Empty response from Gemini');
         return res.status(200).json({ 
-          cleanedText: text,
+          cleanedText: processedText,
           success: true,
           fallback: true
         });
@@ -204,19 +311,14 @@ ${text}`;
 
       // Clean up the response
       let cleanedText = response.trim();
-      
-      // Remove any markdown code blocks that Gemini might add
       cleanedText = cleanedText.replace(/```[\s\S]*?```/g, '');
-      
-      // Remove explanatory prefixes if present
       cleanedText = cleanedText.replace(/^(Optimized text|Result|Output|Here is the optimized text):\s*/i, '');
       cleanedText = cleanedText.trim();
 
-      // If cleaned text is empty or too different in length (likely an error), return original
-      if (!cleanedText || cleanedText.length < text.length * 0.1) {
-        console.warn('Text cleanup (TTS optimization): Response seems invalid, using original text');
+      if (!cleanedText || cleanedText.length < processedText.length * 0.1) {
+        console.warn('Text cleanup (TTS optimization): Response seems invalid, using preprocessed text');
         return res.status(200).json({ 
-          cleanedText: text,
+          cleanedText: processedText,
           success: true,
           fallback: true
         });
@@ -228,7 +330,7 @@ ${text}`;
       });
     }
 
-    // Build prompt based on other preferences (existing cleanup logic)
+    // Build prompt based on other preferences
     let prompt = `Clean and organize the following text based on these requirements:\n\n`;
 
     if (cleanupPrefs.reorganizeParagraphs) {
@@ -268,36 +370,30 @@ ${text}`;
     prompt += `- Ensure the cleaned text remains readable and coherent\n`;
     prompt += `- Return ONLY the cleaned text without any explanatory comments or metadata\n`;
     
-    prompt += `\n\nText to clean:\n${text}`;
+    prompt += `\n\nText to clean:\n${processedText}`;
 
     // Check if Gemini API key is configured
     if (!process.env.GEMINI_API_KEY) {
       console.error('GEMINI_API_KEY not configured');
       return res.status(200).json({ 
-        cleanedText: text,
+        cleanedText: processedText,
         success: true,
         fallback: true,
         error: 'GEMINI_API_KEY not configured'
       });
     }
 
-    // Use Gemini service with free tier (gemini-2.5-flash)
+    // Use Gemini service with free tier
     let response: string;
     try {
       response = await geminiService.chat({
         message: prompt,
-        tier: 'free', // Uses gemini-2.5-flash
+        tier: 'free',
       });
     } catch (geminiError: any) {
       console.error('Gemini API error:', geminiError);
-      console.error('Error details:', {
-        message: geminiError?.message,
-        stack: geminiError?.stack,
-        hasApiKey: !!process.env.GEMINI_API_KEY
-      });
-      // Return original text as fallback
       return res.status(200).json({ 
-        cleanedText: text,
+        cleanedText: processedText,
         success: true,
         fallback: true,
         error: geminiError?.message || 'Gemini API call failed'
@@ -306,9 +402,8 @@ ${text}`;
 
     if (!response) {
       console.error('Text cleanup: Empty response from Gemini');
-      // Return original text as fallback
       return res.status(200).json({ 
-        cleanedText: text,
+        cleanedText: processedText,
         success: true,
         fallback: true
       });
@@ -316,19 +411,14 @@ ${text}`;
 
     // Clean up the response
     let cleanedText = response.trim();
-    
-    // Remove any markdown code blocks that Gemini might add
     cleanedText = cleanedText.replace(/```[\s\S]*?```/g, '');
-    
-    // Remove explanatory prefixes if present
     cleanedText = cleanedText.replace(/^(Cleaned text|Result|Output|Here is the cleaned text):\s*/i, '');
     cleanedText = cleanedText.trim();
 
-    // If cleaned text is empty or too different in length (likely an error), return original
-    if (!cleanedText || cleanedText.length < text.length * 0.1) {
-      console.warn('Text cleanup: Response seems invalid, using original text');
+    if (!cleanedText || cleanedText.length < processedText.length * 0.1) {
+      console.warn('Text cleanup: Response seems invalid, using preprocessed text');
       return res.status(200).json({ 
-        cleanedText: text,
+        cleanedText: processedText,
         success: true,
         fallback: true
       });
@@ -341,21 +431,7 @@ ${text}`;
 
   } catch (error: any) {
     console.error('Text cleanup error:', error);
-    console.error('Error details:', {
-      message: error?.message,
-      stack: error?.stack,
-      name: error?.name,
-      type: typeof error,
-      body: req.body ? { 
-        hasText: !!req.body.text, 
-        hasPreferences: !!req.body.preferences,
-        bodyType: typeof req.body
-      } : 'no body',
-      method: req.method,
-      url: req.url
-    });
     
-    // Try to get text from body as fallback
     let fallbackText = '';
     try {
       const body = req.body || {};
@@ -373,8 +449,6 @@ ${text}`;
       // Ignore errors in fallback extraction
     }
     
-    // Always return 200 with fallback instead of 500
-    // This prevents the API from returning 500 errors
     return res.status(200).json({ 
       cleanedText: fallbackText,
       success: true,
@@ -384,3 +458,73 @@ ${text}`;
   }
 }
 
+/**
+ * Handle formula conversion
+ */
+async function handleFormulaConversion(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { message } = req.body;
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Valid message string is required' });
+    }
+
+    // Limit message length to prevent abuse
+    if (message.length > 1000) {
+      return res.status(400).json({ error: 'Message too long (max 1000 characters)' });
+    }
+
+    // Use Gemini service directly for formula conversion
+    const response = await geminiService.chat({
+      message,
+      tier: 'free',
+    });
+
+    if (!response) {
+      console.error('Formula conversion: Empty response from Gemini');
+      return res.status(200).json({ 
+        response: message,
+        success: true,
+        fallback: true
+      });
+    }
+
+    // Clean up the response to extract just the LaTeX
+    let latex = response.trim();
+    latex = latex.replace(/```latex\n?/g, '').replace(/```\n?/g, '');
+    latex = latex.replace(/^(LaTeX code:|Output:|Result:)\s*/i, '');
+    latex = latex.replace(/\n.*explanation.*/gi, '');
+    latex = latex.trim();
+    
+    if (latex.includes('\n')) {
+      const lines = latex.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      if (lines.length > 0) {
+        latex = lines[0];
+      }
+    }
+
+    if (!latex) {
+      latex = message;
+    }
+
+    return res.status(200).json({ 
+      response: latex,
+      success: true 
+    });
+
+  } catch (error: any) {
+    console.error('Formula conversion error:', error);
+    
+    const { message } = req.body;
+    return res.status(200).json({ 
+      response: message || '',
+      success: true,
+      fallback: true,
+      error: error.message
+    });
+  }
+}

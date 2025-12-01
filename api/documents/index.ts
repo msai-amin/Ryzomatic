@@ -57,10 +57,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     case 'ocr-status':
       return handleOCRStatus(req, res);
     default:
-      return res.status(400).json({ 
-        error: 'Invalid action', 
-        validActions: ['upload', 'ocr-process', 'ocr-status']
-      });
+      // Handle relationship actions and document description actions
+      return handleRelationshipActions(req, res);
   }
 }
 
@@ -603,5 +601,347 @@ async function extractTextContent(filePath: string, mimeType: string): Promise<s
   }
   
   return '';
+}
+
+/**
+ * Handle relationship actions and document description actions
+ */
+async function handleRelationshipActions(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Content-Type', 'application/json');
+  
+  try {
+    const action = (req.body?.action || req.query.action) as string;
+    
+    // Route based on HTTP method and action
+    if (req.method === 'GET') {
+      return await handleRelationshipGet(req, res, action);
+    } else if (req.method === 'POST') {
+      return await handleRelationshipPost(req, res, action);
+    } else if (req.method === 'PATCH') {
+      return await handleRelationshipPatch(req, res, action);
+    } else if (req.method === 'DELETE') {
+      return await handleRelationshipDelete(req, res, action);
+    } else {
+      res.setHeader('Allow', ['GET', 'POST', 'PATCH', 'DELETE']);
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+  } catch (error) {
+    console.error('Unhandled error in relationship handler:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: errorMessage
+    });
+  }
+}
+
+// Optional service - loaded dynamically to avoid module loading errors
+let documentDescriptionService: any = null;
+
+async function getDocumentDescriptionService() {
+  if (documentDescriptionService !== null) {
+    return documentDescriptionService;
+  }
+  
+  if (documentDescriptionService === false) {
+    return null;
+  }
+  
+  try {
+    const module = await import('../../lib/documentDescriptionService');
+    documentDescriptionService = module.documentDescriptionService;
+    return documentDescriptionService;
+  } catch (error) {
+    documentDescriptionService = false;
+    console.warn('DocumentDescriptionService not available:', error instanceof Error ? error.message : 'Unknown error');
+    return null;
+  }
+}
+
+async function handleRelationshipGet(req: VercelRequest, res: VercelResponse, action: string) {
+  try {
+    const { sourceDocumentId, userId, bookId } = req.query;
+
+    // Handle document description requests
+    if (action === 'getDescription' && bookId && userId) {
+      const service = await getDocumentDescriptionService();
+      if (!service) {
+        return res.status(500).json({ error: 'Document description service not available' });
+      }
+      const description = await service.getDescription(
+        bookId as string,
+        userId as string
+      );
+      return res.status(200).json({ data: description });
+    }
+
+    if (action === 'getCombinedDescription' && bookId && userId) {
+      const service = await getDocumentDescriptionService();
+      if (!service) {
+        return res.status(500).json({ error: 'Document description service not available' });
+      }
+      const description = await service.getCombinedDescription(
+        bookId as string,
+        userId as string
+      );
+      return res.status(200).json({ data: { description } });
+    }
+
+    // Original functionality: Get related documents
+    if (!sourceDocumentId || !userId) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+
+    const { data, error } = await supabase.rpc('get_related_documents_with_details', {
+      source_doc_id: sourceDocumentId as string
+    });
+
+    if (error) {
+      console.error('Error fetching related documents:', error);
+      return res.status(500).json({ error: 'Failed to fetch related documents' });
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      data: data || [],
+      count: data?.length || 0
+    });
+
+  } catch (error) {
+    console.error('Error in GET relationship handler:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+async function handleRelationshipPost(req: VercelRequest, res: VercelResponse, action: string) {
+  try {
+    const { sourceDocumentId, relatedDocumentId, relationshipDescription, userId, bookId, content } = req.body;
+
+    // Handle document description generation
+    if (action === 'generateDescription' && bookId && userId) {
+      const service = await getDocumentDescriptionService();
+      if (!service) {
+        return res.status(500).json({ error: 'Document description service not available' });
+      }
+      const description = await service.generateDescription(
+        bookId,
+        userId,
+        content
+      );
+      if (!description) {
+        return res.status(500).json({ error: 'Failed to generate description' });
+      }
+      return res.status(200).json({ data: description });
+    }
+
+    if (!sourceDocumentId || !relatedDocumentId || !userId) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Authenticate user
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.replace('Bearer ', '');
+    
+    let authenticatedSupabase = supabase;
+    
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.SUPABASE_URL) {
+      authenticatedSupabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+      
+      if (token) {
+        const { data: { user }, error: authError } = await authenticatedSupabase.auth.getUser(token);
+        if (authError || !user || user.id !== userId) {
+          return res.status(401).json({ error: 'Invalid or expired token' });
+        }
+      }
+    } else if (token && process.env.SUPABASE_URL && process.env.VITE_SUPABASE_ANON_KEY) {
+      authenticatedSupabase = createClient(process.env.SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        },
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+          detectSessionInUrl: false
+        }
+      });
+      
+      const { data: { user }, error: authError } = await authenticatedSupabase.auth.getUser(token);
+      if (authError || !user || user.id !== userId) {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+      }
+    } else {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    if (!authenticatedSupabase) {
+      return res.status(500).json({ error: 'Database not initialized' });
+    }
+    
+    const { data: existing, error: checkError } = await authenticatedSupabase
+      .from('document_relationships')
+      .select('id')
+      .eq('source_document_id', sourceDocumentId)
+      .eq('related_document_id', relatedDocumentId)
+      .eq('user_id', userId)
+      .single();
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('Error checking existing relationship:', checkError);
+      return res.status(500).json({ error: 'Failed to check existing relationship' });
+    }
+
+    if (existing) {
+      return res.status(409).json({ error: 'Relationship already exists' });
+    }
+
+    const insertData = {
+      user_id: userId,
+      source_document_id: sourceDocumentId,
+      related_document_id: relatedDocumentId,
+      relationship_description: relationshipDescription,
+      relevance_calculation_status: 'pending'
+    };
+    
+    const { data: relationship, error } = await authenticatedSupabase
+      .from('document_relationships')
+      .insert(insertData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating relationship:', error);
+      return res.status(500).json({ 
+        error: 'Failed to create relationship', 
+        details: error.message,
+        code: error.code
+      });
+    }
+
+    return res.status(201).json({ 
+      success: true, 
+      data: relationship,
+      message: 'Relationship created successfully. Relevance calculation will start in background.'
+    });
+
+  } catch (error) {
+    console.error('Error in POST relationship handler:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+async function handleRelationshipPatch(req: VercelRequest, res: VercelResponse, action: string) {
+  try {
+    const { relationshipId, bookId, userId } = req.query;
+
+    // Handle document description update
+    if (action === 'updateDescription' && bookId && userId) {
+      const service = await getDocumentDescriptionService();
+      if (!service) {
+        return res.status(500).json({ error: 'Document description service not available' });
+      }
+      const body = req.body as any;
+      const description = await service.updateDescription(
+        bookId as string,
+        userId as string,
+        body.userDescription
+      );
+      if (!description) {
+        return res.status(500).json({ error: 'Failed to update description' });
+      }
+      return res.status(200).json({ data: description });
+    }
+
+    // Original functionality: Update relationship
+    const { relationshipDescription, relevancePercentage, aiGeneratedDescription, relevanceCalculationStatus } = req.body;
+
+    if (!relationshipId) {
+      return res.status(400).json({ error: 'Missing relationship ID' });
+    }
+
+    const updateData: any = {};
+    if (relationshipDescription !== undefined) updateData.relationship_description = relationshipDescription;
+    if (relevancePercentage !== undefined) updateData.relevance_percentage = relevancePercentage;
+    if (aiGeneratedDescription !== undefined) updateData.ai_generated_description = aiGeneratedDescription;
+    if (relevanceCalculationStatus !== undefined) updateData.relevance_calculation_status = relevanceCalculationStatus;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    const { data: relationship, error } = await supabase
+      .from('document_relationships')
+      .update(updateData)
+      .eq('id', relationshipId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating relationship:', error);
+      return res.status(500).json({ error: 'Failed to update relationship' });
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      data: relationship,
+      message: 'Relationship updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Error in PATCH relationship handler:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+async function handleRelationshipDelete(req: VercelRequest, res: VercelResponse, action: string) {
+  try {
+    const { relationshipId, bookId, userId } = req.query;
+
+    // Handle document description deletion
+    if (action === 'deleteDescription' && bookId && userId) {
+      const service = await getDocumentDescriptionService();
+      if (!service) {
+        return res.status(500).json({ error: 'Document description service not available' });
+      }
+      const success = await service.deleteDescription(
+        bookId as string,
+        userId as string
+      );
+      if (!success) {
+        return res.status(500).json({ error: 'Failed to delete description' });
+      }
+      return res.status(200).json({ success: true });
+    }
+
+    // Original functionality: Delete relationship
+    if (!relationshipId) {
+      return res.status(400).json({ error: 'Missing relationship ID' });
+    }
+
+    const { error } = await supabase
+      .from('document_relationships')
+      .delete()
+      .eq('id', relationshipId);
+
+    if (error) {
+      console.error('Error deleting relationship:', error);
+      return res.status(500).json({ error: 'Failed to delete relationship' });
+    }
+
+    return res.status(200).json({ 
+      success: true,
+      message: 'Relationship deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error in DELETE relationship handler:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 }
 

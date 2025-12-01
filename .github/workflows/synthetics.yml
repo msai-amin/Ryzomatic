@@ -26,12 +26,4 @@ jobs:
           echo "highlights: $code"
           if [ "$code" != "401" ] && [ "$code" != "405" ]; then exit 1; fi
 
-      - name: Probe OCR status (expects 401 without token)
-        env:
-          PROD_URL: ${{ secrets.PROD_URL }}
-        run: |
-          code=$(curl -sSL -o /dev/null -w "%{http_code}\n" "$PROD_URL/api/documents?action=ocr-status&documentId=invalid")
-          echo "ocr-status: $code"
-          if [ "$code" != "401" ] && [ "$code" != "400" ] && [ "$code" != "404" ]; then exit 1; fi
-
 

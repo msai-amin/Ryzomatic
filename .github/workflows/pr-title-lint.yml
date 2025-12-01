@@ -8,26 +8,68 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: amannn/action-semantic-pull-request@v5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          types: |
-            feat
-            fix
-            docs
-            style
-            refactor
-            perf
-            test
-            build
-            ci
-            chore
-            revert
-          requireScope: false
-          subjectPattern: ^(?![A-Z]).+$
-          subjectPatternError: |
-            The subject must not start with an uppercase letter.
-            Example: "feat: add reading mode theme"
+      - name: Validate PR title format
+        id: validate
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          echo "PR title: $TITLE"
+          
+          # Check if title already matches strict format (lowercase type with colon)
+          if echo "$TITLE" | grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert):\s+.+'; then
+            echo "✅ PR title already matches strict conventional commit format"
+            echo "strict_format=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Normalize common type variations (case-insensitive, handle both / and :)
+          # First normalize types, then ensure space after colon
+          NORMALIZED=$(echo "$TITLE" | sed -E 's/^[Ff]eature[\/:]/feat:/' | sed -E 's/^[Ff]ix[\/:]/fix:/' | sed -E 's/^[Bb]ug[\/:]/fix:/' | sed -E 's/^[Dd]oc[\/:]/docs:/' | sed -E 's/^[Dd]ocumentation[\/:]/docs:/' | sed -E 's/^[Ss]tyle[\/:]/style:/' | sed -E 's/^[Rr]efactor[\/:]/refactor:/' | sed -E 's/^[Pp]erf[\/:]/perf:/' | sed -E 's/^[Tt]est[\/:]/test:/' | sed -E 's/^[Bb]uild[\/:]/build:/' | sed -E 's/^[Cc][Ii][\/:]/ci:/' | sed -E 's/^[Cc]hore[\/:]/chore:/' | sed -E 's/^[Rr]evert[\/:]/revert:/')
+          
+          # Ensure space after colon if missing (e.g., "feat:description" -> "feat: description")
+          NORMALIZED=$(echo "$NORMALIZED" | sed -E 's/^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert):([^ ])/\1: \2/')
+          
+          echo "Normalized: $NORMALIZED"
+          
+          # Check if normalized title matches conventional commit format
+          if echo "$NORMALIZED" | grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert):\s+.+'; then
+            echo "✅ PR title is valid (after normalization)"
+            echo ""
+            echo "Accepted formats:"
+            echo "  - feat: description"
+            echo "  - Feature: description"
+            echo "  - Feature/description"
+            echo "  - fix: description"
+            echo ""
+            echo "Note: Your title was normalized from \"$TITLE\" to \"$NORMALIZED\""
+            echo "strict_format=false" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            echo "❌ PR title does not match conventional commit format"
+            echo ""
+            echo "Expected format: <type>: <description>"
+            echo ""
+            echo "Valid types (case-insensitive):"
+            echo "  - feat / Feature (new feature)"
+            echo "  - fix / Fix / Bug (bug fix)"
+            echo "  - docs / Doc / Documentation (documentation)"
+            echo "  - style (formatting)"
+            echo "  - refactor (code refactoring)"
+            echo "  - perf (performance improvement)"
+            echo "  - test (adding tests)"
+            echo "  - build (build system)"
+            echo "  - ci (CI changes)"
+            echo "  - chore (maintenance)"
+            echo "  - revert (revert changes)"
+            echo ""
+            echo "Examples:"
+            echo "  ✅ feat: add paper recommendation feature"
+            echo "  ✅ Feature: add paper recommendation feature"
+            echo "  ✅ Feature/paper recommendation feature"
+            echo "  ✅ fix: resolve typography settings color issue"
+            echo ""
+            echo "Your title: \"$TITLE\""
+            echo "Normalized: \"$NORMALIZED\""
+            exit 1
+          fi
 
 

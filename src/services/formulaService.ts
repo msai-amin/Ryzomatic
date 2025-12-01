@@ -181,12 +181,13 @@ Expression: ${formulaText}`
 - Input: "∑(i=1 to n) i" → Output: \\sum_{i=1}^{n} i`
 
       // Call formula conversion API endpoint
-      const response = await fetch('/api/formula/convert', {
+      const response = await fetch('/api/utils?action=convert-formula', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          action: 'convert-formula',
           message: prompt,
         }),
       })

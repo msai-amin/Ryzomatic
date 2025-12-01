@@ -26,7 +26,7 @@ export const DocumentDescriptionEditor: React.FC<DocumentDescriptionEditorProps>
 
   const loadDescription = async () => {
     try {
-      const response = await fetch(`/api/documents/relationships?action=getDescription&bookId=${bookId}&userId=${userId}`);
+      const response = await fetch(`/api/documents?action=getDescription&bookId=${bookId}&userId=${userId}`);
       const result = await response.json();
       
       if (result.data) {
@@ -43,7 +43,7 @@ export const DocumentDescriptionEditor: React.FC<DocumentDescriptionEditorProps>
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
-      const response = await fetch('/api/documents/relationships', {
+      const response = await fetch('/api/documents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'generateDescription', bookId, userId })
@@ -63,7 +63,7 @@ export const DocumentDescriptionEditor: React.FC<DocumentDescriptionEditorProps>
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/documents/relationships?action=updateDescription&bookId=${bookId}&userId=${userId}`, {
+      const response = await fetch(`/api/documents?action=updateDescription&bookId=${bookId}&userId=${userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userDescription: description })
