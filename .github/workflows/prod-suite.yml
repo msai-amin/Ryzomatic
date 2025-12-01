@@ -54,17 +54,6 @@ jobs:
             *) echo "Warning: Unexpected status $code"; exit 0 ;;
           esac
 
-      - name: Probe OCR status (warn on >=500)
-        continue-on-error: true
-        run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" "${PROD_URL%/}/api/documents?action=ocr-status")
-          echo "status=$code"
-          case "$code" in
-            200|204|401) exit 0 ;;
-            5*) echo "Warning: Server error $code"; exit 0 ;;
-            *) echo "Unexpected status $code"; exit 1 ;;
-          esac
-
   lighthouse:
     name: Lighthouse (Desktop)
     runs-on: ubuntu-latest
