@@ -43,14 +43,15 @@ export default defineConfig({
   // Use webServer to automatically start/stop the preview server
   // In CI, always use preview server (requires build first)
   // Locally, use dev server unless PLAYWRIGHT_TEST_BASE_URL is set
-  webServer: process.env.CI ? {
+  // If PLAYWRIGHT_TEST_BASE_URL is set, don't start a server (reuse existing one)
+  webServer: process.env.PLAYWRIGHT_TEST_BASE_URL ? undefined : (process.env.CI ? {
     command: 'npm run preview',
     url: 'http://localhost:3001',
     reuseExistingServer: false,
     timeout: 120 * 1000,
     stdout: 'pipe',
     stderr: 'pipe',
-  } : (process.env.PLAYWRIGHT_TEST_BASE_URL ? undefined : {
+  } : {
     command: 'npm run dev',
     url: 'http://localhost:3001',
     reuseExistingServer: true,
