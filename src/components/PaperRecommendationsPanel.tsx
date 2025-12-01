@@ -62,6 +62,40 @@ export const PaperRecommendationsPanel: React.FC<PaperRecommendationsPanelProps>
   const docId = sourceDocumentId || currentDocument?.id;
   const docOpenAlexId = openAlexId;
 
+  // Load cached recommendations from localStorage on mount or when document/type changes
+  useEffect(() => {
+    if (docId) {
+      const cacheKey = `paper_recommendations_${docId}_${recommendationType}`;
+      try {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          // Check if cache is still valid (24 hours)
+          const cacheAge = Date.now() - (parsed.timestamp || 0);
+          const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+          if (cacheAge < maxAge && parsed.recommendations) {
+            setRecommendations(parsed.recommendations);
+            setError(null);
+            logger.info('Loaded cached paper recommendations', { docId, count: parsed.recommendations.length });
+          } else {
+            // Cache expired, remove it
+            localStorage.removeItem(cacheKey);
+            setRecommendations([]);
+          }
+        } else {
+          // No cache found, clear recommendations
+          setRecommendations([]);
+        }
+      } catch (err) {
+        logger.error('Error loading cached recommendations', { docId }, err as Error);
+        setRecommendations([]);
+      }
+    } else {
+      // No document, clear recommendations
+      setRecommendations([]);
+    }
+  }, [docId, recommendationType]);
+
   // Note: Recommendations are no longer automatically loaded on document change
   // Users must click the "Get Recommendations" button to trigger loading
 
@@ -129,6 +163,20 @@ export const PaperRecommendationsPanel: React.FC<PaperRecommendationsPanelProps>
 
       setRecommendations(recs);
       
+      // Cache recommendations in localStorage
+      if (docId && recs.length > 0) {
+        const cacheKey = `paper_recommendations_${docId}_${recommendationType}`;
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify({
+            recommendations: recs,
+            timestamp: Date.now(),
+            recommendationType,
+          }));
+        } catch (err) {
+          logger.warn('Failed to cache recommendations', { docId }, err as Error);
+        }
+      }
+      
       // Show info message if using content-based search
       if (data.recommendationMethod === 'content_based' && recs.length > 0) {
         logger.info('Using content-based recommendations', { docId, count: recs.length });
@@ -172,13 +220,32 @@ export const PaperRecommendationsPanel: React.FC<PaperRecommendationsPanelProps>
 
       if (response.ok) {
         // Update local state
-        setRecommendations(prev =>
-          prev.map(r =>
+        setRecommendations(prev => {
+          const updated = prev.map(r =>
             r.id === paperId
               ? { ...r, user_feedback: feedback, saved_to_library: feedback === 'saved' }
               : r
-          )
-        );
+          );
+          
+          // Update cache with new feedback
+          if (docId) {
+            const cacheKey = `paper_recommendations_${docId}_${recommendationType}`;
+            try {
+              const cached = localStorage.getItem(cacheKey);
+              if (cached) {
+                const parsed = JSON.parse(cached);
+                localStorage.setItem(cacheKey, JSON.stringify({
+                  ...parsed,
+                  recommendations: updated,
+                }));
+              }
+            } catch (err) {
+              logger.warn('Failed to update cached recommendations', { docId }, err as Error);
+            }
+          }
+          
+          return updated;
+        });
       }
     } catch (err) {
       logger.error('Error updating feedback', { paperId }, err as Error);
@@ -282,6 +349,8 @@ export const PaperRecommendationsPanel: React.FC<PaperRecommendationsPanelProps>
           <button
             onClick={() => {
               setRecommendationType('related_works');
+              // Clear current recommendations when switching type
+              setRecommendations([]);
               loadRecommendations();
             }}
             className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
@@ -295,6 +364,8 @@ export const PaperRecommendationsPanel: React.FC<PaperRecommendationsPanelProps>
           <button
             onClick={() => {
               setRecommendationType('cited_by');
+              // Clear current recommendations when switching type
+              setRecommendations([]);
               loadRecommendations();
             }}
             className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
