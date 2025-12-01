@@ -46,20 +46,8 @@ jobs:
           license-checker --summary > licenses-summary.txt 2>&1 || true
           
           # Generate detailed report
-          license-checker --onlyAllow "$(cat <<EOF
-MIT
-Apache-2.0
-BSD-2-Clause
-BSD-3-Clause
-ISC
-0BSD
-Unlicense
-Public Domain
-CC0-1.0
-LGPL-2.1
-LGPL-3.0
-EOF
-)" --excludePrivatePackages > allowed-licenses.txt 2>&1 || true
+          ALLOWED_LICENSES="MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;Unlicense;Public Domain;CC0-1.0;LGPL-2.1;LGPL-3.0"
+          license-checker --onlyAllow "$ALLOWED_LICENSES" --excludePrivatePackages > allowed-licenses.txt 2>&1 || true
       
       - name: Check for problematic licenses
         id: license-check
