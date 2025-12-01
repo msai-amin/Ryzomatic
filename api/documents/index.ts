@@ -10,7 +10,6 @@ import { Readable } from 'stream';
 import { uploadFile, generateDocumentKey } from '../../lib/s3';
 import { GPT5NanoService, OCR_LIMITS } from '../../lib/gpt5nano';
 import { geminiService } from '../../lib/gemini';
-import { documentDescriptionService } from '../../lib/documentDescriptionService';
 import { checkRateLimit, getRateLimitHeaders } from '../../lib/rateLimiter.js';
 import formidable from 'formidable';
 import fs from 'fs/promises';
@@ -259,7 +258,12 @@ async function handleUpload(req: VercelRequest, res: VercelResponse) {
 
     // Generate document description (async)
     if (content && content.length > 100) {
-      documentDescriptionService.generateDescription(document.id, user.id, content)
+      getDocumentDescriptionService()
+        .then(service => {
+          if (service) {
+            return service.generateDescription(document.id, user.id, content);
+          }
+        })
         .catch(err => console.error('Error generating description:', err));
     }
 
@@ -636,23 +640,23 @@ async function handleRelationshipActions(req: VercelRequest, res: VercelResponse
 }
 
 // Optional service - loaded dynamically to avoid module loading errors
-let documentDescriptionService: any = null;
+let cachedDocumentDescriptionService: any = null;
 
 async function getDocumentDescriptionService() {
-  if (documentDescriptionService !== null) {
-    return documentDescriptionService;
+  if (cachedDocumentDescriptionService !== null) {
+    return cachedDocumentDescriptionService;
   }
   
-  if (documentDescriptionService === false) {
+  if (cachedDocumentDescriptionService === false) {
     return null;
   }
   
   try {
     const module = await import('../../lib/documentDescriptionService');
-    documentDescriptionService = module.documentDescriptionService;
-    return documentDescriptionService;
+    cachedDocumentDescriptionService = module.documentDescriptionService;
+    return cachedDocumentDescriptionService;
   } catch (error) {
-    documentDescriptionService = false;
+    cachedDocumentDescriptionService = false;
     console.warn('DocumentDescriptionService not available:', error instanceof Error ? error.message : 'Unknown error');
     return null;
   }
