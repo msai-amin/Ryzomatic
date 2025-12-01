@@ -46,6 +46,32 @@ class DocumentContentService {
   private readonly MAX_EMBEDDING_LENGTH = 8000; // Max chars for embedding
 
   /**
+   * Sanitize content to remove problematic Unicode escape sequences
+   * that cause PostgreSQL errors
+   */
+  private sanitizeContent(content: string): string {
+    if (!content) return content;
+    
+    return content
+      // Remove null bytes
+      .replace(/\0/g, '')
+      // Remove control characters (except newlines and tabs)
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
+      // Replace problematic Unicode escape sequences with space
+      // This handles literal backslash-u sequences that PostgreSQL tries to interpret
+      .replace(/\\u([0-9A-Fa-f]{0,3})(?![0-9A-Fa-f])/g, ' ')
+      // Replace incomplete hex escape sequences
+      .replace(/\\x([0-9A-Fa-f]{0,1})(?![0-9A-Fa-f])/g, ' ')
+      // Replace problematic line/paragraph separators with regular newlines
+      .replace(/[\u2028\u2029]/g, '\n')
+      // Replace zero-width spaces
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      // Replace replacement character with space
+      .replace(/\uFFFD/g, ' ')
+      .trim();
+  }
+
+  /**
    * Store document content with automatic chunking
    */
   async storeDocumentContent(
@@ -56,6 +82,10 @@ class DocumentContentService {
   ): Promise<{ success: boolean; chunks: number }> {
     try {
       const context = { bookId, userId, extractionMethod };
+      
+      // Sanitize content before processing
+      content = this.sanitizeContent(content);
+      
       logger.info('Storing document content', context, {
         contentLength: content.length,
         method: extractionMethod
@@ -69,11 +99,11 @@ class DocumentContentService {
       const chunks = this.chunkContent(content);
       logger.info('Content chunked', context, { chunkCount: chunks.length });
 
-      // Store each chunk
+      // Store each chunk (sanitize each chunk as well for safety)
       const chunkRecords: Omit<DocumentContent, 'id'>[] = chunks.map((chunk, index) => ({
         book_id: bookId,
         user_id: userId,
-        content: chunk,
+        content: this.sanitizeContent(chunk), // Sanitize each chunk
         chunk_index: index,
         chunk_count: chunks.length,
         extraction_method: extractionMethod,
@@ -113,6 +143,7 @@ class DocumentContentService {
       });
 
       // Generate embedding and description (async, don't block)
+      // Use original sanitized content for embedding
       this.generateEmbeddingAndDescription(bookId, userId, content).catch(error => {
         logger.error('Failed to generate embedding', context, error);
       });
