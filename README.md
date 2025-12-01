@@ -1,6 +1,6 @@
-# Smart Reader (ryzomatic)
+# AI Research Platform (ryzomatic)
 
-An intelligent academic reading platform that transforms how researchers manage, read, and analyze documents. Built with React, TypeScript, and modern web technologies, Smart Reader combines AI-powered insights, natural text-to-speech, and advanced document management to create a comprehensive research workflow solution.
+An intelligent academic reading platform that transforms how researchers manage, read, and analyze documents. Built with React, TypeScript, and modern web technologies, AI Research Platform combines AI-powered insights, natural text-to-speech, and advanced document management to create a comprehensive research workflow solution.
 
 ## 🌟 Key Features
 
@@ -326,7 +326,7 @@ Navigate to `http://localhost:3001`
 ## 📁 Project Structure
 
 ```
-smart-reader-serverless/
+AI Research Platform-serverless/
 ├── src/
 │   ├── components/          # React components
 │   │   ├── PaperRecommendationsPanel.tsx
