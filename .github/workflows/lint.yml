@@ -29,9 +29,10 @@ jobs:
         # Example: uses: github/super-linter@<commit-sha>
         uses: github/super-linter@v5
         env:
-          # Only enable JavaScript and TypeScript linters for performance
-          VALIDATE_JAVASCRIPT_ES: true
-          VALIDATE_TYPESCRIPT_ES: true
+          # Disable JavaScript/TypeScript ESLint validation - we use our own npm run lint step
+          # Super-Linter v5 has issues with ESLint 9 flat config format
+          VALIDATE_JAVASCRIPT_ES: false
+          VALIDATE_TYPESCRIPT_ES: false
           # Disable all other linters to reduce runtime
           VALIDATE_ALL_CODEBASE: false  # Only scan changed files
           DEFAULT_BRANCH: main
@@ -41,7 +42,4 @@ jobs:
           FILTER_REGEX_EXCLUDE: '(dist|node_modules|coverage|playwright-report|\.cache|tests)/.*'
           # Disable other language validators to speed up
           VALIDATE_ALL: false
-          # ESLint configuration file (Super-Linter v5 with ESLint 9 expects .mjs for flat config)
-          JAVASCRIPT_ES_CONFIG_FILE: 'eslint.config.mjs'
-          TYPESCRIPT_ES_CONFIG_FILE: 'eslint.config.mjs'
 
