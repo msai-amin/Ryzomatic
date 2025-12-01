@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { FileText, Clock, Timer, ChevronLeft, ChevronRight, Flame, Trophy, BarChart3, ChevronDown, ChevronUp, History, GitBranch, TrendingUp, Activity, Network, X } from 'lucide-react'
+import { FileText, Clock, Timer, ChevronLeft, ChevronRight, Flame, Trophy, BarChart3, ChevronDown, ChevronUp, History, GitBranch, TrendingUp, Activity, Network, X, Sparkles } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
 import { pomodoroService } from '../src/services/pomodoroService'
@@ -8,6 +8,7 @@ import { timerService, TimerState } from '../src/services/timerService'
 import { AchievementPanel } from '../src/components/AchievementPanel'
 import { PomodoroDashboard } from '../src/components/PomodoroDashboard'
 import { RelatedDocumentsPanel } from '../src/components/RelatedDocumentsPanel'
+import { PaperRecommendationsPanel } from '../src/components/PaperRecommendationsPanel'
 import { AddRelatedDocumentModal } from '../src/components/AddRelatedDocumentModal'
 import { DocumentPreviewModal } from '../src/components/DocumentPreviewModal'
 import { DocumentRelationshipGraph } from '../src/components/DocumentRelationshipGraph'
@@ -55,6 +56,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
   const [sectionsExpanded, setSectionsExpanded] = useState({
     library: false,
     related: false,
+    paperRecommendations: false,
     stats: false,
     activity: false,
     achievements: false
@@ -537,6 +539,54 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
                         <FileText className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--color-text-tertiary)' }} />
                         <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
                           Open a document to see related documents
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Paper Recommendations Section */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <Sparkles className="w-5 h-5" style={{ color: '#8b5cf6' }} />
+                    <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                      Paper Recommendations
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => toggleSection('paperRecommendations')}
+                    className="p-1 rounded transition-colors"
+                    style={{ color: 'var(--color-text-secondary)' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    {sectionsExpanded.paperRecommendations ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {sectionsExpanded.paperRecommendations && (
+                  <>
+                    {currentDocument ? (
+                      <div>
+                        <PaperRecommendationsPanel
+                          sourceDocumentId={currentDocument.id}
+                          onPaperSelect={(paper) => {
+                            // Open paper in new tab if available
+                            if (paper.open_access_url) {
+                              window.open(paper.open_access_url, '_blank');
+                            } else if (paper.doi) {
+                              window.open(`https://doi.org/${paper.doi}`, '_blank');
+                            }
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="text-center py-6">
+                        <Sparkles className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--color-text-tertiary)' }} />
+                        <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                          Open a document to see paper recommendations
                         </p>
                       </div>
                     )}

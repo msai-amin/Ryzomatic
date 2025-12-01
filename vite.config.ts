@@ -130,7 +130,23 @@ export default defineConfig(({ mode }) => ({
     headers: {
       'Cross-Origin-Embedder-Policy': 'unsafe-none',
       'Cross-Origin-Opener-Policy': 'unsafe-none',
-    }
+    },
+    // Proxy API requests - prefer local vercel dev (port 3000), fallback to production
+    proxy: {
+      '/api': {
+        target: process.env.VERCEL_DEV_URL || 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        ws: false,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, res) => {
+            console.warn('API proxy error - local vercel dev may not be running:', err.message);
+            console.warn('To use local API, run: vercel dev --listen 3000 (in another terminal)');
+            console.warn('Falling back to production API...');
+          });
+        },
+      },
+    },
   },
   preview: {
     port: 3001,

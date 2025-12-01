@@ -105,7 +105,7 @@ export const cleanupDocumentText = async ({
     }
 
     try {
-      const response = await fetch('/api/text/cleanup', {
+      const response = await fetch('/api/utils?action=cleanup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

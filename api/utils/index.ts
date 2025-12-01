@@ -1,3 +1,8 @@
+/**
+ * Consolidated Utils API
+ * Handles text cleanup and formula conversion in a single endpoint
+ */
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { geminiService } from '../../lib/gemini.js';
 
@@ -12,13 +17,27 @@ interface CleanupPreferences {
   optimizeForTTS?: boolean;
 }
 
-/**
- * Text Cleanup API Endpoint
- * 
- * Uses Gemini 2.5 Flash Lite to organize and clean text based on user preferences
- * This endpoint doesn't require authentication as it's used internally in reading mode
- */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const action = (req.body?.action || req.query.action) as string;
+
+  // Route based on action
+  switch (action) {
+    case 'cleanup':
+      return handleTextCleanup(req, res);
+    case 'convert-formula':
+      return handleFormulaConversion(req, res);
+    default:
+      return res.status(400).json({ 
+        error: 'Invalid action', 
+        validActions: ['cleanup', 'convert-formula']
+      });
+  }
+}
+
+/**
+ * Handle text cleanup
+ */
+async function handleTextCleanup(req: VercelRequest, res: VercelResponse) {
   try {
     // Enable CORS
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -34,7 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    // Parse body if needed (Vercel should auto-parse, but let's be safe)
+    // Parse body if needed
     let body = req.body;
     if (typeof body === 'string') {
       try {
@@ -60,7 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Preferences object is required' });
     }
 
-    // Limit text length to prevent abuse (max 50000 characters per page)
+    // Limit text length to prevent abuse
     if (text.length > 50000) {
       return res.status(400).json({ error: 'Text too long (max 50000 characters per page)' });
     }
@@ -170,21 +189,15 @@ ${text}`;
         });
       }
 
-      // Use Gemini service with free tier (gemini-2.5-flash)
+      // Use Gemini service with free tier
       let response: string;
       try {
         response = await geminiService.chat({
           message: ttsPrompt,
-          tier: 'free', // Uses gemini-2.5-flash
+          tier: 'free',
         });
       } catch (geminiError: any) {
         console.error('Gemini API error in TTS optimization:', geminiError);
-        console.error('Error details:', {
-          message: geminiError?.message,
-          stack: geminiError?.stack,
-          hasApiKey: !!process.env.GEMINI_API_KEY
-        });
-        // Return original text as fallback
         return res.status(200).json({ 
           cleanedText: text,
           success: true,
@@ -204,15 +217,10 @@ ${text}`;
 
       // Clean up the response
       let cleanedText = response.trim();
-      
-      // Remove any markdown code blocks that Gemini might add
       cleanedText = cleanedText.replace(/```[\s\S]*?```/g, '');
-      
-      // Remove explanatory prefixes if present
       cleanedText = cleanedText.replace(/^(Optimized text|Result|Output|Here is the optimized text):\s*/i, '');
       cleanedText = cleanedText.trim();
 
-      // If cleaned text is empty or too different in length (likely an error), return original
       if (!cleanedText || cleanedText.length < text.length * 0.1) {
         console.warn('Text cleanup (TTS optimization): Response seems invalid, using original text');
         return res.status(200).json({ 
@@ -228,7 +236,7 @@ ${text}`;
       });
     }
 
-    // Build prompt based on other preferences (existing cleanup logic)
+    // Build prompt based on other preferences
     let prompt = `Clean and organize the following text based on these requirements:\n\n`;
 
     if (cleanupPrefs.reorganizeParagraphs) {
@@ -281,21 +289,15 @@ ${text}`;
       });
     }
 
-    // Use Gemini service with free tier (gemini-2.5-flash)
+    // Use Gemini service with free tier
     let response: string;
     try {
       response = await geminiService.chat({
         message: prompt,
-        tier: 'free', // Uses gemini-2.5-flash
+        tier: 'free',
       });
     } catch (geminiError: any) {
       console.error('Gemini API error:', geminiError);
-      console.error('Error details:', {
-        message: geminiError?.message,
-        stack: geminiError?.stack,
-        hasApiKey: !!process.env.GEMINI_API_KEY
-      });
-      // Return original text as fallback
       return res.status(200).json({ 
         cleanedText: text,
         success: true,
@@ -306,7 +308,6 @@ ${text}`;
 
     if (!response) {
       console.error('Text cleanup: Empty response from Gemini');
-      // Return original text as fallback
       return res.status(200).json({ 
         cleanedText: text,
         success: true,
@@ -316,15 +317,10 @@ ${text}`;
 
     // Clean up the response
     let cleanedText = response.trim();
-    
-    // Remove any markdown code blocks that Gemini might add
     cleanedText = cleanedText.replace(/```[\s\S]*?```/g, '');
-    
-    // Remove explanatory prefixes if present
     cleanedText = cleanedText.replace(/^(Cleaned text|Result|Output|Here is the cleaned text):\s*/i, '');
     cleanedText = cleanedText.trim();
 
-    // If cleaned text is empty or too different in length (likely an error), return original
     if (!cleanedText || cleanedText.length < text.length * 0.1) {
       console.warn('Text cleanup: Response seems invalid, using original text');
       return res.status(200).json({ 
@@ -341,21 +337,7 @@ ${text}`;
 
   } catch (error: any) {
     console.error('Text cleanup error:', error);
-    console.error('Error details:', {
-      message: error?.message,
-      stack: error?.stack,
-      name: error?.name,
-      type: typeof error,
-      body: req.body ? { 
-        hasText: !!req.body.text, 
-        hasPreferences: !!req.body.preferences,
-        bodyType: typeof req.body
-      } : 'no body',
-      method: req.method,
-      url: req.url
-    });
     
-    // Try to get text from body as fallback
     let fallbackText = '';
     try {
       const body = req.body || {};
@@ -373,8 +355,6 @@ ${text}`;
       // Ignore errors in fallback extraction
     }
     
-    // Always return 200 with fallback instead of 500
-    // This prevents the API from returning 500 errors
     return res.status(200).json({ 
       cleanedText: fallbackText,
       success: true,
@@ -384,3 +364,73 @@ ${text}`;
   }
 }
 
+/**
+ * Handle formula conversion
+ */
+async function handleFormulaConversion(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { message } = req.body;
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Valid message string is required' });
+    }
+
+    // Limit message length to prevent abuse
+    if (message.length > 1000) {
+      return res.status(400).json({ error: 'Message too long (max 1000 characters)' });
+    }
+
+    // Use Gemini service directly for formula conversion
+    const response = await geminiService.chat({
+      message,
+      tier: 'free',
+    });
+
+    if (!response) {
+      console.error('Formula conversion: Empty response from Gemini');
+      return res.status(200).json({ 
+        response: message,
+        success: true,
+        fallback: true
+      });
+    }
+
+    // Clean up the response to extract just the LaTeX
+    let latex = response.trim();
+    latex = latex.replace(/```latex\n?/g, '').replace(/```\n?/g, '');
+    latex = latex.replace(/^(LaTeX code:|Output:|Result:)\s*/i, '');
+    latex = latex.replace(/\n.*explanation.*/gi, '');
+    latex = latex.trim();
+    
+    if (latex.includes('\n')) {
+      const lines = latex.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      if (lines.length > 0) {
+        latex = lines[0];
+      }
+    }
+
+    if (!latex) {
+      latex = message;
+    }
+
+    return res.status(200).json({ 
+      response: latex,
+      success: true 
+    });
+
+  } catch (error: any) {
+    console.error('Formula conversion error:', error);
+    
+    const { message } = req.body;
+    return res.status(200).json({ 
+      response: message || '',
+      success: true,
+      fallback: true,
+      error: error.message
+    });
+  }
+}

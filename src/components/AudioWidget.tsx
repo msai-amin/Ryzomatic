@@ -201,12 +201,15 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
 
   // Ref to prevent infinite loops from position updates
   const isUpdatingPositionRef = useRef(false)
+  const hasInitializedPositionRef = useRef(false)
   
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (isUpdatingPositionRef.current) return // Prevent infinite loops
+    if (hasInitializedPositionRef.current) return // Only initialize once
     if (audioWidgetPosition.x === 0 && audioWidgetPosition.y === 0) {
       isUpdatingPositionRef.current = true
+      hasInitializedPositionRef.current = true
       const widgetWidth = widgetRef.current?.offsetWidth ?? widgetSizeRef.current.width
       const widgetHeight = widgetRef.current?.offsetHeight ?? widgetSizeRef.current.height
       const sidebarGuard = isRightSidebarOpen ? (rightSidebarWidth || 280) + 24 : 24
@@ -221,8 +224,11 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ className = '' }) => {
         setAudioWidgetPosition(clamped)
       }
       isUpdatingPositionRef.current = false
+    } else {
+      // If position is already set, mark as initialized
+      hasInitializedPositionRef.current = true
     }
-  }, [audioWidgetPosition.x, audioWidgetPosition.y, clampPosition, isRightSidebarOpen, rightSidebarWidth, setAudioWidgetPosition])
+  }, [clampPosition, isRightSidebarOpen, rightSidebarWidth, setAudioWidgetPosition])
 
   useEffect(() => {
     if (isDragging) return
