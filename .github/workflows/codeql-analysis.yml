@@ -28,19 +28,19 @@ jobs:
       - name: Initialize CodeQL
         # Security: Pin to specific commit SHA instead of version tag for supply chain security
         # Example: uses: github/codeql-action/init@<commit-sha>
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
 
       - name: Autobuild
         # Security: Pin to specific commit SHA instead of version tag for supply chain security
         # Example: uses: github/codeql-action/autobuild@<commit-sha>
-        uses: github/codeql-action/autobuild@v3
+        uses: github/codeql-action/autobuild@v4
 
       - name: Perform CodeQL Analysis
         # Security: Pin to specific commit SHA instead of version tag for supply chain security
         # Example: uses: github/codeql-action/analyze@<commit-sha>
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: '/language:javascript-typescript'
 
