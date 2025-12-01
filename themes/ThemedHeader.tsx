@@ -487,14 +487,13 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                 <Tooltip content="Reader settings" position="bottom">
                   <button
                     onClick={() => setShowSettings(true)}
-                    className="flex items-center gap-2 rounded-lg border px-3 py-1 text-sm transition-colors"
+                    className="flex items-center justify-center rounded-lg border p-2 text-sm transition-colors"
                     style={{
                       color: 'var(--color-text-primary)',
                       borderColor: 'var(--color-border)'
                     }}
                   >
                     <Settings className="h-4 w-4" />
-                    <span>Typography</span>
                   </button>
                 </Tooltip>
               )}
