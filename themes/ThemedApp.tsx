@@ -96,10 +96,10 @@ const ThemedAppContent: React.FC = () => {
 
         const doc = {
           id: book.id,
-          name: book.title || book.name || 'Untitled',
+          name: book.title || book.fileName || 'Untitled',
           type: book.type || 'pdf',
           content: '',
-          uploadedAt: book.uploadedAt || new Date(),
+          uploadedAt: book.savedAt || new Date(),
           pdfData: pdfData,
           totalPages: book.totalPages,
           currentPage: book.lastReadPage || 1,

@@ -302,7 +302,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     let targetSpan: HTMLElement | null = null
     
     // First, try to use pageTexts to verify the word index is valid
-    const pageText = document?.pageTexts?.[currentPage - 1]?.text || ''
+    const pageText = document?.pageTexts?.[currentPage - 1] || ''
     let targetWordPosition = tts.currentWordIndex
     
     // If we have pageText, use it to get the target word for better matching
