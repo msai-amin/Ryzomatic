@@ -10,6 +10,7 @@ on:
 permissions:
   issues: write
   pull-requests: write
+  contents: read  # Required for private repositories
 
 jobs:
   stale:
@@ -21,6 +22,8 @@ jobs:
         # Security: Pin to specific commit SHA instead of version tag for supply chain security
         # Example: uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # Not needed for stale action, but helps with private repos
 
       - name: Mark Stale Issues and Pull Requests
         # Security: Pin to specific commit SHA instead of version tag for supply chain security
