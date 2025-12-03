@@ -120,10 +120,135 @@ class LibraryOrganizationService {
     }
   }
 
+  // Ensure default collections exist (smart collections and Trash)
+  async ensureDefaultCollections(): Promise<void> {
+    this.ensureAuthenticated();
+    
+    try {
+      // Check which default collections already exist
+      const { data: existingCollections, error: checkError } = await supabase
+        .from('user_collections')
+        .select('name')
+        .eq('user_id', this.currentUserId!);
+      
+      if (checkError) {
+        logger.warn('Failed to check existing collections', { userId: this.currentUserId }, checkError);
+        return; // Don't fail if check fails
+      }
+      
+      const existingNames = new Set((existingCollections || []).map(c => c.name));
+      
+      // Default smart collections to create
+      const defaultCollections = [
+        {
+          name: 'In Progress',
+          description: 'Books you are currently reading',
+          is_smart: true,
+          smart_filter: { progress_min: 0.01, progress_max: 99.99 },
+          color: '#F59E0B',
+          icon: 'book-open',
+          display_order: 1
+        },
+        {
+          name: 'Recently Added',
+          description: 'Books added in the last 30 days',
+          is_smart: true,
+          smart_filter: { uploaded_after: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() },
+          color: '#3B82F6',
+          icon: 'calendar',
+          display_order: 2
+        },
+        {
+          name: 'Needs Review',
+          description: 'Books not read in the last 90 days',
+          is_smart: true,
+          smart_filter: { last_read_before: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString() },
+          color: '#EF4444',
+          icon: 'alert-circle',
+          display_order: 3
+        },
+        {
+          name: 'Completed',
+          description: 'Books you have finished reading',
+          is_smart: true,
+          smart_filter: { progress_min: 100, progress_max: 100 },
+          color: '#10B981',
+          icon: 'check-circle',
+          display_order: 4
+        },
+        {
+          name: 'Unread',
+          description: 'Books you have not started',
+          is_smart: true,
+          smart_filter: { progress_min: 0, progress_max: 0 },
+          color: '#6B7280',
+          icon: 'book-marked',
+          display_order: 5
+        },
+        {
+          name: 'Trash',
+          description: 'Deleted books',
+          is_smart: false,
+          smart_filter: {},
+          color: '#6B7280',
+          icon: 'trash-2',
+          display_order: 9999
+        }
+      ];
+      
+      // Create missing collections
+      const collectionsToCreate = defaultCollections.filter(c => !existingNames.has(c.name));
+      
+      if (collectionsToCreate.length > 0) {
+        const insertData = collectionsToCreate.map(c => {
+          const data: any = {
+            user_id: this.currentUserId!,
+            name: c.name,
+            description: c.description,
+            is_smart: c.is_smart,
+            color: c.color,
+            icon: c.icon,
+            display_order: c.display_order,
+            is_favorite: false
+          };
+          
+          // Only include smart_filter for smart collections
+          if (c.is_smart && c.smart_filter) {
+            data.smart_filter = c.smart_filter;
+          } else {
+            data.smart_filter = {};
+          }
+          
+          return data;
+        });
+        
+        const { error: insertError } = await supabase
+          .from('user_collections')
+          .insert(insertData);
+        
+        if (insertError) {
+          logger.warn('Failed to create default collections', { userId: this.currentUserId }, insertError);
+        } else {
+          logger.info('Default collections ensured', { 
+            userId: this.currentUserId, 
+            created: collectionsToCreate.length,
+            collections: collectionsToCreate.map(c => c.name)
+          });
+        }
+      }
+    } catch (error) {
+      logger.error('Error ensuring default collections', { userId: this.currentUserId }, error as Error);
+      // Don't throw - this is a best-effort operation
+    }
+  }
+
   async getCollections(): Promise<Collection[]> {
     this.ensureAuthenticated();
     
     try {
+      // Ensure default collections exist first
+      await this.ensureDefaultCollections();
+      
       const start = Date.now();
       
       // Simple query without RPC functions

@@ -229,6 +229,17 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
   const [reviews, setReviews] = useState<Map<string, PeerReview>>(new Map());
   const { /* setCurrentDocument, */ addDocument, user } = useAppStore();
   
+  // Helper function to format storage size
+  const formatStorageSize = (bytes: number): string => {
+    if (bytes >= 1024 * 1024 * 1024) {
+      // Show GB for sizes >= 1GB
+      return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+    } else {
+      // Show MB for smaller sizes
+      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    }
+  };
+  
   // CRITICAL: Normalize user.id to prevent React comparison error
   const normalizedUserId = user?.id ?? '';
   const viewModes: Array<{ key: 'list' | 'grid' | 'comfortable'; label: string; icon: typeof LayoutList }> = [
@@ -439,7 +450,8 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
       }
       
       // Use Supabase storage info
-      setStorageInfo(supabaseStorageService.getStorageInfo());
+      const storageInfo = await supabaseStorageService.getStorageInfo();
+      setStorageInfo(storageInfo);
       
       // Check Google Drive status
       const isEnabled = await supabaseStorageService.isGoogleDriveEnabled();
@@ -1530,8 +1542,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
               <div className="flex flex-wrap gap-3 text-xs md:text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
                 <span className="flex items-center gap-2 px-3 py-1 rounded-full" style={{ backgroundColor: 'rgba(148,163,184,0.08)' }}>
                   <HardDrive className="w-3 h-3" />
-                  Storage: {(storageInfo.used / 1024 / 1024).toFixed(2)} MB of{' '}
-                  {storageInfo.max ? `${(storageInfo.max / 1024 / 1024).toFixed(0)} MB` : '∞'}
+                  Storage: {formatStorageSize(storageInfo.used)} of {storageInfo.max ? formatStorageSize(storageInfo.max) : '∞'}
                 </span>
                 <span className="flex items-center gap-2 px-3 py-1 rounded-full" style={{ backgroundColor: 'rgba(148,163,184,0.08)' }}>
                   <Star className="w-3 h-3" />

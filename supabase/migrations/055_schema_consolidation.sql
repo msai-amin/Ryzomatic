@@ -75,17 +75,40 @@ CREATE INDEX IF NOT EXISTS idx_user_books_embedding ON user_books
   WHERE description_embedding IS NOT NULL;
 
 -- Migrate data from document_descriptions to user_books (if table exists)
+-- Handle both schema versions: 023 (ai_generated_description/user_entered_description) and 052 (description)
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'document_descriptions') THEN
-    UPDATE user_books ub
-    SET 
-      description_embedding = dd.description_embedding,
-      ai_description = dd.ai_generated_description,
-      user_description = dd.user_entered_description,
-      last_auto_generated_at = dd.last_auto_generated_at
-    FROM document_descriptions dd
-    WHERE ub.id = dd.book_id;
+    -- Check which schema version exists
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_name = 'document_descriptions' 
+      AND column_name = 'ai_generated_description'
+    ) THEN
+      -- Migration 023 schema: has ai_generated_description and user_entered_description
+      UPDATE user_books ub
+      SET 
+        description_embedding = dd.description_embedding,
+        ai_description = dd.ai_generated_description,
+        user_description = dd.user_entered_description,
+        last_auto_generated_at = dd.last_auto_generated_at
+      FROM document_descriptions dd
+      WHERE ub.id = dd.book_id;
+    ELSIF EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_name = 'document_descriptions' 
+      AND column_name = 'description'
+    ) THEN
+      -- Migration 052 schema: has single description column
+      UPDATE user_books ub
+      SET 
+        description_embedding = dd.description_embedding,
+        ai_description = CASE WHEN dd.is_ai_generated THEN dd.description ELSE NULL END,
+        user_description = CASE WHEN NOT dd.is_ai_generated THEN dd.description ELSE NULL END,
+        last_auto_generated_at = dd.last_auto_generated_at
+      FROM document_descriptions dd
+      WHERE ub.id = dd.book_id;
+    END IF;
   END IF;
 END $$;
 
@@ -160,7 +183,7 @@ BEGIN
       'completed',
       jsonb_build_object(
         'method', 'vector_similarity',
-        'model', 'text-embedding-004',
+        'model', 'gemini-embedding-001',
         'similarity_score', related_record.similarity,
         'auto_generated', true,
         'generated_at', NOW()

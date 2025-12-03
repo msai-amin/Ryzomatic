@@ -2,16 +2,17 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Conversation memories (extracted semantic entities)
+-- Note: conversations table may be in public or chat schema depending on migration order
 CREATE TABLE conversation_memories (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+  conversation_id UUID, -- FK constraint added below after determining schema
   entity_type TEXT NOT NULL, -- 'concept', 'question', 'insight', 'reference', 'action', 'document'
   entity_text TEXT NOT NULL,
   entity_metadata JSONB DEFAULT '{}',
-  source_message_id UUID REFERENCES messages(id),
-  document_id UUID REFERENCES documents(id) ON DELETE SET NULL,
-  embedding vector(768), -- Gemini text-embedding-004
+  source_message_id UUID, -- FK constraint added below after determining schema
+  document_id UUID, -- May reference documents or user_books depending on migration order
+  embedding vector(768), -- Gemini gemini-embedding-001
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -43,7 +44,7 @@ CREATE TABLE action_cache (
 -- Memory extraction jobs (track which conversations need extraction)
 CREATE TABLE memory_extraction_jobs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+  conversation_id UUID, -- FK constraint added below after determining schema
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
   error_message TEXT,
@@ -51,6 +52,43 @@ CREATE TABLE memory_extraction_jobs (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   completed_at TIMESTAMPTZ
 );
+
+-- Add foreign key constraints after determining which schema conversations/messages are in
+DO $$
+BEGIN
+  -- Add FK for conversation_id in conversation_memories
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'conversations') THEN
+    ALTER TABLE conversation_memories 
+      ADD CONSTRAINT conversation_memories_conversation_id_fkey 
+      FOREIGN KEY (conversation_id) REFERENCES public.conversations(id) ON DELETE CASCADE;
+  ELSIF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'chat' AND table_name = 'conversations') THEN
+    ALTER TABLE conversation_memories 
+      ADD CONSTRAINT conversation_memories_conversation_id_fkey 
+      FOREIGN KEY (conversation_id) REFERENCES chat.conversations(id) ON DELETE CASCADE;
+  END IF;
+
+  -- Add FK for source_message_id in conversation_memories
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'messages') THEN
+    ALTER TABLE conversation_memories 
+      ADD CONSTRAINT conversation_memories_source_message_id_fkey 
+      FOREIGN KEY (source_message_id) REFERENCES public.messages(id) ON DELETE SET NULL;
+  ELSIF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'chat' AND table_name = 'messages') THEN
+    ALTER TABLE conversation_memories 
+      ADD CONSTRAINT conversation_memories_source_message_id_fkey 
+      FOREIGN KEY (source_message_id) REFERENCES chat.messages(id) ON DELETE SET NULL;
+  END IF;
+
+  -- Add FK for conversation_id in memory_extraction_jobs
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'conversations') THEN
+    ALTER TABLE memory_extraction_jobs 
+      ADD CONSTRAINT memory_extraction_jobs_conversation_id_fkey 
+      FOREIGN KEY (conversation_id) REFERENCES public.conversations(id) ON DELETE CASCADE;
+  ELSIF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'chat' AND table_name = 'conversations') THEN
+    ALTER TABLE memory_extraction_jobs 
+      ADD CONSTRAINT memory_extraction_jobs_conversation_id_fkey 
+      FOREIGN KEY (conversation_id) REFERENCES chat.conversations(id) ON DELETE CASCADE;
+  END IF;
+END $$;
 
 -- Indexes for performance
 CREATE INDEX idx_memories_user_embedding ON conversation_memories 

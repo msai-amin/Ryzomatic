@@ -1093,13 +1093,50 @@ class SupabaseStorageService {
   }
 
   // Storage info
-  getStorageInfo() {
-    // For Supabase, we don't have local storage limits
-    return {
-      used: 0,
-      max: 0,
-      percentage: 0
-    };
+  async getStorageInfo(): Promise<{ used: number; max: number; percentage: number }> {
+    this.ensureAuthenticated();
+    
+    try {
+      // Calculate total storage used from user_books table
+      const { data, error } = await supabase
+        .from('user_books')
+        .select('file_size_bytes')
+        .eq('user_id', this.currentUserId!);
+      
+      if (error) {
+        logger.warn('Failed to calculate storage usage', { userId: this.currentUserId }, error);
+        // Return default values on error
+        return {
+          used: 0,
+          max: 2 * 1024 * 1024 * 1024, // 2GB default limit
+          percentage: 0
+        };
+      }
+      
+      // Sum up all file sizes
+      const used = (data || []).reduce((total, book) => {
+        return total + (book.file_size_bytes || 0);
+      }, 0);
+      
+      // Set generous but cost-effective limit: 2GB (2048 MB)
+      // S3 storage costs ~$0.023 per GB/month, so 2GB = ~$0.046/month per user
+      const max = 2 * 1024 * 1024 * 1024; // 2GB in bytes
+      const percentage = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
+      
+      return {
+        used,
+        max,
+        percentage
+      };
+    } catch (error) {
+      logger.error('Error calculating storage info', { userId: this.currentUserId }, error as Error);
+      // Return default values on error
+      return {
+        used: 0,
+        max: 2 * 1024 * 1024 * 1024, // 2GB default limit
+        percentage: 0
+      };
+    }
   }
 
   async isGoogleDriveEnabled(): Promise<boolean> {

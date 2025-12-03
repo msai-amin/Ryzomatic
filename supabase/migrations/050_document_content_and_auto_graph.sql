@@ -193,7 +193,7 @@ BEGIN
       'completed',
       jsonb_build_object(
         'method', 'vector_similarity',
-        'model', 'text-embedding-004',
+        'model', 'gemini-embedding-001',
         'similarity_score', related_record.similarity,
         'auto_generated', true,
         'generated_at', NOW()
@@ -387,7 +387,7 @@ COMMENT ON COLUMN document_content.chunk_index IS
 COMMENT ON COLUMN document_content.extraction_method IS 
   'Method used to extract text: pdfjs, manual, or ocr';
 
-COMMENT ON FUNCTION auto_generate_document_relationships IS 
+COMMENT ON FUNCTION auto_generate_document_relationships(UUID, DECIMAL) IS 
   'Automatically finds and creates document relationships using vector similarity. Called when embeddings are added/updated.';
 
 COMMENT ON FUNCTION get_full_document_content IS 
@@ -403,7 +403,7 @@ COMMENT ON FUNCTION search_document_content IS
 -- Grant execute permissions on functions
 GRANT EXECUTE ON FUNCTION get_full_document_content TO authenticated;
 GRANT EXECUTE ON FUNCTION get_document_content_summary TO authenticated;
-GRANT EXECUTE ON FUNCTION auto_generate_document_relationships TO authenticated;
+GRANT EXECUTE ON FUNCTION auto_generate_document_relationships(UUID, DECIMAL) TO authenticated;
 GRANT EXECUTE ON FUNCTION regenerate_all_document_relationships TO authenticated;
 GRANT EXECUTE ON FUNCTION search_document_content TO authenticated;
 GRANT EXECUTE ON FUNCTION get_document_content_stats TO authenticated;

@@ -85,6 +85,18 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // Get document from store
   const document = currentDocument
 
+  // React PDF Viewer License Key (Commercial License)
+  // Get from environment variable to remove watermark
+  const licenseKey = import.meta.env.VITE_REACT_PDF_VIEWER_LICENSE_KEY || undefined
+  
+  // Set license key globally (fallback for react-pdf-viewer v3.x)
+  useEffect(() => {
+    if (licenseKey && typeof window !== 'undefined') {
+      // Set global license key for react-pdf-viewer (if supported)
+      ;(window as any).reactPdfViewerLicenseKey = licenseKey
+    }
+  }, [licenseKey])
+
   // CRITICAL: ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   // This is required by React's Rules of Hooks - hooks must be called in the same order every render
   // Early returns cause hooks to be skipped, which breaks React's internal dependency tracking
@@ -2988,6 +3000,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                 onPageChange={handlePageChange}
                 onZoom={handleZoom}
                 onRotate={handleRotate}
+                {...(licenseKey ? { licenseKey } : {})}
                 renderLoader={(percentages: number) => (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">

@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS embedding_metadata (
   collection TEXT, -- Collection/namespace in vector store
   
   -- Embedding metadata
-  embedding_model TEXT NOT NULL DEFAULT 'text-embedding-004', -- Model used for generation
+  embedding_model TEXT NOT NULL DEFAULT 'gemini-embedding-001', -- Model used for generation
   vector_dimensions INTEGER NOT NULL DEFAULT 768,
   chunk_index INTEGER, -- For multi-chunk documents
   chunk_text TEXT, -- Store text snippet for reference
@@ -44,10 +44,10 @@ CREATE TABLE IF NOT EXISTS embedding_metadata (
 -- INDEXES
 -- ============================================================================
 
-CREATE INDEX idx_embedding_metadata_user_book ON embedding_metadata(user_id, book_id);
-CREATE INDEX idx_embedding_metadata_provider ON embedding_metadata(provider, vector_id);
-CREATE INDEX idx_embedding_metadata_model ON embedding_metadata(embedding_model);
-CREATE INDEX idx_embedding_metadata_last_queried ON embedding_metadata(last_queried_at DESC);
+CREATE INDEX IF NOT EXISTS idx_embedding_metadata_user_book ON embedding_metadata(user_id, book_id);
+CREATE INDEX IF NOT EXISTS idx_embedding_metadata_provider ON embedding_metadata(provider, vector_id);
+CREATE INDEX IF NOT EXISTS idx_embedding_metadata_model ON embedding_metadata(embedding_model);
+CREATE INDEX IF NOT EXISTS idx_embedding_metadata_last_queried ON embedding_metadata(last_queried_at DESC);
 
 -- ============================================================================
 -- ROW LEVEL SECURITY

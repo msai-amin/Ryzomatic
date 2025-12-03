@@ -190,7 +190,7 @@ An intelligent academic reading platform that transforms how researchers manage,
 1. **Clone the repository**:
 ```bash
 git clone <repository-url>
-cd smart-reader-serverless
+cd Ryzomatic
 ```
 
 2. **Install dependencies**:

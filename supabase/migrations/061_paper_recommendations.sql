@@ -85,6 +85,9 @@ CREATE POLICY "Users can delete own paper recommendations" ON public.paper_recom
   FOR DELETE USING (auth.uid() = user_id);
 
 -- Trigger for updated_at
+-- Drop trigger if it exists (idempotent migration)
+DROP TRIGGER IF EXISTS update_paper_recommendations_updated_at ON public.paper_recommendations CASCADE;
+
 CREATE TRIGGER update_paper_recommendations_updated_at 
   BEFORE UPDATE ON public.paper_recommendations
   FOR EACH ROW 

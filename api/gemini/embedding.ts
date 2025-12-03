@@ -51,9 +51,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const { text, texts } = req.body;
-    const model = genAI.getGenerativeModel({ model: 'models/text-embedding-004' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
     if (typeof text === 'string') {
-      const result = await model.embedContent(text);
+      // Use object format for gemini-embedding-001 with outputDimensionality
+      const result = await model.embedContent({
+        content: text,
+        outputDimensionality: 768
+      });
       res.status(200).json({ embedding: result.embedding.values });
       return;
     }
@@ -62,7 +66,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(400).json({ error: 'texts array must not be empty' });
         return;
       }
-      const results = await Promise.all(texts.map((t: string) => model.embedContent(t)));
+      const results = await Promise.all(texts.map((t: string) => model.embedContent({
+        content: t,
+        outputDimensionality: 768
+      })));
       res.status(200).json({ embeddings: results.map(r => r.embedding.values) });
       return;
     }

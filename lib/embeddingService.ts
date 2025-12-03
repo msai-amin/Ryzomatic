@@ -4,11 +4,11 @@ export interface EmbeddingResult {
 }
 
 export class EmbeddingService {
-  private embeddingModel = 'models/text-embedding-004';
+  private embeddingModel = 'gemini-embedding-001';
   private batchSize = 100; // Gemini's limit
 
   /**
-   * Generate embeddings using Gemini text-embedding-004 via API endpoint
+   * Generate embeddings using Gemini gemini-embedding-001 via API endpoint
    * Uses server-side API to avoid exposing API keys in client
    * @param text - Text to embed
    * @returns Embedding vector (768 dimensions)
