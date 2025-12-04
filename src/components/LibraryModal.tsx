@@ -320,12 +320,6 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
 
   useEffect(() => {
     if (isOpen) {
-      fetchCollections();
-    }
-  }, [isOpen, fetchCollections]);
-
-  useEffect(() => {
-    if (isOpen) {
       // Initialize supabaseStorageService with current user
       if (user?.id) {
         console.log('LibraryModal: Initializing supabaseStorageService with user:', user.id)
@@ -335,7 +329,7 @@ export function LibraryModal({ isOpen, onClose, refreshTrigger }: LibraryModalPr
         supabaseStorageService.setCurrentUser(null)
       }
       loadData();
-      fetchCollections(); // Also refresh collections when modal opens or refreshTrigger changes
+      fetchCollections(); // Refresh collections when modal opens or refreshTrigger changes
     }
   }, [isOpen, activeTab, refreshTrigger, normalizedUserId, fetchCollections]);
 

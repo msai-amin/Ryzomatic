@@ -66,6 +66,7 @@ export interface SortOptions {
 
 class LibraryOrganizationService {
   private currentUserId: string | null = null;
+  private ensuringDefaultsPromise: Promise<void> | null = null;
 
   // Initialize with current user
   setCurrentUser(userId: string | null) {
@@ -74,6 +75,8 @@ class LibraryOrganizationService {
     logger.info('LibraryOrganizationService initialized', { userId });
     } else {
       logger.info('LibraryOrganizationService cleared user context', { userId: null });
+      // Clear the promise when user changes
+      this.ensuringDefaultsPromise = null;
     }
   }
 
@@ -120,126 +123,272 @@ class LibraryOrganizationService {
     }
   }
 
-  // Ensure default collections exist (smart collections and Trash)
-  async ensureDefaultCollections(): Promise<void> {
+  // Clean up duplicate default collections - keep only the first one for each name
+  private async cleanupDuplicateCollections(): Promise<void> {
     this.ensureAuthenticated();
     
     try {
-      // Check which default collections already exist
-      const { data: existingCollections, error: checkError } = await supabase
+      // Get all collections for the user
+      const { data: allCollections, error: fetchError } = await supabase
         .from('user_collections')
-        .select('name')
-        .eq('user_id', this.currentUserId!);
+        .select('id, name, created_at')
+        .eq('user_id', this.currentUserId!)
+        .order('created_at', { ascending: true });
       
-      if (checkError) {
-        logger.warn('Failed to check existing collections', { userId: this.currentUserId }, checkError);
-        return; // Don't fail if check fails
+      if (fetchError || !allCollections) {
+        logger.warn('Failed to fetch collections for cleanup', { userId: this.currentUserId }, fetchError);
+        return;
       }
       
-      const existingNames = new Set((existingCollections || []).map(c => c.name));
+      // Default collection names that should not have duplicates
+      const defaultCollectionNames = ['In Progress', 'Recently Added', 'Needs Review', 'Completed', 'Unread', 'Trash'];
       
-      // Default smart collections to create
-      const defaultCollections = [
-        {
-          name: 'In Progress',
-          description: 'Books you are currently reading',
-          is_smart: true,
-          smart_filter: { progress_min: 0.01, progress_max: 99.99 },
-          color: '#F59E0B',
-          icon: 'book-open',
-          display_order: 1
-        },
-        {
-          name: 'Recently Added',
-          description: 'Books added in the last 30 days',
-          is_smart: true,
-          smart_filter: { uploaded_after: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() },
-          color: '#3B82F6',
-          icon: 'calendar',
-          display_order: 2
-        },
-        {
-          name: 'Needs Review',
-          description: 'Books not read in the last 90 days',
-          is_smart: true,
-          smart_filter: { last_read_before: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString() },
-          color: '#EF4444',
-          icon: 'alert-circle',
-          display_order: 3
-        },
-        {
-          name: 'Completed',
-          description: 'Books you have finished reading',
-          is_smart: true,
-          smart_filter: { progress_min: 100, progress_max: 100 },
-          color: '#10B981',
-          icon: 'check-circle',
-          display_order: 4
-        },
-        {
-          name: 'Unread',
-          description: 'Books you have not started',
-          is_smart: true,
-          smart_filter: { progress_min: 0, progress_max: 0 },
-          color: '#6B7280',
-          icon: 'book-marked',
-          display_order: 5
-        },
-        {
-          name: 'Trash',
-          description: 'Deleted books',
-          is_smart: false,
-          smart_filter: {},
-          color: '#6B7280',
-          icon: 'trash-2',
-          display_order: 9999
+      // Find duplicates for default collections
+      const collectionsByName = new Map<string, typeof allCollections>();
+      
+      for (const collection of allCollections) {
+        if (defaultCollectionNames.includes(collection.name)) {
+          if (!collectionsByName.has(collection.name)) {
+            collectionsByName.set(collection.name, []);
+          }
+          collectionsByName.get(collection.name)!.push(collection);
         }
-      ];
+      }
       
-      // Create missing collections
-      const collectionsToCreate = defaultCollections.filter(c => !existingNames.has(c.name));
+      // Collect IDs of duplicate collections to delete (keep the oldest one)
+      const duplicateIdsToDelete: string[] = [];
       
-      if (collectionsToCreate.length > 0) {
-        const insertData = collectionsToCreate.map(c => {
-          const data: any = {
-            user_id: this.currentUserId!,
-            name: c.name,
-            description: c.description,
-            is_smart: c.is_smart,
-            color: c.color,
-            icon: c.icon,
-            display_order: c.display_order,
-            is_favorite: false
-          };
+      for (const [name, collections] of collectionsByName.entries()) {
+        if (collections.length > 1) {
+          // Sort by created_at, keep the first (oldest), delete the rest
+          const sorted = collections.sort((a, b) => 
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
           
-          // Only include smart_filter for smart collections
-          if (c.is_smart && c.smart_filter) {
-            data.smart_filter = c.smart_filter;
-          } else {
-            data.smart_filter = {};
+          // Delete all except the first one
+          for (let i = 1; i < sorted.length; i++) {
+            duplicateIdsToDelete.push(sorted[i].id);
           }
           
-          return data;
-        });
+          logger.info(`Found ${collections.length} duplicates for collection "${name}", will delete ${sorted.length - 1}`, {
+            userId: this.currentUserId,
+            name,
+            total: collections.length,
+            keeping: sorted[0].id,
+            deleting: sorted.slice(1).map(c => c.id)
+          });
+        }
+      }
+      
+      // Delete duplicate collections
+      if (duplicateIdsToDelete.length > 0) {
+        // For each duplicate, migrate book-collection relationships to the kept collection
+        for (const [name, collections] of collectionsByName.entries()) {
+          if (collections.length > 1) {
+            const sorted = collections.sort((a, b) => 
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+            const keptCollectionId = sorted[0].id;
+            const duplicateIds = sorted.slice(1).map(c => c.id);
+            
+            // Get all book-collection relationships for duplicates
+            const { data: duplicateBookCollections } = await supabase
+              .from('book_collections')
+              .select('book_id')
+              .in('collection_id', duplicateIds);
+            
+            if (duplicateBookCollections && duplicateBookCollections.length > 0) {
+              // Get existing relationships for the kept collection
+              const { data: existingBookCollections } = await supabase
+                .from('book_collections')
+                .select('book_id')
+                .eq('collection_id', keptCollectionId);
+              
+              const existingBookIds = new Set((existingBookCollections || []).map(bc => bc.book_id));
+              
+              // Migrate relationships - only add books that aren't already in the kept collection
+              const bookIdsToMigrate = Array.from(new Set(duplicateBookCollections.map(bc => bc.book_id)))
+                .filter(bookId => !existingBookIds.has(bookId))
+                .map(bookId => ({
+                  book_id: bookId,
+                  collection_id: keptCollectionId
+                }));
+              
+              if (bookIdsToMigrate.length > 0) {
+                await supabase
+                  .from('book_collections')
+                  .insert(bookIdsToMigrate);
+              }
+            }
+          }
+        }
         
-        const { error: insertError } = await supabase
+        // Now remove book-collection relationships for duplicates (after migration)
+        await supabase
+          .from('book_collections')
+          .delete()
+          .in('collection_id', duplicateIdsToDelete);
+        
+        // Finally delete the duplicate collections
+        const { error: deleteError } = await supabase
           .from('user_collections')
-          .insert(insertData);
+          .delete()
+          .in('id', duplicateIdsToDelete);
         
-        if (insertError) {
-          logger.warn('Failed to create default collections', { userId: this.currentUserId }, insertError);
+        if (deleteError) {
+          logger.warn('Failed to delete duplicate collections', { userId: this.currentUserId }, deleteError);
         } else {
-          logger.info('Default collections ensured', { 
-            userId: this.currentUserId, 
-            created: collectionsToCreate.length,
-            collections: collectionsToCreate.map(c => c.name)
+          logger.info('Cleaned up duplicate collections', {
+            userId: this.currentUserId,
+            deletedCount: duplicateIdsToDelete.length
           });
         }
       }
     } catch (error) {
-      logger.error('Error ensuring default collections', { userId: this.currentUserId }, error as Error);
+      logger.error('Error cleaning up duplicate collections', { userId: this.currentUserId }, error as Error);
       // Don't throw - this is a best-effort operation
     }
+  }
+
+  // Ensure default collections exist (smart collections and Trash)
+  async ensureDefaultCollections(): Promise<void> {
+    this.ensureAuthenticated();
+    
+    // If already ensuring defaults, wait for that to complete instead of starting a new one
+    if (this.ensuringDefaultsPromise) {
+      return this.ensuringDefaultsPromise;
+    }
+    
+    // Create the promise and store it
+    this.ensuringDefaultsPromise = (async () => {
+      try {
+        // First, clean up any existing duplicates
+        await this.cleanupDuplicateCollections();
+        
+        // Check which default collections already exist
+        const { data: existingCollections, error: checkError } = await supabase
+          .from('user_collections')
+          .select('id, name')
+          .eq('user_id', this.currentUserId!);
+        
+        if (checkError) {
+          logger.warn('Failed to check existing collections', { userId: this.currentUserId }, checkError);
+          return; // Don't fail if check fails
+        }
+        
+        const existingNames = new Set((existingCollections || []).map(c => c.name));
+        
+        // Default smart collections to create
+        const defaultCollections = [
+          {
+            name: 'In Progress',
+            description: 'Books you are currently reading',
+            is_smart: true,
+            smart_filter: { progress_min: 0.01, progress_max: 99.99 },
+            color: '#F59E0B',
+            icon: 'book-open',
+            display_order: 1
+          },
+          {
+            name: 'Recently Added',
+            description: 'Books added in the last 30 days',
+            is_smart: true,
+            smart_filter: { uploaded_after: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() },
+            color: '#3B82F6',
+            icon: 'calendar',
+            display_order: 2
+          },
+          {
+            name: 'Needs Review',
+            description: 'Books not read in the last 90 days',
+            is_smart: true,
+            smart_filter: { last_read_before: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString() },
+            color: '#EF4444',
+            icon: 'alert-circle',
+            display_order: 3
+          },
+          {
+            name: 'Completed',
+            description: 'Books you have finished reading',
+            is_smart: true,
+            smart_filter: { progress_min: 100, progress_max: 100 },
+            color: '#10B981',
+            icon: 'check-circle',
+            display_order: 4
+          },
+          {
+            name: 'Unread',
+            description: 'Books you have not started',
+            is_smart: true,
+            smart_filter: { progress_min: 0, progress_max: 0 },
+            color: '#6B7280',
+            icon: 'book-marked',
+            display_order: 5
+          },
+          {
+            name: 'Trash',
+            description: 'Deleted books',
+            is_smart: false,
+            smart_filter: {},
+            color: '#6B7280',
+            icon: 'trash-2',
+            display_order: 9999
+          }
+        ];
+        
+        // Create missing collections
+        const collectionsToCreate = defaultCollections.filter(c => !existingNames.has(c.name));
+        
+        if (collectionsToCreate.length > 0) {
+          const insertData = collectionsToCreate.map(c => {
+            const data: any = {
+              user_id: this.currentUserId!,
+              name: c.name,
+              description: c.description,
+              is_smart: c.is_smart,
+              color: c.color,
+              icon: c.icon,
+              display_order: c.display_order,
+              is_favorite: false
+            };
+            
+            // Only include smart_filter for smart collections
+            if (c.is_smart && c.smart_filter) {
+              data.smart_filter = c.smart_filter;
+            } else {
+              data.smart_filter = {};
+            }
+            
+            return data;
+          });
+          
+          // Use a unique constraint check - only insert if name doesn't exist
+          // This provides database-level protection against duplicates
+          const { error: insertError } = await supabase
+            .from('user_collections')
+            .insert(insertData);
+          
+          if (insertError) {
+            // If there's a unique constraint violation or similar, log it but don't fail
+            logger.warn('Failed to create default collections (may already exist)', { 
+              userId: this.currentUserId,
+              error: insertError.message 
+            });
+          } else {
+            logger.info('Default collections ensured', { 
+              userId: this.currentUserId, 
+              created: insertData.length,
+              collections: insertData.map(c => c.name)
+            });
+          }
+        }
+      } finally {
+        // Clear the promise so future calls can start fresh
+        this.ensuringDefaultsPromise = null;
+      }
+    })();
+    
+    return this.ensuringDefaultsPromise;
   }
 
   async getCollections(): Promise<Collection[]> {
@@ -273,24 +422,116 @@ class LibraryOrganizationService {
           );
         }
 
+        // Deduplicate collections by name (keep the oldest one if duplicates exist)
+        const collectionsByName = new Map<string, Collection>();
+        const duplicateIds: string[] = [];
+        
+        for (const collection of (fallbackData || [])) {
+          const existing = collectionsByName.get(collection.name);
+          if (existing) {
+            // Compare created_at to keep the oldest one
+            const existingDate = new Date(existing.created_at || existing.updated_at || 0);
+            const currentDate = new Date(collection.created_at || collection.updated_at || 0);
+            
+            if (currentDate < existingDate) {
+              // Current is older, keep it and mark existing as duplicate
+              duplicateIds.push(existing.id);
+              collectionsByName.set(collection.name, collection);
+              logger.warn('Duplicate collection found, keeping older one', { 
+                userId: this.currentUserId, 
+                name: collection.name,
+                keeping: collection.id,
+                removing: existing.id
+              });
+            } else {
+              // Existing is older, keep it and mark current as duplicate
+              duplicateIds.push(collection.id);
+              logger.warn('Duplicate collection found, keeping older one', { 
+                userId: this.currentUserId, 
+                name: collection.name,
+                keeping: existing.id,
+                removing: collection.id
+              });
+            }
+          } else {
+            collectionsByName.set(collection.name, collection);
+          }
+        }
+        
+        const deduplicated = Array.from(collectionsByName.values());
+
         const durationMs = Date.now() - start;
         logger.info('Collections retrieved (fallback)', { 
           userId: this.currentUserId, 
           durationMs,
-          count: fallbackData?.length || 0
+          count: deduplicated.length,
+          duplicatesRemoved: duplicateIds.length
         });
         
-        return fallbackData || [];
+        // If duplicates were found, schedule a cleanup (non-blocking)
+        if (duplicateIds.length > 0) {
+          this.cleanupDuplicateCollections().catch(err => 
+            logger.warn('Background cleanup of duplicates failed', { userId: this.currentUserId }, err)
+          );
+        }
+        
+        return deduplicated;
       }
 
+      // Deduplicate collections by name (keep the oldest one if duplicates exist)
+      const collectionsByName = new Map<string, Collection>();
+      const duplicateIds: string[] = [];
+      
+      for (const collection of (data || [])) {
+        const existing = collectionsByName.get(collection.name);
+        if (existing) {
+          // Compare created_at to keep the oldest one
+          const existingDate = new Date(existing.created_at || existing.updated_at || 0);
+          const currentDate = new Date(collection.created_at || collection.updated_at || 0);
+          
+          if (currentDate < existingDate) {
+            // Current is older, keep it and mark existing as duplicate
+            duplicateIds.push(existing.id);
+            collectionsByName.set(collection.name, collection);
+            logger.warn('Duplicate collection found, keeping older one', { 
+              userId: this.currentUserId, 
+              name: collection.name,
+              keeping: collection.id,
+              removing: existing.id
+            });
+          } else {
+            // Existing is older, keep it and mark current as duplicate
+            duplicateIds.push(collection.id);
+            logger.warn('Duplicate collection found, keeping older one', { 
+              userId: this.currentUserId, 
+              name: collection.name,
+              keeping: existing.id,
+              removing: collection.id
+            });
+          }
+        } else {
+          collectionsByName.set(collection.name, collection);
+        }
+      }
+      
+      const deduplicated = Array.from(collectionsByName.values());
+
       const durationMs = Date.now() - start;
-      logger.info('Collections retrieved (cached)', { 
+      logger.info('Collections retrieved', { 
         userId: this.currentUserId, 
         durationMs,
-        count: data?.length || 0
+        count: deduplicated.length,
+        duplicatesRemoved: duplicateIds.length
       });
 
-      return data || [];
+      // If duplicates were found, schedule a cleanup (non-blocking)
+      if (duplicateIds.length > 0) {
+        this.cleanupDuplicateCollections().catch(err => 
+          logger.warn('Background cleanup of duplicates failed', { userId: this.currentUserId }, err)
+        );
+      }
+
+      return deduplicated;
     } catch (error) {
       logger.error('Error getting collections', { userId: this.currentUserId }, error as Error);
       throw error;
