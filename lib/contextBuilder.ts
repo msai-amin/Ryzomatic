@@ -43,7 +43,7 @@ export class ContextBuilder {
   }): Promise<ContextBuilderResult> {
     const { userId, query, conversationId, documentId, limit = 15 } = params;
 
-    // Step 1: Extract entities from user query
+    // Step 1: Generate query embedding (used for both memories and notes/highlights)
     const queryEmbedding = await embeddingService.embed(query);
     
     // Step 2: Search for relevant memories
@@ -54,12 +54,12 @@ export class ContextBuilder {
       documentId,
     });
 
-    // Step 3: Get notes for the document
+    // Step 3: Get notes for the document (now using vector similarity search)
     const relevantNotes = documentId
       ? await this.getRelevantNotes(userId, documentId, query, Math.ceil(limit * 0.3))
       : [];
 
-    // Step 4: Get highlights for the document
+    // Step 4: Get highlights for the document (now using vector similarity search)
     const relevantHighlights = documentId
       ? await this.getRelevantHighlights(userId, documentId, query, Math.ceil(limit * 0.2))
       : [];
@@ -89,9 +89,55 @@ export class ContextBuilder {
   }
 
   /**
-   * Get relevant notes based on semantic similarity
+   * Get relevant notes based on semantic similarity using vector search
    */
   private async getRelevantNotes(
+    userId: string,
+    documentId: string,
+    query: string,
+    limit: number
+  ): Promise<Array<{ id: string; content: string; pageNumber: number }>> {
+    try {
+      // Generate query embedding
+      const queryEmbedding = await embeddingService.embed(query);
+      const queryEmbeddingVector = embeddingService.formatForPgVector(queryEmbedding);
+
+      // Use vector similarity search via database function
+      const { data: similarNotes, error } = await supabase.rpc('find_similar_notes', {
+        query_embedding: queryEmbeddingVector,
+        p_user_id: userId,
+        p_book_id: documentId,
+        similarity_threshold: 0.7,
+        result_limit: limit,
+      });
+
+      if (error) {
+        console.warn('Vector search failed, falling back to text matching:', error);
+        // Fallback to text matching if vector search fails
+        return this.getRelevantNotesFallback(userId, documentId, query, limit);
+      }
+
+      if (!similarNotes || similarNotes.length === 0) {
+        // Fallback to text matching if no vector results
+        return this.getRelevantNotesFallback(userId, documentId, query, limit);
+      }
+
+      return similarNotes.map((note: any) => ({
+        id: note.id,
+        content: note.content,
+        pageNumber: note.page_number,
+      }));
+    } catch (error) {
+      console.error('Error getting relevant notes:', error);
+      // Fallback to text matching on error
+      return this.getRelevantNotesFallback(userId, documentId, query, limit);
+    }
+  }
+
+  /**
+   * Fallback method using simple text matching (for backward compatibility)
+   */
+  private async getRelevantNotesFallback(
     userId: string,
     documentId: string,
     query: string,
@@ -104,11 +150,10 @@ export class ContextBuilder {
         .eq('user_id', userId)
         .eq('book_id', documentId)
         .order('created_at', { ascending: false })
-        .limit(limit * 2); // Get more for filtering
+        .limit(limit * 2);
 
       if (!notes) return [];
 
-      // Simple text matching (in a production system, you'd compute embeddings)
       const queryLower = query.toLowerCase();
       const relevantNotes = notes
         .filter(note => note.content.toLowerCase().includes(queryLower))
@@ -121,15 +166,63 @@ export class ContextBuilder {
 
       return relevantNotes;
     } catch (error) {
-      console.error('Error getting relevant notes:', error);
+      console.error('Error in fallback note search:', error);
       return [];
     }
   }
 
   /**
-   * Get relevant highlights based on semantic similarity
+   * Get relevant highlights based on semantic similarity using vector search
    */
   private async getRelevantHighlights(
+    userId: string,
+    documentId: string,
+    query: string,
+    limit: number
+  ): Promise<Array<{ id: string; text: string; color: string; pageNumber: number }>> {
+    try {
+      // Generate query embedding
+      const queryEmbedding = await embeddingService.embed(query);
+      const queryEmbeddingVector = embeddingService.formatForPgVector(queryEmbedding);
+
+      // Use vector similarity search via database function
+      const { data: similarHighlights, error } = await supabase.rpc('find_similar_highlights', {
+        query_embedding: queryEmbeddingVector,
+        p_user_id: userId,
+        p_book_id: documentId,
+        similarity_threshold: 0.7,
+        result_limit: limit,
+        include_orphaned: false,
+      });
+
+      if (error) {
+        console.warn('Vector search failed, falling back to text matching:', error);
+        // Fallback to text matching if vector search fails
+        return this.getRelevantHighlightsFallback(userId, documentId, query, limit);
+      }
+
+      if (!similarHighlights || similarHighlights.length === 0) {
+        // Fallback to text matching if no vector results
+        return this.getRelevantHighlightsFallback(userId, documentId, query, limit);
+      }
+
+      return similarHighlights.map((hl: any) => ({
+        id: hl.id,
+        text: hl.highlighted_text,
+        color: hl.color_hex,
+        pageNumber: hl.page_number,
+      }));
+    } catch (error) {
+      console.error('Error getting relevant highlights:', error);
+      // Fallback to text matching on error
+      return this.getRelevantHighlightsFallback(userId, documentId, query, limit);
+    }
+  }
+
+  /**
+   * Fallback method using simple text matching (for backward compatibility)
+   */
+  private async getRelevantHighlightsFallback(
     userId: string,
     documentId: string,
     query: string,
@@ -141,12 +234,12 @@ export class ContextBuilder {
         .select('*')
         .eq('user_id', userId)
         .eq('book_id', documentId)
+        .eq('is_orphaned', false)
         .order('created_at', { ascending: false })
-        .limit(limit * 2); // Get more for filtering
+        .limit(limit * 2);
 
       if (!highlights) return [];
 
-      // Simple text matching
       const queryLower = query.toLowerCase();
       const relevantHighlights = highlights
         .filter(hl => hl.highlighted_text.toLowerCase().includes(queryLower))
@@ -160,7 +253,7 @@ export class ContextBuilder {
 
       return relevantHighlights;
     } catch (error) {
-      console.error('Error getting relevant highlights:', error);
+      console.error('Error in fallback highlight search:', error);
       return [];
     }
   }

@@ -1,10 +1,10 @@
-import { supabase } from './supabase';
+import { createClient } from '@supabase/supabase-js';
 import { MemoryGraphService, MemoryNode, MemoryEdge, MemoryGraph } from './memoryGraph';
 import { embeddingService } from './embeddingService';
 
 export interface UnifiedNode {
   id: string;
-  node_type: 'document' | 'note' | 'memory';
+  node_type: 'document' | 'note' | 'memory' | 'highlight';
   content: string;
   metadata?: Record<string, any>;
 }
@@ -148,6 +148,40 @@ export class UnifiedGraphService extends MemoryGraphService {
                 }
               }
             }
+
+            // Get highlights for this document
+            const { data: highlights } = await supabase
+              .from('user_highlights')
+              .select('*')
+              .eq('book_id', currentId)
+              .eq('user_id', userId)
+              .eq('is_orphaned', false)
+              .limit(20);
+
+            if (highlights) {
+              for (const highlight of highlights) {
+                const highlightKey = `highlight:${highlight.id}`;
+                if (!processed.has(highlightKey)) {
+                  processed.add(highlightKey);
+                  nodes.set(highlightKey, {
+                    id: highlightKey,
+                    node_type: 'highlight',
+                    content: highlight.highlighted_text,
+                    metadata: { 
+                      page_number: highlight.page_number,
+                      color: highlight.color_hex 
+                    }
+                  });
+
+                  edges.push({
+                    from: `doc:${currentId}`,
+                    to: highlightKey,
+                    relationship_type: 'contains',
+                    depth: currentDepth + 1
+                  });
+                }
+              }
+            }
           }
         }
 
@@ -265,29 +299,54 @@ export class UnifiedGraphService extends MemoryGraphService {
         }
       }
 
-      // 3. Search notes (limited to recent/popular)
-      const { data: notes } = await supabase
-        .from('user_notes')
-        .select('*')
-        .eq('user_id', userId)
-        .limit(100);
+      // 3. Search notes using stored embeddings (much faster)
+      const queryEmbeddingVector = embeddingService.formatForPgVector(queryEmbedding);
+      const { data: similarNotes } = await supabase.rpc('find_similar_notes', {
+        query_embedding: queryEmbeddingVector,
+        p_user_id: userId,
+        p_book_id: null, // Search across all documents
+        similarity_threshold: 0.70,
+        result_limit: 50,
+      });
 
-      if (notes) {
-        for (const note of notes) {
-          const noteEmbedding = await embeddingService.embed(note.content);
-          const similarity = embeddingService.cosineSimilarity(queryEmbedding, noteEmbedding);
+      if (similarNotes) {
+        for (const note of similarNotes) {
+          results.push({
+            node: {
+              id: `note:${note.id}`,
+              node_type: 'note',
+              content: note.content,
+              metadata: { page_number: note.page_number }
+            },
+            score: note.similarity
+          });
+        }
+      }
 
-          if (similarity >= 0.70) {
-            results.push({
-              node: {
-                id: `note:${note.id}`,
-                node_type: 'note',
-                content: note.content,
-                metadata: { page_number: note.page_number, note_type: note.note_type }
-              },
-              score: similarity
-            });
-          }
+      // 4. Search highlights using stored embeddings
+      const { data: similarHighlights } = await supabase.rpc('find_similar_highlights', {
+        query_embedding: queryEmbeddingVector,
+        p_user_id: userId,
+        p_book_id: null, // Search across all documents
+        similarity_threshold: 0.70,
+        result_limit: 50,
+        include_orphaned: false,
+      });
+
+      if (similarHighlights) {
+        for (const highlight of similarHighlights) {
+          results.push({
+            node: {
+              id: `highlight:${highlight.id}`,
+              node_type: 'highlight',
+              content: highlight.highlighted_text,
+              metadata: { 
+                page_number: highlight.page_number,
+                color: highlight.color_hex 
+              }
+            },
+            score: highlight.similarity
+          });
         }
       }
 
@@ -450,6 +509,18 @@ export class UnifiedGraphService extends MemoryGraphService {
       console.error('Error getting note relationships:', error);
       return [];
     }
+  }
+
+  /**
+   * Get document graph with highlights included
+   */
+  async getDocumentGraphWithHighlights(
+    documentId: string,
+    userId: string,
+    maxDepth: number = 2
+  ): Promise<UnifiedGraph> {
+    // Use the enhanced getDocumentCentricGraph which now includes highlights
+    return this.getDocumentCentricGraph(documentId, userId, maxDepth);
   }
 }
 

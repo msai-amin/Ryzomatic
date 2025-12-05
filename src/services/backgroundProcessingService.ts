@@ -1,6 +1,7 @@
 import { documentRelevanceService } from './documentRelevanceService';
 import { autoRelationshipService } from '../../lib/autoRelationshipService';
 import { documentDescriptionService } from '../../lib/documentDescriptionService';
+import { notesHighlightsEmbeddingService } from '../../lib/notesHighlightsEmbeddingService';
 import { supabase } from '../services/supabaseAuthService';
 
 class BackgroundProcessingService {
@@ -53,6 +54,10 @@ class BackgroundProcessingService {
       // Process note relationship auto-detection
       console.log('BackgroundProcessingService: Processing note relationships');
       await this.processNoteRelationships();
+
+      // Process pending embedding generation jobs for notes and highlights
+      console.log('BackgroundProcessingService: Processing pending embeddings');
+      await notesHighlightsEmbeddingService.processPendingEmbeddings(50);
     } catch (error) {
       console.error('BackgroundProcessingService: Error processing queue:', error);
     }

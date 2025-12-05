@@ -85,9 +85,51 @@ export class DocumentDescriptionService {
         content = book.text_content || '';
       }
 
-      // Generate description using Gemini
+      // Fetch user's notes and highlights for this document
+      const [notesResult, highlightsResult] = await Promise.all([
+        supabase
+          .from('user_notes')
+          .select('content, page_number')
+          .eq('book_id', bookId)
+          .eq('user_id', userId)
+          .limit(10)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('user_highlights')
+          .select('highlighted_text, page_number')
+          .eq('book_id', bookId)
+          .eq('user_id', userId)
+          .eq('is_orphaned', false)
+          .limit(10)
+          .order('created_at', { ascending: false }),
+      ]);
+
+      const notes = notesResult.data || [];
+      const highlights = highlightsResult.data || [];
+
+      // Build enhanced prompt with user context
       const documentContent = content || '';
-      const prompt = `Generate a comprehensive 2-3 sentence description of this document. Focus on the main topics, purpose, and key points. Be specific and informative.\n\nDocument: ${documentContent.substring(0, 5000)}`;
+      let prompt = `Generate a comprehensive 2-3 sentence description of this document. Focus on the main topics, purpose, and key points. Be specific and informative.\n\nDocument: ${documentContent.substring(0, 5000)}`;
+
+      // Add user's highlighted sections if available
+      if (highlights.length > 0) {
+        const highlightedSections = highlights
+          .slice(0, 5)
+          .map((h, idx) => `"${h.highlighted_text.substring(0, 100)}"`)
+          .join(', ');
+        prompt += `\n\nUser has highlighted these important sections: ${highlightedSections}`;
+      }
+
+      // Add user's notes if available
+      if (notes.length > 0) {
+        const noteTopics = notes
+          .slice(0, 5)
+          .map((n, idx) => n.content.substring(0, 100))
+          .join('; ');
+        prompt += `\n\nUser's notes indicate interest in: ${noteTopics}`;
+      }
+
+      prompt += `\n\nGenerate a description that reflects the user's focus areas and the document's main content.`;
       
       const aiDescription = await geminiService.chat({
         message: prompt,

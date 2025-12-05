@@ -1,5 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { notesHighlightsEmbeddingService } from '../../lib/notesHighlightsEmbeddingService'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -245,6 +246,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .catch(err => console.error('Background concept extraction failed:', err))
       }
 
+      // Queue embedding generation (non-blocking, background job)
+      notesHighlightsEmbeddingService.queueHighlightEmbedding(highlight.id, user.id, 5)
+        .catch(err => console.error('Failed to queue highlight embedding:', err))
+
       return res.status(200).json({ success: true, highlight })
     }
 
@@ -276,6 +281,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (error) {
         console.error('Error updating highlight:', error)
         return res.status(500).json({ error: 'Failed to update highlight' })
+      }
+
+      // Regenerate embedding if highlighted text was updated
+      // Check if we need to fetch the updated highlight text
+      if (highlight) {
+        // Queue embedding regeneration (non-blocking, background job)
+        notesHighlightsEmbeddingService.queueHighlightEmbedding(highlight.id, user.id, 7) // Higher priority for updates
+          .catch(err => console.error('Failed to queue highlight embedding update:', err))
       }
 
       return res.status(200).json({ success: true, highlight })

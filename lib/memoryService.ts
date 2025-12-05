@@ -384,6 +384,270 @@ export class MemoryService {
         .map(([text, count]) => ({ text, count: count as number })),
     };
   }
+
+  /**
+   * Extract memory entities from notes
+   */
+  async extractFromNotes(params: {
+    userId: string;
+    noteIds?: string[];
+    documentId?: string;
+  }): Promise<{ success: boolean; entitiesCreated: number; relationshipsCreated: number }> {
+    const { userId, noteIds, documentId } = params;
+
+    try {
+      // Fetch notes
+      let query = supabase
+        .from('user_notes')
+        .select('id, content, book_id, page_number, created_at')
+        .eq('user_id', userId);
+
+      if (noteIds && noteIds.length > 0) {
+        query = query.in('id', noteIds);
+      } else if (documentId) {
+        query = query.eq('book_id', documentId);
+      } else {
+        return { success: false, entitiesCreated: 0, relationshipsCreated: 0 };
+      }
+
+      const { data: notes, error: notesError } = await query;
+
+      if (notesError || !notes || notes.length === 0) {
+        console.error('Error fetching notes for extraction:', notesError);
+        return { success: false, entitiesCreated: 0, relationshipsCreated: 0 };
+      }
+
+      // Combine note contents for extraction
+      const noteTexts = notes.map((note, idx) => 
+        `Note ${idx + 1} (Page ${note.page_number}): ${note.content}`
+      ).join('\n\n');
+
+      // Extract entities using Gemini
+      const extraction = await geminiService.extractMemoryEntities({
+        conversationMessages: [
+          { role: 'user', content: `Extract semantic entities from these notes:\n\n${noteTexts}` }
+        ],
+        documentTitle: documentId ? 'Document Notes' : undefined,
+      });
+
+      // Generate embeddings for all entities
+      const textsToEmbed = extraction.entities.map(e => e.text);
+      const embeddings = await embeddingService.embedBatch(textsToEmbed);
+
+      // Store entities
+      const entitiesToInsert = extraction.entities.map((entity, idx) => ({
+        user_id: userId,
+        entity_type: entity.type,
+        entity_text: entity.text,
+        entity_metadata: {
+          ...entity.metadata,
+          source: 'note',
+          note_ids: notes.map(n => n.id),
+          document_id: documentId || notes[0]?.book_id,
+        },
+        document_id: documentId || notes[0]?.book_id,
+        embedding: embeddingService.formatForPgVector(embeddings[idx]),
+      }));
+
+      const { data: insertedEntities, error: insertError } = await supabase
+        .from('conversation_memories')
+        .insert(entitiesToInsert)
+        .select('id');
+
+      if (insertError) {
+        throw new Error(`Failed to insert entities: ${insertError.message}`);
+      }
+
+      // Store relationships if provided
+      let relationshipsCreated = 0;
+      if (extraction.relationships && insertedEntities && insertedEntities.length > 0) {
+        const relationshipsToInsert = extraction.relationships.map(rel => {
+          const fromEntity = insertedEntities[rel.from];
+          const toEntity = insertedEntities[rel.to];
+          
+          if (!fromEntity || !toEntity) return null;
+
+          return {
+            user_id: userId,
+            memory_from: fromEntity.id,
+            memory_to: toEntity.id,
+            relationship_type: rel.type,
+            strength: rel.strength || 0.5,
+          };
+        }).filter(Boolean);
+
+        if (relationshipsToInsert.length > 0) {
+          const { error: relError } = await supabase
+            .from('memory_relationships')
+            .insert(relationshipsToInsert);
+
+          if (!relError) {
+            relationshipsCreated = relationshipsToInsert.length;
+          }
+        }
+      }
+
+      return {
+        success: true,
+        entitiesCreated: insertedEntities?.length || 0,
+        relationshipsCreated,
+      };
+    } catch (error) {
+      console.error('Error extracting memory from notes:', error);
+      return {
+        success: false,
+        entitiesCreated: 0,
+        relationshipsCreated: 0,
+      };
+    }
+  }
+
+  /**
+   * Extract memory entities from highlights
+   */
+  async extractFromHighlights(params: {
+    userId: string;
+    highlightIds?: string[];
+    documentId?: string;
+  }): Promise<{ success: boolean; entitiesCreated: number; relationshipsCreated: number }> {
+    const { userId, highlightIds, documentId } = params;
+
+    try {
+      // Fetch highlights
+      let query = supabase
+        .from('user_highlights')
+        .select('id, highlighted_text, book_id, page_number, created_at')
+        .eq('user_id', userId)
+        .eq('is_orphaned', false);
+
+      if (highlightIds && highlightIds.length > 0) {
+        query = query.in('id', highlightIds);
+      } else if (documentId) {
+        query = query.eq('book_id', documentId);
+      } else {
+        return { success: false, entitiesCreated: 0, relationshipsCreated: 0 };
+      }
+
+      const { data: highlights, error: highlightsError } = await query;
+
+      if (highlightsError || !highlights || highlights.length === 0) {
+        console.error('Error fetching highlights for extraction:', highlightsError);
+        return { success: false, entitiesCreated: 0, relationshipsCreated: 0 };
+      }
+
+      // Combine highlight texts for extraction
+      const highlightTexts = highlights.map((hl, idx) => 
+        `Highlight ${idx + 1} (Page ${hl.page_number}): "${hl.highlighted_text}"`
+      ).join('\n\n');
+
+      // Extract entities using Gemini
+      const extraction = await geminiService.extractMemoryEntities({
+        conversationMessages: [
+          { role: 'user', content: `Extract semantic entities and concepts from these highlights:\n\n${highlightTexts}` }
+        ],
+        documentTitle: documentId ? 'Document Highlights' : undefined,
+      });
+
+      // Generate embeddings for all entities
+      const textsToEmbed = extraction.entities.map(e => e.text);
+      const embeddings = await embeddingService.embedBatch(textsToEmbed);
+
+      // Store entities
+      const entitiesToInsert = extraction.entities.map((entity, idx) => ({
+        user_id: userId,
+        entity_type: entity.type,
+        entity_text: entity.text,
+        entity_metadata: {
+          ...entity.metadata,
+          source: 'highlight',
+          highlight_ids: highlights.map(h => h.id),
+          document_id: documentId || highlights[0]?.book_id,
+        },
+        document_id: documentId || highlights[0]?.book_id,
+        embedding: embeddingService.formatForPgVector(embeddings[idx]),
+      }));
+
+      const { data: insertedEntities, error: insertError } = await supabase
+        .from('conversation_memories')
+        .insert(entitiesToInsert)
+        .select('id');
+
+      if (insertError) {
+        throw new Error(`Failed to insert entities: ${insertError.message}`);
+      }
+
+      // Store relationships if provided
+      let relationshipsCreated = 0;
+      if (extraction.relationships && insertedEntities && insertedEntities.length > 0) {
+        const relationshipsToInsert = extraction.relationships.map(rel => {
+          const fromEntity = insertedEntities[rel.from];
+          const toEntity = insertedEntities[rel.to];
+          
+          if (!fromEntity || !toEntity) return null;
+
+          return {
+            user_id: userId,
+            memory_from: fromEntity.id,
+            memory_to: toEntity.id,
+            relationship_type: rel.type,
+            strength: rel.strength || 0.5,
+          };
+        }).filter(Boolean);
+
+        if (relationshipsToInsert.length > 0) {
+          const { error: relError } = await supabase
+            .from('memory_relationships')
+            .insert(relationshipsToInsert);
+
+          if (!relError) {
+            relationshipsCreated = relationshipsToInsert.length;
+          }
+        }
+      }
+
+      return {
+        success: true,
+        entitiesCreated: insertedEntities?.length || 0,
+        relationshipsCreated,
+      };
+    } catch (error) {
+      console.error('Error extracting memory from highlights:', error);
+      return {
+        success: false,
+        entitiesCreated: 0,
+        relationshipsCreated: 0,
+      };
+    }
+  }
+
+  /**
+   * Extract memory entities from both notes and highlights for a document
+   */
+  async extractFromNotesAndHighlights(
+    userId: string,
+    documentId: string
+  ): Promise<{ success: boolean; entitiesCreated: number; relationshipsCreated: number }> {
+    try {
+      // Extract from both sources in parallel
+      const [notesResult, highlightsResult] = await Promise.all([
+        this.extractFromNotes({ userId, documentId }),
+        this.extractFromHighlights({ userId, documentId }),
+      ]);
+
+      return {
+        success: notesResult.success || highlightsResult.success,
+        entitiesCreated: notesResult.entitiesCreated + highlightsResult.entitiesCreated,
+        relationshipsCreated: notesResult.relationshipsCreated + highlightsResult.relationshipsCreated,
+      };
+    } catch (error) {
+      console.error('Error extracting from notes and highlights:', error);
+      return {
+        success: false,
+        entitiesCreated: 0,
+        relationshipsCreated: 0,
+      };
+    }
+  }
 }
 
 export const memoryService = new MemoryService();

@@ -2,6 +2,7 @@
 import { userNotes, userBooks, supabase } from '../../lib/supabase';
 import { sendMessageToAI } from './aiService';
 import { conceptExtractionService } from './conceptExtractionService';
+import { notesHighlightsEmbeddingService } from '../../lib/notesHighlightsEmbeddingService';
 
 // Helper function to extract concepts from note (runs in background)
 async function extractConceptsFromNote(
@@ -138,6 +139,12 @@ class NotesService {
           .catch(err => console.error('Background concept extraction failed:', err))
       }
 
+      // Queue embedding generation (non-blocking, background job)
+      if (data) {
+        notesHighlightsEmbeddingService.queueNoteEmbedding(data.id, userId, 5)
+          .catch(err => console.error('Failed to queue note embedding:', err))
+      }
+
       return { data: data as NoteWithMetadata, error: null };
     } catch (error) {
       console.error('NotesService: Exception creating note:', error);
@@ -177,6 +184,13 @@ class NotesService {
       if (error) {
         console.error('NotesService: Error updating note:', error);
         return { data: null, error: error as Error };
+      }
+
+      // Regenerate embedding if content was updated
+      if (data && updates.content !== undefined) {
+        // Queue embedding regeneration (non-blocking, background job)
+        notesHighlightsEmbeddingService.queueNoteEmbedding(data.id, data.user_id, 7) // Higher priority for updates
+          .catch(err => console.error('Failed to queue note embedding update:', err))
       }
 
       return { data: data as NoteWithMetadata, error: null };

@@ -6,6 +6,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { userInterestProfileService } from '../../lib/userInterestProfileService';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -104,6 +105,9 @@ async function handleGetRecommendations(
       return res.status(400).json({ error: 'sourceDocumentId or openAlexId required' });
     }
 
+    // Get user interest profile to enhance recommendations
+    const interestProfile = await userInterestProfileService.buildInterestProfile(userId, 30);
+
     // If we have a document ID, fetch full document data (including content)
     let document: any = null;
     let workId = openAlexId;
@@ -164,12 +168,17 @@ async function handleGetRecommendations(
     } 
     // If no workId but we have document content, use content-based search
     else if (sourceDocumentId && document) {
-      recommendations = await getContentBasedRecommendations(document, limit, email);
+      recommendations = await getContentBasedRecommendations(document, limit, email, interestProfile);
     } 
     else {
       return res.status(400).json({
         error: 'Could not determine OpenAlex work ID and no document content available for content-based search.',
       });
+    }
+
+    // Enhance recommendations with interest-based scoring
+    if (interestProfile && interestProfile.topConcepts.length > 0) {
+      recommendations = enhanceRecommendationsWithInterest(recommendations, interestProfile);
     }
 
     // Cache recommendations in database if we have a source document
@@ -183,6 +192,7 @@ async function handleGetRecommendations(
       sourceDocumentId,
       openAlexId: workId || null,
       recommendationMethod: workId ? 'citation_graph' : 'content_based',
+      interestProfileUsed: !!interestProfile,
     });
   } catch (error: any) {
     console.error('Error getting recommendations:', error);
@@ -306,12 +316,46 @@ async function handleUpdateFeedback(
 }
 
 /**
+ * Enhance recommendations with user interest profile
+ */
+function enhanceRecommendationsWithInterest(
+  recommendations: any[],
+  interestProfile: { topConcepts: Array<{ concept: string; importance: number }> }
+): any[] {
+  const topConcepts = interestProfile.topConcepts.slice(0, 10).map(c => c.concept.toLowerCase());
+  
+  return recommendations.map(rec => {
+    let interestScore = 0;
+    const titleLower = (rec.title || '').toLowerCase();
+    const abstractLower = (rec.abstract || '').toLowerCase();
+    
+    // Check if recommendation matches user's top concepts
+    topConcepts.forEach((concept, idx) => {
+      const importance = interestProfile.topConcepts[idx]?.importance || 0;
+      if (titleLower.includes(concept) || abstractLower.includes(concept)) {
+        interestScore += importance * 10; // Boost score based on importance
+      }
+    });
+
+    // Add interest-based boost to recommendation score
+    rec.recommendation_score = Math.min(100, (rec.recommendation_score || 50) + interestScore);
+    
+    if (interestScore > 0) {
+      rec.recommendation_reason = `${rec.recommendation_reason || 'Recommended'} (matches your interests)`;
+    }
+
+    return rec;
+  }).sort((a, b) => (b.recommendation_score || 0) - (a.recommendation_score || 0));
+}
+
+/**
  * Get recommendations based on document content using Gemini AI for intelligent analysis
  */
 async function getContentBasedRecommendations(
   document: { title?: string; content?: string },
   limit: number,
-  email?: string
+  email?: string,
+  interestProfile?: { topConcepts: Array<{ concept: string; importance: number }> } | null
 ): Promise<any[]> {
   try {
     // Use Gemini to intelligently extract search queries from the document
@@ -325,18 +369,25 @@ async function getContentBasedRecommendations(
 
     const title = document.title || 'Untitled Document';
 
+    // Build prompt with user interest context
+    let interestContext = '';
+    if (interestProfile && interestProfile.topConcepts.length > 0) {
+      const topConcepts = interestProfile.topConcepts.slice(0, 5).map(c => c.concept).join(', ');
+      interestContext = `\n\nUser's research interests (from notes/highlights): ${topConcepts}\nConsider these interests when generating search queries to find papers that align with the user's focus areas.`;
+    }
+
     const prompt = `You are an expert academic research assistant. Analyze the following document and extract the most important search terms and concepts for finding related academic papers.
 
 Document Title: ${title}
 
 Document Content (preview):
-${contentPreview}
+${contentPreview}${interestContext}
 
-Based on this document, generate 3-5 optimized search queries for finding related academic papers. Focus on:
+Based on this document${interestContext ? ' and the user\'s research interests' : ''}, generate 3-5 optimized search queries for finding related academic papers. Focus on:
 1. Core research concepts and methodologies
 2. Key technical terms and domain-specific vocabulary
 3. Research questions or problems addressed
-4. Important theoretical frameworks or models mentioned
+4. Important theoretical frameworks or models mentioned${interestContext ? '\n5. Concepts that align with the user\'s highlighted interests' : ''}
 
 Return ONLY a JSON array of search query strings, like this:
 ["query 1", "query 2", "query 3"]
