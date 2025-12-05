@@ -224,34 +224,41 @@ SECURITY DEFINER
 SET search_path = 'public, extensions'
 AS $$
 DECLARE
-  new_embedding vector(768);
   related_doc_id UUID;
   similarity_score DECIMAL(5,2);
   relationship_type TEXT;
   ai_description TEXT;
   relationship_record public.document_relationships;
+  source_desc_id UUID;
 BEGIN
-  -- Get the embedding of the newly added document
-  SELECT description_embedding INTO new_embedding
+  -- Get the description ID for the new document
+  SELECT id INTO source_desc_id
   FROM public.document_descriptions
   WHERE book_id = new_book_id AND user_id = new_user_id AND description_embedding IS NOT NULL;
 
-  IF new_embedding IS NULL THEN
+  IF source_desc_id IS NULL THEN
     RAISE WARNING 'No embedding found for new document %s, skipping auto-relationship generation.', new_book_id;
     RETURN;
   END IF;
 
   -- Find similar existing documents using vector similarity
+  -- Use CTE to avoid declaring vector type in DECLARE section
   FOR related_doc_id, similarity_score IN
+    WITH source_embedding AS (
+      SELECT description_embedding
+      FROM public.document_descriptions
+      WHERE id = source_desc_id
+    )
     SELECT
       dd.book_id,
-      (1 - (dd.description_embedding <=> new_embedding)) AS similarity
+      (1 - (dd.description_embedding <=> se.description_embedding)) AS similarity
     FROM public.document_descriptions dd
+    CROSS JOIN source_embedding se
     WHERE dd.user_id = new_user_id
       AND dd.book_id != new_book_id
       AND dd.description_embedding IS NOT NULL
-      AND (1 - (dd.description_embedding <=> new_embedding)) >= similarity_threshold
-    ORDER BY (dd.description_embedding <=> new_embedding)
+      AND (1 - (dd.description_embedding <=> se.description_embedding)) >= similarity_threshold
+    ORDER BY (dd.description_embedding <=> se.description_embedding)
     LIMIT limit_count
   LOOP
     -- Determine relationship type based on similarity score
