@@ -127,24 +127,81 @@ CREATE TRIGGER update_document_relationships_updated_at BEFORE UPDATE ON documen
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================================================
--- DOCUMENT DESCRIPTIONS TABLE (Modified to include embedding)
+-- DOCUMENT DESCRIPTIONS TABLE (Create if not exists, then add embedding)
 -- ============================================================================
 
--- Add embedding column if it doesn't exist
+-- Create document_descriptions table if it doesn't exist
+CREATE TABLE IF NOT EXISTS public.document_descriptions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  book_id UUID REFERENCES public.user_books(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  
+  -- AI-generated description
+  description TEXT,
+  is_ai_generated BOOLEAN DEFAULT FALSE,
+  last_auto_generated_at TIMESTAMPTZ,
+  
+  -- Vector embedding for similarity search (768 dimensions)
+  description_embedding vector(768),
+  
+  -- Timestamps
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  -- One description per book
+  UNIQUE(book_id)
+);
+
+-- Add embedding column if it doesn't exist (for existing tables)
 DO $$ 
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'document_descriptions' 
+    WHERE table_schema = 'public'
+    AND table_name = 'document_descriptions' 
     AND column_name = 'description_embedding'
   ) THEN
-    ALTER TABLE document_descriptions ADD COLUMN description_embedding extensions.vector(768);
+    ALTER TABLE public.document_descriptions 
+    ADD COLUMN description_embedding vector(768);
   END IF;
 END $$;
 
+-- Indexes for document_descriptions
+CREATE INDEX IF NOT EXISTS idx_document_descriptions_book_id 
+  ON public.document_descriptions(book_id);
+CREATE INDEX IF NOT EXISTS idx_document_descriptions_user_id 
+  ON public.document_descriptions(user_id);
+
 -- Create an index for vector similarity search
 CREATE INDEX IF NOT EXISTS idx_document_descriptions_embedding 
-  ON document_descriptions USING hnsw (description_embedding vector_cosine_ops);
+  ON public.document_descriptions USING hnsw (description_embedding vector_cosine_ops);
+
+-- Row Level Security
+ALTER TABLE public.document_descriptions ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Users can read own document descriptions" ON public.document_descriptions;
+DROP POLICY IF EXISTS "Users can create own document descriptions" ON public.document_descriptions;
+DROP POLICY IF EXISTS "Users can update own document descriptions" ON public.document_descriptions;
+DROP POLICY IF EXISTS "Users can delete own document descriptions" ON public.document_descriptions;
+
+-- Create policies
+CREATE POLICY "Users can read own document descriptions" ON public.document_descriptions
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create own document descriptions" ON public.document_descriptions
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own document descriptions" ON public.document_descriptions
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own document descriptions" ON public.document_descriptions
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- Trigger for updated_at
+DROP TRIGGER IF EXISTS update_document_descriptions_updated_at ON public.document_descriptions;
+CREATE TRIGGER update_document_descriptions_updated_at BEFORE UPDATE ON public.document_descriptions
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================================================
 -- AUTO-GRAPH GENERATION FUNCTION
@@ -167,7 +224,7 @@ SECURITY DEFINER
 SET search_path = 'public, extensions'
 AS $$
 DECLARE
-  new_embedding extensions.vector(768);
+  new_embedding vector(768);
   related_doc_id UUID;
   similarity_score DECIMAL(5,2);
   relationship_type TEXT;
