@@ -2,6 +2,7 @@ import { documentRelevanceService } from './documentRelevanceService';
 import { autoRelationshipService } from '../../lib/autoRelationshipService';
 import { documentDescriptionService } from '../../lib/documentDescriptionService';
 import { notesHighlightsEmbeddingService } from '../../lib/notesHighlightsEmbeddingService';
+import { paperEmbeddingService } from '../../lib/paperEmbeddingService';
 import { supabase } from '../services/supabaseAuthService';
 
 class BackgroundProcessingService {
@@ -58,8 +59,91 @@ class BackgroundProcessingService {
       // Process pending embedding generation jobs for notes and highlights
       console.log('BackgroundProcessingService: Processing pending embeddings');
       await notesHighlightsEmbeddingService.processPendingEmbeddings(50);
+
+      // Process paper embedding jobs
+      console.log('BackgroundProcessingService: Processing paper embedding jobs');
+      await this.processPaperEmbeddingJobs();
     } catch (error) {
       console.error('BackgroundProcessingService: Error processing queue:', error);
+    }
+  }
+
+  /**
+   * Process pending paper embedding jobs
+   */
+  private async processPaperEmbeddingJobs(): Promise<void> {
+    try {
+      // Get pending jobs
+      const { data: jobs, error } = await supabase
+        .from('paper_embedding_jobs')
+        .select('*')
+        .eq('status', 'pending')
+        .order('priority', { ascending: false })
+        .order('created_at', { ascending: true })
+        .limit(1); // Process one job at a time
+
+      if (error) throw error;
+      if (!jobs || jobs.length === 0) return;
+
+      const job = jobs[0];
+
+      // Mark as processing
+      await supabase
+        .from('paper_embedding_jobs')
+        .update({
+          status: 'processing',
+          started_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', job.id);
+
+      try {
+        let progress: any = null;
+
+        if (job.job_type === 'popular_papers_update') {
+          // Pre-compute from popular_papers table
+          const limit = job.parameters?.limit || 10000;
+          const batchSize = job.parameters?.batchSize || 100;
+          
+          progress = await paperEmbeddingService.precomputeFromPopularPapers(limit, batchSize);
+        } else if (job.job_type === 'batch_precompute' && job.parameters?.paperIds) {
+          // Batch pre-compute specific papers
+          const paperIds = job.parameters.paperIds;
+          const batchSize = job.parameters.batchSize || 100;
+          
+          progress = await paperEmbeddingService.batchPrecompute(paperIds, batchSize);
+        } else {
+          throw new Error(`Unknown job type: ${job.job_type}`);
+        }
+
+        // Update job with results
+        await supabase
+          .from('paper_embedding_jobs')
+          .update({
+            status: 'completed',
+            papers_processed: progress.processed,
+            papers_failed: progress.failed,
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', job.id);
+
+        console.log(`Paper embedding job ${job.id} completed: ${progress.processed}/${progress.total} processed`);
+      } catch (jobError: any) {
+        console.error(`Error processing paper embedding job ${job.id}:`, jobError);
+        
+        // Update job as failed
+        await supabase
+          .from('paper_embedding_jobs')
+          .update({
+            status: 'failed',
+            error_message: jobError.message,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', job.id);
+      }
+    } catch (error) {
+      console.error('Error processing paper embedding jobs:', error);
     }
   }
 

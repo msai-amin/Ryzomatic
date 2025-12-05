@@ -7,6 +7,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { userInterestProfileService } from '../../lib/userInterestProfileService';
+import { embeddingService } from '../../lib/embeddingService';
+import { paperEmbeddingService } from '../../lib/paperEmbeddingService';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -74,10 +76,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return handleSearch(req, res, user.id);
     case 'update-feedback':
       return handleUpdateFeedback(req, res, user.id);
+    case 'track-view':
+      return handleTrackInteraction(req, res, user.id, 'view');
+    case 'track-click':
+      return handleTrackInteraction(req, res, user.id, 'click');
+    case 'track-save':
+      return handleTrackInteraction(req, res, user.id, 'save');
     default:
       return res.status(400).json({
         error: 'Invalid action',
-        validActions: ['get-recommendations', 'search', 'update-feedback'],
+        validActions: ['get-recommendations', 'search', 'update-feedback', 'track-view', 'track-click', 'track-save'],
       });
   }
 }
@@ -107,6 +115,27 @@ async function handleGetRecommendations(
 
     // Get user interest profile to enhance recommendations
     const interestProfile = await userInterestProfileService.buildInterestProfile(userId, 30);
+
+    // Get interest embedding vector if available
+    let userInterestEmbedding: number[] | null = null;
+    if (interestProfile?.interestVector) {
+      userInterestEmbedding = interestProfile.interestVector;
+    } else {
+      // Try to get from database if not in profile
+      const { data: profileData } = await supabase
+        .from('user_interest_profiles')
+        .select('interest_embedding')
+        .eq('user_id', userId)
+        .single();
+      
+      if (profileData?.interest_embedding) {
+        try {
+          userInterestEmbedding = JSON.parse(profileData.interest_embedding);
+        } catch (e) {
+          console.warn('Failed to parse interest embedding:', e);
+        }
+      }
+    }
 
     // If we have a document ID, fetch full document data (including content)
     let document: any = null;
@@ -168,7 +197,18 @@ async function handleGetRecommendations(
     } 
     // If no workId but we have document content, use content-based search
     else if (sourceDocumentId && document) {
-      recommendations = await getContentBasedRecommendations(document, limit, email, interestProfile);
+      // Try vector search first if user has interest embedding
+      if (userInterestEmbedding) {
+        const vectorResults = await searchPapersByVectorSimilarity(userInterestEmbedding, limit * 2);
+        if (vectorResults && vectorResults.length > 0) {
+          recommendations = vectorResults;
+        } else {
+          // Fallback to content-based search
+          recommendations = await getContentBasedRecommendations(document, limit, email, interestProfile, userInterestEmbedding);
+        }
+      } else {
+        recommendations = await getContentBasedRecommendations(document, limit, email, interestProfile, userInterestEmbedding);
+      }
     } 
     else {
       return res.status(400).json({
@@ -176,14 +216,25 @@ async function handleGetRecommendations(
       });
     }
 
-    // Enhance recommendations with interest-based scoring
-    if (interestProfile && interestProfile.topConcepts.length > 0) {
+    // Enhance recommendations with interest-based scoring using embeddings
+    if (userInterestEmbedding) {
+      recommendations = await reRankWithEmbeddings(recommendations, userInterestEmbedding);
+    } else if (interestProfile && interestProfile.topConcepts.length > 0) {
+      // Fallback to text-based matching if no embedding available
       recommendations = enhanceRecommendationsWithInterest(recommendations, interestProfile);
     }
 
     // Cache recommendations in database if we have a source document
     if (sourceDocumentId && recommendations.length > 0) {
       await cacheRecommendations(userId, sourceDocumentId, recommendations);
+    }
+
+    // Track view for all recommended papers
+    if (recommendations.length > 0) {
+      const openalexIds = recommendations.map(r => r.openalex_id).filter(Boolean);
+      await trackPaperViews(userId, openalexIds).catch(err => 
+        console.warn('Failed to track paper views:', err)
+      );
     }
 
     return res.status(200).json({
@@ -193,6 +244,7 @@ async function handleGetRecommendations(
       openAlexId: workId || null,
       recommendationMethod: workId ? 'citation_graph' : 'content_based',
       interestProfileUsed: !!interestProfile,
+      embeddingReRankingUsed: !!userInterestEmbedding,
     });
   } catch (error: any) {
     console.error('Error getting recommendations:', error);
@@ -305,6 +357,22 @@ async function handleUpdateFeedback(
       throw error;
     }
 
+    // Track save if savedToLibrary is true
+    if (savedToLibrary) {
+      const { data: recData } = await supabase
+        .from('paper_recommendations')
+        .select('openalex_id')
+        .eq('id', recommendationId)
+        .eq('user_id', userId)
+        .single();
+
+      if (recData?.openalex_id) {
+        await trackPaperInteraction(userId, recData.openalex_id, 'save').catch(err =>
+          console.warn('Failed to track save:', err)
+        );
+      }
+    }
+
     return res.status(200).json({ success: data });
   } catch (error: any) {
     console.error('Error updating feedback:', error);
@@ -316,7 +384,162 @@ async function handleUpdateFeedback(
 }
 
 /**
- * Enhance recommendations with user interest profile
+ * Track paper interaction (view/click/save)
+ */
+async function handleTrackInteraction(
+  req: VercelRequest,
+  res: VercelResponse,
+  userId: string,
+  interactionType: 'view' | 'click' | 'save'
+) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { openalexId } = req.body;
+
+    if (!openalexId) {
+      return res.status(400).json({ error: 'openalexId required' });
+    }
+
+    const success = await trackPaperInteraction(userId, openalexId, interactionType);
+
+    return res.status(200).json({ success });
+  } catch (error: any) {
+    console.error(`Error tracking ${interactionType}:`, error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: error.message,
+    });
+  }
+}
+
+/**
+ * Track paper interaction in database
+ */
+async function trackPaperInteraction(
+  userId: string,
+  openalexId: string,
+  interactionType: 'view' | 'click' | 'save'
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('track_paper_interaction', {
+      p_openalex_id: openalexId,
+      p_user_id: userId,
+      p_interaction_type: interactionType,
+    });
+
+    if (error) throw error;
+    return data || false;
+  } catch (error) {
+    console.error(`Error tracking ${interactionType} for paper ${openalexId}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Track views for multiple papers (batch)
+ */
+async function trackPaperViews(userId: string, openalexIds: string[]): Promise<void> {
+  try {
+    // Track views in batch
+    await Promise.all(
+      openalexIds.map(id => trackPaperInteraction(userId, id, 'view'))
+    );
+  } catch (error) {
+    console.error('Error tracking paper views:', error);
+  }
+}
+
+/**
+ * Re-rank recommendations using vector similarity to user interest profile
+ */
+async function reRankWithEmbeddings(
+  recommendations: any[],
+  userInterestEmbedding: number[] | null
+): Promise<any[]> {
+  if (!userInterestEmbedding || recommendations.length === 0) {
+    return recommendations;
+  }
+
+  try {
+    const scored = await Promise.all(
+      recommendations.map(async (rec) => {
+        // Create text representation of paper
+        const paperText = `${rec.title || ''} ${rec.abstract || ''}`.trim();
+        
+        if (!paperText || paperText.length < 10) {
+          return { ...rec, embedding_similarity: 0 };
+        }
+
+        // Check if paper has pre-computed embedding
+        let paperEmbedding: number[] | null = null;
+        const hasPrecomputed = await paperEmbeddingService.hasPrecomputedEmbedding(rec.openalex_id);
+        
+        if (hasPrecomputed) {
+          // Get pre-computed embedding from database
+          const { data } = await supabase
+            .from('paper_recommendations')
+            .select('embedding')
+            .eq('openalex_id', rec.openalex_id)
+            .not('embedding', 'is', null)
+            .limit(1)
+            .single();
+
+          if (data?.embedding) {
+            try {
+              paperEmbedding = JSON.parse(data.embedding);
+            } catch (e) {
+              console.warn(`Failed to parse pre-computed embedding for ${rec.openalex_id}`);
+            }
+          }
+        }
+
+        // If no pre-computed embedding, generate on-demand (but prefer pre-computed for performance)
+        if (!paperEmbedding) {
+          paperEmbedding = await paperEmbeddingService.getEmbedding(rec.openalex_id, false);
+        }
+
+        if (!paperEmbedding) {
+          return { ...rec, embedding_similarity: 0 };
+        }
+
+        // Calculate cosine similarity
+        const similarity = embeddingService.cosineSimilarity(
+          userInterestEmbedding,
+          paperEmbedding
+        );
+
+        // Combine original score with embedding similarity
+        const originalScore = rec.recommendation_score || 50;
+        const embeddingBoost = similarity * 100; // Convert 0-1 to 0-100
+        
+        // Weighted combination: 60% original, 40% embedding similarity
+        const finalScore = (originalScore * 0.6) + (embeddingBoost * 0.4);
+
+        return {
+          ...rec,
+          embedding_similarity: similarity,
+          recommendation_score: Math.min(100, Math.max(0, finalScore)),
+          recommendation_reason: similarity > 0.7 
+            ? `${rec.recommendation_reason || 'Recommended'} (highly aligned with your interests)`
+            : rec.recommendation_reason
+        };
+      })
+    );
+
+    // Sort by final score
+    return scored.sort((a, b) => b.recommendation_score - a.recommendation_score);
+  } catch (error) {
+    console.error('Error re-ranking with embeddings:', error);
+    // Return original recommendations if embedding fails
+    return recommendations;
+  }
+}
+
+/**
+ * Enhance recommendations with user interest profile (text-based fallback)
  */
 function enhanceRecommendationsWithInterest(
   recommendations: any[],
@@ -349,13 +572,74 @@ function enhanceRecommendationsWithInterest(
 }
 
 /**
+ * Search papers using vector similarity search in database
+ */
+async function searchPapersByVectorSimilarity(
+  queryEmbedding: number[],
+  limit: number = 20
+): Promise<any[]> {
+  try {
+    const embeddingString = embeddingService.formatForPgVector(queryEmbedding);
+
+    const { data, error } = await supabase.rpc('find_similar_papers_by_embedding', {
+      query_embedding: embeddingString,
+      similarity_threshold: 0.7,
+      result_limit: limit,
+    });
+
+    if (error) {
+      console.error('Error in vector similarity search:', error);
+      return [];
+    }
+
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+      // Transform to recommendation format
+    return data.map((paper: any) => {
+      // Reconstruct abstract from inverted index if needed
+      let abstract = '';
+      if (paper.abstract_inverted_index) {
+        const words: string[] = [];
+        Object.keys(paper.abstract_inverted_index).forEach((word: string) => {
+          paper.abstract_inverted_index[word].forEach((position: number) => {
+            words[position] = word;
+          });
+        });
+        abstract = words.filter((w) => w).join(' ');
+      }
+
+      return {
+        id: paper.openalex_id?.split('/').pop() || paper.openalex_id,
+        openalex_id: paper.openalex_id,
+        title: paper.title,
+        authors: paper.authors || [],
+        abstract,
+        abstract_inverted_index: paper.abstract_inverted_index,
+        publication_year: paper.publication_year,
+        cited_by_count: paper.cited_by_count || 0,
+        recommendation_type: 'semantic',
+        recommendation_score: paper.recommendation_score || (paper.similarity_score * 100),
+        recommendation_reason: `Semantically similar (${Math.round(paper.similarity_score * 100)}% match)`,
+        embedding_similarity: paper.similarity_score,
+      };
+    });
+  } catch (error) {
+    console.error('Error searching papers by vector similarity:', error);
+    return [];
+  }
+}
+
+/**
  * Get recommendations based on document content using Gemini AI for intelligent analysis
  */
 async function getContentBasedRecommendations(
   document: { title?: string; content?: string },
   limit: number,
   email?: string,
-  interestProfile?: { topConcepts: Array<{ concept: string; importance: number }> } | null
+  interestProfile?: { topConcepts: Array<{ concept: string; importance: number }> } | null,
+  userInterestEmbedding?: number[] | null
 ): Promise<any[]> {
   try {
     // Use Gemini to intelligently extract search queries from the document
@@ -480,10 +764,18 @@ Each query should be 3-10 words and optimized for academic paper search.`;
       }
     }
 
-    // Sort by citation count and limit results
+    // Sort by citation count first
     allResults.sort((a, b) => (b.cited_by_count || 0) - (a.cited_by_count || 0));
-
-    return transformWorks(allResults.slice(0, limit), 'semantic');
+    
+    // Transform to our format
+    let recommendations = transformWorks(allResults.slice(0, limit * 2), 'semantic'); // Get more for re-ranking
+    
+    // Re-rank using embeddings if available
+    if (userInterestEmbedding) {
+      recommendations = await reRankWithEmbeddings(recommendations, userInterestEmbedding);
+    }
+    
+    return recommendations.slice(0, limit);
   } catch (error: any) {
     console.error('Error in Gemini-based recommendations:', error);
     // Fallback to simple search if Gemini fails
@@ -695,6 +987,28 @@ async function cacheRecommendations(
   sourceDocumentId: string,
   recommendations: any[]
 ): Promise<void> {
+  // Get openalex_ids to check for pre-computed embeddings
+  const openalexIds = recommendations.map(rec => rec.openalex_id).filter(Boolean);
+  
+  // Fetch pre-computed embeddings for these papers (from any existing record)
+  let embeddingMap = new Map<string, string>();
+  if (openalexIds.length > 0) {
+    const { data: existingEmbeddings } = await supabase
+      .from('paper_recommendations')
+      .select('openalex_id, embedding, precomputed_at')
+      .in('openalex_id', openalexIds)
+      .not('embedding', 'is', null)
+      .limit(openalexIds.length);
+
+    if (existingEmbeddings) {
+      existingEmbeddings.forEach(rec => {
+        if (rec.embedding && rec.openalex_id) {
+          embeddingMap.set(rec.openalex_id, rec.embedding);
+        }
+      });
+    }
+  }
+
   const inserts = recommendations.map((rec) => ({
     user_id: userId,
     source_document_id: sourceDocumentId,
@@ -711,6 +1025,9 @@ async function cacheRecommendations(
     recommendation_type: rec.recommendation_type,
     recommendation_score: rec.recommendation_score,
     recommendation_reason: rec.recommendation_reason,
+    // Copy pre-computed embedding if available
+    embedding: embeddingMap.get(rec.openalex_id) || null,
+    precomputed_at: embeddingMap.has(rec.openalex_id) ? new Date().toISOString() : null,
   }));
 
   if (inserts.length > 0) {
