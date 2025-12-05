@@ -395,7 +395,7 @@ class LibraryOrganizationService {
     this.ensureAuthenticated();
     
     try {
-      // Ensure default collections exist first
+      // Ensure default collections exist first (this also runs cleanup)
       await this.ensureDefaultCollections();
       
       const start = Date.now();
@@ -407,135 +407,179 @@ class LibraryOrganizationService {
         .eq('user_id', this.currentUserId!)
         .order('display_order', { ascending: true });
 
-      if (error) {
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('user_collections')
-          .select('*')
-          .eq('user_id', this.currentUserId!);
+      const collectionsData = error 
+        ? (await supabase
+            .from('user_collections')
+            .select('*')
+            .eq('user_id', this.currentUserId!)).data || []
+        : (data || []);
 
-        if (fallbackError) {
-          throw errorHandler.createError(
-            `Failed to get collections: ${fallbackError.message}`,
-            ErrorType.DATABASE,
-            ErrorSeverity.HIGH,
-            { context: 'getCollections', error: fallbackError.message }
-          );
-        }
-
-        // Deduplicate collections by name (keep the oldest one if duplicates exist)
-        const collectionsByName = new Map<string, Collection>();
-        const duplicateIds: string[] = [];
-        
-        for (const collection of (fallbackData || [])) {
-          const existing = collectionsByName.get(collection.name);
-          if (existing) {
-            // Compare created_at to keep the oldest one
-            const existingDate = new Date(existing.created_at || existing.updated_at || 0);
-            const currentDate = new Date(collection.created_at || collection.updated_at || 0);
-            
-            if (currentDate < existingDate) {
-              // Current is older, keep it and mark existing as duplicate
-              duplicateIds.push(existing.id);
-              collectionsByName.set(collection.name, collection);
-              logger.warn('Duplicate collection found, keeping older one', { 
-                userId: this.currentUserId, 
-                name: collection.name,
-                keeping: collection.id,
-                removing: existing.id
-              });
-            } else {
-              // Existing is older, keep it and mark current as duplicate
-              duplicateIds.push(collection.id);
-              logger.warn('Duplicate collection found, keeping older one', { 
-                userId: this.currentUserId, 
-                name: collection.name,
-                keeping: existing.id,
-                removing: collection.id
-              });
-            }
-          } else {
-            collectionsByName.set(collection.name, collection);
-          }
-        }
-        
-        const deduplicated = Array.from(collectionsByName.values());
-
-        const durationMs = Date.now() - start;
-        logger.info('Collections retrieved (fallback)', { 
-          userId: this.currentUserId, 
-          durationMs,
-          count: deduplicated.length,
-          duplicatesRemoved: duplicateIds.length
-        });
-        
-        // If duplicates were found, schedule a cleanup (non-blocking)
-        if (duplicateIds.length > 0) {
-          this.cleanupDuplicateCollections().catch(err => 
-            logger.warn('Background cleanup of duplicates failed', { userId: this.currentUserId }, err)
-          );
-        }
-        
-        return deduplicated;
+      if (error && !collectionsData.length) {
+        throw errorHandler.createError(
+          `Failed to get collections: ${error.message}`,
+          ErrorType.DATABASE,
+          ErrorSeverity.HIGH,
+          { context: 'getCollections', error: error.message }
+        );
       }
 
-      // Deduplicate collections by name (keep the oldest one if duplicates exist)
-      const collectionsByName = new Map<string, Collection>();
-      const duplicateIds: string[] = [];
-      
-      for (const collection of (data || [])) {
-        const existing = collectionsByName.get(collection.name);
-        if (existing) {
-          // Compare created_at to keep the oldest one
-          const existingDate = new Date(existing.created_at || existing.updated_at || 0);
-          const currentDate = new Date(collection.created_at || collection.updated_at || 0);
-          
-          if (currentDate < existingDate) {
-            // Current is older, keep it and mark existing as duplicate
-            duplicateIds.push(existing.id);
-            collectionsByName.set(collection.name, collection);
-            logger.warn('Duplicate collection found, keeping older one', { 
-              userId: this.currentUserId, 
-              name: collection.name,
-              keeping: collection.id,
-              removing: existing.id
-            });
-          } else {
-            // Existing is older, keep it and mark current as duplicate
-            duplicateIds.push(collection.id);
-            logger.warn('Duplicate collection found, keeping older one', { 
-              userId: this.currentUserId, 
-              name: collection.name,
-              keeping: existing.id,
-              removing: collection.id
-            });
-          }
-        } else {
-          collectionsByName.set(collection.name, collection);
-        }
-      }
-      
-      const deduplicated = Array.from(collectionsByName.values());
+      // Always deduplicate and clean up immediately before returning
+      const deduplicated = await this.deduplicateAndCleanup(collectionsData);
 
       const durationMs = Date.now() - start;
       logger.info('Collections retrieved', { 
         userId: this.currentUserId, 
         durationMs,
         count: deduplicated.length,
-        duplicatesRemoved: duplicateIds.length
+        originalCount: collectionsData.length
       });
-
-      // If duplicates were found, schedule a cleanup (non-blocking)
-      if (duplicateIds.length > 0) {
-        this.cleanupDuplicateCollections().catch(err => 
-          logger.warn('Background cleanup of duplicates failed', { userId: this.currentUserId }, err)
-        );
-      }
 
       return deduplicated;
     } catch (error) {
       logger.error('Error getting collections', { userId: this.currentUserId }, error as Error);
       throw error;
     }
+  }
+
+  // Deduplicate collections and clean up duplicates from database
+  private async deduplicateAndCleanup(collections: Collection[]): Promise<Collection[]> {
+    // Default collection names that should not have duplicates
+    const defaultCollectionNames = ['In Progress', 'Recently Added', 'Needs Review', 'Completed', 'Unread', 'Trash'];
+    
+    // Group collections by name - separate default from user-created
+    const defaultCollectionsByName = new Map<string, Collection[]>();
+    const userCollectionsByName = new Map<string, Collection[]>();
+    
+    for (const collection of collections) {
+      if (defaultCollectionNames.includes(collection.name)) {
+        if (!defaultCollectionsByName.has(collection.name)) {
+          defaultCollectionsByName.set(collection.name, []);
+        }
+        defaultCollectionsByName.get(collection.name)!.push(collection);
+      } else {
+        // For user-created collections, allow duplicates (users might want multiple with same name)
+        // But we still deduplicate by ID to avoid showing exact duplicates
+        userCollectionsByName.set(collection.id, [collection]);
+      }
+    }
+    
+    // Process default collections - find duplicates and clean them up
+    const duplicatesToDelete: { id: string; keptCollectionId: string; name: string }[] = [];
+    const finalCollections: Collection[] = [];
+    const keptCollectionsMap = new Map<string, Collection>(); // Map of name -> kept collection
+    
+    for (const [name, dups] of defaultCollectionsByName.entries()) {
+      if (dups.length > 1) {
+        // Sort by created_at, keep the oldest
+        const sorted = [...dups].sort((a, b) => 
+          new Date(a.created_at || a.updated_at || 0).getTime() - 
+          new Date(b.created_at || b.updated_at || 0).getTime()
+        );
+        
+        const kept = sorted[0];
+        keptCollectionsMap.set(name, kept);
+        finalCollections.push(kept);
+        
+        // Mark the rest for deletion with reference to kept collection
+        for (let i = 1; i < sorted.length; i++) {
+          duplicatesToDelete.push({
+            id: sorted[i].id,
+            keptCollectionId: kept.id,
+            name: name
+          });
+        }
+        
+        logger.info(`Found ${dups.length} duplicates for default collection "${name}", will delete ${sorted.length - 1}`, {
+          userId: this.currentUserId,
+          name,
+          keeping: kept.id,
+          deleting: sorted.slice(1).map(c => c.id)
+        });
+      } else {
+        // No duplicates, just add it
+        const kept = dups[0];
+        keptCollectionsMap.set(name, kept);
+        finalCollections.push(kept);
+      }
+    }
+    
+    // Add all user-created collections (no deduplication needed)
+    for (const coll of collections) {
+      if (!defaultCollectionNames.includes(coll.name)) {
+        // Only add if we haven't already added it (in case of ID duplicates)
+        if (!finalCollections.find(c => c.id === coll.id)) {
+          finalCollections.push(coll);
+        }
+      }
+    }
+    
+    // If we found duplicates, delete them from the database immediately
+    if (duplicatesToDelete.length > 0) {
+      try {
+        // Migrate book-collection relationships first
+        for (const duplicateInfo of duplicatesToDelete) {
+          const keptCollectionId = duplicateInfo.keptCollectionId;
+          
+          // Get book-collection relationships for duplicate
+          const { data: duplicateBookCollections } = await supabase
+            .from('book_collections')
+            .select('book_id')
+            .eq('collection_id', duplicateInfo.id);
+          
+          if (duplicateBookCollections && duplicateBookCollections.length > 0) {
+            // Get existing relationships for kept collection
+            const { data: existingBookCollections } = await supabase
+              .from('book_collections')
+              .select('book_id')
+              .eq('collection_id', keptCollectionId);
+            
+            const existingBookIds = new Set((existingBookCollections || []).map(bc => bc.book_id));
+            
+            // Migrate relationships
+            const bookIdsToMigrate = duplicateBookCollections
+              .map(bc => bc.book_id)
+              .filter(bookId => !existingBookIds.has(bookId))
+              .map(bookId => ({
+                book_id: bookId,
+                collection_id: keptCollectionId
+              }));
+            
+            if (bookIdsToMigrate.length > 0) {
+              await supabase
+                .from('book_collections')
+                .insert(bookIdsToMigrate);
+            }
+          }
+        }
+        
+        // Delete book-collection relationships for duplicates
+        const duplicateIds = duplicatesToDelete.map(d => d.id);
+        await supabase
+          .from('book_collections')
+          .delete()
+          .in('collection_id', duplicateIds);
+        
+        // Delete duplicate collections
+        const { error: deleteError } = await supabase
+          .from('user_collections')
+          .delete()
+          .in('id', duplicateIds);
+        
+        if (deleteError) {
+          logger.warn('Failed to delete duplicate collections', { userId: this.currentUserId }, deleteError);
+        } else {
+          logger.info('Deleted duplicate collections immediately', {
+            userId: this.currentUserId,
+            deletedCount: duplicateIds.length,
+            collections: duplicatesToDelete.map(d => d.name)
+          });
+        }
+      } catch (cleanupError) {
+        logger.error('Error cleaning up duplicates immediately', { userId: this.currentUserId }, cleanupError as Error);
+      }
+    }
+    
+    return finalCollections.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
   }
 
   async updateCollection(id: string, updates: Partial<Collection>): Promise<Collection> {
