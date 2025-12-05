@@ -242,10 +242,11 @@ export class NotesHighlightsEmbeddingService {
     if (genAI) {
       try {
         const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
+        // Use same format as api/gemini/embedding.ts
         const result = await model.embedContent({
           content: text,
           outputDimensionality: 768,
-        });
+        } as any);
         return result.embedding.values;
       } catch (error) {
         console.warn('Server-side embedding failed, falling back to API:', error);

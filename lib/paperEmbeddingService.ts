@@ -50,10 +50,11 @@ export class PaperEmbeddingService {
       const genAI = new GoogleGenerativeAI(geminiKey);
       const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
       
+      // Use same format as api/gemini/embedding.ts
       const result = await model.embedContent({
         content: text,
         outputDimensionality: 768
-      });
+      } as any);
       
       const embedding = result.embedding.values;
       const embeddingString = embeddingService.formatForPgVector(embedding);

@@ -2,6 +2,11 @@ import { createClient } from '@supabase/supabase-js';
 import { MemoryGraphService, MemoryNode, MemoryEdge, MemoryGraph } from './memoryGraph';
 import { embeddingService } from './embeddingService';
 
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
 export interface UnifiedNode {
   id: string;
   node_type: 'document' | 'note' | 'memory' | 'highlight';
