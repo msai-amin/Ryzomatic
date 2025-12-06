@@ -186,10 +186,23 @@ export class PaperEmbeddingService {
       const totalBatches = Math.ceil(total / batchSize);
       console.log(`\n📦 Processing batch ${batchNum}/${totalBatches} (${batch.length} papers)...`);
 
-      // Process batch with concurrency limit
+      // Track batch progress for real-time updates
+      let batchProcessed = 0;
+      let batchFailed = 0;
+      
+      // Process batch with concurrency limit and progress callback
       const batchResults = await this.processBatchWithConcurrency(
         batch,
-        this.MAX_CONCURRENT
+        this.MAX_CONCURRENT,
+        () => {
+          // Update progress bar as papers complete (real-time)
+          batchProcessed = batchResults.filter(r => r === true).length;
+          batchFailed = batchResults.filter(r => r === false).length;
+          const currentProcessed = processed + batchProcessed;
+          const currentFailed = failed + batchFailed;
+          const currentPercentage = Math.round((currentProcessed / total) * 100);
+          this.displayProgressBar(currentProcessed, total, currentFailed, currentPercentage);
+        }
       );
 
       // Count results
@@ -241,7 +254,8 @@ export class PaperEmbeddingService {
    */
   private async processBatchWithConcurrency(
     paperIds: string[],
-    maxConcurrent: number
+    maxConcurrent: number,
+    onProgress?: () => void
   ): Promise<boolean[]> {
     const results: boolean[] = [];
     const executing: Promise<void>[] = [];
@@ -251,9 +265,17 @@ export class PaperEmbeddingService {
       const promise = this.generateEmbeddingForPaper(paperId)
         .then(success => {
           results.push(success);
+          // Update progress as each paper completes
+          if (onProgress) {
+            onProgress();
+          }
         })
         .catch(() => {
           results.push(false);
+          // Update progress even on error
+          if (onProgress) {
+            onProgress();
+          }
         });
 
       executing.push(promise);
