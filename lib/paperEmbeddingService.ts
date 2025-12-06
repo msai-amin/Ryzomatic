@@ -17,7 +17,10 @@ export interface PrecomputeProgress {
 
 export class PaperEmbeddingService {
   private readonly DEFAULT_BATCH_SIZE = 100;
-  private readonly MAX_CONCURRENT = 10; // Limit concurrent embedding generation
+  private readonly MAX_CONCURRENT = 5; // Reduced for free tier (was 10)
+  private readonly REQUEST_DELAY_MS = 5000; // 5 seconds between requests for free tier (15 req/min = 4 sec, using 5 for safety)
+  private readonly DAILY_LIMIT = 1500; // Typical free tier daily limit
+  private lastRequestTime = 0;
 
   /**
    * Generate embedding for a single paper
@@ -65,6 +68,16 @@ export class PaperEmbeddingService {
       if (!geminiKey) {
         throw new Error('GEMINI_API_KEY not configured');
       }
+
+      // Rate limiting: ensure we don't exceed free tier limits
+      // Free tier typically: 15 requests/minute, 1,500 requests/day
+      const now = Date.now();
+      const timeSinceLastRequest = now - this.lastRequestTime;
+      if (timeSinceLastRequest < this.REQUEST_DELAY_MS) {
+        const waitTime = this.REQUEST_DELAY_MS - timeSinceLastRequest;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+      this.lastRequestTime = Date.now();
 
       const { GoogleGenerativeAI } = await import('@google/generative-ai');
       const genAI = new GoogleGenerativeAI(geminiKey);
@@ -223,10 +236,15 @@ export class PaperEmbeddingService {
 
       executing.push(promise);
 
-      // Limit concurrency
+      // Limit concurrency (reduced for free tier)
       if (executing.length >= maxConcurrent) {
         await Promise.race(executing);
         executing.splice(executing.findIndex(p => p === promise), 1);
+      }
+      
+      // Additional delay between batches for free tier
+      if (i < paperIds.length - 1 && i % maxConcurrent === 0) {
+        await new Promise(resolve => setTimeout(resolve, this.REQUEST_DELAY_MS));
       }
     }
 
@@ -274,6 +292,16 @@ export class PaperEmbeddingService {
       }
 
       const paperIds = data.map(p => p.openalex_id);
+      
+      // For free tier, limit to daily quota if enabled
+      if (respectDailyLimit && paperIds.length > this.DAILY_LIMIT) {
+        console.log(`⚠️  Free tier daily limit: ${this.DAILY_LIMIT} requests`);
+        console.log(`   Limiting to first ${this.DAILY_LIMIT} papers`);
+        console.log(`   Remaining papers will be processed in subsequent runs`);
+        console.log(`   Estimated time: ${Math.ceil(this.DAILY_LIMIT * this.REQUEST_DELAY_MS / 1000 / 60)} minutes`);
+        return this.batchPrecompute(paperIds.slice(0, this.DAILY_LIMIT), batchSize);
+      }
+      
       return this.batchPrecompute(paperIds, batchSize);
     } catch (error) {
       console.error('Error pre-computing from popular papers:', error);
