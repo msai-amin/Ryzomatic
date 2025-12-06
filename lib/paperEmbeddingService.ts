@@ -186,20 +186,20 @@ export class PaperEmbeddingService {
       const totalBatches = Math.ceil(total / batchSize);
       console.log(`\n📦 Processing batch ${batchNum}/${totalBatches} (${batch.length} papers)...`);
 
-      // Track batch progress for real-time updates
-      let batchProcessed = 0;
-      let batchFailed = 0;
-      
       // Process batch with concurrency limit and progress callback
+      // We'll track progress by counting completed items
+      let batchCompleted = 0;
       const batchResults = await this.processBatchWithConcurrency(
         batch,
         this.MAX_CONCURRENT,
         () => {
           // Update progress bar as papers complete (real-time)
-          batchProcessed = batchResults.filter(r => r === true).length;
-          batchFailed = batchResults.filter(r => r === false).length;
-          const currentProcessed = processed + batchProcessed;
-          const currentFailed = failed + batchFailed;
+          batchCompleted++;
+          // Estimate current batch results (may not be final yet)
+          const estimatedSuccess = Math.round(batchCompleted * 0.95); // Assume 95% success rate for estimate
+          const estimatedFailed = batchCompleted - estimatedSuccess;
+          const currentProcessed = processed + estimatedSuccess;
+          const currentFailed = failed + estimatedFailed;
           const currentPercentage = Math.round((currentProcessed / total) * 100);
           this.displayProgressBar(currentProcessed, total, currentFailed, currentPercentage);
         }
@@ -259,12 +259,14 @@ export class PaperEmbeddingService {
   ): Promise<boolean[]> {
     const results: boolean[] = [];
     const executing: Promise<void>[] = [];
+    let completedCount = 0;
 
     for (let index = 0; index < paperIds.length; index++) {
       const paperId = paperIds[index];
       const promise = this.generateEmbeddingForPaper(paperId)
         .then(success => {
           results.push(success);
+          completedCount++;
           // Update progress as each paper completes
           if (onProgress) {
             onProgress();
@@ -272,6 +274,7 @@ export class PaperEmbeddingService {
         })
         .catch(() => {
           results.push(false);
+          completedCount++;
           // Update progress even on error
           if (onProgress) {
             onProgress();
