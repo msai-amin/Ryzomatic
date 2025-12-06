@@ -89,6 +89,8 @@ export class PaperEmbeddingService {
       const timeSinceLastRequest = now - this.lastRequestTime;
       if (timeSinceLastRequest < this.REQUEST_DELAY_MS) {
         const waitTime = this.REQUEST_DELAY_MS - timeSinceLastRequest;
+        // Show waiting indicator
+        process.stdout.write(`\r⏳ Rate limiting: waiting ${Math.ceil(waitTime/1000)}s...     `);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
       this.lastRequestTime = Date.now();
@@ -156,9 +158,15 @@ export class PaperEmbeddingService {
         })
         .eq('openalex_id', openalexId);
 
+      // Show success indicator
+      process.stdout.write(`\r✅ Generated embedding for: ${openalexId.split('/').pop()}     `);
+      
       return true;
-    } catch (error) {
-      console.error(`Error generating embedding for paper ${openalexId}:`, error);
+    } catch (error: any) {
+      // Show error indicator (briefly)
+      const errorMsg = error.message?.substring(0, 30) || 'Error';
+      process.stdout.write(`\r❌ Failed: ${openalexId.split('/').pop()} (${errorMsg}...)     `);
+      // Don't spam console with full errors, just log to file if needed
       return false;
     }
   }
@@ -175,12 +183,16 @@ export class PaperEmbeddingService {
     let processed = 0;
     let failed = 0;
 
-    console.log(`Starting batch pre-computation for ${total} papers (batch size: ${batchSize})...`);
+    console.log(`\n🚀 Starting batch pre-computation for ${total} papers (batch size: ${batchSize})...`);
+    console.log(`📊 Rate limit: ${Math.round(60000 / this.REQUEST_DELAY_MS)} requests/minute`);
+    console.log(`⏱️  Estimated time: ~${Math.ceil(total * this.REQUEST_DELAY_MS / 1000 / 60)} minutes\n`);
 
     // Process in batches
     for (let i = 0; i < paperIds.length; i += batchSize) {
       const batch = paperIds.slice(i, i + batchSize);
-      console.log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(total / batchSize)} (${batch.length} papers)...`);
+      const batchNum = Math.floor(i / batchSize) + 1;
+      const totalBatches = Math.ceil(total / batchSize);
+      console.log(`\n📦 Processing batch ${batchNum}/${totalBatches} (${batch.length} papers)...`);
 
       // Process batch with concurrency limit
       const batchResults = await this.processBatchWithConcurrency(
@@ -210,7 +222,8 @@ export class PaperEmbeddingService {
         onProgress(progress);
       }
 
-      console.log(`Progress: ${processed}/${total} processed (${failed} failed) - ${progress.percentage}%`);
+      // Display progress bar
+      this.displayProgressBar(processed, total, failed, progress.percentage);
 
       // Delay between batches to respect rate limits (free tier)
       if (i + batchSize < paperIds.length) {
@@ -225,7 +238,9 @@ export class PaperEmbeddingService {
       percentage: Math.round((processed / total) * 100),
     };
 
-    console.log(`Batch pre-computation complete: ${processed}/${total} successful, ${failed} failed`);
+    // Final progress bar
+    this.displayProgressBar(processed, total, failed, Math.round((processed / total) * 100));
+    console.log(`\n✅ Batch pre-computation complete: ${processed}/${total} successful, ${failed} failed`);
     return finalProgress;
   }
 
@@ -389,6 +404,33 @@ export class PaperEmbeddingService {
    */
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Display a progress bar for embedding generation
+   */
+  private displayProgressBar(processed: number, total: number, failed: number, percentage: number): void {
+    const barWidth = 50;
+    const filled = Math.round((percentage / 100) * barWidth);
+    const empty = barWidth - filled;
+    const bar = '█'.repeat(filled) + '░'.repeat(empty);
+    
+    // Calculate ETA (rough estimate)
+    const successRate = processed > 0 ? (processed - failed) / processed : 1;
+    const avgTimePerPaper = 5; // seconds (rough estimate with rate limiting)
+    const remaining = total - processed;
+    const estimatedSeconds = remaining * avgTimePerPaper;
+    const hours = Math.floor(estimatedSeconds / 3600);
+    const minutes = Math.floor((estimatedSeconds % 3600) / 60);
+    const eta = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+
+    // Clear previous line and print progress
+    process.stdout.write(`\r📊 Progress: [${bar}] ${percentage}% | ${processed}/${total} processed | ${failed} failed | ETA: ${eta}     `);
+    
+    // If complete, add newline
+    if (processed >= total) {
+      process.stdout.write('\n');
+    }
   }
 }
 
