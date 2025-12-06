@@ -89,8 +89,6 @@ export class PaperEmbeddingService {
       const timeSinceLastRequest = now - this.lastRequestTime;
       if (timeSinceLastRequest < this.REQUEST_DELAY_MS) {
         const waitTime = this.REQUEST_DELAY_MS - timeSinceLastRequest;
-        // Show waiting indicator
-        process.stdout.write(`\r⏳ Rate limiting: waiting ${Math.ceil(waitTime/1000)}s...     `);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
       this.lastRequestTime = Date.now();
@@ -143,7 +141,7 @@ export class PaperEmbeddingService {
         // No existing records - this paper hasn't been recommended yet
         // We'll store the embedding in popular_papers table instead
         // When a user gets this paper recommended, the embedding will be copied over
-        console.log(`No existing records for ${openalexId}, embedding stored in popular_papers only`);
+        // (Silent - progress bar will show status)
       }
 
       // Update popular_papers table to mark as precomputed
@@ -158,15 +156,9 @@ export class PaperEmbeddingService {
         })
         .eq('openalex_id', openalexId);
 
-      // Show success indicator
-      process.stdout.write(`\r✅ Generated embedding for: ${openalexId.split('/').pop()}     `);
-      
       return true;
     } catch (error: any) {
-      // Show error indicator (briefly)
-      const errorMsg = error.message?.substring(0, 30) || 'Error';
-      process.stdout.write(`\r❌ Failed: ${openalexId.split('/').pop()} (${errorMsg}...)     `);
-      // Don't spam console with full errors, just log to file if needed
+      // Errors are tracked in the progress bar, no need to spam console
       return false;
     }
   }
@@ -410,22 +402,34 @@ export class PaperEmbeddingService {
    * Display a progress bar for embedding generation
    */
   private displayProgressBar(processed: number, total: number, failed: number, percentage: number): void {
-    const barWidth = 50;
+    const barWidth = 40;
     const filled = Math.round((percentage / 100) * barWidth);
     const empty = barWidth - filled;
     const bar = '█'.repeat(filled) + '░'.repeat(empty);
     
-    // Calculate ETA (rough estimate)
-    const successRate = processed > 0 ? (processed - failed) / processed : 1;
-    const avgTimePerPaper = 5; // seconds (rough estimate with rate limiting)
+    // Calculate ETA (rough estimate based on rate limiting)
+    const avgTimePerPaper = this.REQUEST_DELAY_MS / 1000; // seconds per paper (with rate limiting)
     const remaining = total - processed;
     const estimatedSeconds = remaining * avgTimePerPaper;
     const hours = Math.floor(estimatedSeconds / 3600);
     const minutes = Math.floor((estimatedSeconds % 3600) / 60);
-    const eta = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+    const seconds = Math.floor(estimatedSeconds % 60);
+    
+    let eta = '';
+    if (hours > 0) {
+      eta = `${hours}h ${minutes}m`;
+    } else if (minutes > 0) {
+      eta = `${minutes}m ${seconds}s`;
+    } else {
+      eta = `${seconds}s`;
+    }
+
+    // Calculate success rate
+    const success = processed - failed;
+    const successRate = processed > 0 ? Math.round((success / processed) * 100) : 100;
 
     // Clear previous line and print progress
-    process.stdout.write(`\r📊 Progress: [${bar}] ${percentage}% | ${processed}/${total} processed | ${failed} failed | ETA: ${eta}     `);
+    process.stdout.write(`\r📊 [${bar}] ${percentage}% | ${processed}/${total} | ✅${success} ❌${failed} (${successRate}%) | ⏱️ ${eta}     `);
     
     // If complete, add newline
     if (processed >= total) {
