@@ -198,9 +198,9 @@ export class PaperEmbeddingService {
 
       console.log(`Progress: ${processed}/${total} processed (${failed} failed) - ${progress.percentage}%`);
 
-      // Small delay between batches to avoid rate limiting
+      // Delay between batches to respect rate limits (free tier)
       if (i + batchSize < paperIds.length) {
-        await this.delay(1000); // 1 second between batches
+        await this.delay(this.REQUEST_DELAY_MS);
       }
     }
 
