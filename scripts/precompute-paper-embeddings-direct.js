@@ -143,23 +143,98 @@ async function checkStatus() {
       }
     }
     
-    // Check popular_papers table
-    const { data: popularPapers, error: ppError } = await supabase
-      .from('popular_papers')
-      .select('count')
-      .limit(1);
+    // Check if process is currently running
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
     
-    if (ppError) {
-      if (ppError.code === '42P01') {
-        console.log('\n❌ Migration not applied: popular_papers table does not exist');
-      } else {
-        console.log(`\n⚠️  Error checking popular_papers: ${ppError.message}`);
+    let isRunning = false;
+    let processInfo = '';
+    try {
+      const { stdout } = await execAsync('pgrep -fl "tsx.*precompute" || true');
+      isRunning = stdout.trim().length > 0;
+      if (isRunning) {
+        processInfo = stdout.trim().split('\n')[0] || '';
+      }
+    } catch (e) {
+      // Process not found
+    }
+    
+    console.log('');
+    if (isRunning) {
+      console.log(`🟢 Status: PROCESSING (embedding generation is active)`);
+      if (processInfo) {
+        console.log(`   Process: ${processInfo.substring(0, 60)}...`);
       }
     } else {
-      const { count } = await supabase
+      console.log(`🔴 Status: IDLE (no active embedding process)`);
+    }
+    console.log('');
+    
+    // Check popular_papers table for remaining papers
+    const { data: remainingPapers, error: ppError } = await supabase
+      .from('popular_papers')
+      .select('openalex_id, precomputed_at', { count: 'exact' })
+      .eq('precomputed', false);
+    
+    const { data: totalPapers, error: totalError } = await supabase
+      .from('popular_papers')
+      .select('openalex_id', { count: 'exact' });
+    
+    if (!ppError && !totalError) {
+      const remainingCount = remainingPapers?.length || 0;
+      const totalCount = totalPapers?.length || 0;
+      const processedCount = totalCount - remainingCount;
+      const percentage = totalCount > 0 ? Math.round((processedCount / totalCount) * 100) : 0;
+      
+      console.log(`📚 Processing Status:`);
+      console.log(`   Total papers: ${totalCount}`);
+      console.log(`   ✅ Processed: ${processedCount}`);
+      console.log(`   ⏳ Remaining: ${remainingCount}`);
+      console.log(`   📊 Progress: ${percentage}%`);
+      
+      if (remainingCount > 0) {
+        const estimatedCycles = Math.ceil(remainingCount / 1000);
+        const estimatedHours = Math.ceil((remainingCount * 5) / 3600); // 5 seconds per paper
+        console.log(`\n⏱️  Estimated:`);
+        console.log(`   Cycles needed: ${estimatedCycles}`);
+        console.log(`   Time remaining: ~${estimatedHours} hours`);
+      } else {
+        console.log(`\n✅ All papers have been processed!`);
+      }
+      
+      // Check for recent activity
+      const { data: recentActivity, error: recentError } = await supabase
         .from('popular_papers')
-        .select('*', { count: 'exact', head: true });
-      console.log(`\n📚 Popular papers in database: ${count || 0}`);
+        .select('precomputed_at')
+        .eq('precomputed', true)
+        .not('precomputed_at', 'is', null)
+        .order('precomputed_at', { ascending: false })
+        .limit(1);
+      
+      if (!recentError && recentActivity && recentActivity.length > 0) {
+        const lastProcessed = new Date(recentActivity[0].precomputed_at);
+        const minutesAgo = Math.floor((Date.now() - lastProcessed.getTime()) / 60000);
+        console.log(`\n🕐 Last activity: ${minutesAgo} minutes ago`);
+        
+        if (minutesAgo < 10 && isRunning) {
+          console.log(`   ✅ Processing is active and recent`);
+        } else if (minutesAgo < 10 && !isRunning) {
+          console.log(`   ⚠️  Recent activity but process not running (may have just finished)`);
+        } else if (minutesAgo >= 10 && isRunning) {
+          console.log(`   ⚠️  Process running but no recent activity (may be stuck)`);
+        } else if (minutesAgo >= 10 && !isRunning) {
+          console.log(`   ℹ️  No recent activity - process may need to be restarted`);
+        }
+      } else if (isRunning) {
+        console.log(`\n⚠️  Process is running but no recent activity detected`);
+      }
+    } else {
+      if (ppError?.code === '42P01') {
+        console.log('\n❌ Migration not applied: popular_papers table does not exist');
+      } else {
+        console.log(`\n⚠️  Error checking popular_papers: ${ppError?.message || totalError?.message}`);
+      }
     }
   } catch (error) {
     console.error('❌ Error:', error.message);
