@@ -314,11 +314,13 @@ export class PaperEmbeddingService {
 
   /**
    * Pre-compute embeddings from popular_papers table
+   * If continueUntilComplete is true, will process all remaining papers in loops
    */
   async precomputeFromPopularPapers(
     limit?: number,
     batchSize: number = this.DEFAULT_BATCH_SIZE,
-    respectDailyLimit: boolean = true
+    respectDailyLimit: boolean = true,
+    continueUntilComplete: boolean = false
   ): Promise<PrecomputeProgress> {
     try {
       const { data, error } = await supabase
@@ -342,9 +344,10 @@ export class PaperEmbeddingService {
       const paperIds = data.map(p => p.openalex_id);
       
       // For free tier, limit to daily quota if enabled
+      // If user wants to continue without pause, we can process more
       if (respectDailyLimit && paperIds.length > this.DAILY_LIMIT) {
-        console.log(`⚠️  Free tier daily limit: ${this.DAILY_LIMIT} requests`);
-        console.log(`   Limiting to first ${this.DAILY_LIMIT} papers`);
+        console.log(`⚠️  Daily limit: ${this.DAILY_LIMIT} requests`);
+        console.log(`   Processing first ${this.DAILY_LIMIT} papers in this run`);
         console.log(`   Remaining papers will be processed in subsequent runs`);
         console.log(`   Estimated time: ${Math.ceil(this.DAILY_LIMIT * this.REQUEST_DELAY_MS / 1000 / 60)} minutes`);
         return this.batchPrecompute(paperIds.slice(0, this.DAILY_LIMIT), batchSize);
