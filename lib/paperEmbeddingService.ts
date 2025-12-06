@@ -239,7 +239,8 @@ export class PaperEmbeddingService {
     const results: boolean[] = [];
     const executing: Promise<void>[] = [];
 
-    for (const paperId of paperIds) {
+    for (let index = 0; index < paperIds.length; index++) {
+      const paperId = paperIds[index];
       const promise = this.generateEmbeddingForPaper(paperId)
         .then(success => {
           results.push(success);
@@ -256,8 +257,8 @@ export class PaperEmbeddingService {
         executing.splice(executing.findIndex(p => p === promise), 1);
       }
       
-      // Additional delay between batches for free tier
-      if (i < paperIds.length - 1 && i % maxConcurrent === 0) {
+      // Additional delay between requests for free tier
+      if (index < paperIds.length - 1 && index % maxConcurrent === 0) {
         await new Promise(resolve => setTimeout(resolve, this.REQUEST_DELAY_MS));
       }
     }
@@ -284,7 +285,8 @@ export class PaperEmbeddingService {
    */
   async precomputeFromPopularPapers(
     limit?: number,
-    batchSize: number = this.DEFAULT_BATCH_SIZE
+    batchSize: number = this.DEFAULT_BATCH_SIZE,
+    respectDailyLimit: boolean = true
   ): Promise<PrecomputeProgress> {
     try {
       const { data, error } = await supabase
@@ -308,9 +310,7 @@ export class PaperEmbeddingService {
       const paperIds = data.map(p => p.openalex_id);
       
       // For free tier, limit to daily quota if enabled
-      // Default to true (respect daily limits) unless explicitly disabled
-      const shouldRespectLimit = respectDailyLimit !== false;
-      if (shouldRespectLimit !== false && paperIds.length > this.DAILY_LIMIT) {
+      if (respectDailyLimit && paperIds.length > this.DAILY_LIMIT) {
         console.log(`⚠️  Free tier daily limit: ${this.DAILY_LIMIT} requests`);
         console.log(`   Limiting to first ${this.DAILY_LIMIT} papers`);
         console.log(`   Remaining papers will be processed in subsequent runs`);
