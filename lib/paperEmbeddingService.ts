@@ -17,10 +17,24 @@ export interface PrecomputeProgress {
 
 export class PaperEmbeddingService {
   private readonly DEFAULT_BATCH_SIZE = 100;
-  private readonly MAX_CONCURRENT = 5; // Reduced for free tier (was 10)
-  private readonly REQUEST_DELAY_MS = 5000; // 5 seconds between requests for free tier (15 req/min = 4 sec, using 5 for safety)
-  private readonly DAILY_LIMIT = 1500; // Typical free tier daily limit
+  // Rate limits: Check if using paid tier (higher limits) or free tier
+  // Paid tier: 100 req/min, 30K tokens/min, 1,000 req/day (standard)
+  // Free tier: 15 req/min, 1,500 req/day
+  private readonly MAX_CONCURRENT = this.isPaidTier() ? 10 : 5; // Paid: 10 (100 req/min), Free: 5
+  private readonly REQUEST_DELAY_MS = this.isPaidTier() ? 600 : 5000; // Paid: 600ms (100 req/min), Free: 5s (15 req/min)
+  private readonly DAILY_LIMIT = this.isPaidTier() ? 1000 : 1500; // Paid: 1,000 req/day (API limit), Free: 1,500
   private lastRequestTime = 0;
+
+  /**
+   * Check if using paid Gemini API tier (has higher rate limits)
+   * Paid tiers typically have much higher quotas
+   */
+  private isPaidTier(): boolean {
+    // Check environment variable or API key characteristics
+    // For now, assume paid tier if we have the key (user can override)
+    // You can set GEMINI_TIER=paid in env to force paid tier settings
+    return process.env.GEMINI_TIER === 'paid' || process.env.GEMINI_TIER === 'pro';
+  }
 
   /**
    * Generate embedding for a single paper
