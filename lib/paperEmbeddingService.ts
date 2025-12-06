@@ -60,23 +60,9 @@ export class PaperEmbeddingService {
         return false;
       }
 
-      // Generate embedding using Gemini API directly (server-side)
-      const geminiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-      if (!geminiKey) {
-        throw new Error('GEMINI_API_KEY not configured');
-      }
-
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
-      
-      // Use same format as api/gemini/embedding.ts
-      const result = await model.embedContent({
-        content: text,
-        outputDimensionality: 768
-      } as any);
-      
-      const embedding = result.embedding.values;
+      // Generate embedding using the embedding service (which uses the working API endpoint)
+      // This is more reliable than calling Gemini directly
+      const embedding = await embeddingService.embed(text);
       const embeddingString = embeddingService.formatForPgVector(embedding);
 
       // Store in database
