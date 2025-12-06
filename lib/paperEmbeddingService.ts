@@ -33,10 +33,30 @@ export class PaperEmbeddingService {
 
       // Create text representation
       const abstract = openAlexPopularPaperService.reconstructAbstract(paper.abstract_inverted_index);
-      const text = `${paper.title} ${abstract || ''}`.trim();
+      let text = `${paper.title} ${abstract || ''}`.trim();
 
       if (!text || text.length < 10) {
         console.warn(`Paper ${openalexId} has insufficient text for embedding`);
+        return false;
+      }
+
+      // Sanitize text: remove special characters that might cause API errors
+      // Limit length to 2000 characters to avoid token limit issues
+      // Gemini embedding API has limits, so we'll use title + first part of abstract
+      text = text
+        .replace(/[^\x20-\x7E\n\r\t]/g, ' ') // Replace non-ASCII with space
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .trim();
+      
+      // If text is too long, prioritize title and truncate abstract
+      if (text.length > 2000) {
+        const titlePart = paper.title.substring(0, 200);
+        const abstractPart = (abstract || '').substring(0, 1800);
+        text = `${titlePart} ${abstractPart}`.trim();
+      }
+
+      if (text.length < 10) {
+        console.warn(`Paper ${openalexId} has insufficient text after sanitization`);
         return false;
       }
 
