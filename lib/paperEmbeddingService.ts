@@ -308,7 +308,9 @@ export class PaperEmbeddingService {
       const paperIds = data.map(p => p.openalex_id);
       
       // For free tier, limit to daily quota if enabled
-      if (respectDailyLimit && paperIds.length > this.DAILY_LIMIT) {
+      // Default to true (respect daily limits) unless explicitly disabled
+      const shouldRespectLimit = respectDailyLimit !== false;
+      if (shouldRespectLimit && paperIds.length > this.DAILY_LIMIT) {
         console.log(`⚠️  Free tier daily limit: ${this.DAILY_LIMIT} requests`);
         console.log(`   Limiting to first ${this.DAILY_LIMIT} papers`);
         console.log(`   Remaining papers will be processed in subsequent runs`);
