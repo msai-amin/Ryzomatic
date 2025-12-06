@@ -343,6 +343,78 @@ export class PaperEmbeddingService {
 
       const paperIds = data.map(p => p.openalex_id);
       
+      // If continueUntilComplete is true, process all papers in continuous loops
+      if (continueUntilComplete) {
+        console.log(`🔄 Continuous mode: Processing ALL remaining papers until complete`);
+        console.log(`   Initial papers to process: ${paperIds.length}`);
+        console.log(`   Will process in cycles of ${this.DAILY_LIMIT} papers each`);
+        
+        let totalProcessed = 0;
+        let totalFailed = 0;
+        let cycle = 1;
+        let hasMorePapers = true;
+        
+        while (hasMorePapers) {
+          // Fetch fresh list of unprocessed papers from database
+          const { data: remainingData, error: remainingError } = await supabase
+            .from('popular_papers')
+            .select('openalex_id')
+            .eq('precomputed', false)
+            .order('popularity_score', { ascending: false })
+            .limit(limit || 10000);
+          
+          if (remainingError) throw remainingError;
+          
+          if (!remainingData || remainingData.length === 0) {
+            console.log(`\n✅ No more papers to process! All done.`);
+            hasMorePapers = false;
+            break;
+          }
+          
+          const remainingPaperIds = remainingData.map(p => p.openalex_id);
+          const papersToProcess = remainingPaperIds.slice(0, this.DAILY_LIMIT);
+          
+          console.log(`\n🔄 Cycle ${cycle}: Processing ${papersToProcess.length} papers...`);
+          console.log(`   Total remaining: ${remainingPaperIds.length} papers`);
+          
+          const progress = await this.batchPrecompute(papersToProcess, batchSize);
+          totalProcessed += progress.processed;
+          totalFailed += progress.failed;
+          
+          console.log(`✅ Cycle ${cycle} complete: ${progress.processed} processed, ${progress.failed} failed`);
+          console.log(`📊 Total so far: ${totalProcessed} processed, ${totalFailed} failed`);
+          
+          // Check if there are more papers to process
+          const { count } = await supabase
+            .from('popular_papers')
+            .select('*', { count: 'exact', head: true })
+            .eq('precomputed', false);
+          
+          if (!count || count === 0) {
+            hasMorePapers = false;
+            console.log(`\n✅ All papers processed! Final totals:`);
+            console.log(`   Processed: ${totalProcessed}`);
+            console.log(`   Failed: ${totalFailed}`);
+            break;
+          }
+          
+          cycle++;
+          
+          // Brief pause between cycles
+          if (hasMorePapers) {
+            console.log(`\n⏸️  Brief pause before next cycle (${count} papers remaining)...`);
+            await this.delay(2000); // 2 second pause between cycles
+          }
+        }
+        
+        return {
+          total: totalProcessed + totalFailed,
+          processed: totalProcessed,
+          failed: totalFailed,
+          percentage: 100,
+        };
+      }
+      
       // For free tier, limit to daily quota if enabled
       // If user wants to continue without pause, we can process more
       if (respectDailyLimit && paperIds.length > this.DAILY_LIMIT) {
