@@ -1,10 +1,13 @@
 /**
  * Consolidated Utils API
- * Handles text cleanup and formula conversion in a single endpoint
+ * Handles text cleanup, formula conversion, embeddings, and TTS in a single endpoint
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { geminiService } from '../../lib/gemini.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { createClient } from '@supabase/supabase-js';
+import { checkRateLimit, getRateLimitHeaders } from '../../lib/rateLimiter.js';
 
 interface CleanupPreferences {
   reorganizeParagraphs: boolean;
@@ -103,7 +106,40 @@ function preprocessPublicationMetadata(text: string): string {
   return cleaned.trim();
 }
 
+// Initialize Supabase client for embedding endpoint
+const supabase = createClient(
+  process.env.SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
+
+// Initialize Gemini for embeddings
+const geminiKey = process.env.GEMINI_API_KEY;
+let genAI: GoogleGenerativeAI | null = null;
+if (geminiKey) {
+  genAI = new GoogleGenerativeAI(geminiKey);
+}
+
+// Helper function to escape XML for TTS
+function escapeXml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Enable CORS for all actions
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   const action = (req.body?.action || req.query.action) as string;
 
   // Route based on action
@@ -112,10 +148,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return handleTextCleanup(req, res);
     case 'convert-formula':
       return handleFormulaConversion(req, res);
+    case 'embedding':
+      return handleEmbedding(req, res);
+    case 'tts':
+      return handleTTS(req, res);
     default:
       return res.status(400).json({ 
         error: 'Invalid action', 
-        validActions: ['cleanup', 'convert-formula']
+        validActions: ['cleanup', 'convert-formula', 'embedding', 'tts']
       });
   }
 }
@@ -525,6 +565,307 @@ async function handleFormulaConversion(req: VercelRequest, res: VercelResponse) 
       success: true,
       fallback: true,
       error: error.message
+    });
+  }
+}
+
+/**
+ * Handle embedding generation
+ * POST /api/utils?action=embedding
+ */
+async function handleEmbedding(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    // Authenticate user
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Check rate limit
+    const rateLimitResult = await checkRateLimit(user.id, 'embedding');
+    const rateLimitHeaders = getRateLimitHeaders(rateLimitResult);
+    
+    // Set rate limit headers in response
+    Object.entries(rateLimitHeaders).forEach(([key, value]) => {
+      res.setHeader(key, value);
+    });
+
+    if (!rateLimitResult.allowed) {
+      return res.status(429).json({
+        error: 'Rate limit exceeded',
+        limit: rateLimitResult.limit,
+        remaining: 0,
+        reset_at: rateLimitResult.resetAt?.toISOString(),
+      });
+    }
+
+    if (!geminiKey || !genAI) {
+      return res.status(500).json({ error: 'GEMINI_API_KEY is not configured' });
+    }
+
+    const { text, texts } = req.body;
+    const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
+    
+    if (typeof text === 'string') {
+      // Pass text as first parameter, options as second (matches paperEmbeddingService.ts)
+      const result = await model.embedContent(text, {
+        outputDimensionality: 768
+      } as any);
+      return res.status(200).json({ embedding: result.embedding.values });
+    }
+    
+    if (Array.isArray(texts)) {
+      if (texts.length === 0) {
+        return res.status(400).json({ error: 'texts array must not be empty' });
+      }
+      const results = await Promise.all(texts.map((t: string) => model.embedContent(t, {
+        outputDimensionality: 768
+      } as any)));
+      return res.status(200).json({ embeddings: results.map(r => r.embedding.values) });
+    }
+    
+    return res.status(400).json({ error: 'Must provide "text" (string) or "texts" (array)' });
+  } catch (error: any) {
+    console.error('Embedding generation error:', error);
+    return res.status(500).json({ error: 'Embedding failed', details: error.message || error.toString() });
+  }
+}
+
+/**
+ * Handle Azure TTS
+ * GET /api/utils?action=tts - Get voices list
+ * POST /api/utils?action=tts - Synthesize speech
+ */
+async function handleTTS(req: VercelRequest, res: VercelResponse) {
+  // Handle GET requests for fetching voices list
+  if (req.method === 'GET') {
+    try {
+      // Get Azure TTS credentials from environment
+      const subscriptionKey = process.env.AZURE_TTS_KEY || process.env.VITE_AZURE_TTS_KEY;
+      const azureRegion = req.query.region as string || process.env.AZURE_TTS_REGION || process.env.VITE_AZURE_TTS_REGION || 'eastus';
+
+      if (!subscriptionKey) {
+        return res.status(500).json({ 
+          error: 'Azure TTS not configured',
+          hint: 'Set AZURE_TTS_KEY (without VITE_ prefix) in environment variables'
+        });
+      }
+
+      // Azure TTS voices endpoint
+      const endpoint = `https://${azureRegion}.tts.speech.microsoft.com/cognitiveservices/voices/list`;
+      
+      console.log('Azure TTS Proxy: Fetching voices list', {
+        endpoint,
+        region: azureRegion
+      });
+
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          'Ocp-Apim-Subscription-Key': subscriptionKey,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error('Azure TTS Proxy: Failed to fetch voices', {
+          status: response.status,
+          statusText: response.statusText,
+          endpoint: endpoint,
+          region: azureRegion,
+          subscriptionKeyPresent: !!subscriptionKey,
+          error: errorText.substring(0, 500)
+        });
+        
+        // Provide helpful error messages
+        let errorMessage = `Failed to fetch voices: ${response.statusText}`;
+        if (response.status === 404) {
+          errorMessage = `Azure TTS endpoint not found (404). Please verify:
+1. Your Azure Speech Services resource is in the '${azureRegion}' region
+2. Your subscription key is valid and has TTS access
+3. The endpoint format matches your Azure resource type`;
+        } else if (response.status === 401 || response.status === 403) {
+          errorMessage = `Azure TTS authentication failed (${response.status}). Please verify your subscription key is correct.`;
+        }
+        
+        return res.status(response.status).json({ 
+          error: errorMessage,
+          details: errorText,
+          endpoint: endpoint,
+          region: azureRegion
+        });
+      }
+
+      const voicesData = await response.json();
+      
+      console.log('Azure TTS Proxy: Voices fetched successfully', {
+        count: Array.isArray(voicesData) ? voicesData.length : 0
+      });
+
+      return res.status(200).json(voicesData);
+    } catch (error) {
+      console.error('Azure TTS Proxy: Error fetching voices', error);
+      return res.status(500).json({ 
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  // Handle POST requests for synthesis
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { text, voice, locale, region, ssml } = req.body;
+
+    if (!text && !ssml) {
+      return res.status(400).json({ error: 'Text or SSML is required' });
+    }
+
+    // Get Azure TTS credentials from environment
+    const subscriptionKey = process.env.AZURE_TTS_KEY || process.env.VITE_AZURE_TTS_KEY;
+    const azureRegion = region || process.env.AZURE_TTS_REGION || process.env.VITE_AZURE_TTS_REGION || 'eastus';
+
+    console.log('Azure TTS Proxy: Environment check', {
+      hasAZURE_TTS_KEY: !!process.env.AZURE_TTS_KEY,
+      hasVITE_AZURE_TTS_KEY: !!process.env.VITE_AZURE_TTS_KEY,
+      subscriptionKeyLength: subscriptionKey?.length || 0,
+      azureRegion
+    });
+
+    if (!subscriptionKey) {
+      console.error('Azure TTS subscription key not configured');
+      console.error('Available env vars with AZURE or TTS:', 
+        Object.keys(process.env).filter(k => k.includes('AZURE') || k.includes('TTS')));
+      return res.status(500).json({ 
+        error: 'Azure TTS not configured',
+        hint: 'Set AZURE_TTS_KEY (without VITE_ prefix) in environment variables'
+      });
+    }
+
+    // Build the SSML if not provided
+    const ssmlContent = ssml || `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${locale || 'en-US'}">
+      <voice name="${voice || 'en-US-AriaNeural'}">
+        ${escapeXml(text || '')}
+      </voice>
+    </speak>`;
+
+    const endpoint = `https://${azureRegion}.tts.speech.microsoft.com/cognitiveservices/v1`;
+
+    console.log('Azure TTS Proxy Request:', {
+      endpoint,
+      textLength: text?.length || ssml?.length || 0,
+      voice: voice || 'en-US-AriaNeural',
+      locale: locale || 'en-US'
+    });
+
+    // Call Azure TTS API
+    const startTime = Date.now();
+    console.log('Azure TTS Proxy: Starting Azure TTS API request with fetch...');
+    
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      console.error('Azure TTS Proxy: Request timeout after 50 seconds', {
+        elapsed: Date.now() - startTime
+      });
+      controller.abort();
+    }, 50000); // 50 second timeout
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Ocp-Apim-Subscription-Key': subscriptionKey,
+          'Content-Type': 'application/ssml+xml',
+          'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
+          'User-Agent': 'SmartReader/1.0',
+          'Connection': 'close',
+          'Cache-Control': 'no-cache',
+        },
+        body: ssmlContent,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      console.log('Azure TTS Proxy: Received response from Azure TTS API', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        elapsed: Date.now() - startTime
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error('Azure TTS API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText.substring(0, 200),
+          elapsed: Date.now() - startTime
+        });
+        throw new Error(`Azure TTS API error: ${response.status} ${response.statusText}`);
+      }
+
+      // Read the audio data
+      const audioBuffer = await response.arrayBuffer();
+      
+      console.log('Azure TTS Proxy: Response complete', {
+        bufferSize: audioBuffer.byteLength,
+        elapsed: Date.now() - startTime
+      });
+
+      if (!audioBuffer || audioBuffer.byteLength === 0) {
+        throw new Error('Received empty audio buffer from Azure TTS');
+      }
+
+      // Return the audio as binary data
+      console.log('Azure TTS Proxy Success:', {
+        audioSize: audioBuffer.byteLength,
+        elapsed: Date.now() - startTime
+      });
+
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Content-Length', audioBuffer.byteLength.toString());
+      res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+      return res.send(Buffer.from(audioBuffer));
+    } catch (error) {
+      clearTimeout(timeoutId);
+      
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('Azure TTS Proxy: Request aborted (timeout)', {
+          elapsed: Date.now() - startTime
+        });
+        return res.status(504).json({ 
+          error: 'Gateway Timeout',
+          message: 'Azure TTS API request timeout after 50 seconds'
+        });
+      }
+      
+      console.error('Azure TTS Proxy: Fetch error', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown',
+        elapsed: Date.now() - startTime
+      });
+      throw error;
+    }
+
+  } catch (error) {
+    console.error('Azure TTS Proxy Error:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 }

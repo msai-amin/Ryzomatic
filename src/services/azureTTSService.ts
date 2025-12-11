@@ -244,15 +244,18 @@ class AzureTTSService {
       // CRITICAL FIX: Use server-side proxy endpoint to avoid CORS and authentication issues
       // The proxy endpoint handles authentication and CORS headers properly
       // IMPORTANT: If you see errors about direct Azure endpoint calls, clear your browser cache!
-      const proxyEndpoint = '/api/azure-tts';
+      const proxyEndpoint = '/api/utils?action=tts';
       
       // Safety check: Ensure we're not accidentally calling Azure directly
       if (typeof window === 'undefined' || !window.location) {
         throw new Error('Cannot fetch voices: window.location is not available');
       }
       
-      const url = new URL(proxyEndpoint, window.location.origin);
-      url.searchParams.set('region', this.region);
+      // proxyEndpoint is '/api/utils?action=tts', so we need to construct URL properly
+      const baseUrl = new URL('/api/utils', window.location.origin);
+      baseUrl.searchParams.set('action', 'tts');
+      baseUrl.searchParams.set('region', this.region);
+      const url = baseUrl;
 
       console.log('AzureTTSService.getVoices: Fetching voices via proxy', {
         endpoint: url.toString(),
@@ -441,7 +444,7 @@ class AzureTTSService {
     </speak>`;
 
     // Use server-side proxy endpoint to avoid HTTP/2 protocol errors
-    const proxyEndpoint = '/api/azure-tts';
+    const proxyEndpoint = '/api/utils?action=tts';
 
     console.log('Azure TTS Request Details (via proxy):', {
       endpoint: proxyEndpoint,

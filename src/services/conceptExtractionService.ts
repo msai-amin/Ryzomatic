@@ -33,7 +33,7 @@ class ConceptExtractionService {
       }
 
       // Call API endpoint for concept extraction
-      const response = await fetch('/api/gemini/embedding', {
+      const response = await fetch('/api/utils?action=embedding', {
         method: 'POST',
         headers,
         body: JSON.stringify({ 

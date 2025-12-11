@@ -2,8 +2,8 @@ import { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { notesHighlightsEmbeddingService } from '../../lib/notesHighlightsEmbeddingService'
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseUrl = process.env.SUPABASE_URL || ''
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
 // Helper function to extract concepts from highlight (runs in background)
 // This is a simplified version - full concept extraction happens client-side
@@ -39,10 +39,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Get auth token from header
+    // Get auth token from header - check this first for proper 401 responses
     const authHeader = req.headers.authorization
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    // Check environment variables after auth check
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Missing required environment variables:', {
+        hasSupabaseUrl: !!supabaseUrl,
+        hasSupabaseServiceKey: !!supabaseServiceKey
+      })
+      return res.status(500).json({ error: 'Server configuration error' })
     }
 
     const token = authHeader.substring(7)

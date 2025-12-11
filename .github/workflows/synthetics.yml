@@ -22,8 +22,17 @@ jobs:
         env:
           PROD_URL: ${{ secrets.PROD_URL }}
         run: |
-          code=$(curl -sSL -o /dev/null -w "%{http_code}\n" "$PROD_URL/api/highlights")
+          code=$(curl -sSL -X GET -o /dev/null -w "%{http_code}\n" "$PROD_URL/api/highlights")
           echo "highlights: $code"
-          if [ "$code" != "401" ] && [ "$code" != "405" ]; then exit 1; fi
+          # Accept 401 (unauthorized) or 405 (method not allowed) for unauthenticated requests
+          # Reject 200 (should not allow unauthenticated access) and other unexpected codes
+          if [ "$code" = "200" ]; then
+            echo "ERROR: Highlights endpoint returned 200 without authentication (should require auth)"
+            exit 1
+          fi
+          if [ "$code" != "401" ] && [ "$code" != "405" ]; then
+            echo "ERROR: Unexpected status code: $code (expected 401 or 405)"
+            exit 1
+          fi
 
 

@@ -30,7 +30,7 @@ export class EmbeddingService {
       
       // Use server-side API endpoint instead of calling Gemini directly
       // This keeps API keys secure and avoids 403 errors
-      const response = await fetch('/api/gemini/embedding', {
+      const response = await fetch('/api/utils?action=embedding', {
         method: 'POST',
         headers,
         body: JSON.stringify({ text }),
