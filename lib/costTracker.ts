@@ -1,9 +1,27 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy-load Supabase client to prevent errors when imported on client side
+const getSupabaseClient = () => {
+  if (typeof window !== 'undefined') {
+    return null; // Client-side, don't create server-side client
+  }
+  
+  const supabaseUrl = process.env.SUPABASE_URL || '';
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  
+  if (!supabaseUrl || !supabaseKey || supabaseUrl.trim() === '' || supabaseKey.trim() === '') {
+    return null;
+  }
+  
+  try {
+    return createClient(supabaseUrl.trim(), supabaseKey.trim());
+  } catch (error) {
+    console.error('Failed to create Supabase client:', error);
+    return null;
+  }
+};
+
+const supabase = getSupabaseClient();
 
 export interface CostMetrics {
   totalTokensUsed: number;
@@ -34,6 +52,11 @@ export class CostTracker {
     contextSize: number;
     fromCache?: boolean;
   }): Promise<void> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return;
+    }
+    
     try {
       const { userId, model, tokensUsed, usedMemoryContext, contextSize, fromCache } = params;
       
@@ -76,6 +99,19 @@ export class CostTracker {
    * Get cost metrics for a user
    */
   async getCostMetrics(userId: string, days: number = 7): Promise<CostMetrics> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return {
+        totalTokensUsed: 0,
+        totalCost: 0,
+        cacheHits: 0,
+        cacheMisses: 0,
+        averageContextSize: 0,
+        memoryBasedQueries: 0,
+        simpleHistoryQueries: 0,
+      };
+    }
+    
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
@@ -181,6 +217,16 @@ export class CostTracker {
     cacheSize: number;
     averageResponseTime: number;
   }> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return {
+        hitRate: 0,
+        totalRequests: 0,
+        cacheSize: 0,
+        averageResponseTime: 0,
+      };
+    }
+    
     const { data: cacheEntries } = await supabase
       .from('action_cache')
       .select('hit_count')

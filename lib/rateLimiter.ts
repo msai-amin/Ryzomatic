@@ -1,9 +1,27 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy-load Supabase client to prevent errors when imported on client side
+const getSupabaseClient = () => {
+  if (typeof window !== 'undefined') {
+    return null; // Client-side, don't create server-side client
+  }
+  
+  const supabaseUrl = process.env.SUPABASE_URL || '';
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  
+  if (!supabaseUrl || !supabaseKey || supabaseUrl.trim() === '' || supabaseKey.trim() === '') {
+    return null;
+  }
+  
+  try {
+    return createClient(supabaseUrl.trim(), supabaseKey.trim());
+  } catch (error) {
+    console.error('Failed to create Supabase client:', error);
+    return null;
+  }
+};
+
+const supabase = getSupabaseClient();
 
 export interface RateLimitResult {
   allowed: boolean;

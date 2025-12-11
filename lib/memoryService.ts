@@ -2,10 +2,28 @@ import { createClient } from '@supabase/supabase-js';
 import { embeddingService } from './embeddingService';
 import { geminiService } from './gemini';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy-load Supabase client to prevent errors when imported on client side
+const getSupabaseClient = () => {
+  if (typeof window !== 'undefined') {
+    return null; // Client-side, don't create server-side client
+  }
+  
+  const supabaseUrl = process.env.SUPABASE_URL || '';
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  
+  if (!supabaseUrl || !supabaseKey || supabaseUrl.trim() === '' || supabaseKey.trim() === '') {
+    return null;
+  }
+  
+  try {
+    return createClient(supabaseUrl.trim(), supabaseKey.trim());
+  } catch (error) {
+    console.error('Failed to create Supabase client:', error);
+    return null;
+  }
+};
+
+const supabase = getSupabaseClient();
 
 export interface MemoryEntity {
   id?: string;
@@ -42,6 +60,11 @@ export class MemoryService {
     documentTitle?: string;
     documentId?: string;
   }): Promise<{ success: boolean; entitiesCreated: number; relationshipsCreated: number }> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return { success: false, entitiesCreated: 0, relationshipsCreated: 0 };
+    }
+    
     const { conversationId, userId, messages, documentTitle, documentId } = params;
 
     try {
@@ -166,6 +189,11 @@ export class MemoryService {
     documentId?: string;
     similarityThreshold?: number;
   }): Promise<MemoryEntity[]> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return [];
+    }
+    
     const {
       userId,
       query,
@@ -229,6 +257,11 @@ export class MemoryService {
    * Get memories for a specific conversation
    */
   async getConversationMemories(conversationId: string, userId: string): Promise<MemoryEntity[]> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from('conversation_memories')
       .select('*')
@@ -251,6 +284,11 @@ export class MemoryService {
     memory: MemoryEntity;
     related: Array<MemoryEntity & { relationshipType: string; strength: number }>;
   }> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      throw new Error('Supabase client not available');
+    }
+    
     // Get the memory
     const { data: memory } = await supabase
       .from('conversation_memories')
@@ -319,6 +357,15 @@ export class MemoryService {
     topQuestions: Array<{ text: string; count: number }>;
     topInsights: Array<{ text: string; count: number }>;
   }> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return {
+        topConcepts: [],
+        topQuestions: [],
+        topInsights: [],
+      };
+    }
+    
     const { userId, startDate, endDate, entityTypes, limit = 10 } = params;
 
     let query = supabase
@@ -393,6 +440,11 @@ export class MemoryService {
     noteIds?: string[];
     documentId?: string;
   }): Promise<{ success: boolean; entitiesCreated: number; relationshipsCreated: number }> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return { success: false, entitiesCreated: 0, relationshipsCreated: 0 };
+    }
+    
     const { userId, noteIds, documentId } = params;
 
     try {
@@ -510,6 +562,11 @@ export class MemoryService {
     highlightIds?: string[];
     documentId?: string;
   }): Promise<{ success: boolean; entitiesCreated: number; relationshipsCreated: number }> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return { success: false, entitiesCreated: 0, relationshipsCreated: 0 };
+    }
+    
     const { userId, highlightIds, documentId } = params;
 
     try {
