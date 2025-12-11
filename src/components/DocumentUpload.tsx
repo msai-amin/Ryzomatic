@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react'
+import React, { useCallback, useState, useEffect, useRef } from 'react'
 import { X, Upload, FileText, AlertCircle, Save, Cloud } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { storageService } from '../services/storageService'
@@ -39,6 +39,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const [saveToLibrary, setSaveToLibrary] = useState(true)
   const [userProfile, setUserProfile] = useState<any>({ tier: 'free', credits: 0, ocr_count_monthly: 0 })
   const [extractionProgress, setExtractionProgress] = useState<string>('')
+  const handleFileRef = useRef<((file: File) => Promise<void>) | null>(null)
 
   // CRITICAL: Normalize user.id to prevent React comparison error
   const normalizedUserId = user?.id ?? ''
@@ -85,7 +86,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
     }
   }, [])
 
-  const handleFile = async (file: File) => {
+  const handleFile = useCallback(async (file: File) => {
     const context = {
       component: 'DocumentUpload',
       action: 'handleFile'
@@ -585,7 +586,27 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
     } finally {
       setLoading(false)
     }
-  }
+  }, [user, saveToLibrary, setAsCurrentDocument, addDocument, setLoading, refreshLibrary, refreshRelatedDocuments, onUploadComplete, onClose])
+
+  // Store handleFile in ref for event listener
+  useEffect(() => {
+    handleFileRef.current = handleFile
+  }, [handleFile])
+
+  // Listen for file drop events from EmptyState
+  useEffect(() => {
+    const handleFileDrop = (event: CustomEvent) => {
+      const file = event.detail?.file
+      if (file instanceof File && handleFileRef.current) {
+        handleFileRef.current(file)
+      }
+    }
+
+    window.addEventListener('app:upload-file', handleFileDrop as EventListener)
+    return () => {
+      window.removeEventListener('app:upload-file', handleFileDrop as EventListener)
+    }
+  }, [])
 
   // Handle OCR consent approval
   const handleOCRApprove = async () => {

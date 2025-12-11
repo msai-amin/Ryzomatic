@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useState } from 'react'
 import { Upload, FileText, Sparkles } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 
@@ -8,6 +8,7 @@ interface EmptyStateProps {
 
 export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
   const openCustomReadingWizard = useAppStore((state) => state.openCustomReadingWizard)
+  const [dragActive, setDragActive] = useState(false)
 
   const handleUpload = useCallback(() => {
     if (onUploadClick) {
@@ -20,6 +21,35 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
   const handleOpenCustomReading = useCallback(() => {
       openCustomReadingWizard('empty-state')
   }, [openCustomReadingWizard])
+
+  const handleDrag = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true)
+    } else if (e.type === 'dragleave') {
+      setDragActive(false)
+    }
+  }, [])
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(false)
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      // Open upload modal first
+      handleUpload()
+      
+      // Wait a bit for the modal to open, then trigger file selection
+      setTimeout(() => {
+        // Dispatch a custom event with the file so DocumentUpload can handle it
+        window.dispatchEvent(new CustomEvent('app:upload-file', {
+          detail: { file: e.dataTransfer.files[0] }
+        }))
+      }, 100)
+    }
+  }, [handleUpload])
 
   return (
     <div 
@@ -65,12 +95,16 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onUploadClick }) => {
         <div 
           className="text-center p-6 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer"
           style={{
-            backgroundColor: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-            boxShadow: 'var(--shadow-sm)',
+            backgroundColor: dragActive ? 'rgba(156, 163, 175, 0.1)' : 'var(--color-surface)',
+            border: dragActive ? '2px dashed var(--color-primary)' : '1px solid var(--color-border)',
+            boxShadow: dragActive ? 'var(--shadow-md)' : 'var(--shadow-sm)',
             borderRadius: 'var(--border-radius-lg)',
           }}
           onClick={() => handleUpload()}
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
           role="button"
           tabIndex={0}
           onKeyPress={(e) => {
