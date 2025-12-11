@@ -2,10 +2,31 @@ import { createClient } from '@supabase/supabase-js';
 import { embeddingService } from './embeddingService';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy-load Supabase client to prevent errors when imported on client side
+// Only create client if we have valid server-side environment variables
+const getSupabaseClient = () => {
+  // Check if we're in a browser (client-side) - process.env won't have server vars
+  if (typeof window !== 'undefined') {
+    return null; // Client-side, don't create server-side client
+  }
+  
+  const supabaseUrl = process.env.SUPABASE_URL || '';
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  
+  if (!supabaseUrl || !supabaseKey || supabaseUrl.trim() === '' || supabaseKey.trim() === '') {
+    // Return null if env vars are missing
+    return null;
+  }
+  
+  try {
+    return createClient(supabaseUrl.trim(), supabaseKey.trim());
+  } catch (error) {
+    console.error('Failed to create Supabase client:', error);
+    return null;
+  }
+};
+
+const supabase = getSupabaseClient();
 
 // For server-side embedding generation (bypasses API endpoint)
 const geminiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
@@ -21,6 +42,11 @@ export class NotesHighlightsEmbeddingService {
    * Generate embedding for a note and store it in the database
    */
   async generateEmbeddingForNote(noteId: string, userId: string): Promise<boolean> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return false;
+    }
+    
     try {
       // Fetch the note
       const { data: note, error: fetchError } = await supabase
@@ -75,6 +101,11 @@ export class NotesHighlightsEmbeddingService {
    * Generate embedding for a highlight and store it in the database
    */
   async generateEmbeddingForHighlight(highlightId: string, userId: string): Promise<boolean> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return false;
+    }
+    
     try {
       // Fetch the highlight
       const { data: highlight, error: fetchError } = await supabase
@@ -129,6 +160,11 @@ export class NotesHighlightsEmbeddingService {
    * Generate embeddings for multiple items in batch
    */
   async generateEmbeddingsBatch(items: EmbeddingJobItem[]): Promise<void> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return;
+    }
+    
     const results = await Promise.allSettled(
       items.map(async (item) => {
         if (item.type === 'note') {
@@ -170,6 +206,11 @@ export class NotesHighlightsEmbeddingService {
    * Process pending embedding jobs from the queue
    */
   async processPendingEmbeddings(limit: number = 50): Promise<number> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return 0;
+    }
+    
     try {
       // Get pending jobs from database
       const { data: jobs, error } = await supabase.rpc('get_pending_embedding_jobs', {
@@ -266,6 +307,11 @@ export class NotesHighlightsEmbeddingService {
    * Queue an embedding job for a note
    */
   async queueNoteEmbedding(noteId: string, userId: string, priority: number = 5): Promise<void> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return;
+    }
+    
     try {
       await supabase.rpc('queue_embedding_job', {
         p_user_id: userId,
@@ -282,6 +328,11 @@ export class NotesHighlightsEmbeddingService {
    * Queue an embedding job for a highlight
    */
   async queueHighlightEmbedding(highlightId: string, userId: string, priority: number = 5): Promise<void> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return;
+    }
+    
     try {
       await supabase.rpc('queue_embedding_job', {
         p_user_id: userId,

@@ -2,10 +2,29 @@ import { createClient } from '@supabase/supabase-js';
 import { embeddingService } from './embeddingService';
 import { openAlexPopularPaperService, OpenAlexPaper } from './openAlexPopularPaperService';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy-load Supabase client to prevent errors when imported on client side
+const getSupabaseClient = () => {
+  // Check if we're in a browser (client-side) - process.env won't have server vars
+  if (typeof window !== 'undefined') {
+    return null; // Client-side, don't create server-side client
+  }
+  
+  const supabaseUrl = process.env.SUPABASE_URL || '';
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  
+  if (!supabaseUrl || !supabaseKey || supabaseUrl.trim() === '' || supabaseKey.trim() === '') {
+    return null;
+  }
+  
+  try {
+    return createClient(supabaseUrl.trim(), supabaseKey.trim());
+  } catch (error) {
+    console.error('Failed to create Supabase client:', error);
+    return null;
+  }
+};
+
+const supabase = getSupabaseClient();
 
 export interface PrecomputeProgress {
   total: number;
@@ -40,6 +59,11 @@ export class PaperEmbeddingService {
    * Generate embedding for a single paper
    */
   async generateEmbeddingForPaper(openalexId: string): Promise<boolean> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return false;
+    }
+    
     try {
       // Fetch paper from OpenAlex
       const paper = await openAlexPopularPaperService.fetchPaperById(openalexId);
@@ -436,6 +460,11 @@ export class PaperEmbeddingService {
    * Check if paper has pre-computed embedding
    */
   async hasPrecomputedEmbedding(openalexId: string): Promise<boolean> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return false;
+    }
+    
     try {
       const { data, error } = await supabase
         .from('paper_recommendations')
@@ -456,6 +485,11 @@ export class PaperEmbeddingService {
    * Get embedding for a paper (from pre-computed or generate on-demand)
    */
   async getEmbedding(openalexId: string, generateIfMissing: boolean = false): Promise<number[] | null> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return null;
+    }
+    
     try {
       // Check for pre-computed embedding (any record for this paper will have the same embedding)
       const { data, error } = await supabase
