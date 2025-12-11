@@ -56,6 +56,18 @@ export async function checkRateLimit(
   endpoint: string,
   limitOverride?: number
 ): Promise<RateLimitResult> {
+  if (!supabase) {
+    console.error('Supabase client not available (server-side only)');
+    // Fail open - allow request if Supabase unavailable
+    const limit = limitOverride || RATE_LIMITS[endpoint] || 1000;
+    return {
+      allowed: true,
+      remaining: null,
+      resetAt: null,
+      limit: limit,
+    };
+  }
+  
   try {
     // Get the limit for this endpoint (or use override)
     const limit = limitOverride || RATE_LIMITS[endpoint] || 1000;

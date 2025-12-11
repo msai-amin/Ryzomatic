@@ -1,10 +1,28 @@
 import { createClient } from '@supabase/supabase-js';
 import { embeddingService } from './embeddingService';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy-load Supabase client to prevent errors when imported on client side
+const getSupabaseClient = () => {
+  if (typeof window !== 'undefined') {
+    return null; // Client-side, don't create server-side client
+  }
+  
+  const supabaseUrl = process.env.SUPABASE_URL || '';
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  
+  if (!supabaseUrl || !supabaseKey || supabaseUrl.trim() === '' || supabaseKey.trim() === '') {
+    return null;
+  }
+  
+  try {
+    return createClient(supabaseUrl.trim(), supabaseKey.trim());
+  } catch (error) {
+    console.error('Failed to create Supabase client:', error);
+    return null;
+  }
+};
+
+const supabase = getSupabaseClient();
 
 export interface InterestConcept {
   concept: string;
@@ -36,6 +54,11 @@ export class UserInterestProfileService {
    * Build or update interest profile for a user
    */
   async buildInterestProfile(userId: string, days: number = 30): Promise<InterestProfile | null> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return null;
+    }
+    
     try {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -332,6 +355,11 @@ export class UserInterestProfileService {
    * Get recommended documents based on interest profile
    */
   async getRecommendedDocuments(userId: string, limit: number = 10): Promise<string[]> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return [];
+    }
+    
     try {
       // Get user's interest profile
       const profile = await this.buildInterestProfile(userId);

@@ -115,6 +115,11 @@ export class ContextBuilder {
     query: string,
     limit: number
   ): Promise<Array<{ id: string; content: string; pageNumber: number }>> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return this.getRelevantNotesFallback(userId, documentId, query, limit);
+    }
+    
     try {
       // Generate query embedding
       const queryEmbedding = await embeddingService.embed(query);
@@ -198,6 +203,11 @@ export class ContextBuilder {
     query: string,
     limit: number
   ): Promise<Array<{ id: string; text: string; color: string; pageNumber: number }>> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return this.getRelevantHighlightsFallback(userId, documentId, query, limit);
+    }
+    
     try {
       // Generate query embedding
       const queryEmbedding = await embeddingService.embed(query);

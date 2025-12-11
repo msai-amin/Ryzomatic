@@ -3,10 +3,28 @@ import { paperPopularityService } from './paperPopularityService';
 import { paperEmbeddingService } from './paperEmbeddingService';
 import { openAlexPopularPaperService } from './openAlexPopularPaperService';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy-load Supabase client to prevent errors when imported on client side
+const getSupabaseClient = () => {
+  if (typeof window !== 'undefined') {
+    return null; // Client-side, don't create server-side client
+  }
+  
+  const supabaseUrl = process.env.SUPABASE_URL || '';
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  
+  if (!supabaseUrl || !supabaseKey || supabaseUrl.trim() === '' || supabaseKey.trim() === '') {
+    return null;
+  }
+  
+  try {
+    return createClient(supabaseUrl.trim(), supabaseKey.trim());
+  } catch (error) {
+    console.error('Failed to create Supabase client:', error);
+    return null;
+  }
+};
+
+const supabase = getSupabaseClient();
 
 export interface MaintenanceResult {
   success: boolean;
@@ -25,6 +43,17 @@ export class PaperEmbeddingMaintenanceService {
     limit: number = 50000,
     email?: string
   ): Promise<MaintenanceResult> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return {
+        success: false,
+        papersIdentified: 0,
+        papersPrecomputed: 0,
+        papersFailed: 0,
+        message: 'Supabase client not available',
+      };
+    }
+    
     try {
       console.log('Starting popular papers list update...');
 
@@ -84,6 +113,17 @@ export class PaperEmbeddingMaintenanceService {
     years: number = 5,
     email?: string
   ): Promise<MaintenanceResult> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return {
+        success: false,
+        papersIdentified: 0,
+        papersPrecomputed: 0,
+        papersFailed: 0,
+        message: 'Supabase client not available',
+      };
+    }
+    
     try {
       console.log(`Refreshing trending papers (last ${years} years, limit: ${limit})...`);
 
@@ -153,6 +193,17 @@ export class PaperEmbeddingMaintenanceService {
    * Remove embeddings for papers not accessed in 90+ days
    */
   async cleanupOldEmbeddings(daysThreshold: number = 90): Promise<MaintenanceResult> {
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return {
+        success: false,
+        papersIdentified: 0,
+        papersPrecomputed: 0,
+        papersFailed: 0,
+        message: 'Supabase client not available',
+      };
+    }
+    
     try {
       console.log(`Cleaning up embeddings older than ${daysThreshold} days...`);
 
