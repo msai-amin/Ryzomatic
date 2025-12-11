@@ -8,12 +8,14 @@ const runtimeEnv =
 const supabaseUrl =
   import.meta.env.VITE_SUPABASE_URL ||
   runtimeEnv.VITE_SUPABASE_URL ||
-  runtimeEnv.SUPABASE_URL;
+  runtimeEnv.SUPABASE_URL ||
+  '';
 
 const supabaseAnonKey =
   import.meta.env.VITE_SUPABASE_ANON_KEY ||
   runtimeEnv.VITE_SUPABASE_ANON_KEY ||
-  runtimeEnv.SUPABASE_ANON_KEY;
+  runtimeEnv.SUPABASE_ANON_KEY ||
+  '';
 
 console.log('=== Supabase Environment Variables Debug ===');
 console.log('VITE_SUPABASE_URL:', supabaseUrl);
@@ -63,9 +65,15 @@ const isValidKey = supabaseAnonKey &&
                    !supabaseAnonKey.includes('_key_here') &&
                    supabaseAnonKey.length >= 50; // Real JWT keys are much longer
 
+// Ensure we have valid URL and key before creating client
+// This prevents "supabaseUrl is required" errors
 export const supabase =
-  supabaseUrl && isValidKey
-    ? createClient(supabaseUrl, supabaseAnonKey, {
+  supabaseUrl && 
+  supabaseUrl.trim() !== '' && 
+  isValidKey && 
+  supabaseAnonKey &&
+  supabaseAnonKey.trim() !== ''
+    ? createClient(supabaseUrl.trim(), supabaseAnonKey.trim(), {
         auth: {
           persistSession: true,
           autoRefreshToken: true,
