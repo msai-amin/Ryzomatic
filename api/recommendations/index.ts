@@ -114,7 +114,13 @@ async function handleGetRecommendations(
     }
 
     // Get user interest profile to enhance recommendations
-    const interestProfile = await userInterestProfileService.buildInterestProfile(userId, 30);
+    let interestProfile: any = null;
+    try {
+      interestProfile = await userInterestProfileService.buildInterestProfile(userId, 30);
+    } catch (error) {
+      console.warn('Error building interest profile, continuing without it:', error);
+      interestProfile = null;
+    }
 
     // Get interest embedding vector if available
     let userInterestEmbedding: number[] | null = null;
@@ -122,18 +128,24 @@ async function handleGetRecommendations(
       userInterestEmbedding = interestProfile.interestVector;
     } else {
       // Try to get from database if not in profile
-      const { data: profileData } = await supabase
-        .from('user_interest_profiles')
-        .select('interest_embedding')
-        .eq('user_id', userId)
-        .single();
-      
-      if (profileData?.interest_embedding) {
-        try {
-          userInterestEmbedding = JSON.parse(profileData.interest_embedding);
-        } catch (e) {
-          console.warn('Failed to parse interest embedding:', e);
+      try {
+        const { data: profileData, error: profileError } = await supabase
+          .from('user_interest_profiles')
+          .select('interest_embedding')
+          .eq('user_id', userId)
+          .maybeSingle(); // Use maybeSingle to avoid errors if no record found
+        
+        if (profileError) {
+          console.warn('Error fetching interest profile from database:', profileError);
+        } else if (profileData?.interest_embedding) {
+          try {
+            userInterestEmbedding = JSON.parse(profileData.interest_embedding);
+          } catch (e) {
+            console.warn('Failed to parse interest embedding:', e);
+          }
         }
+      } catch (error) {
+        console.warn('Error getting interest embedding from database:', error);
       }
     }
 
@@ -142,99 +154,152 @@ async function handleGetRecommendations(
     let workId = openAlexId;
     
     if (sourceDocumentId) {
-      // Fetch document with content
-      const { data: docData } = await supabase
-        .from('user_books')
-        .select('custom_metadata, title, content')
-        .eq('id', sourceDocumentId)
-        .eq('user_id', userId)
-        .single();
-
-      document = docData;
-
-      if (document?.custom_metadata?.openalex_id) {
-        workId = document.custom_metadata.openalex_id;
-      } else if (document?.custom_metadata?.doi) {
-        workId = document.custom_metadata.doi;
-      }
-
-      // If no content in user_books, try document_content table
-      if (!document?.content) {
-        const { data: contentData } = await supabase
-          .from('document_content')
-          .select('content')
-          .eq('book_id', sourceDocumentId)
+      try {
+        // Fetch document with content
+        const { data: docData, error: docError } = await supabase
+          .from('user_books')
+          .select('custom_metadata, title, content')
+          .eq('id', sourceDocumentId)
           .eq('user_id', userId)
-          .order('chunk_index', { ascending: true })
-          .limit(3); // Get first 3 chunks (usually contains abstract/intro)
+          .maybeSingle(); // Use maybeSingle to avoid errors if no record found
 
-        if (contentData && contentData.length > 0) {
-          document = {
-            ...document,
-            content: contentData.map(c => c.content).join(' '),
-          };
+        if (docError) {
+          console.warn('Error fetching document:', docError);
+        } else {
+          document = docData;
+
+          if (document?.custom_metadata?.openalex_id) {
+            workId = document.custom_metadata.openalex_id;
+          } else if (document?.custom_metadata?.doi) {
+            workId = document.custom_metadata.doi;
+          }
+
+          // If no content in user_books, try document_content table
+          if (!document?.content) {
+            try {
+              const { data: contentData, error: contentError } = await supabase
+                .from('document_content')
+                .select('content')
+                .eq('book_id', sourceDocumentId)
+                .eq('user_id', userId)
+                .order('chunk_index', { ascending: true })
+                .limit(3); // Get first 3 chunks (usually contains abstract/intro)
+
+              if (contentError) {
+                console.warn('Error fetching document content:', contentError);
+              } else if (contentData && contentData.length > 0) {
+                document = {
+                  ...document,
+                  content: contentData.map(c => c.content).join(' '),
+                };
+              }
+            } catch (error) {
+              console.warn('Error fetching document content chunks:', error);
+            }
+          }
         }
+      } catch (error) {
+        console.warn('Error fetching document data:', error);
       }
     }
 
     // Fetch recommendations from OpenAlex
     let recommendations: any[] = [];
 
-    // If we have a workId, use citation graph (related works)
-    if (workId) {
-      // Normalize OpenAlex ID (handle both full URL and ID)
-      if (workId.startsWith('https://')) {
-        workId = workId.split('/').pop() || workId;
-      }
+    try {
+      // If we have a workId, use citation graph (related works)
+      if (workId) {
+        // Normalize OpenAlex ID (handle both full URL and ID)
+        if (workId.startsWith('https://')) {
+          workId = workId.split('/').pop() || workId;
+        }
 
-      if (recommendationType === 'related_works') {
-        recommendations = await getRelatedWorks(workId, limit, email);
-      } else if (recommendationType === 'cited_by') {
-        recommendations = await getCitedBy(workId, limit, email);
-      } else {
-        recommendations = await getRelatedWorks(workId, limit, email);
-      }
-    } 
-    // If no workId but we have document content, use content-based search
-    else if (sourceDocumentId && document) {
-      // Try vector search first if user has interest embedding
-      if (userInterestEmbedding) {
-        const vectorResults = await searchPapersByVectorSimilarity(userInterestEmbedding, limit * 2);
-        if (vectorResults && vectorResults.length > 0) {
-          recommendations = vectorResults;
+        if (recommendationType === 'related_works') {
+          recommendations = await getRelatedWorks(workId, limit, email);
+        } else if (recommendationType === 'cited_by') {
+          recommendations = await getCitedBy(workId, limit, email);
         } else {
-          // Fallback to content-based search
+          recommendations = await getRelatedWorks(workId, limit, email);
+        }
+      } 
+      // If no workId but we have document content, use content-based search
+      else if (sourceDocumentId && document) {
+        // Try vector search first if user has interest embedding
+        if (userInterestEmbedding) {
+          try {
+            const vectorResults = await searchPapersByVectorSimilarity(userInterestEmbedding, limit * 2);
+            if (vectorResults && vectorResults.length > 0) {
+              recommendations = vectorResults;
+            } else {
+              // Fallback to content-based search
+              recommendations = await getContentBasedRecommendations(document, limit, email, interestProfile, userInterestEmbedding);
+            }
+          } catch (vectorError) {
+            console.warn('Error in vector similarity search, falling back to content-based:', vectorError);
+            recommendations = await getContentBasedRecommendations(document, limit, email, interestProfile, userInterestEmbedding);
+          }
+        } else {
           recommendations = await getContentBasedRecommendations(document, limit, email, interestProfile, userInterestEmbedding);
         }
-      } else {
-        recommendations = await getContentBasedRecommendations(document, limit, email, interestProfile, userInterestEmbedding);
+      } 
+      else {
+        return res.status(400).json({
+          error: 'Could not determine OpenAlex work ID and no document content available for content-based search.',
+        });
       }
-    } 
-    else {
-      return res.status(400).json({
-        error: 'Could not determine OpenAlex work ID and no document content available for content-based search.',
-      });
+    } catch (fetchError: any) {
+      console.error('Error fetching recommendations from OpenAlex:', fetchError);
+      // Return empty recommendations instead of failing completely
+      recommendations = [];
+      // If we have a document title, try a simple fallback search
+      if (document?.title && document.title.length > 10) {
+        try {
+          const fallbackUrl = `${OPENALEX_BASE_URL}/works?search=${encodeURIComponent(document.title)}&per-page=${limit}&sort=cited_by_count:desc${email ? `&mailto=${encodeURIComponent(email)}` : ''}`;
+          const fallbackResponse = await fetch(fallbackUrl, { headers: { Accept: 'application/json' } });
+          if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json();
+            recommendations = transformWorks(fallbackData.results || [], 'semantic');
+          }
+        } catch (fallbackError) {
+          console.warn('Fallback search also failed:', fallbackError);
+        }
+      }
     }
 
     // Enhance recommendations with interest-based scoring using embeddings
-    if (userInterestEmbedding) {
-      recommendations = await reRankWithEmbeddings(recommendations, userInterestEmbedding);
-    } else if (interestProfile && interestProfile.topConcepts.length > 0) {
-      // Fallback to text-based matching if no embedding available
-      recommendations = enhanceRecommendationsWithInterest(recommendations, interestProfile);
+    try {
+      if (userInterestEmbedding) {
+        recommendations = await reRankWithEmbeddings(recommendations, userInterestEmbedding);
+      } else if (interestProfile && interestProfile.topConcepts.length > 0) {
+        // Fallback to text-based matching if no embedding available
+        recommendations = enhanceRecommendationsWithInterest(recommendations, interestProfile);
+      }
+    } catch (error) {
+      console.warn('Error enhancing recommendations with interest profile, using original recommendations:', error);
+      // Continue with unenhanced recommendations
     }
 
     // Cache recommendations in database if we have a source document
     if (sourceDocumentId && recommendations.length > 0) {
-      await cacheRecommendations(userId, sourceDocumentId, recommendations);
+      try {
+        await cacheRecommendations(userId, sourceDocumentId, recommendations);
+      } catch (error) {
+        console.warn('Error caching recommendations:', error);
+        // Continue even if caching fails
+      }
     }
 
     // Track view for all recommended papers
     if (recommendations.length > 0) {
-      const openalexIds = recommendations.map(r => r.openalex_id).filter(Boolean);
-      await trackPaperViews(userId, openalexIds).catch(err => 
-        console.warn('Failed to track paper views:', err)
-      );
+      try {
+        const openalexIds = recommendations.map(r => r.openalex_id).filter(Boolean);
+        await trackPaperViews(userId, openalexIds).catch(err => 
+          console.warn('Failed to track paper views:', err)
+        );
+      } catch (error) {
+        console.warn('Error tracking paper views:', error);
+        // Continue even if tracking fails
+      }
     }
 
     return res.status(200).json({
@@ -466,66 +531,82 @@ async function reRankWithEmbeddings(
   try {
     const scored = await Promise.all(
       recommendations.map(async (rec) => {
-        // Create text representation of paper
-        const paperText = `${rec.title || ''} ${rec.abstract || ''}`.trim();
-        
-        if (!paperText || paperText.length < 10) {
-          return { ...rec, embedding_similarity: 0 };
-        }
+        try {
+          // Create text representation of paper
+          const paperText = `${rec.title || ''} ${rec.abstract || ''}`.trim();
+          
+          if (!paperText || paperText.length < 10) {
+            return { ...rec, embedding_similarity: 0 };
+          }
 
-        // Check if paper has pre-computed embedding
-        let paperEmbedding: number[] | null = null;
-        const hasPrecomputed = await paperEmbeddingService.hasPrecomputedEmbedding(rec.openalex_id);
-        
-        if (hasPrecomputed) {
-          // Get pre-computed embedding from database
-          const { data } = await supabase
-            .from('paper_recommendations')
-            .select('embedding')
-            .eq('openalex_id', rec.openalex_id)
-            .not('embedding', 'is', null)
-            .limit(1)
-            .single();
+          // Check if paper has pre-computed embedding
+          let paperEmbedding: number[] | null = null;
+          try {
+            const hasPrecomputed = await paperEmbeddingService.hasPrecomputedEmbedding(rec.openalex_id);
+            
+            if (hasPrecomputed) {
+              // Get pre-computed embedding from database
+              const { data, error } = await supabase
+                .from('paper_recommendations')
+                .select('embedding')
+                .eq('openalex_id', rec.openalex_id)
+                .not('embedding', 'is', null)
+                .limit(1)
+                .maybeSingle(); // Use maybeSingle to avoid errors if no record found
 
-          if (data?.embedding) {
+              if (error) {
+                console.warn(`Error fetching embedding for ${rec.openalex_id}:`, error);
+              } else if (data?.embedding) {
+                try {
+                  paperEmbedding = JSON.parse(data.embedding);
+                } catch (e) {
+                  console.warn(`Failed to parse pre-computed embedding for ${rec.openalex_id}:`, e);
+                }
+              }
+            }
+          } catch (error) {
+            console.warn(`Error checking precomputed embedding for ${rec.openalex_id}:`, error);
+          }
+
+          // If no pre-computed embedding, try to get it (but don't generate on-demand to avoid delays)
+          if (!paperEmbedding) {
             try {
-              paperEmbedding = JSON.parse(data.embedding);
-            } catch (e) {
-              console.warn(`Failed to parse pre-computed embedding for ${rec.openalex_id}`);
+              paperEmbedding = await paperEmbeddingService.getEmbedding(rec.openalex_id, false);
+            } catch (error) {
+              console.warn(`Error getting embedding for ${rec.openalex_id}:`, error);
             }
           }
-        }
 
-        // If no pre-computed embedding, generate on-demand (but prefer pre-computed for performance)
-        if (!paperEmbedding) {
-          paperEmbedding = await paperEmbeddingService.getEmbedding(rec.openalex_id, false);
-        }
+          if (!paperEmbedding) {
+            return { ...rec, embedding_similarity: 0 };
+          }
 
-        if (!paperEmbedding) {
+          // Calculate cosine similarity
+          const similarity = embeddingService.cosineSimilarity(
+            userInterestEmbedding,
+            paperEmbedding
+          );
+
+          // Combine original score with embedding similarity
+          const originalScore = rec.recommendation_score || 50;
+          const embeddingBoost = similarity * 100; // Convert 0-1 to 0-100
+          
+          // Weighted combination: 60% original, 40% embedding similarity
+          const finalScore = (originalScore * 0.6) + (embeddingBoost * 0.4);
+
+          return {
+            ...rec,
+            embedding_similarity: similarity,
+            recommendation_score: Math.min(100, Math.max(0, finalScore)),
+            recommendation_reason: similarity > 0.7 
+              ? `${rec.recommendation_reason || 'Recommended'} (highly aligned with your interests)`
+              : rec.recommendation_reason
+          };
+        } catch (error) {
+          // If individual recommendation processing fails, return it unchanged
+          console.warn(`Error processing recommendation ${rec.openalex_id}:`, error);
           return { ...rec, embedding_similarity: 0 };
         }
-
-        // Calculate cosine similarity
-        const similarity = embeddingService.cosineSimilarity(
-          userInterestEmbedding,
-          paperEmbedding
-        );
-
-        // Combine original score with embedding similarity
-        const originalScore = rec.recommendation_score || 50;
-        const embeddingBoost = similarity * 100; // Convert 0-1 to 0-100
-        
-        // Weighted combination: 60% original, 40% embedding similarity
-        const finalScore = (originalScore * 0.6) + (embeddingBoost * 0.4);
-
-        return {
-          ...rec,
-          embedding_similarity: similarity,
-          recommendation_score: Math.min(100, Math.max(0, finalScore)),
-          recommendation_reason: similarity > 0.7 
-            ? `${rec.recommendation_reason || 'Recommended'} (highly aligned with your interests)`
-            : rec.recommendation_reason
-        };
       })
     );
 
@@ -795,110 +876,124 @@ Each query should be 3-10 words and optimized for academic paper search.`;
  * Get related works from OpenAlex
  */
 async function getRelatedWorks(workId: string, limit: number, email?: string): Promise<any[]> {
-  // First get the seed work
-  let seedUrl = `${OPENALEX_BASE_URL}/works/${workId}`;
-  if (email) {
-    seedUrl += `?mailto=${encodeURIComponent(email)}`;
-  }
-
-  const seedResponse = await fetch(seedUrl, {
-    headers: { Accept: 'application/json' },
-  });
-
-  if (!seedResponse.ok) {
-    const errorText = await seedResponse.text().catch(() => 'Unknown error');
-    throw new Error(`Failed to fetch seed work: ${seedResponse.status} - ${errorText.substring(0, 100)}`);
-  }
-
-  const seedResponseText = await seedResponse.text();
-  if (!seedResponseText || seedResponseText.trim().length === 0) {
-    throw new Error('Empty response from OpenAlex');
-  }
-
-  let seedData;
   try {
-    seedData = JSON.parse(seedResponseText);
-  } catch (parseError) {
-    console.error('Failed to parse seed work response:', seedResponseText.substring(0, 200));
-    throw new Error('Invalid JSON response from OpenAlex');
-  }
-  const relatedWorks = seedData.related_works || [];
+    // First get the seed work
+    let seedUrl = `${OPENALEX_BASE_URL}/works/${workId}`;
+    if (email) {
+      seedUrl += `?mailto=${encodeURIComponent(email)}`;
+    }
 
-  if (relatedWorks.length === 0) {
+    const seedResponse = await fetch(seedUrl, {
+      headers: { Accept: 'application/json' },
+    });
+
+    if (!seedResponse.ok) {
+      const errorText = await seedResponse.text().catch(() => 'Unknown error');
+      console.warn(`Failed to fetch seed work: ${seedResponse.status} - ${errorText.substring(0, 100)}`);
+      return [];
+    }
+
+    const seedResponseText = await seedResponse.text();
+    if (!seedResponseText || seedResponseText.trim().length === 0) {
+      console.warn('Empty response from OpenAlex for seed work');
+      return [];
+    }
+
+    let seedData;
+    try {
+      seedData = JSON.parse(seedResponseText);
+    } catch (parseError) {
+      console.error('Failed to parse seed work response:', seedResponseText.substring(0, 200));
+      return [];
+    }
+    const relatedWorks = seedData.related_works || [];
+
+    if (relatedWorks.length === 0) {
+      return [];
+    }
+
+    // Extract IDs
+    const ids = relatedWorks
+      .slice(0, Math.min(limit, 25))
+      .map((url: string) => url.split('/').pop())
+      .filter(Boolean);
+
+    if (ids.length === 0) {
+      return [];
+    }
+
+    // Fetch related works
+    const filter = `ids.openalex:${ids.join('|')}`;
+    const url = `${OPENALEX_BASE_URL}/works?filter=${filter}&per-page=${limit}`;
+    const worksUrl = email ? `${url}&mailto=${encodeURIComponent(email)}` : url;
+
+    const response = await fetch(worksUrl, {
+      headers: { Accept: 'application/json' },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.warn(`Failed to fetch related works: ${response.status} - ${errorText.substring(0, 100)}`);
+      return [];
+    }
+
+    const responseText = await response.text();
+    if (!responseText || responseText.trim().length === 0) {
+      return []; // Return empty array if no content
+    }
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse related works response:', responseText.substring(0, 200));
+      return []; // Return empty array on parse error
+    }
+
+    return transformWorks(data.results || [], 'related_works');
+  } catch (error) {
+    console.error('Error in getRelatedWorks:', error);
     return [];
   }
-
-  // Extract IDs
-  const ids = relatedWorks
-    .slice(0, Math.min(limit, 25))
-    .map((url: string) => url.split('/').pop())
-    .filter(Boolean);
-
-  if (ids.length === 0) {
-    return [];
-  }
-
-  // Fetch related works
-  const filter = `ids.openalex:${ids.join('|')}`;
-  const url = `${OPENALEX_BASE_URL}/works?filter=${filter}&per-page=${limit}`;
-  const worksUrl = email ? `${url}&mailto=${encodeURIComponent(email)}` : url;
-
-  const response = await fetch(worksUrl, {
-    headers: { Accept: 'application/json' },
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`Failed to fetch related works: ${response.status} - ${errorText.substring(0, 100)}`);
-  }
-
-  const responseText = await response.text();
-  if (!responseText || responseText.trim().length === 0) {
-    return []; // Return empty array if no content
-  }
-
-  let data;
-  try {
-    data = JSON.parse(responseText);
-  } catch (parseError) {
-    console.error('Failed to parse related works response:', responseText.substring(0, 200));
-    return []; // Return empty array on parse error
-  }
-
-  return transformWorks(data.results || [], 'related_works');
 }
 
 /**
  * Get papers that cite the seed paper
  */
 async function getCitedBy(workId: string, limit: number, email?: string): Promise<any[]> {
-  const filter = `cites:${workId}`;
-  const url = `${OPENALEX_BASE_URL}/works?filter=${filter}&per-page=${limit}&sort=cited_by_count:desc`;
-  const worksUrl = email ? `${url}&mailto=${encodeURIComponent(email)}` : url;
-
-  const response = await fetch(worksUrl, {
-    headers: { Accept: 'application/json' },
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`Failed to fetch cited by: ${response.status} - ${errorText.substring(0, 100)}`);
-  }
-
-  const responseText = await response.text();
-  if (!responseText || responseText.trim().length === 0) {
-    return []; // Return empty array if no content
-  }
-
-  let data;
   try {
-    data = JSON.parse(responseText);
-  } catch (parseError) {
-    console.error('Failed to parse cited by response:', responseText.substring(0, 200));
-    return []; // Return empty array on parse error
-  }
+    const filter = `cites:${workId}`;
+    const url = `${OPENALEX_BASE_URL}/works?filter=${filter}&per-page=${limit}&sort=cited_by_count:desc`;
+    const worksUrl = email ? `${url}&mailto=${encodeURIComponent(email)}` : url;
 
-  return transformWorks(data.results || [], 'cited_by');
+    const response = await fetch(worksUrl, {
+      headers: { Accept: 'application/json' },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.warn(`Failed to fetch cited by: ${response.status} - ${errorText.substring(0, 100)}`);
+      return [];
+    }
+
+    const responseText = await response.text();
+    if (!responseText || responseText.trim().length === 0) {
+      return []; // Return empty array if no content
+    }
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse cited by response:', responseText.substring(0, 200));
+      return []; // Return empty array on parse error
+    }
+
+    return transformWorks(data.results || [], 'cited_by');
+  } catch (error) {
+    console.error('Error in getCitedBy:', error);
+    return [];
+  }
 }
 
 /**
