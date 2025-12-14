@@ -571,52 +571,84 @@ async function reRankWithEmbeddings(
           }
 
           // Check if paper has pre-computed embedding
-          let paperEmbedding: number[] | null = null;
-          try {
-            const hasPrecomputed = await paperEmbeddingService.hasPrecomputedEmbedding(rec.openalex_id);
-            
-            if (hasPrecomputed) {
-              // Get pre-computed embedding from database
-              const { data, error } = await supabase
-                .from('paper_recommendations')
-                .select('embedding')
-                .eq('openalex_id', rec.openalex_id)
-                .not('embedding', 'is', null)
-                .limit(1)
-                .maybeSingle(); // Use maybeSingle to avoid errors if no record found
+          // Skip embedding lookup entirely if openalex_id is missing or invalid
+          if (!rec.openalex_id || typeof rec.openalex_id !== 'string' || rec.openalex_id.length === 0) {
+            return { ...rec, embedding_similarity: 0 };
+          }
 
-              if (error) {
-                console.warn(`Error fetching embedding for ${rec.openalex_id}:`, error);
-              } else if (data?.embedding) {
-                try {
-                  paperEmbedding = JSON.parse(data.embedding);
-                } catch (e) {
-                  console.warn(`Failed to parse pre-computed embedding for ${rec.openalex_id}:`, e);
-                }
+          let paperEmbedding: number[] | null = null;
+          
+          // First, try to get embedding directly from database (faster and more reliable)
+          try {
+            const { data, error } = await supabase
+              .from('paper_recommendations')
+              .select('embedding')
+              .eq('openalex_id', rec.openalex_id)
+              .not('embedding', 'is', null)
+              .limit(1)
+              .maybeSingle(); // Use maybeSingle to avoid errors if no record found
+
+            if (error) {
+              console.warn(`Error fetching embedding for ${rec.openalex_id}:`, error);
+            } else if (data?.embedding) {
+              try {
+                paperEmbedding = JSON.parse(data.embedding);
+              } catch (e) {
+                console.warn(`Failed to parse pre-computed embedding for ${rec.openalex_id}:`, e);
               }
             }
           } catch (error) {
-            console.warn(`Error checking precomputed embedding for ${rec.openalex_id}:`, error);
+            console.warn(`Error fetching embedding from database for ${rec.openalex_id}:`, error);
           }
 
-          // If no pre-computed embedding, try to get it (but don't generate on-demand to avoid delays)
-          if (!paperEmbedding) {
-            try {
-              paperEmbedding = await paperEmbeddingService.getEmbedding(rec.openalex_id, false);
-            } catch (error) {
-              console.warn(`Error getting embedding for ${rec.openalex_id}:`, error);
-            }
-          }
+          // Only use paperEmbeddingService as a last resort, and wrap it very carefully
+          // Skip this to avoid potential issues with service initialization
+          // if (!paperEmbedding) {
+          //   try {
+          //     paperEmbedding = await paperEmbeddingService.getEmbedding(rec.openalex_id, false);
+          //   } catch (error) {
+          //     console.warn(`Error getting embedding via service for ${rec.openalex_id}:`, error);
+          //   }
+          // }
 
           if (!paperEmbedding) {
             return { ...rec, embedding_similarity: 0 };
           }
 
+          // Validate embeddings before calculating similarity
+          if (!Array.isArray(paperEmbedding) || paperEmbedding.length === 0) {
+            console.warn(`Invalid paper embedding for ${rec.openalex_id}`);
+            return { ...rec, embedding_similarity: 0 };
+          }
+
+          if (!Array.isArray(userInterestEmbedding) || userInterestEmbedding.length === 0) {
+            console.warn('Invalid user interest embedding');
+            return { ...rec, embedding_similarity: 0 };
+          }
+
+          // Ensure embeddings have the same length
+          if (paperEmbedding.length !== userInterestEmbedding.length) {
+            console.warn(`Embedding dimension mismatch: paper=${paperEmbedding.length}, user=${userInterestEmbedding.length}`);
+            return { ...rec, embedding_similarity: 0 };
+          }
+
           // Calculate cosine similarity
-          const similarity = embeddingService.cosineSimilarity(
-            userInterestEmbedding,
-            paperEmbedding
-          );
+          let similarity = 0;
+          try {
+            similarity = embeddingService.cosineSimilarity(
+              userInterestEmbedding,
+              paperEmbedding
+            );
+            
+            // Validate similarity result
+            if (isNaN(similarity) || !isFinite(similarity)) {
+              console.warn(`Invalid similarity result for ${rec.openalex_id}: ${similarity}`);
+              similarity = 0;
+            }
+          } catch (error) {
+            console.warn(`Error calculating cosine similarity for ${rec.openalex_id}:`, error);
+            similarity = 0;
+          }
 
           // Combine original score with embedding similarity
           const originalScore = rec.recommendation_score || 50;
