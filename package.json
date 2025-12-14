@@ -59,7 +59,7 @@
     "docx": "^9.5.1",
     "file-saver": "^2.0.5",
     "formidable": "^3.5.4",
-    "framer-motion": "^10.18.0",
+    "framer-motion": "^12.23.26",
     "googleapis": "^160.0.0",
     "howler": "^2.2.4",
     "html-docx-js-typescript": "^0.1.5",
