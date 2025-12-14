@@ -32,61 +32,85 @@ function getGeminiClient() {
  * Main handler
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Enable CORS
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type');
+  try {
+    // Enable CORS
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
 
-  const action = (req.body?.action || req.query.action) as string;
+    const action = (req.body?.action || req.query.action) as string;
 
-  // If no action provided, return available actions
-  if (!action) {
-    return res.status(400).json({
-      error: 'Action parameter required',
-      validActions: ['get-recommendations', 'search', 'update-feedback'],
-      usage: {
-        'get-recommendations': 'POST /api/recommendations?action=get-recommendations',
-        'search': 'POST /api/recommendations?action=search',
-        'update-feedback': 'POST /api/recommendations?action=update-feedback',
-      },
-    });
-  }
-
-  // Authenticate user
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-  if (authError || !user) {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-
-  // Route based on action
-  switch (action) {
-    case 'get-recommendations':
-      return handleGetRecommendations(req, res, user.id);
-    case 'search':
-      return handleSearch(req, res, user.id);
-    case 'update-feedback':
-      return handleUpdateFeedback(req, res, user.id);
-    case 'track-view':
-      return handleTrackInteraction(req, res, user.id, 'view');
-    case 'track-click':
-      return handleTrackInteraction(req, res, user.id, 'click');
-    case 'track-save':
-      return handleTrackInteraction(req, res, user.id, 'save');
-    default:
+    // If no action provided, return available actions
+    if (!action) {
       return res.status(400).json({
-        error: 'Invalid action',
-        validActions: ['get-recommendations', 'search', 'update-feedback', 'track-view', 'track-click', 'track-save'],
+        error: 'Action parameter required',
+        validActions: ['get-recommendations', 'search', 'update-feedback'],
+        usage: {
+          'get-recommendations': 'POST /api/recommendations?action=get-recommendations',
+          'search': 'POST /api/recommendations?action=search',
+          'update-feedback': 'POST /api/recommendations?action=update-feedback',
+        },
       });
+    }
+
+    // Authenticate user
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    let user;
+    try {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !authUser) {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
+      user = authUser;
+    } catch (authErr: any) {
+      console.error('Authentication error:', authErr);
+      return res.status(401).json({ error: 'Authentication failed' });
+    }
+
+    // Route based on action
+    try {
+      switch (action) {
+        case 'get-recommendations':
+          return await handleGetRecommendations(req, res, user.id);
+        case 'search':
+          return await handleSearch(req, res, user.id);
+        case 'update-feedback':
+          return await handleUpdateFeedback(req, res, user.id);
+        case 'track-view':
+          return await handleTrackInteraction(req, res, user.id, 'view');
+        case 'track-click':
+          return await handleTrackInteraction(req, res, user.id, 'click');
+        case 'track-save':
+          return await handleTrackInteraction(req, res, user.id, 'save');
+        default:
+          return res.status(400).json({
+            error: 'Invalid action',
+            validActions: ['get-recommendations', 'search', 'update-feedback', 'track-view', 'track-click', 'track-save'],
+          });
+      }
+    } catch (routeError: any) {
+      console.error(`Error handling action ${action}:`, routeError);
+      return res.status(500).json({
+        error: 'Internal server error',
+        message: routeError.message || 'An unexpected error occurred',
+      });
+    }
+  } catch (error: any) {
+    // Top-level error handler - catch any unhandled errors
+    console.error('Unhandled error in recommendations API:', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: error.message || 'An unexpected error occurred',
+    });
   }
 }
 
@@ -424,17 +448,24 @@ async function handleUpdateFeedback(
 
     // Track save if savedToLibrary is true
     if (savedToLibrary) {
-      const { data: recData } = await supabase
-        .from('paper_recommendations')
-        .select('openalex_id')
-        .eq('id', recommendationId)
-        .eq('user_id', userId)
-        .single();
+      try {
+        const { data: recData, error: recError } = await supabase
+          .from('paper_recommendations')
+          .select('openalex_id')
+          .eq('id', recommendationId)
+          .eq('user_id', userId)
+          .maybeSingle(); // Use maybeSingle to avoid errors if no record found
 
-      if (recData?.openalex_id) {
-        await trackPaperInteraction(userId, recData.openalex_id, 'save').catch(err =>
-          console.warn('Failed to track save:', err)
-        );
+        if (recError) {
+          console.warn('Error fetching recommendation for tracking:', recError);
+        } else if (recData?.openalex_id) {
+          await trackPaperInteraction(userId, recData.openalex_id, 'save').catch(err =>
+            console.warn('Failed to track save:', err)
+          );
+        }
+      } catch (error) {
+        console.warn('Error tracking save interaction:', error);
+        // Don't fail the request if tracking fails
       }
     }
 
