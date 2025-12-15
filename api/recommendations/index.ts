@@ -32,13 +32,20 @@ const OPENALEX_BASE_URL = 'https://api.openalex.org';
 
 /**
  * Initialize Gemini client
+ * Returns null if API key is missing or initialization fails
  */
-function getGeminiClient() {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('Gemini API key not configured');
+function getGeminiClient(): GoogleGenerativeAI | null {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      console.warn('Gemini API key not configured, skipping Gemini-based recommendations');
+      return null;
+    }
+    return new GoogleGenerativeAI(apiKey);
+  } catch (error) {
+    console.error('Failed to initialize Gemini client:', error);
+    return null;
   }
-  return new GoogleGenerativeAI(apiKey);
 }
 
 /**
@@ -111,18 +118,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
       }
     } catch (routeError: any) {
-      console.error(`Error handling action ${action}:`, routeError);
+      const errorCode = routeError.code || 'ROUTE_HANDLER_ERROR';
+      console.error(`Error handling action ${action}:`, {
+        action,
+        errorCode,
+        errorMessage: routeError.message,
+        errorStack: routeError.stack?.substring(0, 500),
+        userId: user?.id,
+      });
       return res.status(500).json({
         error: 'Internal server error',
         message: routeError.message || 'An unexpected error occurred',
+        errorCode,
       });
     }
   } catch (error: any) {
     // Top-level error handler - catch any unhandled errors
-    console.error('Unhandled error in recommendations API:', error);
+    const errorCode = error.code || 'TOP_LEVEL_ERROR';
+    console.error('Unhandled error in recommendations API:', {
+      errorCode,
+      errorMessage: error.message,
+      errorStack: error.stack?.substring(0, 500),
+      action: req.body?.action || req.query.action,
+    });
     return res.status(500).json({
       error: 'Internal server error',
       message: error.message || 'An unexpected error occurred',
+      errorCode,
     });
   }
 }
@@ -139,6 +161,15 @@ async function handleGetRecommendations(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const startTime = Date.now();
+  const MAX_EXECUTION_TIME = 25000; // 25 seconds for safety (Vercel Hobby: 10s, Pro: 60s)
+  
+  // Helper function to check if we're approaching timeout
+  const checkTimeout = (): boolean => {
+    const elapsed = Date.now() - startTime;
+    return elapsed > MAX_EXECUTION_TIME;
+  };
+
   try {
     const sourceDocumentId = req.query.sourceDocumentId || req.body?.sourceDocumentId;
     const openAlexId = req.query.openAlexId || req.body?.openAlexId;
@@ -152,10 +183,24 @@ async function handleGetRecommendations(
 
     // Get user interest profile to enhance recommendations
     let interestProfile: any = null;
+    const profileStartTime = Date.now();
     try {
       interestProfile = await userInterestProfileService.buildInterestProfile(userId, 30);
-    } catch (error) {
-      console.warn('Error building interest profile, continuing without it:', error);
+      const profileTime = Date.now() - profileStartTime;
+      if (profileTime > 5000) {
+        console.warn('Interest profile building took longer than expected', {
+          userId,
+          executionTimeMs: profileTime,
+        });
+      }
+    } catch (error: any) {
+      const profileTime = Date.now() - profileStartTime;
+      console.warn('Error building interest profile, continuing without it:', {
+        userId,
+        errorCode: error.code || 'INTEREST_PROFILE_ERROR',
+        errorMessage: error.message,
+        executionTimeMs: profileTime,
+      });
       interestProfile = null;
     }
 
@@ -285,17 +330,45 @@ async function handleGetRecommendations(
         });
       }
     } catch (fetchError: any) {
-      console.error('Error fetching recommendations from OpenAlex:', fetchError);
+      const fetchTime = Date.now() - startTime;
+      const errorCode = fetchError.code || fetchError.name || 'OPENALEX_FETCH_ERROR';
+      console.error('Error fetching recommendations from OpenAlex:', {
+        userId,
+        sourceDocumentId,
+        openAlexId: workId,
+        recommendationType,
+        errorCode,
+        errorMessage: fetchError.message,
+        executionTimeMs: fetchTime,
+        isTimeout: fetchError.name === 'AbortError',
+      });
       // Return empty recommendations instead of failing completely
       recommendations = [];
       // If we have a document title, try a simple fallback search
       if (document?.title && document.title.length > 10) {
         try {
           const fallbackUrl = `${OPENALEX_BASE_URL}/works?search=${encodeURIComponent(document.title)}&per-page=${limit}&sort=cited_by_count:desc${email ? `&mailto=${encodeURIComponent(email)}` : ''}`;
-          const fallbackResponse = await fetch(fallbackUrl, { headers: { Accept: 'application/json' } });
-          if (fallbackResponse.ok) {
-            const fallbackData = await fallbackResponse.json();
-            recommendations = transformWorks(fallbackData.results || [], 'semantic');
+          const fallbackController = new AbortController();
+          const fallbackTimeoutId = setTimeout(() => fallbackController.abort(), 10000);
+          
+          try {
+            const fallbackResponse = await fetch(fallbackUrl, {
+              headers: { Accept: 'application/json' },
+              signal: fallbackController.signal,
+            });
+            clearTimeout(fallbackTimeoutId);
+            
+            if (fallbackResponse.ok) {
+              const fallbackData = await fallbackResponse.json();
+              recommendations = transformWorks(fallbackData.results || [], 'semantic');
+            }
+          } catch (fetchError: any) {
+            clearTimeout(fallbackTimeoutId);
+            if (fetchError.name === 'AbortError') {
+              console.warn('Fallback search timed out');
+            } else {
+              throw fetchError;
+            }
           }
         } catch (fallbackError) {
           console.warn('Fallback search also failed:', fallbackError);
@@ -303,11 +376,26 @@ async function handleGetRecommendations(
       }
     }
 
+    // Check timeout before expensive operations
+    if (checkTimeout()) {
+      console.warn('Approaching timeout, skipping enhancement and returning basic recommendations');
+      return res.status(200).json({
+        recommendations: recommendations.slice(0, limit),
+        count: recommendations.length,
+        sourceDocumentId,
+        openAlexId: workId || null,
+        recommendationMethod: workId ? 'citation_graph' : 'content_based',
+        interestProfileUsed: false,
+        embeddingReRankingUsed: false,
+        timeoutWarning: true,
+      });
+    }
+
     // Enhance recommendations with interest-based scoring using embeddings
     try {
-      if (userInterestEmbedding) {
+      if (userInterestEmbedding && !checkTimeout()) {
         recommendations = await reRankWithEmbeddings(recommendations, userInterestEmbedding);
-      } else if (interestProfile && interestProfile.topConcepts.length > 0) {
+      } else if (interestProfile && interestProfile.topConcepts.length > 0 && !checkTimeout()) {
         // Fallback to text-based matching if no embedding available
         recommendations = enhanceRecommendationsWithInterest(recommendations, interestProfile);
       }
@@ -316,8 +404,8 @@ async function handleGetRecommendations(
       // Continue with unenhanced recommendations
     }
 
-    // Cache recommendations in database if we have a source document
-    if (sourceDocumentId && recommendations.length > 0) {
+    // Cache recommendations in database if we have a source document (skip if timeout approaching)
+    if (sourceDocumentId && recommendations.length > 0 && !checkTimeout()) {
       try {
         await cacheRecommendations(userId, sourceDocumentId, recommendations);
       } catch (error) {
@@ -326,8 +414,8 @@ async function handleGetRecommendations(
       }
     }
 
-    // Track view for all recommended papers
-    if (recommendations.length > 0) {
+    // Track view for all recommended papers (skip if timeout approaching)
+    if (recommendations.length > 0 && !checkTimeout()) {
       try {
         const openalexIds = recommendations.map(r => r.openalex_id).filter(Boolean);
         await trackPaperViews(userId, openalexIds).catch(err => 
@@ -339,20 +427,41 @@ async function handleGetRecommendations(
       }
     }
 
+    const executionTime = Date.now() - startTime;
     return res.status(200).json({
-      recommendations,
+      recommendations: recommendations.slice(0, limit),
       count: recommendations.length,
       sourceDocumentId,
       openAlexId: workId || null,
       recommendationMethod: workId ? 'citation_graph' : 'content_based',
       interestProfileUsed: !!interestProfile,
       embeddingReRankingUsed: !!userInterestEmbedding,
+      executionTimeMs: executionTime,
     });
   } catch (error: any) {
-    console.error('Error getting recommendations:', error);
+    const executionTime = Date.now() - startTime;
+    const errorCode = error.code || 'UNKNOWN_ERROR';
+    const errorContext = {
+      userId,
+      sourceDocumentId,
+      openAlexId,
+      recommendationType,
+      executionTimeMs: executionTime,
+      errorCode,
+      errorMessage: error.message,
+      errorStack: error.stack?.substring(0, 500), // Limit stack trace length
+    };
+    
+    console.error('Error getting recommendations:', {
+      ...errorContext,
+      error: error.message,
+    });
+    
     return res.status(500).json({
       error: 'Internal server error',
-      message: error.message,
+      message: error.message || 'An unexpected error occurred',
+      errorCode,
+      executionTimeMs: executionTime,
     });
   }
 }
@@ -383,9 +492,23 @@ async function handleSearch(
       url += `&mailto=${encodeURIComponent(email)}`;
     }
 
-    const response = await fetch(url, {
-      headers: { Accept: 'application/json' },
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    let response;
+    try {
+      response = await fetch(url, {
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        throw new Error('OpenAlex API timeout');
+      }
+      throw fetchError;
+    }
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
@@ -552,10 +675,17 @@ async function trackPaperInteraction(
  */
 async function trackPaperViews(userId: string, openalexIds: string[]): Promise<void> {
   try {
-    // Track views in batch
-    await Promise.all(
+    // Track views in batch using Promise.allSettled to handle partial failures
+    const results = await Promise.allSettled(
       openalexIds.map(id => trackPaperInteraction(userId, id, 'view'))
     );
+    
+    // Log any failures but don't throw
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.warn(`Failed to track view for paper ${openalexIds[index]}:`, result.reason);
+      }
+    });
   } catch (error) {
     console.error('Error tracking paper views:', error);
   }
@@ -577,7 +707,8 @@ async function reRankWithEmbeddings(
   const recommendationsToProcess = recommendations.slice(0, maxRecommendations);
   
   try {
-    const scored = await Promise.all(
+    // Use Promise.allSettled to handle partial failures gracefully
+    const scoredResults = await Promise.allSettled(
       recommendationsToProcess.map(async (rec) => {
         try {
           // Create text representation of paper
@@ -690,6 +821,17 @@ async function reRankWithEmbeddings(
       })
     );
 
+    // Extract successful results and handle failures
+    const scored = scoredResults.map((result, index) => {
+      if (result.status === 'fulfilled') {
+        return result.value;
+      } else {
+        // If promise was rejected, return the original recommendation with default similarity
+        console.warn(`Failed to process recommendation at index ${index}:`, result.reason);
+        return { ...recommendationsToProcess[index], embedding_similarity: 0 };
+      }
+    });
+
     // Sort by final score and combine with unprocessed recommendations
     const sortedScored = scored.sort((a, b) => b.recommendation_score - a.recommendation_score);
     
@@ -700,8 +842,14 @@ async function reRankWithEmbeddings(
     }));
     
     return [...sortedScored, ...unprocessed];
-  } catch (error) {
-    console.error('Error re-ranking with embeddings:', error);
+  } catch (error: any) {
+    const errorCode = error.code || 'EMBEDDING_RERANK_ERROR';
+    console.error('Error re-ranking with embeddings:', {
+      errorCode,
+      errorMessage: error.message,
+      recommendationsCount: recommendations.length,
+      hasUserEmbedding: !!userInterestEmbedding,
+    });
     // Return original recommendations if embedding fails
     return recommendations;
   }
@@ -794,8 +942,14 @@ async function searchPapersByVectorSimilarity(
         embedding_similarity: paper.similarity_score,
       };
     });
-  } catch (error) {
-    console.error('Error searching papers by vector similarity:', error);
+  } catch (error: any) {
+    const errorCode = error.code || 'VECTOR_SIMILARITY_SEARCH_ERROR';
+    console.error('Error searching papers by vector similarity:', {
+      errorCode,
+      errorMessage: error.message,
+      limit,
+      hasQueryEmbedding: !!queryEmbedding,
+    });
     return [];
   }
 }
@@ -813,6 +967,11 @@ async function getContentBasedRecommendations(
   try {
     // Use Gemini to intelligently extract search queries from the document
     const geminiClient = getGeminiClient();
+    if (!geminiClient) {
+      // Skip Gemini, use simple keyword extraction
+      return getSimpleKeywordRecommendations(document, limit, email);
+    }
+    
     const model = geminiClient.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // Prepare document content for analysis (first 10000 chars for context)
@@ -847,7 +1006,23 @@ Return ONLY a JSON array of search query strings, like this:
 
 Each query should be 3-10 words and optimized for academic paper search.`;
 
-    const result = await model.generateContent(prompt);
+    // Add timeout protection for Gemini API call (15 seconds)
+    let result;
+    try {
+      const geminiPromise = model.generateContent(prompt);
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Gemini API timeout after 15 seconds')), 15000)
+      );
+      
+      result = await Promise.race([geminiPromise, timeoutPromise]);
+    } catch (timeoutError: any) {
+      if (timeoutError.message?.includes('timeout')) {
+        console.warn('Gemini API call timed out, falling back to simple keyword extraction');
+        return getSimpleKeywordRecommendations(document, limit, email);
+      }
+      throw timeoutError;
+    }
+    
     const response = result.response;
     const text = response.text();
 
@@ -895,9 +1070,15 @@ Each query should be 3-10 words and optimized for academic paper search.`;
       }
 
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
         const response = await fetch(url, {
           headers: { Accept: 'application/json' },
+          signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
           console.error(`OpenAlex API error for query "${query}": ${response.status}`);
@@ -927,8 +1108,12 @@ Each query should be 3-10 words and optimized for academic paper search.`;
             }
           }
         }
-      } catch (error) {
-        console.error(`Error searching OpenAlex with query "${query}":`, error);
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.warn(`OpenAlex API timeout for query "${query}"`);
+        } else {
+          console.error(`Error searching OpenAlex with query "${query}":`, error);
+        }
         continue;
       }
     }
@@ -946,16 +1131,109 @@ Each query should be 3-10 words and optimized for academic paper search.`;
     
     return recommendations.slice(0, limit);
   } catch (error: any) {
-    console.error('Error in Gemini-based recommendations:', error);
-    // Fallback to simple search if Gemini fails
-    if (document.title && document.title.length > 10) {
-      const url = `${OPENALEX_BASE_URL}/works?search=${encodeURIComponent(document.title)}&per-page=${limit}&sort=cited_by_count:desc${email ? `&mailto=${encodeURIComponent(email)}` : ''}`;
-      const response = await fetch(url, { headers: { Accept: 'application/json' } });
-      if (response.ok) {
-        const data = await response.json();
-        return transformWorks(data.results || [], 'semantic');
-      }
+    const errorCode = error.code || error.name || 'GEMINI_RECOMMENDATIONS_ERROR';
+    console.error('Error in Gemini-based recommendations:', {
+      errorCode,
+      errorMessage: error.message,
+      isTimeout: error.message?.includes('timeout'),
+      documentTitle: document.title?.substring(0, 100),
+      hasContent: !!document.content,
+    });
+    // Fallback to simple keyword extraction
+    return getSimpleKeywordRecommendations(document, limit, email);
+  }
+}
+
+/**
+ * Get recommendations using simple keyword extraction (fallback when Gemini is unavailable)
+ */
+async function getSimpleKeywordRecommendations(
+  document: { title?: string; content?: string },
+  limit: number,
+  email?: string
+): Promise<any[]> {
+  try {
+    // Extract keywords from title and content
+    const title = document.title || '';
+    const content = document.content || '';
+    
+    // Simple keyword extraction: use title if available, otherwise extract from content
+    let searchQuery = '';
+    if (title && title.length > 10) {
+      // Use title as primary search query
+      searchQuery = title;
+    } else if (content && content.length > 50) {
+      // Extract first meaningful words from content
+      const words = content
+        .toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 4)
+        .slice(0, 5);
+      searchQuery = words.join(' ');
+    } else {
+      // Not enough content to generate search query
+      return [];
     }
+
+    if (!searchQuery || searchQuery.length < 5) {
+      return [];
+    }
+
+    // Search OpenAlex with the extracted query
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    try {
+      let url = `${OPENALEX_BASE_URL}/works?search=${encodeURIComponent(searchQuery)}&per-page=${limit}&sort=cited_by_count:desc`;
+      if (email) {
+        url += `&mailto=${encodeURIComponent(email)}`;
+      }
+
+      const response = await fetch(url, {
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.warn(`OpenAlex API error for simple keyword search: ${response.status}`);
+        return [];
+      }
+
+      const responseText = await response.text();
+      if (!responseText || responseText.trim().length === 0) {
+        return [];
+      }
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse OpenAlex response:', responseText.substring(0, 200));
+        return [];
+      }
+
+      return transformWorks(data.results || [], 'semantic');
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.warn('OpenAlex API timeout for simple keyword search');
+      } else {
+        console.error('Error in simple keyword search:', fetchError);
+      }
+      return [];
+    }
+  } catch (error: any) {
+    const errorCode = error.code || error.name || 'SIMPLE_KEYWORD_SEARCH_ERROR';
+    console.error('Error in getSimpleKeywordRecommendations:', {
+      errorCode,
+      errorMessage: error.message,
+      isTimeout: error.name === 'AbortError',
+      hasTitle: !!document.title,
+      hasContent: !!document.content,
+    });
     return [];
   }
 }
@@ -971,9 +1249,25 @@ async function getRelatedWorks(workId: string, limit: number, email?: string): P
       seedUrl += `?mailto=${encodeURIComponent(email)}`;
     }
 
-    const seedResponse = await fetch(seedUrl, {
-      headers: { Accept: 'application/json' },
-    });
+    const controller1 = new AbortController();
+    const timeoutId1 = setTimeout(() => controller1.abort(), 10000); // 10 second timeout
+    
+    let seedResponse;
+    try {
+      seedResponse = await fetch(seedUrl, {
+        headers: { Accept: 'application/json' },
+        signal: controller1.signal,
+      });
+      clearTimeout(timeoutId1);
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId1);
+      if (fetchError.name === 'AbortError') {
+        console.warn('OpenAlex API timeout while fetching seed work');
+      } else {
+        console.warn('Error fetching seed work:', fetchError);
+      }
+      return [];
+    }
 
     if (!seedResponse.ok) {
       const errorText = await seedResponse.text().catch(() => 'Unknown error');
@@ -1015,9 +1309,25 @@ async function getRelatedWorks(workId: string, limit: number, email?: string): P
     const url = `${OPENALEX_BASE_URL}/works?filter=${filter}&per-page=${limit}`;
     const worksUrl = email ? `${url}&mailto=${encodeURIComponent(email)}` : url;
 
-    const response = await fetch(worksUrl, {
-      headers: { Accept: 'application/json' },
-    });
+    const controller2 = new AbortController();
+    const timeoutId2 = setTimeout(() => controller2.abort(), 10000); // 10 second timeout
+    
+    let response;
+    try {
+      response = await fetch(worksUrl, {
+        headers: { Accept: 'application/json' },
+        signal: controller2.signal,
+      });
+      clearTimeout(timeoutId2);
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId2);
+      if (fetchError.name === 'AbortError') {
+        console.warn('OpenAlex API timeout while fetching related works');
+      } else {
+        console.warn('Error fetching related works:', fetchError);
+      }
+      return [];
+    }
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
@@ -1039,8 +1349,14 @@ async function getRelatedWorks(workId: string, limit: number, email?: string): P
     }
 
     return transformWorks(data.results || [], 'related_works');
-  } catch (error) {
-    console.error('Error in getRelatedWorks:', error);
+  } catch (error: any) {
+    const errorCode = error.code || error.name || 'GET_RELATED_WORKS_ERROR';
+    console.error('Error in getRelatedWorks:', {
+      errorCode,
+      errorMessage: error.message,
+      workId,
+      isTimeout: error.name === 'AbortError',
+    });
     return [];
   }
 }
@@ -1054,9 +1370,25 @@ async function getCitedBy(workId: string, limit: number, email?: string): Promis
     const url = `${OPENALEX_BASE_URL}/works?filter=${filter}&per-page=${limit}&sort=cited_by_count:desc`;
     const worksUrl = email ? `${url}&mailto=${encodeURIComponent(email)}` : url;
 
-    const response = await fetch(worksUrl, {
-      headers: { Accept: 'application/json' },
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    let response;
+    try {
+      response = await fetch(worksUrl, {
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.warn('OpenAlex API timeout while fetching cited by papers');
+      } else {
+        console.warn('Error fetching cited by papers:', fetchError);
+      }
+      return [];
+    }
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
@@ -1078,8 +1410,14 @@ async function getCitedBy(workId: string, limit: number, email?: string): Promis
     }
 
     return transformWorks(data.results || [], 'cited_by');
-  } catch (error) {
-    console.error('Error in getCitedBy:', error);
+  } catch (error: any) {
+    const errorCode = error.code || error.name || 'GET_CITED_BY_ERROR';
+    console.error('Error in getCitedBy:', {
+      errorCode,
+      errorMessage: error.message,
+      workId,
+      isTimeout: error.name === 'AbortError',
+    });
     return [];
   }
 }
