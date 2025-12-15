@@ -10,10 +10,23 @@ import { userInterestProfileService } from '../../lib/userInterestProfileService
 import { embeddingService } from '../../lib/embeddingService';
 import { paperEmbeddingService } from '../../lib/paperEmbeddingService';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Initialize Supabase client with error handling
+let supabase: ReturnType<typeof createClient>;
+try {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('Missing Supabase environment variables');
+    throw new Error('Supabase configuration missing');
+  }
+  
+  supabase = createClient(supabaseUrl, supabaseKey);
+} catch (error) {
+  console.error('Failed to initialize Supabase client:', error);
+  // Create a dummy client to prevent crashes, but operations will fail gracefully
+  supabase = createClient('https://dummy.supabase.co', 'dummy-key');
+}
 
 const OPENALEX_BASE_URL = 'https://api.openalex.org';
 
@@ -559,9 +572,13 @@ async function reRankWithEmbeddings(
     return recommendations;
   }
 
+  // Limit the number of recommendations processed to avoid timeout
+  const maxRecommendations = 50;
+  const recommendationsToProcess = recommendations.slice(0, maxRecommendations);
+  
   try {
     const scored = await Promise.all(
-      recommendations.map(async (rec) => {
+      recommendationsToProcess.map(async (rec) => {
         try {
           // Create text representation of paper
           const paperText = `${rec.title || ''} ${rec.abstract || ''}`.trim();
@@ -673,8 +690,16 @@ async function reRankWithEmbeddings(
       })
     );
 
-    // Sort by final score
-    return scored.sort((a, b) => b.recommendation_score - a.recommendation_score);
+    // Sort by final score and combine with unprocessed recommendations
+    const sortedScored = scored.sort((a, b) => b.recommendation_score - a.recommendation_score);
+    
+    // Add back any recommendations that weren't processed (with default similarity)
+    const unprocessed = recommendations.slice(maxRecommendations).map(rec => ({
+      ...rec,
+      embedding_similarity: 0
+    }));
+    
+    return [...sortedScored, ...unprocessed];
   } catch (error) {
     console.error('Error re-ranking with embeddings:', error);
     // Return original recommendations if embedding fails
