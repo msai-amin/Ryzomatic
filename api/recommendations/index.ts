@@ -12,20 +12,29 @@ import { paperEmbeddingService } from '../../lib/paperEmbeddingService';
 
 // Initialize Supabase client with error handling
 let supabase: ReturnType<typeof createClient>;
+let supabaseInitialized = false;
+
 try {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   
   if (!supabaseUrl || !supabaseKey) {
-    console.error('Missing Supabase environment variables');
-    throw new Error('Supabase configuration missing');
+    console.error('Missing Supabase environment variables - Supabase operations will fail');
+    // Create a dummy client to prevent crashes, but operations will fail gracefully
+    supabase = createClient('https://dummy.supabase.co', 'dummy-key');
+    supabaseInitialized = false;
+  } else {
+    supabase = createClient(supabaseUrl, supabaseKey);
+    supabaseInitialized = true;
   }
-  
-  supabase = createClient(supabaseUrl, supabaseKey);
-} catch (error) {
-  console.error('Failed to initialize Supabase client:', error);
+} catch (error: any) {
+  console.error('Failed to initialize Supabase client:', {
+    errorCode: error.code || 'SUPABASE_INIT_ERROR',
+    errorMessage: error.message,
+  });
   // Create a dummy client to prevent crashes, but operations will fail gracefully
   supabase = createClient('https://dummy.supabase.co', 'dummy-key');
+  supabaseInitialized = false;
 }
 
 const OPENALEX_BASE_URL = 'https://api.openalex.org';
@@ -86,14 +95,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let user;
     try {
+      if (!supabaseInitialized) {
+        console.error('Supabase not initialized - cannot authenticate');
+        return res.status(500).json({ 
+          error: 'Service configuration error',
+          errorCode: 'SUPABASE_NOT_INITIALIZED',
+        });
+      }
+      
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
       if (authError || !authUser) {
-        return res.status(401).json({ error: 'Invalid token' });
+        const errorCode = authError?.code || 'AUTH_ERROR';
+        console.warn('Authentication failed:', {
+          errorCode,
+          errorMessage: authError?.message || 'Invalid token',
+        });
+        return res.status(401).json({ 
+          error: 'Invalid token',
+          errorCode,
+        });
       }
       user = authUser;
     } catch (authErr: any) {
-      console.error('Authentication error:', authErr);
-      return res.status(401).json({ error: 'Authentication failed' });
+      const errorCode = authErr.code || 'AUTH_EXCEPTION';
+      console.error('Authentication error:', {
+        errorCode,
+        errorMessage: authErr.message,
+      });
+      return res.status(401).json({ 
+        error: 'Authentication failed',
+        errorCode,
+      });
     }
 
     // Route based on action
@@ -579,6 +611,13 @@ async function handleUpdateFeedback(
     });
 
     if (error) {
+      const errorCode = error.code || 'UPDATE_FEEDBACK_ERROR';
+      console.error('Error updating feedback:', {
+        errorCode,
+        errorMessage: error.message,
+        userId,
+        recommendationId,
+      });
       throw error;
     }
 
@@ -607,10 +646,16 @@ async function handleUpdateFeedback(
 
     return res.status(200).json({ success: data });
   } catch (error: any) {
-    console.error('Error updating feedback:', error);
+    const errorCode = error.code || 'UPDATE_FEEDBACK_HANDLER_ERROR';
+    console.error('Error updating feedback:', {
+      errorCode,
+      errorMessage: error.message,
+      userId,
+    });
     return res.status(500).json({
       error: 'Internal server error',
-      message: error.message,
+      message: error.message || 'Failed to update feedback',
+      errorCode,
     });
   }
 }
@@ -662,10 +707,27 @@ async function trackPaperInteraction(
       p_interaction_type: interactionType,
     });
 
-    if (error) throw error;
+    if (error) {
+      const errorCode = error.code || 'TRACK_INTERACTION_ERROR';
+      console.warn(`Error tracking ${interactionType} for paper ${openalexId}:`, {
+        errorCode,
+        errorMessage: error.message,
+        userId,
+        openalexId,
+        interactionType,
+      });
+      return false;
+    }
     return data || false;
-  } catch (error) {
-    console.error(`Error tracking ${interactionType} for paper ${openalexId}:`, error);
+  } catch (error: any) {
+    const errorCode = error.code || 'TRACK_INTERACTION_EXCEPTION';
+    console.error(`Error tracking ${interactionType} for paper ${openalexId}:`, {
+      errorCode,
+      errorMessage: error.message,
+      userId,
+      openalexId,
+      interactionType,
+    });
     return false;
   }
 }
@@ -905,7 +967,13 @@ async function searchPapersByVectorSimilarity(
     });
 
     if (error) {
-      console.error('Error in vector similarity search:', error);
+      const errorCode = error.code || 'VECTOR_SIMILARITY_SEARCH_ERROR';
+      console.error('Error in vector similarity search:', {
+        errorCode,
+        errorMessage: error.message,
+        limit,
+        hasQueryEmbedding: !!queryEmbedding,
+      });
       return [];
     }
 
@@ -1508,54 +1576,94 @@ async function cacheRecommendations(
   sourceDocumentId: string,
   recommendations: any[]
 ): Promise<void> {
-  // Get openalex_ids to check for pre-computed embeddings
-  const openalexIds = recommendations.map(rec => rec.openalex_id).filter(Boolean);
-  
-  // Fetch pre-computed embeddings for these papers (from any existing record)
-  let embeddingMap = new Map<string, string>();
-  if (openalexIds.length > 0) {
-    const { data: existingEmbeddings } = await supabase
-      .from('paper_recommendations')
-      .select('openalex_id, embedding, precomputed_at')
-      .in('openalex_id', openalexIds)
-      .not('embedding', 'is', null)
-      .limit(openalexIds.length);
+  try {
+    // Get openalex_ids to check for pre-computed embeddings
+    const openalexIds = recommendations.map(rec => rec.openalex_id).filter(Boolean);
+    
+    // Fetch pre-computed embeddings for these papers (from any existing record)
+    let embeddingMap = new Map<string, string>();
+    if (openalexIds.length > 0) {
+      try {
+        const { data: existingEmbeddings, error: embeddingError } = await supabase
+          .from('paper_recommendations')
+          .select('openalex_id, embedding, precomputed_at')
+          .in('openalex_id', openalexIds)
+          .not('embedding', 'is', null)
+          .limit(openalexIds.length);
 
-    if (existingEmbeddings) {
-      existingEmbeddings.forEach(rec => {
-        if (rec.embedding && rec.openalex_id) {
-          embeddingMap.set(rec.openalex_id, rec.embedding);
+        if (embeddingError) {
+          console.warn('Error fetching existing embeddings for cache:', {
+            errorCode: embeddingError.code || 'EMBEDDING_FETCH_ERROR',
+            errorMessage: embeddingError.message,
+          });
+        } else if (existingEmbeddings) {
+          existingEmbeddings.forEach(rec => {
+            if (rec.embedding && rec.openalex_id) {
+              embeddingMap.set(rec.openalex_id, rec.embedding);
+            }
+          });
         }
-      });
+      } catch (error: any) {
+        console.warn('Error fetching embeddings in cacheRecommendations:', {
+          errorCode: error.code || 'EMBEDDING_FETCH_EXCEPTION',
+          errorMessage: error.message,
+        });
+        // Continue without embeddings
+      }
     }
-  }
 
-  const inserts = recommendations.map((rec) => ({
-    user_id: userId,
-    source_document_id: sourceDocumentId,
-    openalex_id: rec.openalex_id,
-    title: rec.title,
-    authors: rec.authors,
-    abstract_inverted_index: rec.abstract ? createInvertedIndex(rec.abstract) : null,
-    publication_year: rec.publication_year,
-    cited_by_count: rec.cited_by_count,
-    open_access_url: rec.open_access_url,
-    doi: rec.doi,
-    venue: rec.venue,
-    topics: rec.topics,
-    recommendation_type: rec.recommendation_type,
-    recommendation_score: rec.recommendation_score,
-    recommendation_reason: rec.recommendation_reason,
-    // Copy pre-computed embedding if available
-    embedding: embeddingMap.get(rec.openalex_id) || null,
-    precomputed_at: embeddingMap.has(rec.openalex_id) ? new Date().toISOString() : null,
-  }));
+    const inserts = recommendations.map((rec) => ({
+      user_id: userId,
+      source_document_id: sourceDocumentId,
+      openalex_id: rec.openalex_id,
+      title: rec.title,
+      authors: rec.authors,
+      abstract_inverted_index: rec.abstract ? createInvertedIndex(rec.abstract) : null,
+      publication_year: rec.publication_year,
+      cited_by_count: rec.cited_by_count,
+      open_access_url: rec.open_access_url,
+      doi: rec.doi,
+      venue: rec.venue,
+      topics: rec.topics,
+      recommendation_type: rec.recommendation_type,
+      recommendation_score: rec.recommendation_score,
+      recommendation_reason: rec.recommendation_reason,
+      // Copy pre-computed embedding if available
+      embedding: embeddingMap.get(rec.openalex_id) || null,
+      precomputed_at: embeddingMap.has(rec.openalex_id) ? new Date().toISOString() : null,
+    }));
 
-  if (inserts.length > 0) {
-    await supabase.from('paper_recommendations').upsert(inserts, {
-      onConflict: 'user_id,openalex_id,source_document_id',
-      ignoreDuplicates: false,
+    if (inserts.length > 0) {
+      try {
+        const { error: upsertError } = await supabase.from('paper_recommendations').upsert(inserts, {
+          onConflict: 'user_id,openalex_id,source_document_id',
+          ignoreDuplicates: false,
+        });
+
+        if (upsertError) {
+          console.warn('Error upserting recommendations to cache:', {
+            errorCode: upsertError.code || 'UPSERT_ERROR',
+            errorMessage: upsertError.message,
+            insertsCount: inserts.length,
+          });
+        }
+      } catch (error: any) {
+        console.warn('Error in cache upsert operation:', {
+          errorCode: error.code || 'CACHE_UPSERT_ERROR',
+          errorMessage: error.message,
+        });
+        // Don't throw - caching is non-critical
+      }
+    }
+  } catch (error: any) {
+    console.error('Error in cacheRecommendations:', {
+      errorCode: error.code || 'CACHE_RECOMMENDATIONS_ERROR',
+      errorMessage: error.message,
+      userId,
+      sourceDocumentId,
+      recommendationsCount: recommendations.length,
     });
+    // Don't throw - caching is non-critical, function should continue
   }
 }
 
