@@ -16,7 +16,7 @@ export class EmbeddingService {
   async embed(text: string): Promise<number[]> {
     try {
       // Get auth token from Supabase session
-      const { supabase } = await import('./supabase');
+      const { supabase } = await import('./supabase.js');
       const { data: { session } } = await supabase.auth.getSession();
       
       const headers: Record<string, string> = {
