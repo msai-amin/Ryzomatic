@@ -62,7 +62,7 @@ function getGeminiClient(): GoogleGenerativeAI | null {
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/5111ef9c-52b7-4869-a626-5ece892fe019',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/recommendations/index.ts:63',message:'Handler entry',data:{method:req.method,hasAction:!!(req.body?.action||req.query.action)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  console.log('[DEBUG] Handler entry', { location: 'api/recommendations/index.ts:63', method: req.method, hasAction: !!(req.body?.action || req.query.action), timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' });
   // #endregion
   try {
     // Enable CORS
@@ -77,7 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const action = (req.body?.action || req.query.action) as string;
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/5111ef9c-52b7-4869-a626-5ece892fe019',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/recommendations/index.ts:75',message:'Action determined',data:{action},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    console.log('[DEBUG] Action determined', { location: 'api/recommendations/index.ts:75', action, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' });
     // #endregion
 
     // If no action provided, return available actions
@@ -102,7 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let user;
     try {
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/5111ef9c-52b7-4869-a626-5ece892fe019',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/recommendations/index.ts:98',message:'Auth check start',data:{supabaseInitialized,hasToken:!!token},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      console.log('[DEBUG] Auth check start', { location: 'api/recommendations/index.ts:98', supabaseInitialized, hasToken: !!token, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' });
       // #endregion
       if (!supabaseInitialized) {
         console.error('Supabase not initialized - cannot authenticate');
@@ -114,7 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/5111ef9c-52b7-4869-a626-5ece892fe019',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/recommendations/index.ts:106',message:'Auth result',data:{hasUser:!!authUser,hasError:!!authError},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      console.log('[DEBUG] Auth result', { location: 'api/recommendations/index.ts:106', hasUser: !!authUser, hasError: !!authError, authErrorCode: authError?.code, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' });
       // #endregion
       if (authError || !authUser) {
         const errorCode = authError?.code || 'AUTH_ERROR';
@@ -143,7 +143,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Route based on action
     try {
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/5111ef9c-52b7-4869-a626-5ece892fe019',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/recommendations/index.ts:133',message:'Routing to handler',data:{action,userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      console.log('[DEBUG] Routing to handler', { location: 'api/recommendations/index.ts:133', action, userId: user.id, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' });
       // #endregion
       switch (action) {
         case 'get-recommendations':
@@ -182,7 +182,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error: any) {
     // Top-level error handler - catch any unhandled errors
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/5111ef9c-52b7-4869-a626-5ece892fe019',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/recommendations/index.ts:145',message:'Top-level error caught',data:{errorCode:error.code||'TOP_LEVEL_ERROR',errorMessage:error.message,errorName:error.name,hasStack:!!error.stack},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    console.error('[DEBUG] Top-level error caught', { location: 'api/recommendations/index.ts:145', errorCode: error.code || 'TOP_LEVEL_ERROR', errorMessage: error.message, errorName: error.name, hasStack: !!error.stack, stack: error.stack?.substring(0, 500), timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' });
     // #endregion
     const errorCode = error.code || 'TOP_LEVEL_ERROR';
     console.error('Unhandled error in recommendations API:', {
@@ -231,7 +231,7 @@ async function handleGetRecommendations(
 
   try {
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/5111ef9c-52b7-4869-a626-5ece892fe019',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/recommendations/index.ts:217',message:'handleGetRecommendations entry',data:{hasSourceDoc:!!sourceDocumentId,hasOpenAlexId:!!openAlexId,recommendationType,limit},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    console.log('[DEBUG] handleGetRecommendations entry', { location: 'api/recommendations/index.ts:217', hasSourceDoc: !!sourceDocumentId, hasOpenAlexId: !!openAlexId, recommendationType, limit, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'E' });
     // #endregion
     if (!sourceDocumentId && !openAlexId) {
       return res.status(400).json({ error: 'sourceDocumentId or openAlexId required' });
@@ -488,7 +488,7 @@ async function handleGetRecommendations(
 
     const executionTime = Date.now() - startTime;
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/5111ef9c-52b7-4869-a626-5ece892fe019',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/recommendations/index.ts:470',message:'Success response',data:{recommendationsCount:recommendations.length,executionTimeMs:executionTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    console.log('[DEBUG] Success response', { location: 'api/recommendations/index.ts:470', recommendationsCount: recommendations.length, executionTimeMs: executionTime, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'E' });
     // #endregion
     return res.status(200).json({
       recommendations: recommendations.slice(0, limit),
@@ -502,6 +502,9 @@ async function handleGetRecommendations(
     });
   } catch (error: any) {
     const executionTime = Date.now() - startTime;
+    // #region agent log
+    console.error('[DEBUG] handleGetRecommendations error', { location: 'api/recommendations/index.ts:503', errorCode: error.code || 'UNKNOWN_ERROR', errorMessage: error.message, errorName: error.name, stack: error.stack?.substring(0, 500), executionTimeMs: executionTime, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'E' });
+    // #endregion
     const errorCode = error.code || 'UNKNOWN_ERROR';
     const errorContext = {
       userId,
