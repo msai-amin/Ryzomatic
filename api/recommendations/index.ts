@@ -6,8 +6,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { userInterestProfileService } from '../../lib/userInterestProfileService';
-import { embeddingService } from '../../lib/embeddingService';
+import { userInterestProfileService } from '../../lib/userInterestProfileService.js';
+import { embeddingService } from '../../lib/embeddingService.js';
 // Note: paperEmbeddingService removed - not used in this endpoint (only in commented code)
 
 // Initialize Supabase client with error handling
