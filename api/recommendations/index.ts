@@ -194,7 +194,9 @@ async function handleGetRecommendations(
   }
 
   const startTime = Date.now();
-  const MAX_EXECUTION_TIME = 25000; // 25 seconds for safety (Vercel Hobby: 10s, Pro: 60s)
+  // Vercel Hobby functions can time out at ~10s; keep a conservative budget so we can
+  // return partial results instead of hitting FUNCTION_INVOCATION_FAILED.
+  const MAX_EXECUTION_TIME = 8000; // 8 seconds safety budget
   
   // Helper function to check if we're approaching timeout
   const checkTimeout = (): boolean => {
@@ -381,7 +383,7 @@ async function handleGetRecommendations(
         try {
           const fallbackUrl = `${OPENALEX_BASE_URL}/works?search=${encodeURIComponent(document.title)}&per-page=${limit}&sort=cited_by_count:desc${email ? `&mailto=${encodeURIComponent(email)}` : ''}`;
           const fallbackController = new AbortController();
-          const fallbackTimeoutId = setTimeout(() => fallbackController.abort(), 10000);
+          const fallbackTimeoutId = setTimeout(() => fallbackController.abort(), 5000);
           
           try {
             const fallbackResponse = await fetch(fallbackUrl, {
@@ -525,7 +527,7 @@ async function handleSearch(
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
     
     let response;
     try {
@@ -1042,9 +1044,9 @@ async function getContentBasedRecommendations(
     
     const model = geminiClient.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-    // Prepare document content for analysis (first 10000 chars for context)
+    // Prepare document content for analysis (keep small for latency)
     const contentPreview = document.content
-      ? document.content.substring(0, 10000)
+      ? document.content.substring(0, 6000)
       : '';
 
     const title = document.title || 'Untitled Document';
@@ -1074,12 +1076,12 @@ Return ONLY a JSON array of search query strings, like this:
 
 Each query should be 3-10 words and optimized for academic paper search.`;
 
-    // Add timeout protection for Gemini API call (15 seconds)
+    // Add timeout protection for Gemini API call (keep under Vercel Hobby limits)
     let result;
     try {
       const geminiPromise = model.generateContent(prompt);
       const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Gemini API timeout after 15 seconds')), 15000)
+        setTimeout(() => reject(new Error('Gemini API timeout after 6 seconds')), 6000)
       );
       
       result = await Promise.race([geminiPromise, timeoutPromise]);
@@ -1250,7 +1252,7 @@ async function getSimpleKeywordRecommendations(
 
     // Search OpenAlex with the extracted query
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
     
     try {
       let url = `${OPENALEX_BASE_URL}/works?search=${encodeURIComponent(searchQuery)}&per-page=${limit}&sort=cited_by_count:desc`;
@@ -1318,7 +1320,7 @@ async function getRelatedWorks(workId: string, limit: number, email?: string): P
     }
 
     const controller1 = new AbortController();
-    const timeoutId1 = setTimeout(() => controller1.abort(), 10000); // 10 second timeout
+    const timeoutId1 = setTimeout(() => controller1.abort(), 5000); // 5 second timeout
     
     let seedResponse;
     try {
@@ -1378,7 +1380,7 @@ async function getRelatedWorks(workId: string, limit: number, email?: string): P
     const worksUrl = email ? `${url}&mailto=${encodeURIComponent(email)}` : url;
 
     const controller2 = new AbortController();
-    const timeoutId2 = setTimeout(() => controller2.abort(), 10000); // 10 second timeout
+    const timeoutId2 = setTimeout(() => controller2.abort(), 5000); // 5 second timeout
     
     let response;
     try {
@@ -1439,7 +1441,7 @@ async function getCitedBy(workId: string, limit: number, email?: string): Promis
     const worksUrl = email ? `${url}&mailto=${encodeURIComponent(email)}` : url;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
     
     let response;
     try {
