@@ -12,7 +12,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { paperEmbeddingMaintenanceService } from '../../../lib/paperEmbeddingMaintenanceService';
+import { paperEmbeddingMaintenanceService } from '../../../lib/paperEmbeddingMaintenanceService.js';
 
 /**
  * Main handler

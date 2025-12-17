@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import { memoryService } from '../../lib/memoryService';
-import { unifiedGraphService } from '../../lib/unifiedGraphService';
+import { memoryService } from '../../lib/memoryService.js';
+import { unifiedGraphService } from '../../lib/unifiedGraphService.js';
 import { checkRateLimit, getRateLimitHeaders } from '../../lib/rateLimiter.js';
 
 const supabase = createClient(

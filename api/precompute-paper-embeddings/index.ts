@@ -5,8 +5,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import { paperEmbeddingService } from '../../lib/paperEmbeddingService';
-import { paperPopularityService } from '../../lib/paperPopularityService';
+import { paperEmbeddingService } from '../../lib/paperEmbeddingService.js';
+import { paperPopularityService } from '../../lib/paperPopularityService.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,

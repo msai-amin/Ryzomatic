@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import { geminiService } from '../../lib/gemini';
-import { contextBuilder } from '../../lib/contextBuilder';
-import { memoryService } from '../../lib/memoryService';
+import { geminiService } from '../../lib/gemini.js';
+import { contextBuilder } from '../../lib/contextBuilder.js';
+import { memoryService } from '../../lib/memoryService.js';
 import { checkRateLimit, getRateLimitHeaders } from '../../lib/rateLimiter.js';
 
 const supabase = createClient(
