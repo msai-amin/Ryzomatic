@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { embeddingService } from './embeddingService';
+import { embeddingService } from './embeddingService.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Lazy-load Supabase client to prevent errors when imported on client side
