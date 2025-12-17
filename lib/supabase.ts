@@ -1,4 +1,4 @@
-import { supabase } from '../src/services/supabaseAuthService';
+import { supabase } from '../src/services/supabaseAuthService.js';
 
 // Re-export the single Supabase client instance
 export { supabase };
