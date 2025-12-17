@@ -8,7 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { userInterestProfileService } from '../../lib/userInterestProfileService';
 import { embeddingService } from '../../lib/embeddingService';
-import { paperEmbeddingService } from '../../lib/paperEmbeddingService';
+// Note: paperEmbeddingService removed - not used in this endpoint (only in commented code)
 
 // Initialize Supabase client with error handling
 let supabase: ReturnType<typeof createClient>;
@@ -813,15 +813,7 @@ async function reRankWithEmbeddings(
             console.warn(`Error fetching embedding from database for ${rec.openalex_id}:`, error);
           }
 
-          // Only use paperEmbeddingService as a last resort, and wrap it very carefully
-          // Skip this to avoid potential issues with service initialization
-          // if (!paperEmbedding) {
-          //   try {
-          //     paperEmbedding = await paperEmbeddingService.getEmbedding(rec.openalex_id, false);
-          //   } catch (error) {
-          //     console.warn(`Error getting embedding via service for ${rec.openalex_id}:`, error);
-          //   }
-          // }
+          // Note: paperEmbeddingService removed from imports - using direct DB queries only
 
           if (!paperEmbedding) {
             return { ...rec, embedding_similarity: 0 };
