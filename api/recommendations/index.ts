@@ -6,9 +6,39 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { userInterestProfileService } from '../../lib/userInterestProfileService';
-import { embeddingService } from '../../lib/embeddingService';
+// Lazy-load services to prevent module-level failures
 // Note: paperEmbeddingService removed - not used in this endpoint (only in commented code)
+let userInterestProfileService: any = null;
+let embeddingService: any = null;
+
+async function getServices() {
+  if (!userInterestProfileService || !embeddingService) {
+    try {
+      const userInterestModule = await import('../../lib/userInterestProfileService');
+      userInterestProfileService = userInterestModule.userInterestProfileService;
+      const embeddingModule = await import('../../lib/embeddingService');
+      embeddingService = embeddingModule.embeddingService;
+    } catch (importError: any) {
+      console.error('[CRITICAL] Failed to import services:', {
+        errorCode: importError.code || 'MODULE_IMPORT_ERROR',
+        errorMessage: importError.message,
+        stack: importError.stack?.substring(0, 500),
+      });
+      // Create fallback services to prevent crashes
+      if (!userInterestProfileService) {
+        userInterestProfileService = {
+          buildInterestProfile: async () => ({ topConcepts: [], interestVector: null }),
+        };
+      }
+      if (!embeddingService) {
+        embeddingService = {
+          formatForPgVector: (vec: number[]) => JSON.stringify(vec),
+        };
+      }
+    }
+  }
+  return { userInterestProfileService, embeddingService };
+}
 
 // Initialize Supabase client with error handling
 let supabase: ReturnType<typeof createClient>;
@@ -243,7 +273,8 @@ async function handleGetRecommendations(
     let interestProfile: any = null;
     const profileStartTime = Date.now();
     try {
-      interestProfile = await userInterestProfileService.buildInterestProfile(userId, 30);
+      const { userInterestProfileService: service } = await getServices();
+      interestProfile = await service.buildInterestProfile(userId, 30);
       const profileTime = Date.now() - profileStartTime;
       if (profileTime > 5000) {
         console.warn('Interest profile building took longer than expected', {
@@ -872,7 +903,8 @@ async function reRankWithEmbeddings(
           // Calculate cosine similarity
           let similarity = 0;
           try {
-            similarity = embeddingService.cosineSimilarity(
+            const { embeddingService: embService } = await getServices();
+            similarity = embService.cosineSimilarity(
               userInterestEmbedding,
               paperEmbedding
             );
@@ -985,7 +1017,8 @@ async function searchPapersByVectorSimilarity(
   limit: number = 20
 ): Promise<any[]> {
   try {
-    const embeddingString = embeddingService.formatForPgVector(queryEmbedding);
+    const { embeddingService: embService } = await getServices();
+    const embeddingString = embService.formatForPgVector(queryEmbedding);
 
     const { data, error } = await (supabase as any).rpc('find_similar_papers_by_embedding', {
       query_embedding: embeddingString,
