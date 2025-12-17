@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
-import { paperPopularityService } from './paperPopularityService';
-import { paperEmbeddingService } from './paperEmbeddingService';
-import { openAlexPopularPaperService } from './openAlexPopularPaperService';
+import { paperPopularityService } from './paperPopularityService.js';
+import { paperEmbeddingService } from './paperEmbeddingService.js';
+import { openAlexPopularPaperService } from './openAlexPopularPaperService.js';
 
 // Lazy-load Supabase client to prevent errors when imported on client side
 const getSupabaseClient = () => {
