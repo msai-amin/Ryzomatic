@@ -204,13 +204,14 @@ async function handleGetRecommendations(
     return elapsed > MAX_EXECUTION_TIME;
   };
 
-  try {
-    const sourceDocumentId = req.query.sourceDocumentId || req.body?.sourceDocumentId;
-    const openAlexId = req.query.openAlexId || req.body?.openAlexId;
-    const recommendationType = req.query.type || req.body?.type || 'related_works';
-    const limit = parseInt(req.query.limit as string) || parseInt(req.body?.limit) || 20;
-    const email = req.query.email || req.body?.email; // For polite pool
+  // Declare variables outside try block so they're available in catch
+  const sourceDocumentId = req.query.sourceDocumentId || req.body?.sourceDocumentId;
+  const openAlexId = req.query.openAlexId || req.body?.openAlexId;
+  const recommendationType = req.query.type || req.body?.type || 'related_works';
+  const limit = parseInt(req.query.limit as string) || parseInt(req.body?.limit) || 20;
+  const email = req.query.email || req.body?.email; // For polite pool
 
+  try {
     if (!sourceDocumentId && !openAlexId) {
       return res.status(400).json({ error: 'sourceDocumentId or openAlexId required' });
     }
@@ -253,11 +254,14 @@ async function handleGetRecommendations(
         
         if (profileError) {
           console.warn('Error fetching interest profile from database:', profileError);
-        } else if (profileData?.interest_embedding) {
-          try {
-            userInterestEmbedding = JSON.parse(profileData.interest_embedding);
-          } catch (e) {
-            console.warn('Failed to parse interest embedding:', e);
+        } else if (profileData) {
+          const profile = profileData as any;
+          if (profile.interest_embedding) {
+            try {
+              userInterestEmbedding = JSON.parse(profile.interest_embedding);
+            } catch (e) {
+              console.warn('Failed to parse interest embedding:', e);
+            }
           }
         }
       } catch (error) {
@@ -303,10 +307,10 @@ async function handleGetRecommendations(
 
               if (contentError) {
                 console.warn('Error fetching document content:', contentError);
-              } else if (contentData && contentData.length > 0) {
+              } else if (contentData && Array.isArray(contentData) && contentData.length > 0) {
                 document = {
                   ...document,
-                  content: contentData.map(c => c.content).join(' '),
+                  content: contentData.map((c: any) => c.content).join(' '),
                 };
               }
             } catch (error) {
@@ -605,7 +609,7 @@ async function handleUpdateFeedback(
       return res.status(400).json({ error: 'recommendationId and feedback required' });
     }
 
-    const { data, error } = await supabase.rpc('update_paper_recommendation_feedback', {
+    const { data, error } = await (supabase as any).rpc('update_paper_recommendation_feedback', {
       recommendation_id: recommendationId,
       user_id_param: userId,
       feedback,
@@ -635,8 +639,8 @@ async function handleUpdateFeedback(
 
         if (recError) {
           console.warn('Error fetching recommendation for tracking:', recError);
-        } else if (recData?.openalex_id) {
-          await trackPaperInteraction(userId, recData.openalex_id, 'save').catch(err =>
+        } else if (recData && (recData as any).openalex_id) {
+          await trackPaperInteraction(userId, (recData as any).openalex_id, 'save').catch(err =>
             console.warn('Failed to track save:', err)
           );
         }
@@ -703,7 +707,7 @@ async function trackPaperInteraction(
   interactionType: 'view' | 'click' | 'save'
 ): Promise<boolean> {
   try {
-    const { data, error } = await supabase.rpc('track_paper_interaction', {
+    const { data, error } = await (supabase as any).rpc('track_paper_interaction', {
       p_openalex_id: openalexId,
       p_user_id: userId,
       p_interaction_type: interactionType,
@@ -802,9 +806,9 @@ async function reRankWithEmbeddings(
 
             if (error) {
               console.warn(`Error fetching embedding for ${rec.openalex_id}:`, error);
-            } else if (data?.embedding) {
+            } else if (data && (data as any).embedding) {
               try {
-                paperEmbedding = JSON.parse(data.embedding);
+                paperEmbedding = JSON.parse((data as any).embedding);
               } catch (e) {
                 console.warn(`Failed to parse pre-computed embedding for ${rec.openalex_id}:`, e);
               }
@@ -954,7 +958,7 @@ async function searchPapersByVectorSimilarity(
   try {
     const embeddingString = embeddingService.formatForPgVector(queryEmbedding);
 
-    const { data, error } = await supabase.rpc('find_similar_papers_by_embedding', {
+    const { data, error } = await (supabase as any).rpc('find_similar_papers_by_embedding', {
       query_embedding: embeddingString,
       similarity_threshold: 0.7,
       result_limit: limit,
@@ -971,12 +975,12 @@ async function searchPapersByVectorSimilarity(
       return [];
     }
 
-    if (!data || data.length === 0) {
+    if (!data || !Array.isArray(data) || (data as any[]).length === 0) {
       return [];
     }
 
       // Transform to recommendation format
-    return data.map((paper: any) => {
+    return (data as any[]).map((paper: any) => {
       // Reconstruct abstract from inverted index if needed
       let abstract = '';
       if (paper.abstract_inverted_index) {
@@ -1590,8 +1594,8 @@ async function cacheRecommendations(
             errorCode: embeddingError.code || 'EMBEDDING_FETCH_ERROR',
             errorMessage: embeddingError.message,
           });
-        } else if (existingEmbeddings) {
-          existingEmbeddings.forEach(rec => {
+        } else if (existingEmbeddings && Array.isArray(existingEmbeddings)) {
+          existingEmbeddings.forEach((rec: any) => {
             if (rec.embedding && rec.openalex_id) {
               embeddingMap.set(rec.openalex_id, rec.embedding);
             }
@@ -1629,7 +1633,7 @@ async function cacheRecommendations(
 
     if (inserts.length > 0) {
       try {
-        const { error: upsertError } = await supabase.from('paper_recommendations').upsert(inserts, {
+        const { error: upsertError } = await supabase.from('paper_recommendations').upsert(inserts as any, {
           onConflict: 'user_id,openalex_id,source_document_id',
           ignoreDuplicates: false,
         });
