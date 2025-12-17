@@ -64,6 +64,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // #region agent log
   console.log('[DEBUG] Handler entry', { location: 'api/recommendations/index.ts:63', method: req.method, hasAction: !!(req.body?.action || req.query.action), timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' });
   // #endregion
+  
+  // Wrap entire handler in try-catch to catch any module-level or unhandled errors
   try {
     // Enable CORS
     res.setHeader('Access-Control-Allow-Credentials', 'true');
