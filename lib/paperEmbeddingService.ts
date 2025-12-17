@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import { embeddingService } from './embeddingService';
-import { openAlexPopularPaperService, OpenAlexPaper } from './openAlexPopularPaperService';
+import { embeddingService } from './embeddingService.js';
+import { openAlexPopularPaperService, OpenAlexPaper } from './openAlexPopularPaperService.js';
 
 // Lazy-load Supabase client to prevent errors when imported on client side
 const getSupabaseClient = () => {

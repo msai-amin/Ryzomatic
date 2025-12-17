@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import { embeddingService } from './embeddingService';
-import { geminiService } from './gemini';
+import { embeddingService } from './embeddingService.js';
+import { geminiService } from './gemini.js';
 
 // Lazy-load Supabase client to prevent errors when imported on client side
 const getSupabaseClient = () => {

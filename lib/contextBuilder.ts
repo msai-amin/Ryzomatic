@@ -1,5 +1,5 @@
-import { memoryService } from './memoryService';
-import { embeddingService } from './embeddingService';
+import { memoryService } from './memoryService.js';
+import { embeddingService } from './embeddingService.js';
 import { createClient } from '@supabase/supabase-js';
 
 // Lazy-load Supabase client to prevent errors when imported on client side
