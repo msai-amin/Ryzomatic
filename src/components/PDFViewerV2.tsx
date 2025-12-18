@@ -1684,6 +1684,9 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       )
     },
     renderHighlights: (props: RenderHighlightsProps) => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/5111ef9c-52b7-4869-a626-5ece892fe019',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PDFViewerV2.tsx:1686',message:'renderHighlights entry',data:{pageIndex:props.pageIndex,highlightsCount:Array.isArray(highlightsRef.current)?highlightsRef.current.length:0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       // Render existing highlights - use ref to avoid plugin recreation on highlight changes
       // Safety check: ensure highlightsRef.current is defined and is an array
       const highlights = Array.isArray(highlightsRef.current) ? highlightsRef.current : []
@@ -1701,14 +1704,29 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             
             return highlightAreas
               .filter((area) => area.pageIndex === props.pageIndex)
-              .map((area, idx) => (
+              .map((area, idx) => {
+                // #region agent log
+                const cssProps = props.getCssProperties(area, props.rotation);
+                fetch('http://127.0.0.1:7242/ingest/5111ef9c-52b7-4869-a626-5ece892fe019',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PDFViewerV2.tsx:1704',message:'Highlight area CSS properties',data:{highlightId:highlight.id,areaIndex:idx,left:cssProps.left,top:cssProps.top,width:cssProps.width,height:cssProps.height,position:cssProps.position,hasOverflow:cssProps.overflow!==undefined},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                // #endregion
+                return (
                 <div
                   key={`${highlight.id}-${idx}`}
+                  ref={(el) => {
+                    // #region agent log
+                    if (el) {
+                      const computed = window.getComputedStyle(el);
+                      const textLayer = el.closest('.rpv-core__text-layer');
+                      const textLayerComputed = textLayer ? window.getComputedStyle(textLayer as Element) : null;
+                      fetch('http://127.0.0.1:7242/ingest/5111ef9c-52b7-4869-a626-5ece892fe019',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PDFViewerV2.tsx:1715',message:'Highlight element computed styles',data:{overflow:computed.overflow,overflowX:computed.overflowX,overflowY:computed.overflowY,width:computed.width,maxWidth:computed.maxWidth,textLayerOverflow:textLayerComputed?.overflow,textLayerOverflowX:textLayerComputed?.overflowX,textLayerMaxWidth:textLayerComputed?.maxWidth},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,D'})}).catch(()=>{});
+                    }
+                    // #endregion
+                  }}
                   style={{
                     background: highlight.color_hex || '#ffeb3b',
                     opacity: 0.4,
                     cursor: 'pointer',
-                    ...props.getCssProperties(area, props.rotation),
+                    ...cssProps,
                   }}
                   onClick={() => {
                     // Handle highlight click (e.g., show notes, edit, etc.)
@@ -1724,7 +1742,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                     e.currentTarget.style.opacity = '0.4'
                   }}
                 />
-              ))
+              )})
           })}
         </div>
       )
@@ -2978,6 +2996,24 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
               -moz-text-decoration: none !important;
               border: none !important;
               outline: none !important;
+            }
+            
+            /* Prevent text clipping in PDF text layer */
+            .pdf-viewer-container .rpv-core__text-layer,
+            .pdf-viewer-container .rpv-core__text-layer-text,
+            .pdf-viewer-container .rpv-core__text-layer-text span {
+              overflow: visible !important;
+              text-overflow: clip !important;
+              white-space: normal !important;
+              word-wrap: break-word !important;
+              max-width: none !important;
+            }
+            
+            /* Ensure highlight overlays don't clip text */
+            .pdf-viewer-container [data-highlight-id],
+            .pdf-viewer-container .rpv-highlight__area {
+              overflow: visible !important;
+              min-width: fit-content !important;
             }
             
             /* Remove any red borders or outlines */
