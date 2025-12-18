@@ -1712,6 +1712,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                 return (
                 <div
                   key={`${highlight.id}-${idx}`}
+                  data-highlight-id={highlight.id}
+                  data-saved-highlight="true"
                   ref={(el) => {
                     // #region agent log
                     if (el) {
@@ -2967,23 +2969,30 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           {/* Override selection preview color - use neutral browser selection color, not highlight color */}
           <style>{`
             /* Override react-pdf-viewer highlight selection preview to use neutral color */
-            /* Target all possible selection preview classes */
-            .rpv-highlight__selected-area,
-            .rpv-highlight__selected-area *,
-            [data-testid="highlight-selected-area"],
-            .rpv-core__viewer .rpv-highlight__selected-area,
-            .rpv-core__viewer .rpv-highlight__selected-area *,
-            .pdf-viewer-container .rpv-highlight__selected-area,
-            .pdf-viewer-container [class*="highlight"][class*="selected"],
-            .pdf-viewer-container [class*="selected"][class*="area"],
-            /* Target any element with inline style background-color that matches highlight colors */
-            .pdf-viewer-container [style*="background-color"]:not([data-highlight-id]) {
+            /* Target all possible selection preview classes - but EXCLUDE saved highlights */
+            .rpv-highlight__selected-area:not([data-saved-highlight]),
+            .rpv-highlight__selected-area:not([data-saved-highlight]) *,
+            [data-testid="highlight-selected-area"]:not([data-saved-highlight]),
+            .rpv-core__viewer .rpv-highlight__selected-area:not([data-saved-highlight]),
+            .rpv-core__viewer .rpv-highlight__selected-area:not([data-saved-highlight]) *,
+            .pdf-viewer-container .rpv-highlight__selected-area:not([data-saved-highlight]),
+            .pdf-viewer-container [class*="highlight"][class*="selected"]:not([data-saved-highlight]),
+            .pdf-viewer-container [class*="selected"][class*="area"]:not([data-saved-highlight]),
+            /* Target selection preview elements (not saved highlights) */
+            .pdf-viewer-container [style*="background-color"]:not([data-highlight-id]):not([data-saved-highlight]) {
               background-color: rgba(0, 123, 255, 0.2) !important;
               color: inherit !important;
             }
-            /* Ensure saved highlights (with data-highlight-id) keep their colors */
-            .pdf-viewer-container [data-highlight-id] {
+            /* Ensure saved highlights (with data-highlight-id) keep their colors and don't show selection preview */
+            .pdf-viewer-container [data-highlight-id],
+            .pdf-viewer-container [data-saved-highlight="true"] {
               /* Let saved highlights use their assigned colors - don't override */
+              /* Hide any selection preview overlays on saved highlights */
+            }
+            /* Hide selection preview when hovering over saved highlights */
+            .pdf-viewer-container [data-saved-highlight="true"] ~ .rpv-highlight__selected-area,
+            .pdf-viewer-container [data-highlight-id] ~ .rpv-highlight__selected-area {
+              display: none !important;
             }
             
             /* Remove strikethrough and red bounding boxes from PDF text layer */
