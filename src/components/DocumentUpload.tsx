@@ -353,6 +353,9 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
             } catch (err) {
               // Save failed - don't add document to store if saveToLibrary was requested
               const error = err instanceof Error ? err : new Error('Unknown error occurred while saving');
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/5111ef9c-52b7-4869-a626-5ece892fe019',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DocumentUpload.tsx:353',message:'Save to library failed',data:{errorMessage:error.message,errorName:error.name,errorStack:error.stack?.substring(0,500),userId:user?.id,hasUser:!!user,documentId:document.id,fileName:file.name,fileSize:file.size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+              // #endregion
               logger.error('Failed to save PDF to library', context, error, {
                 errorMessage: error.message,
                 errorStack: error.stack,

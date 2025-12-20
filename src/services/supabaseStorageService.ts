@@ -130,6 +130,9 @@ class SupabaseStorageService {
 
   // Books Management
   async saveBook(book: SavedBook): Promise<string> {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/5111ef9c-52b7-4869-a626-5ece892fe019',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseStorageService.ts:132',message:'saveBook entry',data:{bookId:book.id,userId:this.currentUserId,bookType:book.type,hasFileData:!!book.fileData,fileName:book.fileName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     this.ensureAuthenticated();
     
     try {
@@ -172,6 +175,9 @@ class SupabaseStorageService {
         }
 
         // Upload to S3
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/5111ef9c-52b7-4869-a626-5ece892fe019',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseStorageService.ts:175',message:'Before S3 upload',data:{fileSizeMB:(fileSize/1024/1024).toFixed(2),userId:this.currentUserId,bookId:book.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
         const uploadResult = await bookStorageService.uploadBook(fileBlob, {
           userId: this.currentUserId!,
           bookId: book.id,
@@ -181,6 +187,9 @@ class SupabaseStorageService {
           fileSize: fileSize,
           totalPages: book.totalPages
         });
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/5111ef9c-52b7-4869-a626-5ece892fe019',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseStorageService.ts:185',message:'After S3 upload',data:{s3Key:uploadResult.s3Key,uploadSuccess:!!uploadResult.s3Key},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
 
         s3Key = uploadResult.s3Key;
         
@@ -244,6 +253,9 @@ class SupabaseStorageService {
         .single();
       
       if (error) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/5111ef9c-52b7-4869-a626-5ece892fe019',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseStorageService.ts:246',message:'Database upsert error',data:{errorCode:error.code,errorMessage:error.message,errorDetails:error.details,errorHint:error.hint,userId:this.currentUserId,bookId:book.id,hasS3Key:!!s3Key,s3Key},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
         // If database save fails, try to clean up S3 upload
         if (s3Key) {
           try {
@@ -323,6 +335,10 @@ class SupabaseStorageService {
       return data.id;
 
     } catch (error) {
+      // #region agent log
+      const err = error as Error;
+      fetch('http://127.0.0.1:7242/ingest/5111ef9c-52b7-4869-a626-5ece892fe019',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseStorageService.ts:325',message:'saveBook catch block',data:{errorMessage:err.message,errorName:err.name,hasStack:!!err.stack,bookId:book.id,userId:this.currentUserId,bookType:book.type,hasFileData:!!book.fileData,fileSize:book.fileData instanceof Blob?book.fileData.size:book.fileData instanceof ArrayBuffer?book.fileData.byteLength:'unknown'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       logger.error('Error saving book', { bookId: book.id }, error as Error);
       throw error;
     }
