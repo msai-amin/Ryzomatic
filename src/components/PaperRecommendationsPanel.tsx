@@ -106,6 +106,9 @@ export const PaperRecommendationsPanel: React.FC<PaperRecommendationsPanelProps>
     setError(null);
 
     try {
+      // #region agent log
+      fetch('/api/debug/log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PaperRecommendationsPanel.tsx:loadRecommendations',message:'loadRecommendations start',data:{docId,hasOpenAlexId:!!docOpenAlexId,type:recommendationType,filters},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'R1'})}).catch(()=>{});
+      // #endregion
       const session = await authService.getSession();
       if (!session) {
         throw new Error('Not authenticated');
@@ -130,6 +133,9 @@ export const PaperRecommendationsPanel: React.FC<PaperRecommendationsPanelProps>
 
       // Check if response has content before parsing
       const responseText = await response.text();
+      // #region agent log
+      fetch('/api/debug/log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PaperRecommendationsPanel.tsx:loadRecommendations',message:'recommendations response',data:{ok:response.ok,status:response.status,bytes:responseText?.length||0,preview:responseText?.slice(0,120)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'R2'})}).catch(()=>{});
+      // #endregion
       
       if (!response.ok) {
         try {
@@ -149,6 +155,9 @@ export const PaperRecommendationsPanel: React.FC<PaperRecommendationsPanelProps>
         throw new Error('Invalid response from server');
       }
       let recs = data.recommendations || [];
+      // #region agent log
+      fetch('/api/debug/log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PaperRecommendationsPanel.tsx:loadRecommendations',message:'recommendations parsed',data:{serverCount:Array.isArray(data.recommendations)?data.recommendations.length:0,method:data.recommendationMethod,workId:data.openAlexId||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'R3'})}).catch(()=>{});
+      // #endregion
 
       // Apply filters
       if (filters.minYear) {
@@ -162,6 +171,9 @@ export const PaperRecommendationsPanel: React.FC<PaperRecommendationsPanelProps>
       }
 
       setRecommendations(recs);
+      // #region agent log
+      fetch('/api/debug/log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PaperRecommendationsPanel.tsx:loadRecommendations',message:'recommendations after filters',data:{finalCount:recs.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'R4'})}).catch(()=>{});
+      // #endregion
       
       // Cache recommendations in localStorage
       if (docId && recs.length > 0) {
@@ -183,6 +195,9 @@ export const PaperRecommendationsPanel: React.FC<PaperRecommendationsPanelProps>
       }
     } catch (err: any) {
       logger.error('Error loading paper recommendations', { docId }, err);
+      // #region agent log
+      fetch('/api/debug/log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PaperRecommendationsPanel.tsx:loadRecommendations',message:'loadRecommendations error',data:{docId,errorMessage:err?.message||String(err)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'R5'})}).catch(()=>{});
+      // #endregion
       
       // Provide helpful error messages
       let errorMessage = err.message || 'Failed to load recommendations';

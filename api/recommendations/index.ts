@@ -9,6 +9,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { userInterestProfileService } from '../../lib/userInterestProfileService.js';
 import { embeddingService } from '../../lib/embeddingService.js';
 // Note: paperEmbeddingService removed - not used in this endpoint (only in commented code)
+import fs from 'node:fs';
 
 // Initialize Supabase client with error handling
 let supabase: ReturnType<typeof createClient>;
@@ -38,6 +39,27 @@ try {
 }
 
 const OPENALEX_BASE_URL = 'https://api.openalex.org';
+
+function appendLocalDebugLog(payload: any) {
+  try {
+    const enabled =
+      process.env.DEBUG_LOGGING_ENABLED === 'true' ||
+      process.env.VERCEL_ENV !== 'production';
+    if (!enabled) return;
+    const p = {
+      ...payload,
+      receivedAt: Date.now(),
+    };
+    fs.mkdirSync('/Users/aminamouhadi/smart-reader-serverless/.cursor', { recursive: true });
+    fs.appendFileSync(
+      '/Users/aminamouhadi/smart-reader-serverless/.cursor/debug.log',
+      JSON.stringify(p) + '\n',
+      'utf8'
+    );
+  } catch {
+    // swallow
+  }
+}
 
 /**
  * Initialize Gemini client
@@ -232,6 +254,22 @@ async function handleGetRecommendations(
   const email = req.query.email || req.body?.email; // For polite pool
 
   try {
+    appendLocalDebugLog({
+      location: 'api/recommendations/index.ts:handleGetRecommendations',
+      message: 'entry',
+      data: {
+        userId,
+        sourceDocumentId,
+        hasOpenAlexId: !!openAlexId,
+        recommendationType,
+        limit,
+      },
+      timestamp: Date.now(),
+      sessionId: 'debug-session',
+      runId: 'run1',
+      hypothesisId: 'S1',
+    });
+
     // #region agent log
     console.log('[DEBUG] handleGetRecommendations entry', { location: 'api/recommendations/index.ts:217', hasSourceDoc: !!sourceDocumentId, hasOpenAlexId: !!openAlexId, recommendationType, limit, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'E' });
     // #endregion
@@ -318,6 +356,22 @@ async function handleGetRecommendations(
             content: (docData as any)?.text_content ?? null,
           };
 
+          appendLocalDebugLog({
+            location: 'api/recommendations/index.ts:docFetch',
+            message: 'user_books fetched',
+            data: {
+              sourceDocumentId,
+              hasDoc: !!docData,
+              hasCustomMetadata: !!(docData as any)?.custom_metadata,
+              textContentLen: ((docData as any)?.text_content || '').length,
+              hasContentFieldAfterNormalize: !!document?.content,
+            },
+            timestamp: Date.now(),
+            sessionId: 'debug-session',
+            runId: 'run1',
+            hypothesisId: 'S2',
+          });
+
           if (document?.custom_metadata?.openalex_id) {
             workId = document.custom_metadata.openalex_id;
           } else if (document?.custom_metadata?.doi) {
@@ -343,6 +397,21 @@ async function handleGetRecommendations(
                   content: contentData.map((c: any) => c.content).join(' '),
                 };
               }
+
+              appendLocalDebugLog({
+                location: 'api/recommendations/index.ts:docContentFallback',
+                message: 'document_content fallback',
+                data: {
+                  sourceDocumentId,
+                  chunkCount: Array.isArray(contentData) ? contentData.length : 0,
+                  contentLen: (document?.content || '').length,
+                  hadError: !!contentError,
+                },
+                timestamp: Date.now(),
+                sessionId: 'debug-session',
+                runId: 'run1',
+                hypothesisId: 'S3',
+              });
             } catch (error) {
               console.warn('Error fetching document content chunks:', error);
             }
@@ -371,6 +440,20 @@ async function handleGetRecommendations(
         } else {
           recommendations = await getRelatedWorks(workId, limit, email);
         }
+
+        appendLocalDebugLog({
+          location: 'api/recommendations/index.ts:fetchBranch',
+          message: 'citation_graph',
+          data: {
+            workId,
+            recommendationType,
+            recCount: Array.isArray(recommendations) ? recommendations.length : 0,
+          },
+          timestamp: Date.now(),
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'S4',
+        });
       } 
       // If no workId but we have document content, use content-based search
       else if (sourceDocumentId && document) {
@@ -391,6 +474,20 @@ async function handleGetRecommendations(
         } else {
           recommendations = await getContentBasedRecommendations(document, limit, email, interestProfile, userInterestEmbedding);
         }
+
+        appendLocalDebugLog({
+          location: 'api/recommendations/index.ts:fetchBranch',
+          message: 'content_based',
+          data: {
+            hasDoc: !!document,
+            contentLen: (document?.content || '').length,
+            recCount: Array.isArray(recommendations) ? recommendations.length : 0,
+          },
+          timestamp: Date.now(),
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'S5',
+        });
       } 
       else {
         return res.status(400).json({
