@@ -301,7 +301,9 @@ async function handleGetRecommendations(
         // Fetch document with content
         const { data: docData, error: docError } = await supabase
           .from('user_books')
-          .select('custom_metadata, title, content')
+          // NOTE: `user_books` does not have a `content` column in this project.
+          // Text documents store content in `text_content`; PDFs store content in `document_content`.
+          .select('custom_metadata, title, text_content')
           .eq('id', sourceDocumentId)
           .eq('user_id', userId)
           .maybeSingle(); // Use maybeSingle to avoid errors if no record found
@@ -309,7 +311,12 @@ async function handleGetRecommendations(
         if (docError) {
           console.warn('Error fetching document:', docError);
         } else {
-          document = docData;
+          // Normalize shape expected by downstream recommendation methods.
+          // Prefer `text_content` (text docs); otherwise fall back to `document_content` chunks for PDFs.
+          document = {
+            ...(docData as any),
+            content: (docData as any)?.text_content ?? null,
+          };
 
           if (document?.custom_metadata?.openalex_id) {
             workId = document.custom_metadata.openalex_id;

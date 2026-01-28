@@ -1,4 +1,4 @@
-import { userBooks, userNotes, userAudio, UserBook, UserNote, UserAudio, supabase } from '../../lib/supabase';
+import { userBooks, userNotes, UserBook, UserNote, supabase } from '../../lib/supabase';
 import { logger } from './logger';
 import { errorHandler, ErrorType, ErrorSeverity } from './errorHandler';
 import { bookStorageService } from './bookStorageService';
@@ -55,6 +55,7 @@ export interface SavedAudio {
 
 class SupabaseStorageService {
   private currentUserId: string | null = null;
+  private hasWarnedLegacyUserAudio = false;
 
   // Initialize with current user
   setCurrentUser(userId: string | null) {
@@ -1006,55 +1007,17 @@ class SupabaseStorageService {
     this.ensureAuthenticated();
     
     try {
-      const { data, error } = await userAudio.list(this.currentUserId!);
-      
-      if (error) {
-        // user_audio table was replaced by tts_audio_cache in migration 020
-        // Check for 404 (table not found) or specific error messages
-        // This prevents 404 errors from blocking Library modal loading
-        const errorAny = error as any;
-        const isTableNotFound = 
-          error.code === 'PGRST116' || // PostgREST table not found error code
-          error.message?.includes('user_audio') || 
-          error.message?.includes('Could not find the table') ||
-          (error.message?.includes('relation') && error.message?.includes('does not exist')) ||
-          errorAny.status === 404 ||
-          errorAny.statusCode === 404 ||
-          errorAny?.hint?.includes('user_audio');
-        
-        if (isTableNotFound) {
-          logger.warn('user_audio table not found (replaced by tts_audio_cache), returning empty array', { 
-            userId: this.currentUserId,
-            errorCode: error.code,
-            errorStatus: errorAny.status || errorAny.statusCode,
-            errorMessage: error.message 
-          });
-          return [];
-        }
-        
-        throw errorHandler.createError(
-          `Failed to load audio from Supabase: ${error.message}`,
-          ErrorType.DATABASE,
-          ErrorSeverity.HIGH,
-          { context: 'getAllAudio', error: error.message }
-        );
+      // Legacy `user_audio` table was removed and replaced by `tts_audio_cache`.
+      // AudioWidget + TTS now use `ttsCacheService` for caching, not this legacy API.
+      // Returning [] avoids repeated console warnings and prevents UI regressions.
+      // If needed later, we can implement a view over `tts_audio_cache` to list saved clips.
+      if (!this.hasWarnedLegacyUserAudio) {
+        this.hasWarnedLegacyUserAudio = true;
+        logger.info('SupabaseStorageService.getAllAudio: legacy user_audio is deprecated; returning empty array', {
+          userId: this.currentUserId,
+        });
       }
-
-      const audio: SavedAudio[] = data.map(audio => ({
-        id: audio.id,
-        bookId: audio.book_id,
-        pageNumber: audio.page_number,
-        title: `Page ${audio.page_number} Audio`,
-        audioData: this.base64ToArrayBuffer(audio.audio_data_base64),
-        audioBlob: new Blob([this.base64ToArrayBuffer(audio.audio_data_base64)]),
-        duration: audio.duration_seconds || 0,
-        pageRange: { start: audio.page_number, end: audio.page_number },
-        voiceName: audio.voice_settings?.voiceName || 'Unknown',
-        voiceSettings: audio.voice_settings,
-        createdAt: new Date(audio.created_at)
-      }));
-
-      return audio;
+      return [];
 
     } catch (error) {
       logger.error('Error loading audio from Supabase', { userId: this.currentUserId }, error as Error);
@@ -1066,41 +1029,21 @@ class SupabaseStorageService {
     this.ensureAuthenticated();
     
     try {
-      const audioDataBase64 = this.arrayBufferToBase64(audio.audioData);
-      
-      const { data, error } = await userAudio.create({
-        user_id: this.currentUserId!,
-        book_id: audio.bookId,
-        page_number: audio.pageNumber,
-        audio_data_base64: audioDataBase64,
-        duration_seconds: audio.duration,
-        voice_settings: audio.voiceSettings
-      });
-
-      if (error) {
-        throw errorHandler.createError(
-          `Failed to save audio to Supabase: ${error.message}`,
-          ErrorType.DATABASE,
-          ErrorSeverity.HIGH,
-          { context: 'saveAudio', error: error.message }
-        );
+      // Legacy path (user_audio) has been removed from the DB.
+      // Keep this method as a no-op fallback to avoid crashing older UI paths.
+      if (!this.hasWarnedLegacyUserAudio) {
+        this.hasWarnedLegacyUserAudio = true;
+        logger.info('SupabaseStorageService.saveAudio: legacy user_audio is deprecated; skipping save', {
+          userId: this.currentUserId,
+          bookId: audio.bookId,
+        });
       }
-
-      const savedAudio: SavedAudio = {
-        id: data.id,
-        bookId: data.book_id,
-        pageNumber: data.page_number,
-        title: `Page ${data.page_number} Audio`,
-        audioData: this.base64ToArrayBuffer(data.audio_data_base64),
-        audioBlob: new Blob([this.base64ToArrayBuffer(data.audio_data_base64)]),
-        duration: data.duration_seconds || 0,
-        pageRange: { start: data.page_number, end: data.page_number },
-        voiceName: data.voice_settings?.voiceName || 'Unknown',
-        voiceSettings: data.voice_settings,
-        createdAt: new Date(data.created_at)
-      };
-
-      return savedAudio;
+      throw errorHandler.createError(
+        'Saving audio clips is not supported in this version (migrated to TTS cache).',
+        ErrorType.DATABASE,
+        ErrorSeverity.LOW,
+        { context: 'saveAudio' }
+      );
 
     } catch (error) {
       logger.error('Error saving audio to Supabase', { userId: this.currentUserId }, error as Error);

@@ -34,7 +34,7 @@ import { HighlightColorPopover } from './HighlightColorPopover'
 import { OCRBanner, OCRStatusBadge } from './OCRStatusBadge'
 import { HighlightManagementPanel } from './HighlightManagementPanel'
 import { NotesPanel } from './NotesPanel'
-import { LibraryModal } from './LibraryModal'
+import { ModernLibraryModal } from './ModernLibraryModal'
 import { DocumentUpload } from './DocumentUpload'
 import { TTSControls } from './TTSControls'
 
@@ -3161,9 +3161,10 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       
       {/* Library Modal */}
       {showLibrary && (
-        <LibraryModal
+        <ModernLibraryModal
           isOpen={showLibrary}
           onClose={() => setShowLibrary(false)}
+          // PDFViewerV2 doesn't currently pass refreshTrigger; modal works without it.
         />
       )}
       
