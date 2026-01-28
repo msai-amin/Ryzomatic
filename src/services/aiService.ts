@@ -625,7 +625,7 @@ export const synthesizeDocuments = async (
   return trackPerformance('synthesizeDocuments', async () => {
     try {
       // Get auth token from Supabase session
-      const { supabase } = await import('../lib/supabase.js');
+      const { supabase } = await import('../../lib/supabase.js');
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session?.access_token) {
