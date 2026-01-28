@@ -376,6 +376,113 @@ export class ContextBuilder {
 
     return memoryIndicators.some(indicator => lowercaseQuery.includes(indicator));
   }
+
+  /**
+   * Build multi-document context for LOTUS synthesis
+   * Fetches full content from multiple documents and formats for LOTUS sem_agg
+   */
+  async buildMultiDocumentContext(params: {
+    userId: string;
+    documentIds: string[];
+    maxContentLength?: number;
+  }): Promise<Array<{ id: string; title: string; content: string }>> {
+    const { userId, documentIds, maxContentLength = 50000 } = params;
+
+    if (!supabase) {
+      console.error('Supabase client not available (server-side only)');
+      return [];
+    }
+
+    if (!documentIds || documentIds.length === 0) {
+      return [];
+    }
+
+    try {
+      // Fetch document metadata
+      const { data: books, error: booksError } = await supabase
+        .from('user_books')
+        .select('id, title')
+        .in('id', documentIds)
+        .eq('user_id', userId);
+
+      if (booksError || !books) {
+        console.error('Error fetching document metadata:', booksError);
+        return [];
+      }
+
+      // Fetch content for each document
+      const documents = await Promise.all(
+        books.map(async (book) => {
+          // Try document_content table first (chunked content)
+          const { data: contentChunks, error: chunksError } = await supabase
+            .from('document_content')
+            .select('content, chunk_index')
+            .eq('book_id', book.id)
+            .eq('user_id', userId)
+            .order('chunk_index', { ascending: true });
+
+          let content = '';
+
+          if (!chunksError && contentChunks && contentChunks.length > 0) {
+            // Concatenate all chunks
+            content = contentChunks.map(c => c.content).join('\n\n');
+          } else {
+            // Fallback: try RPC function
+            const { data: fullContent, error: rpcError } = await supabase
+              .rpc('get_full_document_content', { book_uuid: book.id });
+
+            if (!rpcError && fullContent) {
+              content = fullContent;
+            } else {
+              // Last resort: try user_books.content field
+              const { data: bookData } = await supabase
+                .from('user_books')
+                .select('content')
+                .eq('id', book.id)
+                .eq('user_id', userId)
+                .single();
+
+              content = bookData?.content || '';
+            }
+          }
+
+          return {
+            id: book.id,
+            title: book.title || `Document ${book.id.substring(0, 8)}`,
+            content: content.substring(0, maxContentLength), // Limit content length
+          };
+        })
+      );
+
+      // Filter out documents with no content
+      return documents.filter(doc => doc.content && doc.content.length > 0);
+    } catch (error) {
+      console.error('Error building multi-document context:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Check if query is requesting multi-document synthesis
+   */
+  shouldUseSynthesis(query: string): boolean {
+    const lowercaseQuery = query.toLowerCase();
+    const synthesisIndicators = [
+      'synthesize',
+      'compare these',
+      'across these',
+      'across all',
+      'literature review',
+      'summarize findings',
+      'compare papers',
+      'compare documents',
+      'synthesis',
+      'consolidate',
+      'aggregate',
+    ];
+
+    return synthesisIndicators.some(indicator => lowercaseQuery.includes(indicator));
+  }
 }
 
 export const contextBuilder = new ContextBuilder();

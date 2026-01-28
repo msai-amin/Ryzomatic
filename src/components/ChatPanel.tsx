@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Send, Loader2, Sparkles, FileText, Upload, BookOpen, Save, X } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { ChatMessage } from './ChatMessage'
-import { sendMessageToAI, askForClarification, getFurtherReading } from '../services/aiService'
+import { sendMessageToAI, askForClarification, getFurtherReading, synthesizeDocuments } from '../services/aiService'
 import { notesIntegrationService } from '../services/notesIntegrationService'
 import { Tooltip } from './Tooltip'
 
@@ -118,6 +118,25 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ onClose }) => {
 
   const createMessageId = () => `${Date.now()}_${Math.random().toString(36).slice(2)}`
 
+  // Check if query is requesting synthesis
+  const isSynthesisQuery = (query: string): boolean => {
+    const lowercaseQuery = query.toLowerCase()
+    const synthesisIndicators = [
+      'synthesize',
+      'compare these',
+      'across these',
+      'across all',
+      'literature review',
+      'summarize findings',
+      'compare papers',
+      'compare documents',
+      'synthesis',
+      'consolidate',
+      'aggregate',
+    ]
+    return synthesisIndicators.some(indicator => lowercaseQuery.includes(indicator))
+  }
+
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isTyping || !currentDocument) return
 
@@ -128,6 +147,30 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ onClose }) => {
 
     try {
       setTyping(true)
+
+      // Check if this is a synthesis query
+      if (isSynthesisQuery(userMessage)) {
+        // For now, show info about synthesis feature
+        // In future, this could trigger multi-document selection UI
+        addChatMessage({
+          role: 'assistant',
+          content: `🔬 **LOTUS Synthesis Available**
+
+I detected you're asking for a synthesis across documents. The LOTUS synthesis feature can generate comprehensive literature reviews across multiple papers.
+
+**To use synthesis:**
+- Select multiple documents from your library
+- Use the synthesis API endpoint: \`/api/lotus/synthesis\`
+- Provide document IDs and your research question
+
+**Example query:** "Synthesize the key findings across these papers about [topic]"
+
+For now, I can help with questions about the current document. Would you like me to answer questions about "${currentDocument.name}"?`,
+          id: createMessageId()
+        })
+        setTyping(false)
+        return
+      }
 
       let documentContext = ''
       // CRITICAL: Use safe destructured array instead of accessing currentDocument directly
