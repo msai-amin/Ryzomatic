@@ -8,7 +8,8 @@ import {
   Download, 
   Copy, 
   X, 
-  Trash2 
+  Trash2,
+  Sparkles
 } from 'lucide-react';
 
 interface BulkActionsProps {
@@ -22,6 +23,8 @@ interface BulkActionsProps {
   onExport: () => void;
   onDetectDuplicates: () => void;
   onClearSelection: () => void;
+  onSynthesize?: () => void;
+  showSynthesize?: boolean;
 }
 
 export const BulkActionsToolbar: React.FC<BulkActionsProps> = ({
@@ -34,7 +37,9 @@ export const BulkActionsToolbar: React.FC<BulkActionsProps> = ({
   onDelete,
   onExport,
   onDetectDuplicates,
-  onClearSelection
+  onClearSelection,
+  onSynthesize,
+  showSynthesize = false
 }) => {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
@@ -164,6 +169,20 @@ export const BulkActionsToolbar: React.FC<BulkActionsProps> = ({
         >
           <Copy className="w-5 h-5" />
         </button>
+
+        {showSynthesize && onSynthesize && (
+          <button 
+            onClick={onSynthesize} 
+            className="p-2 rounded-md transition-colors"
+            title="Synthesize Documents"
+            style={{ color: '#8B5CF6' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(139, 92, 246, 0.1)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            data-testid="bulk-synthesize-btn"
+          >
+            <Sparkles className="w-5 h-5" />
+          </button>
+        )}
         
         <div 
           className="w-px h-6 mx-1"

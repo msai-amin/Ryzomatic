@@ -609,6 +609,76 @@ Be specific and actionable in your suggestions.`;
   });
 };
 
+/**
+ * Synthesize insights across multiple documents using LOTUS
+ */
+export const synthesizeDocuments = async (
+  documentIds: string[],
+  query: string,
+  model?: string
+): Promise<{ synthesis: string; documents_used: Array<{ id: string; title: string }> }> => {
+  const logContext = {
+    component: 'AIService',
+    action: 'synthesizeDocuments'
+  };
+
+  return trackPerformance('synthesizeDocuments', async () => {
+    try {
+      // Get auth token from Supabase session
+      const { supabase } = await import('../../lib/supabase.js');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated. Please log in to use synthesis.');
+      }
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      };
+
+      logger.info('Calling LOTUS synthesis API', logContext, {
+        documentCount: documentIds.length,
+        queryLength: query.length,
+        model: model || 'default'
+      });
+
+      const response = await fetch('/api/lotus/synthesis', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          documentIds,
+          query,
+          model,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `Synthesis failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      logger.info('LOTUS synthesis completed', logContext, {
+        synthesisLength: result.synthesis?.length || 0,
+        documentCount: result.document_count || 0
+      });
+
+      return {
+        synthesis: result.synthesis || 'No synthesis generated.',
+        documents_used: result.documents_used || []
+      };
+    } catch (error) {
+      logger.error('LOTUS synthesis error', logContext, error as Error);
+      throw error;
+    }
+  }, logContext, {
+    documentCount: documentIds.length,
+    queryLength: query.length
+  });
+};
+
 // In a real implementation, you would replace this with actual API calls:
 /*
 import OpenAI from 'openai'
