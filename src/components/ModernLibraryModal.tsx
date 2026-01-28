@@ -31,6 +31,7 @@ import { SmartCollectionItem } from './library/SmartCollectionItem';
 import { RecentBookCard } from './library/RecentBookCard';
 import { BulkActionsToolbar } from './library/BulkActionsToolbar';
 import { DocumentUpload } from './DocumentUpload';
+import { SynthesisDialog } from './SynthesisDialog';
 
 const COLLECTION_COLOR_OPTIONS = [
   '#3B82F6',
@@ -697,6 +698,7 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
   const [moveCollectionParentId, setMoveCollectionParentId] = useState<string | null>(null);
   const [isMovingCollection, setIsMovingCollection] = useState(false);
   const [notifications, setNotifications] = useState<LibraryNotification[]>([]);
+  const [synthesisDialogOpen, setSynthesisDialogOpen] = useState(false);
   type ConfirmDialogState =
     | { type: 'bulk-delete' }
     | { type: 'delete-collection'; collection: Collection }
@@ -1187,6 +1189,15 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
     return (collectionToMove.parent_id ?? null) !== moveCollectionParentId;
   }, [collectionToMove, moveCollectionParentId]);
 
+  const selectedDocumentTitles = useMemo(() => {
+    return libraryView.selectedBooks
+      .map(bookId => {
+        const book = books.find(b => b.id === bookId);
+        return book ? { id: bookId, title: book.title } : null;
+      })
+      .filter((item): item is { id: string; title: string } => item !== null);
+  }, [libraryView.selectedBooks, books]);
+
   const handleRenameCollection = useCallback(async (collectionId: string, name: string) => {
     try {
       await libraryOrganizationService.updateCollection(collectionId, { name });
@@ -1289,6 +1300,12 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
     setSelectedTagIds([]);
     setTagManagerOpen(true);
   }, [setTagManagerOpen]);
+
+  const handleOpenSynthesis = useCallback(() => {
+    if (libraryView.selectedBooks.length >= 2) {
+      setSynthesisDialogOpen(true);
+    }
+  }, [libraryView.selectedBooks.length]);
 
   const handleSaveCollectionDetails = useCallback(async (updates: Partial<Collection>) => {
     if (!editingCollectionDetails) return;
@@ -2232,6 +2249,8 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
             onExport={handleBulkExport}
             onDetectDuplicates={handleBulkDetectDuplicates}
             onClearSelection={clearSelection}
+            onSynthesize={handleOpenSynthesis}
+            showSynthesize={libraryView.selectedBooks.length >= 2}
           />
         )}
 
@@ -2566,6 +2585,14 @@ export const ModernLibraryModal: React.FC<ModernLibraryModalProps> = ({
             onConfirm={handleConfirmDialogConfirm}
           />
         )}
+
+        {/* Synthesis Dialog */}
+        <SynthesisDialog
+          isOpen={synthesisDialogOpen}
+          onClose={() => setSynthesisDialogOpen(false)}
+          documentIds={libraryView.selectedBooks}
+          documentTitles={selectedDocumentTitles}
+        />
       </div>
 
       {/* Document Upload Modal */}

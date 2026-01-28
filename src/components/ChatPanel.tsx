@@ -150,22 +150,12 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ onClose }) => {
 
       // Check if this is a synthesis query
       if (isSynthesisQuery(userMessage)) {
-        // For now, show info about synthesis feature
-        // In future, this could trigger multi-document selection UI
+        // Show short guidance to use library for synthesis
         addChatMessage({
           role: 'assistant',
-          content: `🔬 **LOTUS Synthesis Available**
+          content: `**Synthesis across multiple documents?** Select 2+ documents in your Library, then click the **Synthesize** button in the toolbar.
 
-I detected you're asking for a synthesis across documents. The LOTUS synthesis feature can generate comprehensive literature reviews across multiple papers.
-
-**To use synthesis:**
-- Select multiple documents from your library
-- Use the synthesis API endpoint: \`/api/lotus/synthesis\`
-- Provide document IDs and your research question
-
-**Example query:** "Synthesize the key findings across these papers about [topic]"
-
-For now, I can help with questions about the current document. Would you like me to answer questions about "${currentDocument.name}"?`,
+For now, I can help with questions about "${currentDocument.name}".`,
           id: createMessageId()
         })
         setTyping(false)
