@@ -1,1 +1,3 @@
-
+# Exclude Docling API from deployment - bundle exceeds Vercel limits (~4GB)
+# Frontend falls back to PDF.js when /api/docling is unavailable
+api/docling/
