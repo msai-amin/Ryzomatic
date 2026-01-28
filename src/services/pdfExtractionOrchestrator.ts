@@ -1,10 +1,11 @@
 /**
  * PDF Extraction Orchestrator
  * 
- * Central service that manages the 3-tier fallback system:
- * 1. PDF.js native extraction (fast, free)
- * 2. Gemini Vision fallback (automatic for poor quality pages)
- * 3. GPT-5 Nano OCR (user-initiated for scanned documents)
+ * Central service that manages document extraction with multiple strategies:
+ * 1. Docling (preferred) - Superior table, formula, and layout extraction
+ * 2. PDF.js native extraction (fallback) - Fast, free
+ * 3. Gemini Vision fallback (automatic for poor quality pages)
+ * 4. GPT-5 Nano OCR (user-initiated for scanned documents)
  */
 
 import { extractStructuredText } from '../utils/pdfTextExtractor';
@@ -19,6 +20,12 @@ import {
 import { configurePDFWorker } from '../utils/pdfjsConfig';
 import { logger } from './logger';
 import { errorHandler, ErrorType, ErrorSeverity } from './errorHandler';
+import { 
+  processWithDocling, 
+  isDoclingSupported, 
+  type DoclingResult,
+  type DoclingOptions 
+} from './doclingService';
 
 export interface ExtractionResult {
   success: boolean
@@ -27,7 +34,7 @@ export interface ExtractionResult {
   totalPages: number
   pdfData?: Blob | ArrayBuffer
   qualityReport: DocumentQualityReport
-  extractionMethod: 'pdfjs' | 'hybrid' | 'vision' | 'ocr'
+  extractionMethod: 'pdfjs' | 'hybrid' | 'vision' | 'ocr' | 'docling'
   needsOCR: boolean
   ocrStatus: 'not_needed' | 'pending' | 'processing' | 'completed' | 'user_declined'
   visionPagesUsed: number[]
@@ -37,6 +44,8 @@ export interface ExtractionResult {
     ocrPages: number
     processingTime: number
     qualitySummary: string
+    doclingTables?: number
+    doclingFigures?: number
   }
 }
 
@@ -47,6 +56,18 @@ export interface VisionFallbackOptions {
   documentId?: string
   s3Key?: string
   authToken?: string
+}
+
+/**
+ * Options for hybrid extraction pipeline
+ */
+export interface HybridExtractionOptions {
+  /** Use Docling as primary extraction method (default: true) */
+  useDocling?: boolean
+  /** Docling-specific options */
+  doclingOptions?: DoclingOptions
+  /** Vision fallback options for PDF.js pipeline */
+  visionOptions?: VisionFallbackOptions
 }
 
 interface PDFExtractionContext {
@@ -328,6 +349,150 @@ export async function extractWithFallback(
     
     throw appError
   }
+}
+
+/**
+ * Extract text using hybrid pipeline with Docling as primary method
+ * 
+ * This is the preferred extraction method that provides:
+ * - Superior table structure recognition
+ * - Better formula/math extraction
+ * - Improved multi-column layout handling
+ * - Support for more file formats (DOCX, PPTX, XLSX, images)
+ * 
+ * Falls back to PDF.js if Docling fails or is unavailable.
+ * 
+ * @param file - File object or ArrayBuffer containing the document
+ * @param options - Hybrid extraction options
+ * @returns ExtractionResult with extracted content
+ */
+export async function extractWithHybridPipeline(
+  file: File | ArrayBuffer,
+  options: HybridExtractionOptions = {}
+): Promise<ExtractionResult> {
+  const startTime = Date.now()
+  const fileName = file instanceof File ? file.name : 'document.pdf'
+  const fileSize = file instanceof File ? file.size : (file as ArrayBuffer).byteLength
+  
+  const context: PDFExtractionContext = {
+    component: 'PDFExtractionOrchestrator',
+    action: 'extractWithHybridPipeline',
+    fileName,
+    fileSize
+  }
+
+  // Default to using Docling unless explicitly disabled
+  const useDocling = options.useDocling !== false
+
+  logger.info('Starting hybrid extraction pipeline', context, {
+    useDocling,
+    fileType: fileName.split('.').pop()?.toLowerCase()
+  })
+
+  // ========================================
+  // STRATEGY 1: Try Docling First (if enabled)
+  // ========================================
+  if (useDocling && isDoclingSupported(fileName)) {
+    try {
+      logger.info('Attempting Docling extraction', context)
+
+      const doclingResult = await processWithDocling(file, fileName, {
+        enableOcr: options.doclingOptions?.enableOcr ?? true,
+        extractTables: options.doclingOptions?.extractTables ?? true,
+        extractFormulas: options.doclingOptions?.extractFormulas ?? true,
+        preserveLayout: options.doclingOptions?.preserveLayout ?? true,
+      })
+
+      if (doclingResult.success && doclingResult.text.trim().length > 0) {
+        const processingTime = Date.now() - startTime
+
+        // Build page texts from Docling structure
+        const pageTexts = doclingResult.structure.pages.map(p => p.text)
+        
+        // Use markdown content as primary (better formatting) or fall back to plain text
+        const content = doclingResult.markdown || doclingResult.text
+
+        // Create a quality report for Docling results
+        // Docling typically produces high-quality output
+        const qualityReport: DocumentQualityReport = {
+          overallScore: 95,
+          pageScores: pageTexts.map(() => 95),
+          extractionMethod: 'docling',
+          issues: [],
+          emptyPages: [],
+          lowQualityPages: [],
+          suspiciousPages: []
+        }
+
+        const result: ExtractionResult = {
+          success: true,
+          content,
+          pageTexts,
+          totalPages: doclingResult.metadata.pageCount,
+          pdfData: file instanceof File ? await file.arrayBuffer() : file,
+          qualityReport,
+          extractionMethod: 'docling',
+          needsOCR: false,
+          ocrStatus: 'not_needed',
+          visionPagesUsed: [],
+          metadata: {
+            pdfJsPages: 0,
+            visionPages: 0,
+            ocrPages: 0,
+            processingTime,
+            qualitySummary: `Extracted with Docling: ${doclingResult.metadata.tables} tables, ${doclingResult.metadata.figures} figures detected`,
+            doclingTables: doclingResult.metadata.tables,
+            doclingFigures: doclingResult.metadata.figures
+          }
+        }
+
+        logger.info('Docling extraction completed successfully', context, {
+          pageCount: result.totalPages,
+          tables: doclingResult.metadata.tables,
+          figures: doclingResult.metadata.figures,
+          contentLength: content.length,
+          processingTime
+        })
+
+        return result
+      } else {
+        // Docling returned but with no content - fall through to PDF.js
+        logger.warn('Docling extraction returned empty content, falling back to PDF.js', context, undefined, {
+          doclingError: doclingResult.error
+        })
+      }
+    } catch (doclingError) {
+      // Docling failed - log and fall through to PDF.js
+      logger.warn('Docling extraction failed, falling back to PDF.js', context, doclingError as Error)
+    }
+  } else if (!isDoclingSupported(fileName)) {
+    logger.info('File type not supported by Docling, using PDF.js', context, {
+      fileType: fileName.split('.').pop()?.toLowerCase()
+    })
+  }
+
+  // ========================================
+  // STRATEGY 2: Fall Back to PDF.js Pipeline
+  // ========================================
+  logger.info('Using PDF.js fallback extraction', context)
+  
+  // For non-PDF files that Docling couldn't handle, we can't use PDF.js
+  const fileExt = fileName.split('.').pop()?.toLowerCase()
+  if (fileExt && fileExt !== 'pdf') {
+    const errorMessage = `Cannot extract text from .${fileExt} file - Docling unavailable and PDF.js only supports PDFs`
+    logger.error('Unsupported file type for fallback', context, new Error(errorMessage))
+    
+    throw errorHandler.createError(
+      errorMessage,
+      ErrorType.PDF_PROCESSING,
+      ErrorSeverity.HIGH,
+      context,
+      { fileName, fileSize, fileType: fileExt }
+    )
+  }
+
+  // Use the existing PDF.js extraction pipeline
+  return extractWithFallback(file, options.visionOptions || { enabled: false })
 }
 
 /**

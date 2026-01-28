@@ -12,7 +12,8 @@ import { documentContentService } from '../services/documentContentService'
 import { OCRConsentDialog } from './OCRConsentDialog'
 import { calculateOCRCredits } from '../utils/ocrUtils'
 import { extractStructuredText } from '../utils/pdfTextExtractor'
-import { extractWithFallback } from '../services/pdfExtractionOrchestrator'
+import { extractWithFallback, extractWithHybridPipeline } from '../services/pdfExtractionOrchestrator'
+import { isDoclingSupported, getMimeTypesForDocling } from '../services/doclingService'
 import { canPerformVisionExtraction } from '../services/visionUsageService'
 import { configurePDFWorker } from '../utils/pdfjsConfig'
 import { supabase } from '../../lib/supabase'
@@ -125,6 +126,9 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
       });
 
       // Validate file
+      const fileExt = file.name.toLowerCase().split('.').pop() || '';
+      const isDoclingFile = isDoclingSupported(file.name);
+      
       if (file.type === 'application/pdf') {
         const validation = validatePDFFile(file, context);
         if (!validation.isValid) {
@@ -134,6 +138,19 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
             ErrorSeverity.MEDIUM,
             context,
             { validationErrors: validation.errors }
+          );
+          throw error;
+        }
+      } else if (isDoclingFile) {
+        // Docling-supported formats (DOCX, PPTX, XLSX, images)
+        const maxSize = 50 * 1024 * 1024; // 50MB for documents
+        if (file.size > maxSize) {
+          const error = errorHandler.createError(
+            `File too large. Maximum size is ${maxSize / (1024 * 1024)}MB.`,
+            ErrorType.VALIDATION,
+            ErrorSeverity.MEDIUM,
+            context,
+            { fileSize: file.size, maxSize }
           );
           throw error;
         }
@@ -158,9 +175,10 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
         }
       }
 
-      if (file.type === 'application/pdf') {
+      if (file.type === 'application/pdf' || isDoclingFile) {
         // Get user info for vision fallback
-        setExtractionProgress('Extracting text from PDF...')
+        const fileTypeLabel = fileExt === 'pdf' ? 'PDF' : fileExt.toUpperCase();
+        setExtractionProgress(`Extracting text from ${fileTypeLabel}...`)
         
         let userId: string | undefined
         let userTier: string | undefined
@@ -183,21 +201,41 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
           logger.warn('Could not get user info for vision fallback', context, authError as Error)
         }
 
-        // Use the new orchestrator for robust extraction
+        // Use the hybrid pipeline (Docling first, PDF.js fallback)
         const extractionResult = await trackPerformance(
-          'extractWithFallback',
-          () => extractWithFallback(file, {
-            enabled: !!userId && !!authToken, // Enable vision fallback if user is authenticated
-            userId,
-            userTier,
-            authToken
+          'extractWithHybridPipeline',
+          () => extractWithHybridPipeline(file, {
+            useDocling: true, // Try Docling first for better extraction
+            doclingOptions: {
+              enableOcr: true,
+              extractTables: true,
+              extractFormulas: true,
+              preserveLayout: true,
+            },
+            visionOptions: {
+              enabled: !!userId && !!authToken, // Enable vision fallback if user is authenticated
+              userId,
+              userTier,
+              authToken
+            }
           }),
           context,
           { fileName: file.name, fileSize: file.size }
         );
 
-        // Show quality report
-        if (extractionResult.metadata.visionPages > 0) {
+        // Show quality report based on extraction method
+        if (extractionResult.extractionMethod === 'docling') {
+          const tableInfo = extractionResult.metadata.doclingTables 
+            ? `\n✓ ${extractionResult.metadata.doclingTables} tables detected` 
+            : '';
+          const figureInfo = extractionResult.metadata.doclingFigures 
+            ? `\n✓ ${extractionResult.metadata.doclingFigures} figures detected` 
+            : '';
+          setExtractionProgress(
+            `✓ ${extractionResult.totalPages} pages extracted with Docling` +
+            tableInfo + figureInfo
+          )
+        } else if (extractionResult.metadata.visionPages > 0) {
           setExtractionProgress(
             `✓ ${extractionResult.metadata.pdfJsPages} pages extracted\n` +
             `✓ ${extractionResult.metadata.visionPages} pages enhanced with AI vision`
@@ -208,11 +246,17 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
         const { content, pdfData, totalPages, pageTexts, needsOCR, ocrStatus, extractionMethod, visionPagesUsed } = extractionResult;
 
+        // Determine document type based on file extension
+        const docType = fileExt === 'pdf' ? 'pdf' as const : 
+                        ['docx', 'pptx', 'xlsx'].includes(fileExt) ? 'document' as const :
+                        ['png', 'jpg', 'jpeg', 'tiff', 'bmp'].includes(fileExt) ? 'image' as const :
+                        'pdf' as const;
+
         const document = {
           id: crypto.randomUUID(),
           name: file.name,
           content,
-          type: 'pdf' as const,
+          type: docType,
           uploadedAt: new Date(),
           pdfData,
           totalPages,
@@ -220,7 +264,8 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
           needsOCR,
           ocrStatus: ocrStatus as 'not_needed' | 'pending' | 'processing' | 'completed' | 'failed' | 'user_declined',
           extractionMethod, // Add extraction method for UI badges
-          visionPages: visionPagesUsed
+          visionPages: visionPagesUsed,
+          sourceFormat: fileExt // Track original file format
         }
         
         // Check if we should show OCR dialog (auto-approve if session setting is enabled)
@@ -977,7 +1022,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
             </p>
             <input
               type="file"
-              accept=".txt,.pdf,application/pdf,text/plain,text/markdown"
+              accept=".txt,.pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg,.tiff,.html,application/pdf,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/png,image/jpeg,image/tiff,text/html"
               onChange={handleFileInput}
               className="hidden"
               id="file-upload"
@@ -1025,12 +1070,17 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
           <div className="mt-6" style={{ color: 'var(--color-text-secondary)' }}>
             <p className="text-caption font-medium mb-2">Supported formats:</p>
             <ul className="space-y-1 text-caption">
-              <li>• Text files (.txt, .md)</li>
               <li>• PDF documents (.pdf)</li>
+              <li>• Word documents (.docx)</li>
+              <li>• PowerPoint presentations (.pptx)</li>
+              <li>• Excel spreadsheets (.xlsx)</li>
+              <li>• Images (.png, .jpg, .jpeg, .tiff)</li>
+              <li>• Text files (.txt, .md)</li>
+              <li>• HTML files (.html)</li>
             </ul>
             <p className="mt-3 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
-              Note: PDFs use intelligent 3-tier extraction with AI vision enhancement for poor quality pages.
-              If text extraction quality is low, the app will automatically use OCR.
+              Documents are processed with Docling for superior table, formula, and layout extraction.
+              If Docling is unavailable, PDFs fall back to intelligent 3-tier extraction with AI vision enhancement.
             </p>
           </div>
 
