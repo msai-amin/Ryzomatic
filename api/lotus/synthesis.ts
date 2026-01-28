@@ -146,12 +146,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Call Python LOTUS service
-    // In production, this would call the Python function at /api/lotus/index
-    // For now, we'll make an internal call to the Python endpoint
-    const lotusUrl = process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}/api/lotus`
-      : 'http://localhost:3000/api/lotus';
+    // Call LOTUS service: external URL if set, otherwise same-origin (Python function excluded on Vercel due to bundle size)
+    const lotusUrl = process.env.LOTUS_API_URL
+      ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/api/lotus` : 'http://localhost:3000/api/lotus');
 
     try {
       const lotusResponse = await fetch(lotusUrl, {
@@ -169,9 +166,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!lotusResponse.ok) {
         const errorText = await lotusResponse.text();
         console.error('LOTUS service error:', errorText);
-        return res.status(500).json({ 
+        // 404/502 when Python function is not deployed (excluded via .vercelignore)
+        if (lotusResponse.status === 404 || lotusResponse.status === 502) {
+          return res.status(503).json({
+            error: 'LOTUS synthesis backend is not deployed on this environment. Set LOTUS_API_URL to an external LOTUS service, or run synthesis locally.',
+            code: 'LOTUS_NOT_AVAILABLE',
+          });
+        }
+        return res.status(500).json({
           error: 'LOTUS synthesis failed',
-          details: errorText.substring(0, 200)
+          details: errorText.substring(0, 200),
         });
       }
 
@@ -199,9 +203,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     } catch (fetchError: any) {
       console.error('Error calling LOTUS service:', fetchError);
-      return res.status(500).json({ 
-        error: 'Failed to call LOTUS service',
-        message: fetchError.message 
+      return res.status(503).json({
+        error: 'LOTUS synthesis backend is not available. Set LOTUS_API_URL to an external LOTUS service, or run synthesis locally.',
+        code: 'LOTUS_NOT_AVAILABLE',
+        message: fetchError.message,
       });
     }
 
