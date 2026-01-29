@@ -6,3 +6,6 @@ api/docling/
 # Use /api/lotus/synthesis (TS) only; set LOTUS_API_URL to an external LOTUS service for synthesis
 api/lotus/index.py
 api/lotus/requirements.txt
+
+# Exclude debug log endpoint - keeps deployment under Hobby plan 12-function limit; works locally with vercel dev
+api/debug/
