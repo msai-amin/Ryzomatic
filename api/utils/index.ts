@@ -626,22 +626,24 @@ async function handleEmbedding(req: VercelRequest, res: VercelResponse) {
 
     const { text, texts } = req.body;
     const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
-    
+    // Request body must include outputDimensionality; SDK ignores it if passed as second arg
     if (typeof text === 'string') {
-      // Pass text as first parameter, options as second (matches paperEmbeddingService.ts)
-      const result = await model.embedContent(text, {
-        outputDimensionality: 768
+      const result = await model.embedContent({
+        content: { parts: [{ text }] },
+        outputDimensionality: 768,
       } as any);
       return res.status(200).json({ embedding: result.embedding.values });
     }
-    
+
     if (Array.isArray(texts)) {
       if (texts.length === 0) {
         return res.status(400).json({ error: 'texts array must not be empty' });
       }
-      const results = await Promise.all(texts.map((t: string) => model.embedContent(t, {
-        outputDimensionality: 768
-      } as any)));
+      const results = await Promise.all(
+        texts.map((t: string) =>
+          model.embedContent({ content: { parts: [{ text: t }] }, outputDimensionality: 768 } as any)
+        )
+      );
       return res.status(200).json({ embeddings: results.map(r => r.embedding.values) });
     }
     

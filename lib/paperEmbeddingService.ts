@@ -121,10 +121,10 @@ export class PaperEmbeddingService {
       const genAI = new GoogleGenerativeAI(geminiKey);
       const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
       
-      // Pass text directly as string (not in object with content property)
-      // The API expects the text as the first parameter
-      const result = await model.embedContent(text, {
-        outputDimensionality: 768
+      // Request body must include outputDimensionality; SDK ignores it if passed as second arg
+      const result = await model.embedContent({
+        content: { parts: [{ text }] },
+        outputDimensionality: 768,
       } as any);
       
       const embedding = result.embedding.values;
