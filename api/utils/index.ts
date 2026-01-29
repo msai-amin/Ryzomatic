@@ -574,6 +574,16 @@ async function handleFormulaConversion(req: VercelRequest, res: VercelResponse) 
  * POST /api/utils?action=embedding
  */
 async function handleEmbedding(req: VercelRequest, res: VercelResponse) {
+  // DEBUG: Log environment variable status
+  console.log('[DEBUG] handleEmbedding called', {
+    hasGeminiKey: !!process.env.GEMINI_API_KEY,
+    geminiKeyLength: process.env.GEMINI_API_KEY?.length || 0,
+    hasSupabaseUrl: !!process.env.SUPABASE_URL,
+    hasSupabaseServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    geminiKeyInitialized: !!geminiKey,
+    genAIInitialized: !!genAI,
+  });
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -587,6 +597,7 @@ async function handleEmbedding(req: VercelRequest, res: VercelResponse) {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
+      console.log('[DEBUG] Auth failed', { authError: authError?.message, hasUser: !!user });
       return res.status(401).json({ error: 'Invalid token' });
     }
 
@@ -609,6 +620,7 @@ async function handleEmbedding(req: VercelRequest, res: VercelResponse) {
     }
 
     if (!geminiKey || !genAI) {
+      console.log('[DEBUG] Gemini not configured', { geminiKey: !!geminiKey, genAI: !!genAI });
       return res.status(500).json({ error: 'GEMINI_API_KEY is not configured' });
     }
 

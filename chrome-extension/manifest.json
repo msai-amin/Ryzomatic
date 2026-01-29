@@ -1,0 +1,53 @@
+{
+  "manifest_version": 3,
+  "name": "Ryzomatic - Save to Library",
+  "version": "1.0.0",
+  "description": "Save web pages, PDFs, and highlights to your Ryzomatic research library. AI-powered reading assistant for researchers.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "contextMenus",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://*.ryzomatic.net/*",
+    "https://ryzomatic.net/*",
+    "https://*.supabase.co/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "dist/background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["dist/content/content-script.js"],
+      "css": ["dist/content/content-script.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "dist/popup/index.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    },
+    "default_title": "Ryzomatic"
+  },
+  "options_page": "dist/options/index.html",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["dist/content/highlight-ui.js", "icons/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
+

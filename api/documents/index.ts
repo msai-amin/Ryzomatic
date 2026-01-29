@@ -22,17 +22,27 @@ export const config = {
   },
 };
 
+// Initialize clients with defensive fallbacks (will check at handler time)
 const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION || 'us-east-1',
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
   },
+});
+
+// Log initialization status
+console.log('[INIT] /api/documents module loaded', {
+  supabaseUrl: process.env.SUPABASE_URL?.substring(0, 30) || 'NOT_SET',
+  hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+  awsRegion: process.env.AWS_REGION || 'NOT_SET',
+  hasAwsAccessKey: !!process.env.AWS_ACCESS_KEY_ID,
+  hasAwsSecretKey: !!process.env.AWS_SECRET_ACCESS_KEY,
 });
 
 // Tier limits
@@ -45,6 +55,34 @@ const TIER_LIMITS = {
  * Main handler - routes to appropriate operation based on action
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // DEBUG: Log environment variable status at handler entry
+  console.log('[DEBUG] /api/documents handler called', {
+    action: req.body?.action || req.query.action,
+    method: req.method,
+    hasSupabaseUrl: !!process.env.SUPABASE_URL,
+    hasSupabaseServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    hasAwsRegion: !!process.env.AWS_REGION,
+    hasAwsAccessKey: !!process.env.AWS_ACCESS_KEY_ID,
+    hasAwsSecretKey: !!process.env.AWS_SECRET_ACCESS_KEY,
+    hasAwsS3Bucket: !!process.env.AWS_S3_BUCKET,
+  });
+
+  // Check required environment variables
+  const missingEnvVars: string[] = [];
+  if (!process.env.SUPABASE_URL) missingEnvVars.push('SUPABASE_URL');
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missingEnvVars.push('SUPABASE_SERVICE_ROLE_KEY');
+  if (!process.env.AWS_ACCESS_KEY_ID) missingEnvVars.push('AWS_ACCESS_KEY_ID');
+  if (!process.env.AWS_SECRET_ACCESS_KEY) missingEnvVars.push('AWS_SECRET_ACCESS_KEY');
+  
+  if (missingEnvVars.length > 0) {
+    console.error('[ERROR] Missing required environment variables:', missingEnvVars);
+    return res.status(500).json({ 
+      error: 'Server configuration error', 
+      missing: missingEnvVars,
+      hint: 'Required environment variables are not set in Vercel'
+    });
+  }
+
   const action = (req.body?.action || req.query.action) as string;
 
   // Route based on action
