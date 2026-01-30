@@ -19,7 +19,7 @@ import {
 import { useAppStore } from '../src/store/appStore'
 import { TypographySettings } from '../src/components/TypographySettings'
 import { GeneralSettings } from '../src/components/GeneralSettings'
-import { LibraryModal } from '../src/components/LibraryModal'
+import { ModernLibraryModal } from '../src/components/ModernLibraryModal'
 import { AuthModal } from '../src/components/AuthModal'
 import { Tooltip } from '../src/components/Tooltip'
 import { UnsavedChangesDialog } from '../src/components/UnsavedChangesDialog'
@@ -555,7 +555,7 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
       )}
 
       {showLibrary && (
-        <LibraryModal
+        <ModernLibraryModal
           isOpen={showLibrary}
           onClose={() => setShowLibrary(false)}
           refreshTrigger={libraryRefreshTrigger}
