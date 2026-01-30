@@ -36,10 +36,12 @@ export const SynthesisDialog: React.FC<SynthesisDialogProps> = ({
       const res = await synthesizeDocuments(documentIds, query.trim());
       setResult(res);
     } catch (e: any) {
-      // Handle LOTUS_NOT_AVAILABLE error specially
       const errorMessage = e.message || 'Synthesis failed';
       if (errorMessage.includes('LOTUS_NOT_AVAILABLE') || errorMessage.includes('not available')) {
-        setError('Synthesis is not available in this environment. Please try again later.');
+        setError(
+          'LOTUS synthesis is not available in this environment. ' +
+          'To use it: run the app locally (e.g. vercel dev), or set LOTUS_API_URL to an external LOTUS service in your deployment.'
+        );
       } else {
         setError(errorMessage);
       }

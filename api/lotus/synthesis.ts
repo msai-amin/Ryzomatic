@@ -147,6 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Call LOTUS service: external URL if set, otherwise same-origin (Python function excluded on Vercel due to bundle size)
+    const hasExternalLotus = !!process.env.LOTUS_API_URL;
     const lotusUrl = process.env.LOTUS_API_URL
       ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/api/lotus` : 'http://localhost:3000/api/lotus');
 
@@ -165,11 +166,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (!lotusResponse.ok) {
         const errorText = await lotusResponse.text();
-        console.error('LOTUS service error:', errorText);
-        // 404/502 when Python function is not deployed (excluded via .vercelignore)
-        if (lotusResponse.status === 404 || lotusResponse.status === 502) {
+        console.error('LOTUS service error:', lotusResponse.status, errorText);
+        // 404/502/500/503 when Python function is not deployed (excluded via .vercelignore) or backend unavailable
+        const backendUnavailable = [404, 502, 503].includes(lotusResponse.status)
+          || (lotusResponse.status === 500 && !hasExternalLotus);
+        if (backendUnavailable) {
           return res.status(503).json({
-            error: 'LOTUS synthesis backend is not deployed on this environment. Set LOTUS_API_URL to an external LOTUS service, or run synthesis locally.',
+            error: 'LOTUS synthesis is not available in this environment. To use it: run the app locally (vercel dev), or set LOTUS_API_URL to an external LOTUS service in your deployment.',
             code: 'LOTUS_NOT_AVAILABLE',
           });
         }
