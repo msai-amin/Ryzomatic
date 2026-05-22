@@ -13,8 +13,7 @@
   "host_permissions": [
     "https://*.ryzomatic.net/*",
     "https://ryzomatic.net/*",
-    "https://*.supabase.co/*",
-    "<all_urls>"
+    "https://*.supabase.co/*"
   ],
   "background": {
     "service_worker": "dist/background/service-worker.js",
