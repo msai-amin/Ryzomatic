@@ -451,7 +451,10 @@ describe('LOTUS Synthesis API', () => {
       expect(res._json.code).toBe('LOTUS_NOT_AVAILABLE');
     });
 
-    it('should return 500 when LOTUS backend returns other errors', async () => {
+    it('should return 503 when LOTUS backend returns 500 without LOTUS_API_URL', async () => {
+      // Without an external LOTUS service configured, the handler treats a 500
+      // from the backend as "not deployed" and maps it to 503/LOTUS_NOT_AVAILABLE
+      // (see api/lotus/synthesis.ts: backendUnavailable check).
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
@@ -465,8 +468,31 @@ describe('LOTUS Synthesis API', () => {
 
       await handler(req, res);
 
-      expect(res._status).toBe(500);
-      expect(res._json.error).toContain('LOTUS synthesis failed');
+      expect(res._status).toBe(503);
+      expect(res._json.code).toBe('LOTUS_NOT_AVAILABLE');
+    });
+
+    it('should return 500 when LOTUS_API_URL is set and the backend returns 500', async () => {
+      vi.stubEnv('LOTUS_API_URL', 'https://lotus.example.com');
+      try {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          text: () => Promise.resolve('Internal Server Error'),
+        });
+
+        const req = createMockRequest({
+          body: mockSynthesisRequest,
+        });
+        const res = createMockResponse();
+
+        await handler(req, res);
+
+        expect(res._status).toBe(500);
+        expect(res._json.error).toContain('LOTUS synthesis failed');
+      } finally {
+        vi.unstubAllEnvs();
+      }
     });
 
     it('should return 503 when fetch throws network error', async () => {
