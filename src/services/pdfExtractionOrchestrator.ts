@@ -415,13 +415,25 @@ export async function extractWithHybridPipeline(
         // Create a quality report for Docling results
         // Docling typically produces high-quality output
         const qualityReport: DocumentQualityReport = {
+          totalPages: pageTexts.length,
+          pageMetrics: pageTexts.map((text, idx) => ({
+            pageNumber: idx + 1,
+            charCount: text.length,
+            wordCount: text.split(/\s+/).filter(Boolean).length,
+            lineCount: text.split('\n').length,
+            specialCharRatio: 0,
+            qualityScore: 95,
+            needsVisionFallback: false,
+            issues: []
+          })),
           overallScore: 95,
-          pageScores: pageTexts.map(() => 95),
+          problematicPages: [],
           extractionMethod: 'docling',
-          issues: [],
-          emptyPages: [],
-          lowQualityPages: [],
-          suspiciousPages: []
+          summary: {
+            successfulPages: pageTexts.length,
+            poorQualityPages: 0,
+            failedPages: 0
+          }
         }
 
         const result: ExtractionResult = {

@@ -33,7 +33,7 @@ export interface Document {
   id: string
   name: string
   content: string
-  type: 'text' | 'pdf'
+  type: 'text' | 'pdf' | 'document' | 'image'
   uploadedAt: Date
   // PDF-specific properties
   pdfData?: ArrayBuffer | string | Blob // Support ArrayBuffer, blob URL, and Blob

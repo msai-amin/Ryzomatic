@@ -21,7 +21,7 @@ export interface DocumentQualityReport {
   pageMetrics: PageQualityMetrics[]
   overallScore: number
   problematicPages: number[]
-  extractionMethod: 'pdfjs' | 'hybrid' | 'vision' | 'ocr'
+  extractionMethod: 'pdfjs' | 'hybrid' | 'vision' | 'ocr' | 'docling'
   summary: {
     successfulPages: number
     poorQualityPages: number
