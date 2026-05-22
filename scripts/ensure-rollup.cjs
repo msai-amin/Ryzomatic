@@ -9,6 +9,11 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
+if (process.platform !== 'linux' || process.arch !== 'x64') {
+  console.log(`ℹ️  Skipping Rollup Linux-x64 check on ${process.platform}/${process.arch}`);
+  process.exit(0);
+}
+
 const rollupPath = path.join(process.cwd(), 'node_modules', '@rollup', 'rollup-linux-x64-gnu');
 
 if (!fs.existsSync(rollupPath)) {

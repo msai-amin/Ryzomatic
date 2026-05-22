@@ -27,7 +27,7 @@ interface DocumentWithProgress {
   progress: number
   readingTime: string
   isActive: boolean
-  type: 'text' | 'pdf'
+  type: 'text' | 'pdf' | 'document' | 'image'
   uploadedAt: string
   totalPages?: number
   currentPage?: number
