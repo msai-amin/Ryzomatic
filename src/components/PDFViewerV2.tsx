@@ -5,7 +5,7 @@
  * which provides better highlighting support and eliminates coordinate conversion issues.
  */
 
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import { Viewer, Worker, DocumentLoadEvent, PageChangeEvent, ZoomEvent, RotateEvent, ScrollMode } from '@react-pdf-viewer/core'
 import { highlightPlugin, HighlightArea, RenderHighlightTargetProps, RenderHighlightContentProps, RenderHighlightsProps, SelectionData } from '@react-pdf-viewer/highlight'
 import { scrollModePlugin } from '@react-pdf-viewer/scroll-mode'
@@ -34,7 +34,10 @@ import { HighlightColorPopover } from './HighlightColorPopover'
 import { OCRBanner, OCRStatusBadge } from './OCRStatusBadge'
 import { HighlightManagementPanel } from './HighlightManagementPanel'
 import { NotesPanel } from './NotesPanel'
-import { ModernLibraryModal } from './ModernLibraryModal'
+// Lazy-load: ~2,600 LOC modal only mounts when the user opens the library.
+const ModernLibraryModal = lazy(() =>
+  import('./ModernLibraryModal').then(m => ({ default: m.ModernLibraryModal }))
+)
 import { DocumentUpload } from './DocumentUpload'
 import { TTSControls } from './TTSControls'
 
@@ -3242,11 +3245,13 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       
       {/* Library Modal */}
       {showLibrary && (
-        <ModernLibraryModal
-          isOpen={showLibrary}
-          onClose={() => setShowLibrary(false)}
-          // PDFViewerV2 doesn't currently pass refreshTrigger; modal works without it.
-        />
+        <Suspense fallback={null}>
+          <ModernLibraryModal
+            isOpen={showLibrary}
+            onClose={() => setShowLibrary(false)}
+            // PDFViewerV2 doesn't currently pass refreshTrigger; modal works without it.
+          />
+        </Suspense>
       )}
       
       {/* Document Upload Modal */}
