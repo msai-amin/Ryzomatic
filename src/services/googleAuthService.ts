@@ -207,7 +207,7 @@ class GoogleAuthService {
         const user = authInstance.currentUser.get();
         this.currentUser = this.mapGoogleUser(user);
         this.persistCurrentUser();
-        console.log('User already signed in:', this.currentUser.email);
+        console.log('User already signed in:', this.currentUser.id);
       }
     } catch (error) {
       console.error('Error initializing Google API:', error);
