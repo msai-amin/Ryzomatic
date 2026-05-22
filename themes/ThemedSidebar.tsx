@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { FileText, Clock, Timer, ChevronLeft, ChevronRight, Flame, Trophy, BarChart3, ChevronDown, ChevronUp, History, GitBranch, TrendingUp, Activity, Network, X, Sparkles } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
@@ -11,7 +11,12 @@ import { RelatedDocumentsPanel } from '../src/components/RelatedDocumentsPanel'
 import { PaperRecommendationsPanel } from '../src/components/PaperRecommendationsPanel'
 import { AddRelatedDocumentModal } from '../src/components/AddRelatedDocumentModal'
 import { DocumentPreviewModal } from '../src/components/DocumentPreviewModal'
-import { DocumentRelationshipGraph } from '../src/components/DocumentRelationshipGraph'
+
+// Lazy-load the d3-based relationship graph: it pulls in d3 (~800KB) and is only
+// shown when the user opens the graph modal from this sidebar.
+const DocumentRelationshipGraph = lazy(() =>
+  import('../src/components/DocumentRelationshipGraph').then(m => ({ default: m.DocumentRelationshipGraph }))
+)
 import { userBooks, documentRelationships, DocumentRelationshipWithDetails } from '../lib/supabase'
 import { supabaseStorageService } from '../src/services/supabaseStorageService'
 
@@ -922,8 +927,9 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
                   </button>
                 </div>
                 <div className="p-6 max-h-[70vh] overflow-y-auto">
-                  <DocumentRelationshipGraph 
-                    sourceDocumentId={currentDocument.id} 
+                  <Suspense fallback={<div className="p-12 text-center" style={{ color: 'var(--color-text-secondary)' }}>Loading relationship graph…</div>}>
+                  <DocumentRelationshipGraph
+                    sourceDocumentId={currentDocument.id}
                     userId={user.id}
                     onOpenDocument={async (documentId) => {
                       // Load and open the document
@@ -973,6 +979,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
                       }
                     }}
                   />
+                  </Suspense>
                 </div>
               </div>
             </div>
