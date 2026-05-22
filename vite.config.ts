@@ -82,7 +82,6 @@ export default defineConfig(({ mode }) => ({
       'citation-js',
       'neo4j-driver',
       'd3',
-      'mermaid',
       'vis-timeline',
       'vis-data'
     ]
