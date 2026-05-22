@@ -32,6 +32,7 @@ import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelec
 import { notesService } from '../services/notesService'
 import { HighlightColorPopover } from './HighlightColorPopover'
 import { OCRBanner, OCRStatusBadge } from './OCRStatusBadge'
+import { pollOCRStatus, requestOCRProcess } from '../services/ocrService'
 import { HighlightManagementPanel } from './HighlightManagementPanel'
 import { NotesPanel } from './NotesPanel'
 // Lazy-load: ~2,600 LOC modal only mounts when the user opens the library.
@@ -999,40 +1000,33 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     if (!normalizedDocumentId) return
     
     if (ocrStatus === 'processing' || ocrStatus === 'pending') {
-      // Start polling for status updates
+      // Start polling for status updates via ocrService
       pollingIntervalRef.current = setInterval(async () => {
-        try {
-          const response = await fetch(`/api/documents?action=ocr-status&documentId=${normalizedDocumentId}`)
-          
-          if (response.ok) {
-            const data = await response.json()
-            
-            if (data.ocrStatus !== ocrStatus) {
-              setOcrStatus(data.ocrStatus)
-              
-              // Update error info if failed
-              if (data.ocrStatus === 'failed') {
-                setOcrError(data.ocrMetadata?.error || 'OCR processing failed')
-                setOcrCanRetry(data.ocrMetadata?.canRetry ?? true)
-              }
-              
-              // Update document content if completed
-              if (data.ocrStatus === 'completed' && data.content) {
-                console.log('OCR completed successfully, text extracted')
-                // TODO: Update document content in store
-              }
-              
-              // Clear interval if done (completed or failed)
-              if (data.ocrStatus !== 'processing' && data.ocrStatus !== 'pending') {
-                if (pollingIntervalRef.current) {
-                  clearInterval(pollingIntervalRef.current)
-                  pollingIntervalRef.current = null
-                }
-              }
+        const data = await pollOCRStatus(normalizedDocumentId)
+        if (!data) return
+
+        if (data.ocrStatus !== ocrStatus) {
+          setOcrStatus(data.ocrStatus)
+
+          // Update error info if failed
+          if (data.ocrStatus === 'failed') {
+            setOcrError(data.ocrMetadata?.error || 'OCR processing failed')
+            setOcrCanRetry(data.ocrMetadata?.canRetry ?? true)
+          }
+
+          // Update document content if completed
+          if (data.ocrStatus === 'completed' && data.content) {
+            console.log('OCR completed successfully, text extracted')
+            // TODO: Update document content in store
+          }
+
+          // Clear interval if done (completed or failed)
+          if (data.ocrStatus !== 'processing' && data.ocrStatus !== 'pending') {
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current)
+              pollingIntervalRef.current = null
             }
           }
-        } catch (error) {
-          console.error('Error checking OCR status:', error)
         }
       }, 3000) // Poll every 3 seconds
 
@@ -2988,51 +2982,13 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             errorMessage={ocrError}
             onRetry={ocrCanRetry ? async () => {
               if (!document?.id) return
-              try {
-                const { authService } = await import('../services/supabaseAuthService')
-                const session = await authService.getSession()
-                const token = session?.access_token
-                if (!token) {
-                  console.error('No access token available')
-                  return
-                }
-                const response = await fetch(`/api/documents?action=ocr-process&documentId=${document.id}`, {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                  }
-                })
-                if (response.ok) {
-                  setOcrStatus('processing')
-                }
-              } catch (error) {
-                console.error('Error retrying OCR:', error)
-              }
+              const ok = await requestOCRProcess(document.id)
+              if (ok) setOcrStatus('processing')
             } : undefined}
             onStartOCR={ocrStatus === 'pending' ? async () => {
               if (!document?.id) return
-              try {
-                const { authService } = await import('../services/supabaseAuthService')
-                const session = await authService.getSession()
-                const token = session?.access_token
-                if (!token) {
-                  console.error('No access token available')
-                  return
-                }
-                const response = await fetch(`/api/documents?action=ocr-process&documentId=${document.id}`, {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                  }
-                })
-                if (response.ok) {
-                  setOcrStatus('processing')
-                }
-              } catch (error) {
-                console.error('Error starting OCR:', error)
-              }
+              const ok = await requestOCRProcess(document.id)
+              if (ok) setOcrStatus('processing')
             } : undefined}
           />
         )}
