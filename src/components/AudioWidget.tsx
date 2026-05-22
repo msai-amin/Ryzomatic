@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAppStore, Voice, TTSPosition } from '../store/appStore'
 import { ttsManager } from '../services/ttsManager'
-import { ttsManagerWithQueue } from '../services/ttsManagerWithQueue'
-import { createSegmentsFromParagraphs } from '../services/ttsQueue'
 import { AudioSettingsPanel } from './AudioSettingsPanel'
 import { ttsCacheService, TTSCacheQuery } from '../services/ttsCacheService'
 import { supabase } from '../../lib/supabase'
