@@ -1,9 +1,14 @@
-import React from 'react'
+import React, { lazy, Suspense } from 'react'
 import { Upload, MessageCircle, Settings, FileText, Library, User, Cloud, LogOut } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { DocumentUpload } from './DocumentUpload'
 import { TypographySettings } from './TypographySettings'
-import { ModernLibraryModal } from './ModernLibraryModal'
+
+// Lazy-load: the library modal is large (~2,600 LOC) and only mounts when
+// the user clicks Library.
+const ModernLibraryModal = lazy(() =>
+  import('./ModernLibraryModal').then(m => ({ default: m.ModernLibraryModal }))
+)
 import { AuthModal } from './AuthModal'
 import { ThemeSwitcher } from './ThemeSwitcher'
 
@@ -128,11 +133,13 @@ export const Header: React.FC = () => {
       )}
 
       {showLibrary && (
-        <ModernLibraryModal 
-          isOpen={showLibrary} 
-          onClose={() => setShowLibrary(false)} 
-          refreshTrigger={libraryRefreshTrigger}
-        />
+        <Suspense fallback={null}>
+          <ModernLibraryModal
+            isOpen={showLibrary}
+            onClose={() => setShowLibrary(false)}
+            refreshTrigger={libraryRefreshTrigger}
+          />
+        </Suspense>
       )}
 
       {showUpload && (

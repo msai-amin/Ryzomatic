@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Upload,
@@ -19,7 +19,11 @@ import {
 import { useAppStore } from '../src/store/appStore'
 import { TypographySettings } from '../src/components/TypographySettings'
 import { GeneralSettings } from '../src/components/GeneralSettings'
-import { ModernLibraryModal } from '../src/components/ModernLibraryModal'
+
+// Lazy-load: ~2,600 LOC modal only mounts when the user opens the library.
+const ModernLibraryModal = lazy(() =>
+  import('../src/components/ModernLibraryModal').then(m => ({ default: m.ModernLibraryModal }))
+)
 import { AuthModal } from '../src/components/AuthModal'
 import { Tooltip } from '../src/components/Tooltip'
 import { UnsavedChangesDialog } from '../src/components/UnsavedChangesDialog'
@@ -555,11 +559,13 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
       )}
 
       {showLibrary && (
-        <ModernLibraryModal
-          isOpen={showLibrary}
-          onClose={() => setShowLibrary(false)}
-          refreshTrigger={libraryRefreshTrigger}
-        />
+        <Suspense fallback={null}>
+          <ModernLibraryModal
+            isOpen={showLibrary}
+            onClose={() => setShowLibrary(false)}
+            refreshTrigger={libraryRefreshTrigger}
+          />
+        </Suspense>
       )}
 
       {showSettings && <TypographySettings onClose={() => setShowSettings(false)} />}
