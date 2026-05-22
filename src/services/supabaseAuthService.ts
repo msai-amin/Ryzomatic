@@ -442,7 +442,7 @@ class SupabaseAuthService {
       }
       
       if (sessionData.session) {
-        console.log('✅ Session created successfully:', sessionData.session.user.email);
+        console.log('✅ Session created successfully for user', sessionData.session.user.id);
         return true;
       }
       

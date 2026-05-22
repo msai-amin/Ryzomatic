@@ -544,14 +544,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       // If session is provided from AuthContext, use it directly to avoid race condition
       if (sessionFromContext?.user) {
         user = sessionFromContext.user;
-        console.log('Using session from AuthContext:', user.email);
+        console.log('Using session from AuthContext for user', user.id);
       } else {
         // Otherwise, get user from auth service (fallback for backward compatibility)
         user = await authService.getCurrentUser();
       }
       
       if (user) {
-        console.log('User authenticated:', user.email);
+        console.log('User authenticated:', user.id);
         
         // Try to get user profile
         let profile = await authService.getUserProfile(user.id);
