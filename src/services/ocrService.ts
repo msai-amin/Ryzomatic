@@ -1,5 +1,62 @@
 // OCR Service - Client-side service for OCR operations
 
+export interface OCRPollResult {
+  ocrStatus: 'not_needed' | 'pending' | 'processing' | 'completed' | 'failed' | 'user_declined'
+  ocrMetadata?: {
+    error?: string
+    canRetry?: boolean
+    [key: string]: any
+  }
+  content?: string
+}
+
+/**
+ * Fetch the latest OCR status for a document. Used by the PDFViewer polling
+ * loop. Cookie-authed — does not require an explicit access token.
+ *
+ * Returns null on any non-OK response or network error so callers can keep
+ * polling without an exception path.
+ */
+export async function pollOCRStatus(documentId: string): Promise<OCRPollResult | null> {
+  try {
+    const response = await fetch(`/api/documents?action=ocr-status&documentId=${documentId}`)
+    if (!response.ok) return null
+    return await response.json()
+  } catch (error) {
+    console.error('Error checking OCR status:', error)
+    return null
+  }
+}
+
+/**
+ * Trigger OCR processing for a document. Used by both the "start OCR" and
+ * "retry OCR" buttons in the PDFViewer OCR banner. Resolves to `true` if
+ * the API accepted the request (the actual processing is async; the caller
+ * should kick off pollOCRStatus to observe completion).
+ */
+export async function requestOCRProcess(documentId: string): Promise<boolean> {
+  try {
+    const { authService } = await import('./supabaseAuthService')
+    const session = await authService.getSession()
+    const token = session?.access_token
+    if (!token) {
+      console.error('No access token available')
+      return false
+    }
+    const response = await fetch(`/api/documents?action=ocr-process&documentId=${documentId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    return response.ok
+  } catch (error) {
+    console.error('Error requesting OCR processing:', error)
+    return false
+  }
+}
+
 interface OCRProcessRequest {
   documentId: string;
   s3Key: string;
