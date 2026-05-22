@@ -188,7 +188,9 @@ describe('SynthesisDialog', () => {
       expect(screen.getByTestId('synthesis-error')).toBeInTheDocument();
     });
     
-    expect(screen.getByText('Synthesis is not available in this environment. Please try again later.')).toBeInTheDocument();
+    expect(
+      screen.getByText(/LOTUS synthesis is not available in this environment/i)
+    ).toBeInTheDocument();
   });
 
   it('should call onClose when clicking backdrop', async () => {
