@@ -136,6 +136,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type');
 
+  // Security headers applied to all responses from this handler
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
