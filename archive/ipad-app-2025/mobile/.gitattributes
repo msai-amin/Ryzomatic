@@ -1,3 +1,0 @@
-# Prevent accidental merges of mobile-specific files to main
-ios/** merge=ours
-capacitor.config.ts merge=ours
