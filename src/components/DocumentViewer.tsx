@@ -1,7 +1,12 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, lazy, Suspense } from 'react'
 import { useAppStore } from '../store/appStore'
 import { EmptyState } from './EmptyState'
-import { PDFViewerV2 } from './PDFViewerV2'
+
+// Lazy-load: PDFViewerV2 is ~3,300 LOC and pulls in @react-pdf-viewer/* plus
+// pdfjs-dist. Only loaded when the current document is actually a PDF.
+const PDFViewerV2 = lazy(() =>
+  import('./PDFViewerV2').then(m => ({ default: m.PDFViewerV2 }))
+)
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { storageService, Note } from '../services/storageService'
@@ -100,7 +105,11 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ onUploadClick })
       )
     }
     
-    return <PDFViewerV2 />
+    return (
+      <Suspense fallback={<div className="flex items-center justify-center h-full"><div style={{ color: 'var(--color-text-secondary)' }}>Loading PDF viewer…</div></div>}>
+        <PDFViewerV2 />
+      </Suspense>
+    )
   }
 
   // Use text viewer for text documents

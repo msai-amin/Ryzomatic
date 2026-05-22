@@ -1,6 +1,11 @@
-import React from 'react'
-import { PDFViewerV2 } from '../PDFViewerV2'
+import React, { lazy, Suspense } from 'react'
 import { ReviewPanel } from './ReviewPanel'
+
+// Lazy-load: PDFViewerV2 is ~3,300 LOC and pulls in @react-pdf-viewer/* plus
+// pdfjs-dist. EditorialLayout is only entered from peer-review mode.
+const PDFViewerV2 = lazy(() =>
+  import('../PDFViewerV2').then(m => ({ default: m.PDFViewerV2 }))
+)
 
 export const EditorialLayout: React.FC = () => {
   return (
@@ -8,7 +13,9 @@ export const EditorialLayout: React.FC = () => {
       {/* Left Pane: PDF Viewer */}
       <div className="w-1/2 h-full relative border-r border-[var(--color-border)]">
         {/* We pass specific props or context to PDFViewerV2 if needed, but it uses global store */}
-        <PDFViewerV2 />
+        <Suspense fallback={<div className="flex items-center justify-center h-full" style={{ color: 'var(--color-text-secondary)' }}>Loading PDF viewer…</div>}>
+          <PDFViewerV2 />
+        </Suspense>
       </div>
 
       {/* Right Pane: Review Editor */}
