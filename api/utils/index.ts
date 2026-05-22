@@ -119,6 +119,43 @@ if (geminiKey) {
   genAI = new GoogleGenerativeAI(geminiKey);
 }
 
+// CORS allowlist. Production origins come from ALLOWED_ORIGINS (comma-separated)
+// in Vercel env; the defaults cover prod + local dev. The Chrome extension
+// uses a chrome-extension:// origin and is matched by prefix. Vercel preview
+// URLs are matched by pattern so feature branches keep working.
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://ryzomatic.net',
+  'https://www.ryzomatic.net',
+  'http://localhost:3001',
+  'http://localhost:3000',
+];
+
+const VERCEL_PREVIEW_PATTERN = /^https:\/\/ryzomatic-[a-z0-9-]+\.vercel\.app$/;
+
+function isOriginAllowed(origin: string): boolean {
+  if (!origin) return false;
+  if (origin.startsWith('chrome-extension://')) return true;
+  if (VERCEL_PREVIEW_PATTERN.test(origin)) return true;
+
+  const envAllowed = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  const allowed = envAllowed.length > 0 ? envAllowed : DEFAULT_ALLOWED_ORIGINS;
+  return allowed.includes(origin);
+}
+
+function applyCors(req: VercelRequest, res: VercelResponse, methods = 'GET, POST, OPTIONS', headers = 'authorization, content-type'): void {
+  const origin = (req.headers.origin || '') as string;
+  if (isOriginAllowed(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', methods);
+  res.setHeader('Access-Control-Allow-Headers', headers);
+}
+
 // Helper function to escape XML for TTS
 function escapeXml(text: string): string {
   return text
@@ -130,11 +167,7 @@ function escapeXml(text: string): string {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Enable CORS for all actions
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type');
+  applyCors(req, res);
 
   // Security headers applied to all responses from this handler
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
@@ -169,11 +202,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
  */
 async function handleTextCleanup(req: VercelRequest, res: VercelResponse) {
   try {
-    // Enable CORS
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    applyCors(req, res, 'POST, OPTIONS', 'Content-Type');
 
     if (req.method === 'OPTIONS') {
       return res.status(200).end();
