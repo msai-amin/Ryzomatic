@@ -67,7 +67,11 @@ class Logger {
       case 'WARN': return LogLevel.WARN;
       case 'ERROR': return LogLevel.ERROR;
       case 'FATAL': return LogLevel.FATAL;
-      default: return import.meta.env.DEV ? LogLevel.DEBUG : LogLevel.INFO;
+      // Default: in dev, surface everything down to DEBUG so iteration is loud.
+      // In prod, default to WARN so the browser console stays clean for users;
+      // INFO breadcrumbs are still captured by Sentry around any error, and
+      // operators can override by setting VITE_LOG_LEVEL=INFO at build time.
+      default: return import.meta.env.DEV ? LogLevel.DEBUG : LogLevel.WARN;
     }
   }
 
