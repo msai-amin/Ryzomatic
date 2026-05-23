@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Slow checks: only run on push so day-to-day commits stay snappy.
+# Skip with `git push --no-verify` when you genuinely need to.
+
+echo "→ type-check"
+npm run type-check || exit 1
+
+echo "→ unit tests"
+npx vitest run --reporter=dot || exit 1

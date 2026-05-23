@@ -21,7 +21,12 @@
     "test:ci": "vitest run --coverage",
     "test:e2e:ci": "playwright test --reporter=json",
     "check-env": "node scripts/check-env.js",
-    "postinstall": "node scripts/ensure-rollup.cjs"
+    "postinstall": "node scripts/ensure-rollup.cjs",
+    "prepare": "husky install"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,mjs,cjs}": "eslint --max-warnings 0 --fix",
+    "*.{json,md,yml,yaml}": []
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.946.0",
@@ -114,6 +119,7 @@
     "jszip": "^3.10.1",
     "lighthouse": "^13.0.1",
     "lighthouse-ci": "^1.13.1",
+    "lint-staged": "^17.0.5",
     "patch-package": "^8.0.1",
     "postcss": "^8.4.32",
     "rollup-plugin-node-polyfills": "^0.2.1",
