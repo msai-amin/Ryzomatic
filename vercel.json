@@ -8,7 +8,7 @@
       "destination": "/api/:path*"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/|assets/|sw\\.js|workbox-|registerSW\\.js|favicon\\.|logo-|robots\\.txt|manifest\\.json|.*\\.(?:js|css|png|jpg|jpeg|gif|svg|webp|ico|woff2?|ttf|map)).*)",
       "destination": "/index.html"
     }
   ],
