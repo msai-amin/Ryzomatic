@@ -5,6 +5,13 @@
 
 import { HowlerAudioPlayer } from './howlerAudioPlayer'
 
+// Dev-only console wrapper. Production users don't need to see init-time
+// TTS chatter ("Fetching voices via proxy", "Voice set", etc) every page
+// load. Errors still go through plain console.error so they remain visible.
+const devLog = (...args: any[]) => {
+  if (import.meta.env.DEV) console.log(...args)
+}
+
 export interface AzureVoice {
   name: string;
   locale: string;
@@ -257,7 +264,7 @@ class AzureTTSService {
       baseUrl.searchParams.set('region', this.region);
       const url = baseUrl;
 
-      console.log('AzureTTSService.getVoices: Fetching voices via proxy', {
+      devLog('AzureTTSService.getVoices: Fetching voices via proxy', {
         endpoint: url.toString(),
         proxyEndpoint,
         region: this.region,
@@ -339,7 +346,7 @@ class AzureTTSService {
         return premiumVoiceNames.includes(v.name) || premiumVoiceNames.includes(baseName);
       });
       
-      console.log(`AzureTTSService.getVoices: Filtered to ${premiumVoices.length} premium voices`);
+      devLog(`AzureTTSService.getVoices: Filtered to ${premiumVoices.length} premium voices`);
       
       return premiumVoices;
     } catch (error) {
@@ -387,7 +394,7 @@ class AzureTTSService {
         voiceType: voice.voiceType || (voice.name && voice.name.includes('Neural') ? 'Neural' : 'Standard')
       };
       
-      console.log('AzureTTSService.setVoice: Voice set', {
+      devLog('AzureTTSService.setVoice: Voice set', {
         name: this.settings.voice.name,
         locale: this.settings.voice.locale,
         gender: this.settings.voice.gender,
@@ -512,12 +519,12 @@ class AzureTTSService {
             throw new Error(`TTS synthesis failed: ${errorData.error || response.statusText}`);
           }
 
-          console.log(`✅ Azure TTS Proxy Request SUCCEEDED! (attempt ${attempt})`);
-          
+          devLog(`✅ Azure TTS Proxy Request SUCCEEDED! (attempt ${attempt})`);
+
           // Read the audio data from the proxy response
           const audioData = await response.arrayBuffer();
-          
-          console.log('AzureTTSService.synthesize: Received audio buffer from proxy', {
+
+          devLog('AzureTTSService.synthesize: Received audio buffer from proxy', {
             size: audioData.byteLength,
             contentType: response.headers.get('content-type'),
             status: response.status

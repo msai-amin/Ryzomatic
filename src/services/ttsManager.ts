@@ -117,16 +117,21 @@ class TTSManager {
     const googleCloudProvider = this.providers.get('google-cloud')
     const azureProvider = this.providers.get('azure')
     
+    // Provider-selection logs fire once at construction (every page load).
+    // Useful in dev, noise in prod — gate behind DEV. The `else` warn for
+    // "no providers available" stays unconditional so prod still surfaces it.
+    const devLog = (msg: string) => { if (import.meta.env.DEV) console.log(msg) }
+
     // Temporarily prioritize Azure TTS to test the new fetch-based proxy
     if (azureProvider && azureProvider.isAvailable && azureProvider.isConfigured) {
       this.currentProvider = azureProvider
-      console.log('TTSManager: Using Azure TTS as default provider (testing fetch-based proxy)')
+      devLog('TTSManager: Using Azure TTS as default provider (testing fetch-based proxy)')
     } else if (googleCloudProvider && googleCloudProvider.isAvailable && googleCloudProvider.isConfigured) {
       this.currentProvider = googleCloudProvider
-      console.log('TTSManager: Using Google Cloud TTS as default provider (premium voices, reliable)')
+      devLog('TTSManager: Using Google Cloud TTS as default provider (premium voices, reliable)')
     } else if (nativeProvider && nativeProvider.isAvailable) {
       this.currentProvider = nativeProvider
-      console.log('TTSManager: Using Native TTS as fallback provider (supports word boundaries and progress)')
+      devLog('TTSManager: Using Native TTS as fallback provider (supports word boundaries and progress)')
     } else {
       this.currentProvider = null
       console.warn('TTSManager: No TTS providers available')
