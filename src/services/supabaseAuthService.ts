@@ -17,11 +17,17 @@ const supabaseAnonKey =
   runtimeEnv.SUPABASE_ANON_KEY ||
   '';
 
-console.log('=== Supabase Environment Variables Debug ===');
-console.log('VITE_SUPABASE_URL:', supabaseUrl);
-console.log('VITE_SUPABASE_ANON_KEY present:', !!supabaseAnonKey);
-console.log('VITE_SUPABASE_ANON_KEY is placeholder:', supabaseAnonKey?.includes('your_') || supabaseAnonKey?.includes('_here'));
-console.log('All env vars:', import.meta.env);
+// Dev-only debug. Production browsers shouldn't see the Supabase project URL
+// or a dump of import.meta.env (which can include every VITE_* var in the
+// build) in the console — it's noise to users and aid to anyone poking at the
+// page. The misconfiguration error path below still runs in prod.
+if (import.meta.env.DEV) {
+  console.log('=== Supabase Environment Variables Debug ===');
+  console.log('VITE_SUPABASE_URL:', supabaseUrl);
+  console.log('VITE_SUPABASE_ANON_KEY present:', !!supabaseAnonKey);
+  console.log('VITE_SUPABASE_ANON_KEY is placeholder:', supabaseAnonKey?.includes('your_') || supabaseAnonKey?.includes('_here'));
+  console.log('All env vars:', import.meta.env);
+}
 
 // Check if the key is a placeholder
 const isPlaceholderKey = supabaseAnonKey?.includes('your_') || 
