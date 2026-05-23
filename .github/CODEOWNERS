@@ -1,0 +1,15 @@
+# Default owner for everything in this repo.
+# CODEOWNERS only takes effect once branch protection enables
+# "Require review from Code Owners".
+*                                       @msai-amin
+
+# Security- and deploy-critical surfaces get an extra signal that
+# changes here deserve an explicit re-read, even on routine bumps.
+/vercel.json                            @msai-amin
+/.github/                               @msai-amin
+/supabase/migrations/                   @msai-amin
+/api/                                   @msai-amin
+/chrome-extension/                      @msai-amin
+/scripts/                               @msai-amin
+/src/services/supabaseAuthService.ts    @msai-amin
+/src/services/googleAuthService.ts      @msai-amin
