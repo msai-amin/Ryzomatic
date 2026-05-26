@@ -13,6 +13,28 @@ import { configurePDFWorker, getPDFWorkerSrc } from './utils/pdfjsConfig'
 
 initSentry()
 
+// Auto-reload the page when a freshly-installed PWA service worker takes
+// control. VitePWA config already has registerType: 'autoUpdate' +
+// skipWaiting + clientsClaim, which install + activate the new SW
+// automatically — but the running JS in any open tab is still the *old*
+// bundle until something forces a navigation. Without this hook, returning
+// users stayed on the previous build's assets until they manually
+// hard-refreshed (which is exactly what hid the Sentry DSN env var from
+// the live SDK after a recent deploy).
+//
+// Guard with a `navigator.serviceWorker.controller` check so first-time
+// visitors don't get an unnecessary one-time reload when their initial
+// SW registers and claims them — only returning visitors with an existing
+// controller see the auto-reload when the new SW supplants the old one.
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
+  let refreshing = false
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return
+    refreshing = true
+    window.location.reload()
+  })
+}
+
 // CRITICAL: Pre-import pdfjs-dist to ensure it's loaded before react-pdf-viewer
 // We use a top-level await to ensure the module is loaded synchronously
 // This ensures that when react-pdf-viewer's Worker component imports pdfjs-dist,

@@ -12,7 +12,13 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         skipWaiting: true,
-        clientsClaim: true
+        clientsClaim: true,
+        // Drop old precache entries when a new SW activates. Without this,
+        // every deploy leaves the previous build's assets sitting in storage,
+        // and the SW can keep serving stale chunks long after activation.
+        // Required for the controllerchange reload in src/main.tsx to actually
+        // pick up the new bundle instead of replaying the old cached one.
+        cleanupOutdatedCaches: true
       },
       includeAssets: ['favicon.ico'],
       manifest: {
