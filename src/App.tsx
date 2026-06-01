@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
+import { BookOpen } from 'lucide-react'
 import { DocumentViewer } from './components/DocumentViewer'
 import { ChatModal } from './components/ChatModal'
 import { ThemedHeader } from '../themes/ThemedHeader'
@@ -7,6 +8,11 @@ import { AuthModal } from './components/AuthModal'
 import NeoReaderTerminal from './components/NeoReaderTerminal'
 import LandingPage from './components/LandingPage'
 import { useAppStore } from './store/appStore'
+import { FEATURES } from './config/featureFlags'
+
+// Ask Your Library (flagship RAG-over-highlights) is lazy-loaded and
+// flag-gated so its code stays out of the bundle when the flag is off.
+const AskLibraryPanel = lazy(() => import('./components/AskLibrary/AskLibraryPanel'))
 import { authService, supabase } from './services/supabaseAuthService'
 import { healthMonitor } from './services/healthMonitor'
 import { logger } from './services/logger'
@@ -24,12 +30,15 @@ function App() {
   // Use AuthContext as the single source of truth for auth state
   const { session, loading: authLoading } = useAuth()
   
-  const { 
-    isChatOpen, 
-    toggleChat, 
-    isAuthenticated, 
-    checkAuth, 
-    user 
+  const {
+    isChatOpen,
+    toggleChat,
+    isAuthenticated,
+    checkAuth,
+    user,
+    isAskLibraryOpen,
+    toggleAskLibrary,
+    setAskLibraryOpen,
   } = useAppStore()
   
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
@@ -420,6 +429,30 @@ function App() {
       <a href="#main-content" className="skip-link">Skip to main content</a>
       <ThemedApp />
       <AchievementToastContainer />
+
+      {/* Ask Your Library — flagship RAG panel, flag-gated + lazy-loaded.
+          Rendered as a floating launcher + drawer overlaid on the main app so
+          it stays isolated and trivially removable during the pilot. */}
+      {FEATURES.askLibrary && (
+        <>
+          {!isAskLibraryOpen && (
+            <button
+              type="button"
+              onClick={toggleAskLibrary}
+              aria-label="Ask Your Library"
+              className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-indigo-700"
+            >
+              <BookOpen className="h-5 w-5" />
+              Ask Your Library
+            </button>
+          )}
+          {isAskLibraryOpen && (
+            <Suspense fallback={null}>
+              <AskLibraryPanel onClose={() => setAskLibraryOpen(false)} />
+            </Suspense>
+          )}
+        </>
+      )}
     </ThemeProvider>
   );
 }

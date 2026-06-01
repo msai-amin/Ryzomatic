@@ -191,6 +191,7 @@ interface AppState {
   // UI state
   isChatOpen: boolean
   isEditorialMode: boolean
+  isAskLibraryOpen: boolean
   reviewCitations: string[]
   reviewContent: string
   reviewFontFamily: string
@@ -296,6 +297,8 @@ interface AppState {
   removeDocument: (id: string) => void
   toggleChat: () => void
   setEditorialMode: (enabled: boolean) => void
+  toggleAskLibrary: () => void
+  setAskLibraryOpen: (open: boolean) => void
   setIsRightSidebarOpen: (open: boolean) => void
   setRightSidebarTab: (tab: 'notes' | 'highlights') => void
   setRightSidebarWidth: (width: number) => void
@@ -403,6 +406,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   rightSidebarTab: readRightSidebarTabPreference('notes'),
   rightSidebarWidth: readNumberPreference('rightSidebarWidth', 360),
   isEditorialMode: false,
+  isAskLibraryOpen: false,
   chatWindowPosition: {
     top: readNumberPreference('chatWindowTop', 120),
     left: readNumberPreference('chatWindowLeft', 80)
@@ -805,6 +809,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
 
   setEditorialMode: (enabled) => set({ isEditorialMode: enabled }),
+
+  toggleAskLibrary: () => set((state) => ({ isAskLibraryOpen: !state.isAskLibraryOpen })),
+  setAskLibraryOpen: (open) => set({ isAskLibraryOpen: open }),
   
   reviewCitations: [],
   reviewContent: '',
