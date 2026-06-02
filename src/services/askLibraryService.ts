@@ -2,11 +2,13 @@
  * Ask Your Library — RAG service grounded in user highlights.
  *
  * Orchestration (zero new migrations or endpoints — all infra already exists):
- *   1. Embed the question via /api/utils?action=embedding
- *   2. Call find_similar_highlights RPC (migration 067, HNSW index on
+ *   1. Validate the question is non-empty
+ *   2. Embed the question via /api/utils?action=embedding
+ *   3. Call find_similar_highlights RPC (migration 067, HNSW index on
  *      user_highlights.embedding) for the top-K matching passages
- *   3. Fetch book titles from user_books to attribute each source
- *   4. Build a grounded Gemini prompt and call sendMessageToAI
+ *   4. Fetch book titles from user_books to attribute each source
+ *   5. Call sendMessageToAI with (instructions, context) separated so that
+ *      tests can assert grounding without parsing one big string
  *
  * Every claim in the answer is tagged [n] pointing to a numbered source.
  * The panel renders those as jump-to-source citation badges.
@@ -30,6 +32,11 @@ export interface AskSource {
   similarity: number
 }
 
+export interface AskOptions {
+  /** Scope retrieval to a single book (optional). Null = whole library. */
+  bookId?: string | null
+}
+
 export interface AskResult {
   status: 'ok' | 'no_sources' | 'embedding_unavailable' | 'error'
   answer: string
@@ -46,9 +53,18 @@ const MAX_EXCERPT_CHARS = 450
 
 class AskLibraryService {
   /**
-   * Main entry point: ask a question against the user's full highlight library.
+   * Main entry point: ask a question against the user's highlight library.
+   *
+   * @param question - Natural-language question from the user
+   * @param userId   - Authenticated user's UUID
+   * @param options  - Optional bookId to scope search to a single document
    */
-  async ask(question: string, userId: string): Promise<AskResult> {
+  async ask(question: string, userId: string, options: AskOptions = {}): Promise<AskResult> {
+    // 0. Guard: empty question
+    if (!question.trim()) {
+      return { status: 'error', answer: '', sources: [] }
+    }
+
     // 1. Embed the question
     let queryEmbedding: number[]
     try {
@@ -60,7 +76,7 @@ class AskLibraryService {
     const queryVector = embeddingService.formatForPgVector(queryEmbedding)
 
     // 2. Retrieve similar highlights via pgvector RPC
-    const hits = await this.retrieveHits(userId, queryVector)
+    const hits = await this.retrieveHits(userId, queryVector, options.bookId ?? null)
     if (hits.length === 0) {
       return { status: 'no_sources', answer: '', sources: [] }
     }
@@ -69,10 +85,15 @@ class AskLibraryService {
     const sources = await this.enrichWithTitles(hits)
 
     // 4. Build grounded prompt and call Gemini
-    const prompt = this.buildPrompt(question, sources)
+    //    Pass instructions and context as separate arguments so unit tests
+    //    can assert that the grounding text is present in the context arg
+    //    and that the instructions forbid outside knowledge.
+    const instructions = this.buildInstructions()
+    const context = this.buildContext(question, sources)
+
     let answer: string
     try {
-      answer = await sendMessageToAI(prompt, undefined, 'free', 'general')
+      answer = await sendMessageToAI(instructions, context, 'free', 'general')
     } catch (err: any) {
       console.error('AskLibrary LLM error:', err)
       return { status: 'error', answer: '', sources }
@@ -83,12 +104,16 @@ class AskLibraryService {
 
   // ── Private helpers ─────────────────────────────────────────────────────────
 
-  private async retrieveHits(userId: string, queryVector: string): Promise<any[]> {
+  private async retrieveHits(
+    userId: string,
+    queryVector: string,
+    bookId: string | null
+  ): Promise<any[]> {
     if (!supabase) return []
     const { data, error } = await supabase.rpc('find_similar_highlights', {
       query_embedding: queryVector,
       p_user_id: userId,
-      p_book_id: null,           // null = cross-library (all books)
+      p_book_id: bookId,           // null = cross-library (all books)
       similarity_threshold: SIMILARITY_THRESHOLD,
       result_limit: MAX_SOURCES,
       include_orphaned: false,
@@ -130,7 +155,28 @@ class AskLibraryService {
     }))
   }
 
-  private buildPrompt(question: string, sources: AskSource[]): string {
+  /**
+   * Grounding instructions passed as the first argument to sendMessageToAI.
+   * Separated from the context so unit tests can assert on each independently.
+   */
+  private buildInstructions(): string {
+    return [
+      'You are answering a question grounded STRICTLY in the user\'s own research highlights.',
+      '',
+      'CRITICAL RULES:',
+      '1. Use ONLY the provided source excerpts — no outside knowledge.',
+      '2. After every claim, append the citation number like [1] or [2].',
+      '3. If the question cannot be answered from the sources, say so clearly.',
+      '4. Do not invent papers, authors, data, or page numbers.',
+      '5. Be concise and scholarly.',
+    ].join('\n')
+  }
+
+  /**
+   * Grounding context (sources + question) passed as the second argument.
+   * Contains the actual highlight text so tests can confirm it is included.
+   */
+  private buildContext(question: string, sources: AskSource[]): string {
     const sourceList = sources
       .map((s) => {
         const paper = s.bookTitle
@@ -140,21 +186,14 @@ class AskLibraryService {
       })
       .join('\n\n')
 
-    return `You are answering a question grounded STRICTLY in the user's own research highlights.
-
-CRITICAL RULES:
-1. Use ONLY the SOURCES provided below — no outside knowledge.
-2. After every claim, append the citation number like [1] or [2].
-3. If the question cannot be answered from the sources, say so clearly.
-4. Do not invent papers, authors, data, or page numbers.
-5. Be concise and scholarly.
-
-SOURCES FROM THE USER'S LIBRARY:
-${sourceList}
-
-QUESTION: ${question}
-
-Answer (with [n] citations after each claim):`
+    return [
+      'SOURCES FROM THE USER\'S LIBRARY:',
+      sourceList,
+      '',
+      `QUESTION: ${question}`,
+      '',
+      'Answer (with [n] citations after each claim):',
+    ].join('\n')
   }
 }
 
