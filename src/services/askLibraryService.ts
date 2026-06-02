@@ -1,211 +1,160 @@
+/**
+ * Ask Your Library — RAG service grounded in user highlights.
+ *
+ * Orchestration (zero new migrations or endpoints — all infra already exists):
+ *   1. Embed the question via /api/utils?action=embedding
+ *   2. Call find_similar_highlights RPC (migration 067, HNSW index on
+ *      user_highlights.embedding) for the top-K matching passages
+ *   3. Fetch book titles from user_books to attribute each source
+ *   4. Build a grounded Gemini prompt and call sendMessageToAI
+ *
+ * Every claim in the answer is tagged [n] pointing to a numbered source.
+ * The panel renders those as jump-to-source citation badges.
+ */
+
 import { embeddingService } from '../../lib/embeddingService'
 import { supabase } from '../../lib/supabase'
 import { sendMessageToAI } from './aiService'
 
-/**
- * Ask Your Library — RAG chat grounded in the user's own highlights.
- *
- * Pilot architecture (deliberately client-side, zero new infra):
- *   1. embed the question                         → embeddingService.embed
- *   2. semantic-retrieve the user's highlights     → find_similar_highlights RPC
- *      (added in migration 067, already used by lib/contextBuilder.ts)
- *   3. answer with an LLM constrained to those      → sendMessageToAI
- *      excerpts, forced to cite [n].
- *
- * The whole point — and the thing ChatGPT structurally cannot do — is that
- * every answer is grounded in *this user's* library and every claim is
- * traceable to the highlight it came from. So we return the sources alongside
- * the answer and the prompt forbids outside knowledge.
- */
+// ── Public types ────────────────────────────────────────────────────────────
 
+/** A single highlight retrieved from the user's library */
 export interface AskSource {
-  index: number // 1-based; matches the [n] tokens in the answer
+  index: number
   highlightId: string
   excerpt: string
   page: number | null
-  bookTitle: string | null
   colorHex: string | null
+  bookId: string | null
+  bookTitle: string | null
   similarity: number
 }
 
 export interface AskResult {
+  status: 'ok' | 'no_sources' | 'embedding_unavailable' | 'error'
   answer: string
   sources: AskSource[]
-  /** Non-fatal status the UI can surface (e.g. nothing relevant found). */
-  status: 'ok' | 'no_sources' | 'embedding_unavailable' | 'error'
 }
 
-interface AskOptions {
-  /** Restrict retrieval to a single book; omit for whole-library search. */
-  bookId?: string | null
-  /** How many highlights to retrieve as grounding context. */
-  k?: number
-  /** Minimum cosine similarity (0-1). Lower = more permissive recall. */
-  threshold?: number
-}
+// ── Configuration ────────────────────────────────────────────────────────────
 
-const DEFAULT_K = 8
-// Pilot uses a permissive threshold: better to show loosely-related highlights
-// and let the LLM decide they don't answer the question than to return nothing.
-const DEFAULT_THRESHOLD = 0.3
+const SIMILARITY_THRESHOLD = 0.45  // fairly generous for pilot
+const MAX_SOURCES = 8
+const MAX_EXCERPT_CHARS = 450
 
-interface RpcHighlightRow {
-  id: string
-  highlighted_text: string
-  page_number: number | null
-  color_hex: string | null
-  similarity: number
-}
+// ── Service class ────────────────────────────────────────────────────────────
 
 class AskLibraryService {
   /**
-   * Retrieve the top-K highlights semantically closest to `query`, enriched
-   * with their source-paper titles. Exposed separately so the UI can preview
-   * sources before/without generating an answer if it wants.
+   * Main entry point: ask a question against the user's full highlight library.
    */
-  async retrieve(query: string, userId: string, opts: AskOptions = {}): Promise<AskSource[]> {
-    if (!supabase) return []
-    const k = opts.k ?? DEFAULT_K
-    const threshold = opts.threshold ?? DEFAULT_THRESHOLD
+  async ask(question: string, userId: string): Promise<AskResult> {
+    // 1. Embed the question
+    let queryEmbedding: number[]
+    try {
+      queryEmbedding = await embeddingService.embed(question)
+    } catch {
+      return { status: 'embedding_unavailable', answer: '', sources: [] }
+    }
 
-    const queryEmbedding = await embeddingService.embed(query)
     const queryVector = embeddingService.formatForPgVector(queryEmbedding)
 
+    // 2. Retrieve similar highlights via pgvector RPC
+    const hits = await this.retrieveHits(userId, queryVector)
+    if (hits.length === 0) {
+      return { status: 'no_sources', answer: '', sources: [] }
+    }
+
+    // 3. Enrich with book titles
+    const sources = await this.enrichWithTitles(hits)
+
+    // 4. Build grounded prompt and call Gemini
+    const prompt = this.buildPrompt(question, sources)
+    let answer: string
+    try {
+      answer = await sendMessageToAI(prompt, undefined, 'free', 'general')
+    } catch (err: any) {
+      console.error('AskLibrary LLM error:', err)
+      return { status: 'error', answer: '', sources }
+    }
+
+    return { status: 'ok', answer, sources }
+  }
+
+  // ── Private helpers ─────────────────────────────────────────────────────────
+
+  private async retrieveHits(userId: string, queryVector: string): Promise<any[]> {
+    if (!supabase) return []
     const { data, error } = await supabase.rpc('find_similar_highlights', {
       query_embedding: queryVector,
       p_user_id: userId,
-      p_book_id: opts.bookId ?? null,
-      similarity_threshold: threshold,
-      result_limit: k,
+      p_book_id: null,           // null = cross-library (all books)
+      similarity_threshold: SIMILARITY_THRESHOLD,
+      result_limit: MAX_SOURCES,
       include_orphaned: false,
     })
-
     if (error) {
-      console.error('askLibraryService.retrieve RPC error:', error)
-      throw error
+      console.warn('find_similar_highlights RPC error:', error)
+      return []
+    }
+    return data ?? []
+  }
+
+  private async enrichWithTitles(hits: any[]): Promise<AskSource[]> {
+    // Collect distinct book ids for a single titles query
+    const bookIds = [...new Set(hits.map((h) => h.book_id).filter(Boolean))]
+    let titleMap: Record<string, string> = {}
+
+    if (supabase && bookIds.length > 0) {
+      const { data: books } = await supabase
+        .from('user_books')
+        .select('id, title, file_name')
+        .in('id', bookIds)
+
+      if (books) {
+        titleMap = Object.fromEntries(
+          books.map((b: any) => [b.id, b.title || b.file_name || 'Untitled'])
+        )
+      }
     }
 
-    const rows = (data ?? []) as RpcHighlightRow[]
-    if (rows.length === 0) return []
-
-    const bookTitles = await this.fetchBookTitles(rows.map((r) => r.id))
-
-    return rows.map((r, i) => ({
+    return hits.map((h, i): AskSource => ({
       index: i + 1,
-      highlightId: r.id,
-      excerpt: r.highlighted_text,
-      page: r.page_number,
-      bookTitle: bookTitles.get(r.id) ?? null,
-      colorHex: r.color_hex,
-      similarity: r.similarity,
+      highlightId: h.id,
+      excerpt: h.highlighted_text?.slice(0, MAX_EXCERPT_CHARS) ?? '',
+      page: h.page_number ?? null,
+      colorHex: h.color_hex ?? null,
+      bookId: h.book_id ?? null,
+      bookTitle: h.book_id ? (titleMap[h.book_id] ?? null) : null,
+      similarity: h.similarity ?? 0,
     }))
   }
 
-  /**
-   * Full ask: retrieve → ground → answer. Returns the answer text (with inline
-   * [n] citations) and the ordered sources those [n] refer to.
-   */
-  async ask(query: string, userId: string, opts: AskOptions = {}): Promise<AskResult> {
-    const trimmed = query.trim()
-    if (!trimmed) return { answer: '', sources: [], status: 'error' }
-
-    let sources: AskSource[]
-    try {
-      sources = await this.retrieve(trimmed, userId, opts)
-    } catch (err: any) {
-      // embeddingService throws a specific "unavailable" error when no key is set
-      if (err?.message?.includes('unavailable')) {
-        return { answer: '', sources: [], status: 'embedding_unavailable' }
-      }
-      return { answer: '', sources: [], status: 'error' }
-    }
-
-    if (sources.length === 0) {
-      return { answer: '', sources: [], status: 'no_sources' }
-    }
-
-    const excerptBlock = sources
+  private buildPrompt(question: string, sources: AskSource[]): string {
+    const sourceList = sources
       .map((s) => {
-        const where = [
-          s.bookTitle ? `"${s.bookTitle}"` : null,
-          s.page != null ? `p.${s.page}` : null,
-        ]
-          .filter(Boolean)
-          .join(', ')
-        return `[${s.index}]${where ? ` (${where})` : ''} ${s.excerpt}`
+        const paper = s.bookTitle
+          ? `${s.bookTitle}${s.page != null ? `, p. ${s.page}` : ''}`
+          : s.page != null ? `p. ${s.page}` : 'Your library'
+        return `[${s.index}] (${paper}): "${s.excerpt}"`
       })
       .join('\n\n')
 
-    const instructions = [
-      'You are answering a question using ONLY the excerpts below, which come from the user\'s own research library (their highlights).',
-      '',
-      'Rules:',
-      '- Use only information contained in the excerpts. Do NOT use outside knowledge.',
-      '- After each claim, cite the supporting excerpt(s) with bracket notation like [1] or [2][3].',
-      '- If the excerpts do not contain enough information to answer, say so plainly in one sentence and do not pad the answer.',
-      '- Be concise and precise. Prefer the user\'s own wording where it helps.',
-      '',
-      `Question: ${trimmed}`,
-      '',
-      'Answer (with [n] citations):',
-    ].join('\n')
+    return `You are answering a question grounded STRICTLY in the user's own research highlights.
 
-    try {
-      const answer = await sendMessageToAI(instructions, excerptBlock, 'free', 'general')
-      return { answer: (answer || '').trim(), sources, status: 'ok' }
-    } catch (err) {
-      console.error('askLibraryService.ask LLM error:', err)
-      // We still have sources — return them so the UI can show grounding even
-      // if generation failed.
-      return { answer: '', sources, status: 'error' }
-    }
-  }
+CRITICAL RULES:
+1. Use ONLY the SOURCES provided below — no outside knowledge.
+2. After every claim, append the citation number like [1] or [2].
+3. If the question cannot be answered from the sources, say so clearly.
+4. Do not invent papers, authors, data, or page numbers.
+5. Be concise and scholarly.
 
-  /**
-   * Map highlight ids → source-paper title. Best-effort: highlight rows from
-   * the RPC don't carry book_id, so we look it up, then resolve titles. Any
-   * failure degrades silently to "no title" (sources still render by page).
-   */
-  private async fetchBookTitles(highlightIds: string[]): Promise<Map<string, string>> {
-    const result = new Map<string, string>()
-    if (!supabase || highlightIds.length === 0) return result
+SOURCES FROM THE USER'S LIBRARY:
+${sourceList}
 
-    try {
-      const { data: highlights, error: hErr } = await supabase
-        .from('user_highlights')
-        .select('id, book_id')
-        .in('id', highlightIds)
-      if (hErr || !highlights) return result
+QUESTION: ${question}
 
-      const bookIdByHighlight = new Map<string, string>()
-      const bookIds = new Set<string>()
-      for (const h of highlights as Array<{ id: string; book_id: string }>) {
-        if (h.book_id) {
-          bookIdByHighlight.set(h.id, h.book_id)
-          bookIds.add(h.book_id)
-        }
-      }
-      if (bookIds.size === 0) return result
-
-      const { data: books, error: bErr } = await supabase
-        .from('user_books')
-        .select('id, title, file_name')
-        .in('id', Array.from(bookIds))
-      if (bErr || !books) return result
-
-      const titleByBook = new Map<string, string>()
-      for (const b of books as Array<{ id: string; title?: string; file_name?: string }>) {
-        titleByBook.set(b.id, b.title || b.file_name || 'Untitled')
-      }
-
-      for (const [highlightId, bookId] of bookIdByHighlight) {
-        const title = titleByBook.get(bookId)
-        if (title) result.set(highlightId, title)
-      }
-    } catch (err) {
-      console.warn('askLibraryService.fetchBookTitles failed (non-fatal):', err)
-    }
-    return result
+Answer (with [n] citations after each claim):`
   }
 }
 
