@@ -68,7 +68,7 @@
     "googleapis": "^160.0.0",
     "howler": "^2.2.4",
     "html-docx-js-typescript": "^0.1.5",
-    "katex": "^0.16.27",
+    "katex": "^0.17.0",
     "lucide-react": "^0.294.0",
     "marked": "^16.4.2",
     "natural": "^8.1.0",
