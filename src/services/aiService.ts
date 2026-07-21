@@ -85,7 +85,7 @@ const getGeminiModel = (tier: 'free' | 'custom' = 'free') => {
 // Load the SQ3R system prompt
 const loadSystemPrompt = async (): Promise<string | null> => {
   try {
-    const response = await fetch('/system-prompts-gemini25/ComprehensiveSummary.md');
+    const response = await fetch('/system-prompts/ComprehensiveSummary.md');
     if (response.ok) {
       const content = await response.text();
       return content;
