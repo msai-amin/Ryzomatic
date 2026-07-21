@@ -15,7 +15,6 @@ export interface SearchResult {
   last_read_at?: string;
   is_favorite: boolean;
   notes_count: number;
-  pomodoro_sessions_count: number;
   created_at: string;
   updated_at: string;
   collections: Array<{
@@ -142,7 +141,6 @@ class LibrarySearchService {
       if (filters.readingProgress) rpcFilters.readingProgress = filters.readingProgress;
       if (filters.isFavorite !== undefined) rpcFilters.isFavorite = filters.isFavorite;
       if (filters.hasNotes !== undefined) rpcFilters.hasNotes = filters.hasNotes;
-      if (filters.hasAudio !== undefined) rpcFilters.hasAudio = filters.hasAudio;
       if (filters.fileSizeRange) rpcFilters.fileSizeRange = filters.fileSizeRange;
       if (filters.dateRange) rpcFilters.dateRange = {
         start: filters.dateRange.start.toISOString(),
@@ -387,8 +385,7 @@ class LibrarySearchService {
       'last_read_at': 'last_read_at',
       'reading_progress': 'reading_progress',
       'file_size_bytes': 'file_size_bytes',
-      'notes_count': 'notes_count',
-      'pomodoro_sessions_count': 'pomodoro_sessions_count'
+      'notes_count': 'notes_count'
     };
 
     return fieldMap[field] || 'last_read_at';

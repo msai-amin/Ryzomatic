@@ -120,13 +120,12 @@ export interface LibraryFilters {
   tags?: string[]
   isFavorite?: boolean
   hasNotes?: boolean
-  hasAudio?: boolean
   fileSizeRange?: { min: number; max: number }
 }
 
 export interface LibraryViewSettings {
   viewMode: 'grid' | 'list' | 'comfortable'
-  sortBy: 'title' | 'created_at' | 'last_read_at' | 'reading_progress' | 'file_size_bytes' | 'notes_count' | 'pomodoro_sessions_count'
+  sortBy: 'title' | 'created_at' | 'last_read_at' | 'reading_progress' | 'file_size_bytes' | 'notes_count'
   sortOrder: 'asc' | 'desc'
   selectedCollectionId: string | null
   selectedTags: string[]
@@ -190,17 +189,6 @@ interface AppState {
   
   // UI state
   isChatOpen: boolean
-  isEditorialMode: boolean
-  reviewCitations: string[]
-  reviewContent: string
-  reviewFontFamily: string
-  reviewFontSize: number
-  reviewTheme: 'light' | 'dark'
-  addReviewCitation: (citation: string) => void
-  setReviewContent: (content: string) => void
-  setReviewFontFamily: (fontFamily: string) => void
-  setReviewFontSize: (fontSize: number) => void
-  setReviewTheme: (theme: 'light' | 'dark') => void
   isRightSidebarOpen: boolean
   audioWidgetVisible: boolean
   setAudioWidgetVisible: (visible: boolean) => void
@@ -247,23 +235,7 @@ interface AppState {
     collectionIds: string[]
     tagIds: string[]
   }
-  
-  // Pomodoro state
-  activePomodoroSessionId: string | null
-  activePomodoroBookId: string | null
-  pomodoroStartTime: number | null
-  pomodoroTimeLeft: number | null
-  pomodoroIsRunning: boolean
-  pomodoroMode: 'work' | 'shortBreak' | 'longBreak'
-  pomodoroTimerToggleRef: (() => void) | null
-  
-  // Feature tour state
-  hasSeenPomodoroTour: boolean
-  
-  // Pomodoro widget state
-  pomodoroWidgetPosition: { x: number; y: number }
-  showPomodoroDashboard: boolean
-  
+
   // Audio widget state
   audioWidgetPosition: { x: number; y: number }
   
@@ -295,7 +267,6 @@ interface AppState {
   updateDocument: (document: Document) => void
   removeDocument: (id: string) => void
   toggleChat: () => void
-  setEditorialMode: (enabled: boolean) => void
   setIsRightSidebarOpen: (open: boolean) => void
   setRightSidebarTab: (tab: 'notes' | 'highlights') => void
   setRightSidebarWidth: (width: number) => void
@@ -326,22 +297,13 @@ interface AppState {
   setTagManagerOpen: (open: boolean) => void
   setPendingAssignmentTargets: (targets: Partial<AppState['pendingAssignmentTargets']>) => void
   
-  setPomodoroSession: (sessionId: string | null, bookId: string | null, startTime: number | null) => void
-  updatePomodoroTimer: (timeLeft: number | null, isRunning: boolean, mode: 'work' | 'shortBreak' | 'longBreak') => void
-  stopPomodoroTimer: () => void
-  startPomodoroTimer: () => void
-  setPomodoroTimerToggleRef: (toggleRef: (() => void) | null) => void
   
   // Feature tour actions
-  setHasSeenPomodoroTour: (seen: boolean) => void
   
   // Unsaved changes tracking actions
   setHasUnsavedChanges: (hasChanges: boolean) => void
   closeDocumentWithoutSaving: () => void
   
-  // Pomodoro widget actions
-  setPomodoroWidgetPosition: (position: { x: number; y: number }) => void
-  setShowPomodoroDashboard: (show: boolean) => void
   setAudioWidgetPosition: (position: { x: number; y: number }) => void
   
   // Text selection and AI mode actions
@@ -402,7 +364,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   isRightSidebarOpen: false,
   rightSidebarTab: readRightSidebarTabPreference('notes'),
   rightSidebarWidth: readNumberPreference('rightSidebarWidth', 360),
-  isEditorialMode: false,
   chatWindowPosition: {
     top: readNumberPreference('chatWindowTop', 120),
     left: readNumberPreference('chatWindowLeft', 80)
@@ -487,21 +448,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     tagIds: []
   },
   
-  // Pomodoro state
-  activePomodoroSessionId: null,
-  activePomodoroBookId: null,
-  pomodoroStartTime: null,
-  pomodoroTimeLeft: null,
-  pomodoroIsRunning: false,
-  pomodoroMode: 'work',
-  pomodoroTimerToggleRef: null,
   
   // Feature tour state
-  hasSeenPomodoroTour: false,
   
-  // Pomodoro widget state
-  pomodoroWidgetPosition: { x: 0, y: 0 },
-  showPomodoroDashboard: false,
   
   // Audio widget state
   audioWidgetPosition: {
@@ -804,18 +753,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     return { isChatOpen: next }
   }),
 
-  setEditorialMode: (enabled) => set({ isEditorialMode: enabled }),
-  
-  reviewCitations: [],
-  reviewContent: '',
-  reviewFontFamily: 'Times New Roman',
-  reviewFontSize: 12,
-  reviewTheme: 'light',
-  addReviewCitation: (citation) => set((state) => ({ reviewCitations: [...state.reviewCitations, citation] })),
-  setReviewContent: (content) => set({ reviewContent: content }),
-  setReviewFontFamily: (fontFamily) => set({ reviewFontFamily: fontFamily }),
-  setReviewFontSize: (fontSize) => set({ reviewFontSize: fontSize }),
-  setReviewTheme: (theme) => set({ reviewTheme: theme }),
 
   audioWidgetVisible: true,
   setAudioWidgetVisible: (visible) => set({ audioWidgetVisible: visible }),
@@ -895,43 +832,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   refreshLibrary: () => {
     console.log('AppStore: refreshLibrary() called, incrementing trigger')
     set((state) => ({ 
-      libraryRefreshTrigger: state.libraryRefreshTrigger + 1 
+      libraryRefreshTrigger: state.libraryRefreshTrigger + 1
     }))
   },
-  
-  setPomodoroSession: (sessionId, bookId, startTime) => set({
-    activePomodoroSessionId: sessionId,
-    activePomodoroBookId: bookId,
-    pomodoroStartTime: startTime
-  }),
-  
-  updatePomodoroTimer: (timeLeft, isRunning, mode) => set({
-    pomodoroTimeLeft: timeLeft,
-    pomodoroIsRunning: isRunning,
-    pomodoroMode: mode
-  }),
-  
-  stopPomodoroTimer: () => set({
-    pomodoroTimeLeft: null,
-    pomodoroIsRunning: false,
-    pomodoroMode: 'work'
-  }),
-  
-  startPomodoroTimer: () => {
-    const { pomodoroTimerToggleRef } = get()
-    if (pomodoroTimerToggleRef) {
-      pomodoroTimerToggleRef()
-    }
-  },
-  
-  setPomodoroTimerToggleRef: (toggleRef) => set({ pomodoroTimerToggleRef: toggleRef }),
-  
-  // Feature tour actions
-  setHasSeenPomodoroTour: (seen) => set({ hasSeenPomodoroTour: seen }),
-  
-  // Pomodoro widget actions
-  setPomodoroWidgetPosition: (position) => set({ pomodoroWidgetPosition: position }),
-  setShowPomodoroDashboard: (show) => set({ showPomodoroDashboard: show }),
+
   setAudioWidgetPosition: (position) => {
     const safePosition = {
       x: Number.isFinite(position.x) ? position.x : 0,

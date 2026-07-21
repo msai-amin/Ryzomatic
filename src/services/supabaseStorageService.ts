@@ -1165,7 +1165,6 @@ class SupabaseStorageService {
     is_favorite?: boolean;
     custom_metadata?: Record<string, any>;
     notes_count?: number;
-    pomodoro_sessions_count?: number;
   }): Promise<void> {
     this.ensureAuthenticated();
     
@@ -1223,10 +1222,9 @@ class SupabaseStorageService {
       tags?: string[];
       isFavorite?: boolean;
       hasNotes?: boolean;
-      hasAudio?: boolean;
     } = {},
     sort: {
-      field: 'title' | 'created_at' | 'last_read_at' | 'reading_progress' | 'file_size_bytes' | 'notes_count' | 'pomodoro_sessions_count';
+      field: 'title' | 'created_at' | 'last_read_at' | 'reading_progress' | 'file_size_bytes' | 'notes_count';
       order: 'asc' | 'desc';
     } = { field: 'last_read_at', order: 'desc' },
     limit: number = 50,
@@ -1280,14 +1278,6 @@ class SupabaseStorageService {
         }
       }
 
-      if (filters.hasAudio !== undefined) {
-        if (filters.hasAudio) {
-          query = query.gt('pomodoro_sessions_count', 0);
-        } else {
-          query = query.eq('pomodoro_sessions_count', 0);
-        }
-      }
-
       if (filters.collections && filters.collections.length > 0) {
         query = query.in('book_collections.collection_id', filters.collections);
       }
@@ -1332,55 +1322,12 @@ class SupabaseStorageService {
       'last_read_at': 'last_read_at',
       'reading_progress': 'reading_progress',
       'file_size_bytes': 'file_size_bytes',
-      'notes_count': 'notes_count',
-      'pomodoro_sessions_count': 'pomodoro_sessions_count'
+      'notes_count': 'notes_count'
     };
 
     return fieldMap[field] || 'last_read_at';
   }
 
-  // Update book counts when notes or audio are added/removed
-  async updateBookCounts(bookId: string, type: 'notes' | 'audio', delta: number): Promise<void> {
-    this.ensureAuthenticated();
-    
-    try {
-      const updateField = type === 'notes' ? 'notes_count' : 'pomodoro_sessions_count';
-      
-      // First get the current value
-      const { data: currentData, error: fetchError } = await supabase
-        .from('user_books')
-        .select(updateField)
-        .eq('id', bookId)
-        .eq('user_id', this.currentUserId!)
-        .single();
-      
-      if (fetchError) throw fetchError;
-      
-      // Then update with new value
-      const currentValue = (currentData as any)?.[updateField] || 0;
-      const { error } = await supabase
-        .from('user_books')
-        .update({
-          [updateField]: currentValue + delta
-        })
-        .eq('id', bookId)
-        .eq('user_id', this.currentUserId!);
-
-      if (error) {
-        throw errorHandler.createError(
-          `Failed to update book counts: ${error.message}`,
-          ErrorType.DATABASE,
-          ErrorSeverity.HIGH,
-          { context: 'updateBookCounts', bookId, type, delta, error: error.message }
-        );
-      }
-
-      logger.info('Book counts updated', { bookId, type, delta, userId: this.currentUserId });
-    } catch (error) {
-      logger.error('Error updating book counts', { bookId, type, delta }, error as Error);
-      throw error;
-    }
-  }
 }
 
 export const supabaseStorageService = new SupabaseStorageService();

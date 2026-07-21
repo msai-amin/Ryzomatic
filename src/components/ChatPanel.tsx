@@ -137,16 +137,6 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ onClose }) => {
         documentContext = currentDocument.content
       }
 
-      // Check for review context in chat messages and include it
-      const reviewContextMessage = chatMessages.find(
-        msg => msg.role === 'user' && msg.content.startsWith('[Review Context Added]')
-      )
-      if (reviewContextMessage) {
-        // Extract review text (remove the prefix)
-        const reviewText = reviewContextMessage.content.replace('[Review Context Added]\n\n', '')
-        documentContext = `Peer Review Context:\n${reviewText}\n\n---\n\nDocument Content:\n${documentContext}`
-      }
-
       if (includeNotes) {
         const relevantNotes = notesIntegrationService.getRelevantNotes(
           currentDocument.id,

@@ -140,8 +140,7 @@ export const LibrarySearchBar: React.FC<LibrarySearchBarProps> = ({
     { value: 'title', label: 'Title A-Z' },
     { value: 'reading_progress', label: 'Reading Progress' },
     { value: 'file_size_bytes', label: 'File Size' },
-    { value: 'notes_count', label: 'Most Notes' },
-    { value: 'pomodoro_sessions_count', label: 'Study Time' }
+    { value: 'notes_count', label: 'Most Notes' }
   ];
 
   const viewModeOptions = [
@@ -436,15 +435,6 @@ const LibraryFiltersPanel: React.FC<LibraryFiltersProps> = ({
               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
             <span className="ml-2 text-sm text-gray-700">Has notes</span>
-          </label>
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={filters.hasAudio === true}
-              onChange={(e) => updateFilter('hasAudio', e.target.checked ? true : undefined)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <span className="ml-2 text-sm text-gray-700">Has audio</span>
           </label>
         </div>
       </div>

@@ -4,7 +4,6 @@ import { ChatModal } from './components/ChatModal'
 import { ThemedHeader } from '../themes/ThemedHeader'
 import { ThemedApp } from '../themes/ThemedApp'
 import { AuthModal } from './components/AuthModal'
-import NeoReaderTerminal from './components/NeoReaderTerminal'
 import LandingPage from './components/LandingPage'
 import { useAppStore } from './store/appStore'
 import { authService, supabase } from './services/supabaseAuthService'
@@ -17,8 +16,6 @@ import { librarySearchService } from './services/librarySearchService'
 import { ThemeProvider } from '../themes/ThemeProvider'
 import { useAuth } from './contexts/AuthContext'
 import { ensurePdfViewerStyles, arePdfViewerStylesApplied } from './styles/ensurePdfViewerStyles'
-import { useAchievementToasts } from './components/AchievementToast'
-import { timerService } from './services/timerService'
 
 function App() {
   // Use AuthContext as the single source of truth for auth state
@@ -34,19 +31,6 @@ function App() {
   
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
-  const [showNeoReader, setShowNeoReader] = useState(false)
-
-  const { showAchievement, AchievementToastContainer } = useAchievementToasts()
-
-  useEffect(() => {
-    // Subscribe to achievements
-    const unsubscribe = timerService.onAchievement((achievements) => {
-      achievements.forEach(achievement => {
-        showAchievement(achievement)
-      })
-    })
-    return unsubscribe
-  }, [showAchievement])
 
   useEffect(() => {
     ensurePdfViewerStyles()
@@ -114,22 +98,13 @@ function App() {
       // Could show alert notification here
     });
 
-    // Check if we should show NeoReader Terminal first
     const urlParams = new URLSearchParams(window.location.search)
     const hashParams = new URLSearchParams(window.location.hash.substring(1))
-    
+
     logger.debug('URL parameters parsed', context, {
       searchParams: Object.fromEntries(urlParams.entries()),
       hashParams: Object.fromEntries(hashParams.entries())
     });
-    
-    // Check if we should show NeoReader Terminal
-    if (urlParams.get('neo') === 'true') {
-      logger.info('NeoReader Terminal requested', context);
-      setShowNeoReader(true)
-      setIsInitialized(true)
-      return
-    }
 
     // Check if we should show auth modal from landing page
     if (urlParams.get('auth') === 'true') {
@@ -409,17 +384,11 @@ function App() {
     );
   }
 
-  // Show NeoReader Terminal if requested
-  if (showNeoReader) {
-    return <NeoReaderTerminal />;
-  }
-
   // Show main app if authenticated
   return (
     <ThemeProvider>
       <a href="#main-content" className="skip-link">Skip to main content</a>
       <ThemedApp />
-      <AchievementToastContainer />
     </ThemeProvider>
   );
 }

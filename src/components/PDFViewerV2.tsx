@@ -26,7 +26,7 @@ import { highlightService, Highlight as HighlightType } from '../services/highli
 import { useTheme } from '../../themes/ThemeProvider'
 import { getPDFWorkerSrc, configurePDFWorker } from '../utils/pdfjsConfig'
 import { parseTextWithBreaks, TextSegment } from '../utils/readingModeUtils'
-import { Eye, BookOpen, FileText, Type, Highlighter, Sparkles, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ZoomIn, ZoomOut, RotateCw, Search, Palette, Moon, Sun, Maximize2, StickyNote, Library, Upload, MousePointer, Save, MessageSquare, Lightbulb, X, PenTool, ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
+import { Eye, BookOpen, FileText, Type, Highlighter, Sparkles, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ZoomIn, ZoomOut, RotateCw, Search, Palette, Moon, Sun, Maximize2, StickyNote, Library, Upload, MousePointer, Save, MessageSquare, Lightbulb, X, ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { notesService } from '../services/notesService'
@@ -63,9 +63,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     setChatMode,
     toggleChat,
     isChatOpen,
-    setHasUnsavedChanges,
-    addReviewCitation,
-    isEditorialMode
+    setHasUnsavedChanges
   } = useAppStore()
 
   // 1. Get values from the (now safe) hook
@@ -191,13 +189,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const [showLibrary, setShowLibrary] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(isEditorialMode)
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
-
-  // Sync header collapsed state with editorial mode
-  useEffect(() => {
-    setIsHeaderCollapsed(isEditorialMode)
-  }, [isEditorialMode])
   const [selectionEnabled, setSelectionEnabled] = useState(true)
 
   // CRITICAL: Update color state when safeAnnotationColors changes
@@ -931,18 +924,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     setContextMenu(null)
   }, [normalizedDocumentId, normalizedUserId, normalizedCurrentPage, pageTextsLength, userId]) // Use length (number) instead of array - document?.id is same as normalizedDocumentId
 
-  const handleIncludeInReview = useCallback(() => {
-    // Access normalizedPageTexts from closure - it's guaranteed to be an array
-    const pageText = normalizedPageTexts[normalizedCurrentPage - 1]
-    const context = getPDFTextSelectionContext(normalizedCurrentPage, pageText)
-    if (context && context.selectedText) {
-      const citation = `> "${context.selectedText}" (Page ${normalizedCurrentPage})`
-      addReviewCitation(citation)
-      console.log('Citation added to review')
-    }
-    setContextMenu(null)
-  }, [normalizedCurrentPage, pageTextsLength, addReviewCitation]) // Use length (number) instead of array
-
   // Sync highlights ref with state
   // CRITICAL: Use array length instead of array reference to prevent React comparison issues
   // React's 'co' function can receive undefined for previous dependency array on first render.
@@ -1537,38 +1518,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             display: 'flex',
             gap: '8px'
           }}>
-            {isEditorialMode ? (
-              <button
-                style={{
-                  backgroundColor: 'var(--color-surface-hover, #1f2937)',
-                  border: '1px solid var(--color-border, #374151)',
-                  borderRadius: '6px',
-                  padding: '6px 10px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  color: 'var(--color-text-primary, #f9fafb)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '4px',
-                  flex: 1,
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface, #111827)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover, #1f2937)'}
-                onClick={() => {
-                  if (props.selectedText) {
-                    const pageNumber = (props.highlightAreas?.[0]?.pageIndex ?? 0) + 1
-                    const citation = `> "${props.selectedText}" (Page ${pageNumber})`
-                    addReviewCitation(citation)
-                  }
-                  props.cancel()
-                }}
-              >
-                <PenTool className="w-3.5 h-3.5" />
-                Review
-              </button>
-            ) : (
             <button
               style={{
                 backgroundColor: 'var(--color-surface-hover, #1f2937)',
@@ -1612,7 +1561,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
               <StickyNote className="w-3.5 h-3.5" />
               Save Note
             </button>
-            )}
             {/* Delete Highlight button - only show if selection matches existing highlight */}
             {existingHighlight && (
               <button
@@ -3036,9 +2984,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           options={createAIContextMenuOptions(
             handleClarification,
             handleFurtherReading,
-            handleSaveNote,
-            handleIncludeInReview,
-            isEditorialMode
+            handleSaveNote
           )}
           onClose={() => setContextMenu(null)}
         />

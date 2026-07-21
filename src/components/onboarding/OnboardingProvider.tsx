@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react'
 import { useAppStore } from '../../store/appStore'
 import { TourStep } from './SpotlightTour'
-import { TTS_TOUR_STEPS, RELATED_DOCS_TOUR_STEPS, PEER_REVIEW_TOUR_STEPS, WELCOME_STEP } from './tourSteps'
+import { TTS_TOUR_STEPS, RELATED_DOCS_TOUR_STEPS, WELCOME_STEP } from './tourSteps'
 import { createMockDocument, createMockRelatedDocuments } from './mockDocument'
 import { Document } from '../../store/appStore'
 import { DocumentRelationshipWithDetails } from '../../../lib/supabase'
 
-export type TourType = 'tts' | 'relatedDocs' | 'peerReview' | null
+export type TourType = 'tts' | 'relatedDocs' | null
 
 export interface OnboardingContextType {
   isActive: boolean
@@ -41,8 +41,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     user, 
     currentDocument, 
     setCurrentDocument, 
-    setRelatedDocuments,
-    setEditorialMode
+    setRelatedDocuments
   } = useAppStore()
   
   const [isActive, setIsActive] = useState(false)
@@ -103,10 +102,8 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   const startTour = (tourType: TourType) => {
     if (!tourType) return
 
-    // Load mock document for the tour (except for peer review which loads it after first step)
-    if (tourType !== 'peerReview') {
-      loadMockDocument()
-    }
+    // Load mock document for the tour
+    loadMockDocument()
 
     // Set tour steps based on type
     let steps: TourStep[] = []
@@ -116,10 +113,6 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         break
       case 'relatedDocs':
         steps = RELATED_DOCS_TOUR_STEPS
-        break
-      case 'peerReview':
-        steps = PEER_REVIEW_TOUR_STEPS
-        // For peer review, load document after first step
         break
     }
 
@@ -152,7 +145,6 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   const completeTour = () => {
     // Return to welcome menu instead of closing
     restorePreviousState()
-    setEditorialMode(false) // Ensure editorial mode is off
     setTourSteps([WELCOME_STEP])
     setCurrentStep(0)
     setCurrentTour(null)
@@ -179,9 +171,6 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         break
       case 'startRelatedDocsTour':
         startTour('relatedDocs')
-        break
-      case 'startPeerReviewTour':
-        startTour('peerReview')
         break
       case 'openRelevanceAnalysis':
         // For now, just advance to next step (relevance analysis would open a modal)
@@ -263,24 +252,6 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
             return steps
           })
         }, 800)
-        break
-      case 'openPeerReview':
-        setEditorialMode(true)
-        // Auto-advance after editorial mode opens
-        setTimeout(() => {
-          // Use functional updates to get current state for both step and steps
-          setTourSteps((steps) => {
-            setCurrentStep((step) => {
-              const nextStep = step + 1
-              if (nextStep >= steps.length) {
-                completeTour()
-                return step // Keep current step since we're completing
-              }
-              return nextStep
-            })
-            return steps
-          })
-        }, 500)
         break
       case 'finishTour':
         completeTour()

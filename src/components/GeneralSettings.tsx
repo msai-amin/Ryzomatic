@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { 
-  X, User, CreditCard, LogOut, Volume2, Settings, Timer, 
-  ChevronDown, ChevronUp, Crown, HardDrive, FileText, 
+  X, User, CreditCard, LogOut, Volume2, Settings,
+  ChevronDown, ChevronUp, Crown, HardDrive, FileText,
   Play, Pause, VolumeX, Monitor, Cloud, AlertCircle
 } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
-import { timerService, TimerSettings } from '../services/timerService';
 import { ttsManager } from '../services/ttsManager';
 
 interface GeneralSettingsProps {
@@ -26,22 +25,6 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ isOpen, onClos
   const [expandedSection, setExpandedSection] = useState<string>('account');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [timerSettings, setTimerSettings] = useState<TimerSettings>({
-    workDuration: 25,
-    shortBreakDuration: 5,
-    longBreakDuration: 15,
-    sessionsUntilLongBreak: 4,
-    autoStartBreaks: false,
-    autoStartPomodoros: false,
-    notificationsEnabled: true,
-  });
-
-  // Load timer settings from service
-  useEffect(() => {
-    const state = timerService.getState();
-    setTimerSettings(state.settings);
-  }, []);
-
   // Calculate usage stats
   const documentCount = documents.length;
   const storageUsed = documents.reduce((total, doc) => {
@@ -61,12 +44,6 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ isOpen, onClos
     if (updates.rate !== undefined) ttsManager.setRate(updates.rate);
     if (updates.pitch !== undefined) ttsManager.setPitch(updates.pitch);
     if (updates.volume !== undefined) ttsManager.setVolume(updates.volume);
-  };
-
-  const handleTimerUpdate = (updates: Partial<TimerSettings>) => {
-    const newSettings = { ...timerSettings, ...updates };
-    setTimerSettings(newSettings);
-    timerService.updateSettings(newSettings);
   };
 
   const handleVoicePreview = async () => {
@@ -367,136 +344,6 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ isOpen, onClos
               <Play className="w-4 h-4" />
               <span>Preview Voice</span>
             </button>
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: 'pomodoro',
-      title: 'Pomodoro Timer',
-      icon: Timer,
-      content: (
-        <div className="space-y-6">
-          {/* Duration Settings */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text-primary)' }}>
-                Work Duration (minutes)
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="60"
-                value={timerSettings.workDuration}
-                onChange={(e) => handleTimerUpdate({ workDuration: parseInt(e.target.value) || 25 })}
-                className="w-full px-3 py-2 rounded-lg border"
-                style={{
-                  backgroundColor: 'var(--color-background)',
-                  borderColor: 'var(--color-border)',
-                  color: 'var(--color-text-primary)',
-                }}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text-primary)' }}>
-                Short Break (minutes)
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="30"
-                value={timerSettings.shortBreakDuration}
-                onChange={(e) => handleTimerUpdate({ shortBreakDuration: parseInt(e.target.value) || 5 })}
-                className="w-full px-3 py-2 rounded-lg border"
-                style={{
-                  backgroundColor: 'var(--color-background)',
-                  borderColor: 'var(--color-border)',
-                  color: 'var(--color-text-primary)',
-                }}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text-primary)' }}>
-                Long Break (minutes)
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="60"
-                value={timerSettings.longBreakDuration}
-                onChange={(e) => handleTimerUpdate({ longBreakDuration: parseInt(e.target.value) || 15 })}
-                className="w-full px-3 py-2 rounded-lg border"
-                style={{
-                  backgroundColor: 'var(--color-background)',
-                  borderColor: 'var(--color-border)',
-                  color: 'var(--color-text-primary)',
-                }}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text-primary)' }}>
-                Sessions Until Long Break
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="10"
-                value={timerSettings.sessionsUntilLongBreak}
-                onChange={(e) => handleTimerUpdate({ sessionsUntilLongBreak: parseInt(e.target.value) || 4 })}
-                className="w-full px-3 py-2 rounded-lg border"
-                style={{
-                  backgroundColor: 'var(--color-background)',
-                  borderColor: 'var(--color-border)',
-                  color: 'var(--color-text-primary)',
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Behavior Settings */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-              Behavior
-            </h4>
-            
-            <label className="flex items-center space-x-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={timerSettings.autoStartBreaks}
-                onChange={(e) => handleTimerUpdate({ autoStartBreaks: e.target.checked })}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <span className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
-                Auto-start breaks
-              </span>
-            </label>
-
-            <label className="flex items-center space-x-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={timerSettings.autoStartPomodoros}
-                onChange={(e) => handleTimerUpdate({ autoStartPomodoros: e.target.checked })}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <span className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
-                Auto-start pomodoros
-              </span>
-            </label>
-
-            <label className="flex items-center space-x-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={timerSettings.notificationsEnabled}
-                onChange={(e) => handleTimerUpdate({ notificationsEnabled: e.target.checked })}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <span className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
-                Enable notifications
-              </span>
-            </label>
           </div>
         </div>
       ),

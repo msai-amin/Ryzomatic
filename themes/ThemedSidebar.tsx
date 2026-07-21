@@ -1,12 +1,7 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
-import { FileText, Clock, Timer, ChevronLeft, ChevronRight, Flame, Trophy, BarChart3, ChevronDown, ChevronUp, History, GitBranch, TrendingUp, Activity, Network, X, Sparkles } from 'lucide-react'
+import { FileText, Clock, ChevronLeft, ChevronRight, BarChart3, ChevronDown, ChevronUp, History, GitBranch, TrendingUp, Activity, Network, X, Sparkles } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { Tooltip } from '../src/components/Tooltip'
-import { pomodoroService } from '../src/services/pomodoroService'
-import { pomodoroGamificationService, StreakInfo, Achievement } from '../src/services/pomodoroGamificationService'
-import { timerService, TimerState } from '../src/services/timerService'
-import { AchievementPanel } from '../src/components/AchievementPanel'
-import { PomodoroDashboard } from '../src/components/PomodoroDashboard'
 import { RelatedDocumentsPanel } from '../src/components/RelatedDocumentsPanel'
 import { PaperRecommendationsPanel } from '../src/components/PaperRecommendationsPanel'
 import { AddRelatedDocumentModal } from '../src/components/AddRelatedDocumentModal'
@@ -42,14 +37,9 @@ const SIDEBAR_COLLAPSED_WIDTH = 72
 const SIDEBAR_EXPANDED_WIDTH = 320
 
 export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, refreshTrigger }) => {
-  const { currentDocument, user, showPomodoroDashboard, setShowPomodoroDashboard, documents: appDocuments, setCurrentDocument, relatedDocuments, setRelatedDocuments, relatedDocumentsRefreshTrigger, refreshRelatedDocuments, recentlyViewedDocuments } = useAppStore()
-  const [pomodoroStats, setPomodoroStats] = useState<{ [key: string]: { timeMinutes: number, sessions: number } }>({})
-  const [streak, setStreak] = useState<StreakInfo | null>(null)
-  const [achievements, setAchievements] = useState<Achievement[]>([])
-  const [loading, setLoading] = useState(false)
+  const { currentDocument, user, documents: appDocuments, setCurrentDocument, relatedDocuments, setRelatedDocuments, relatedDocumentsRefreshTrigger, refreshRelatedDocuments, recentlyViewedDocuments } = useAppStore()
   const [userDocuments, setUserDocuments] = useState<DocumentWithProgress[]>([])
-  const [timerState, setTimerState] = useState<TimerState>(timerService.getState())
-  
+
   // Related Documents state
   const [relatedDocsLoading, setRelatedDocsLoading] = useState(false)
   const [showAddRelatedModal, setShowAddRelatedModal] = useState(false)
@@ -63,8 +53,7 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
     related: false,
     paperRecommendations: false,
     stats: false,
-    activity: false,
-    achievements: false
+    activity: false
   })
   
   const toggleSection = (section: keyof typeof sectionsExpanded) => {
@@ -152,53 +141,6 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
     setUserDocuments(documentsWithProgress)
   }, [recentlyViewedDocuments, currentDocument?.id])
 
-  // Load Pomodoro stats for real documents
-  useEffect(() => {
-    const loadStats = async () => {
-      if (!user || userDocuments.length === 0) return
-      
-      const stats: { [key: string]: { timeMinutes: number, sessions: number } } = {}
-      
-      for (const doc of userDocuments) {
-        const bookStats = await pomodoroService.getBookStats(doc.id)
-        if (bookStats) {
-          stats[doc.id] = {
-            timeMinutes: Math.round(bookStats.total_time_minutes),
-            sessions: bookStats.total_sessions
-          }
-        }
-      }
-      
-      setPomodoroStats(stats)
-    }
-    
-    loadStats()
-  }, [user, userDocuments])
-
-  // Load streak and achievements data
-  useEffect(() => {
-    const loadGamificationData = async () => {
-      if (!user) return
-      
-      setLoading(true)
-      try {
-        const [streakData, achievementsData] = await Promise.all([
-          pomodoroGamificationService.getUserStreak(user.id),
-          pomodoroGamificationService.getUserAchievements(user.id)
-        ])
-        
-        setStreak(streakData)
-        setAchievements(achievementsData)
-      } catch (error) {
-        console.error('Error loading gamification data:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    loadGamificationData()
-  }, [user])
-
   // Load related documents when current document changes
   useEffect(() => {
     const loadRelatedDocuments = async () => {
@@ -253,40 +195,19 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
     }
   }, [relatedDocuments, currentDocument?.id, user, refreshRelatedDocuments])
 
-  // Subscribe to timer state changes
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const unsubscribe = timerService.subscribe(setTimerState)
-    return unsubscribe
-  }, [])
-
-  const workDurationSeconds = timerState.settings.workDuration * 60
-  const isTimerPristine =
-    !timerState.isRunning &&
-    timerState.mode === 'work' &&
-    timerState.timeLeft === workDurationSeconds
-
   const railItems: Array<{
     id: string
     icon: React.ElementType
     label: string
     section?: keyof typeof sectionsExpanded
-    action?: 'pomodoro'
   }> = [
     { id: 'library', icon: History, label: 'Recently Viewed', section: 'library' },
     { id: 'related', icon: GitBranch, label: 'Related Documents', section: 'related' },
     { id: 'stats', icon: TrendingUp, label: 'Productivity Stats', section: 'stats' },
-    { id: 'activity', icon: Activity, label: 'Recent Activity', section: 'activity' },
-    { id: 'achievements', icon: Trophy, label: 'Achievements', section: 'achievements' },
-    { id: 'pomodoro', icon: Timer, label: 'Pomodoro Dashboard', action: 'pomodoro' }
+    { id: 'activity', icon: Activity, label: 'Recent Activity', section: 'activity' }
   ]
 
   const handleRailItemClick = (item: typeof railItems[number]) => {
-    if (item.action === 'pomodoro') {
-      setShowPomodoroDashboard(true)
-      return
-    }
-
     onToggle()
     if (item.section) {
       setSectionsExpanded(prev => ({
@@ -323,38 +244,19 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
           style={{ borderColor: 'var(--color-border)', minHeight: '60px' }}
         >
           {isOpen ? (
-            <>
-              {user && currentDocument && (
-                <Tooltip content="Start Pomodoro timer" position="bottom">
-                  <button
-                    onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
-                    className="p-2 rounded-lg transition-colors"
-                    style={{
-                      backgroundColor: 'var(--color-surface)',
-                      color: 'var(--color-text-secondary)',
-                      border: '1px solid var(--color-border)'
-                    }}
-                    aria-label="Pomodoro"
-                    title="Pomodoro"
-                  >
-                    🍅
-                  </button>
-                </Tooltip>
-              )}
-              <button
-                onClick={onToggle}
-                className="p-2 rounded-lg transition-colors"
-                style={{
-                  backgroundColor: 'var(--color-surface-hover)',
-                  color: 'var(--color-text-primary)',
-                  border: '1px solid var(--color-border)'
-                }}
-                aria-label="Collapse navigation"
-                title="Collapse navigation"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-            </>
+            <button
+              onClick={onToggle}
+              className="p-2 rounded-lg transition-colors"
+              style={{
+                backgroundColor: 'var(--color-surface-hover)',
+                color: 'var(--color-text-primary)',
+                border: '1px solid var(--color-border)'
+              }}
+              aria-label="Collapse navigation"
+              title="Collapse navigation"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
           ) : (
             <button
               onClick={onToggle}
@@ -478,16 +380,6 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
                               </span>
                             </Tooltip>
                           </div>
-
-                          {pomodoroStats[doc.id] && pomodoroStats[doc.id].timeMinutes > 0 && (
-                            <div className="flex items-center space-x-2 text-xs mt-2">
-                              <Tooltip content="Time Spent (Pomodoro)" position="right">
-                                <Timer className="w-3 h-3" style={{ color: '#ef4444' }} />
-                              </Tooltip>
-                              <span style={{ color: 'var(--color-text-secondary)' }}>{pomodoroStats[doc.id].timeMinutes} min</span>
-                              <span style={{ color: 'var(--color-text-tertiary)' }}>({pomodoroStats[doc.id].sessions} sessions)</span>
-                            </div>
-                          )}
 
                           <div className="w-full rounded-full h-1.5 mt-2" style={{ backgroundColor: 'var(--color-border-light)' }}>
                             <div
@@ -621,73 +513,12 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
 
                 {sectionsExpanded.stats && (
                   <div className="space-y-4" data-tour="sidebar-stats">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <BarChart3 className="w-4 h-4" style={{ color: 'var(--color-text-secondary)' }} />
-                        <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                          Analytics
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => setShowPomodoroDashboard(true)}
-                        className="p-1 rounded hover:bg-gray-100 transition-colors"
-                        style={{ color: 'var(--color-text-secondary)' }}
-                        title="View Analytics Dashboard"
-                      >
-                        <BarChart3 className="w-4 h-4" />
-                      </button>
+                    <div className="flex items-center space-x-2">
+                      <BarChart3 className="w-4 h-4" style={{ color: 'var(--color-text-secondary)' }} />
+                      <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                        Analytics
+                      </span>
                     </div>
-
-                    {streak && (
-                      <div
-                        className="p-3 rounded-lg"
-                        style={{
-                          backgroundColor: streak.current_streak > 0 ? '#fef2f2' : '#f8fafc',
-                          border: `1px solid ${streak.current_streak > 0 ? '#fecaca' : 'var(--color-border)'}`
-                        }}
-                      >
-                        <div className="flex items-center space-x-2 mb-2">
-                          <Flame className="w-5 h-5" style={{ color: streak.current_streak > 0 ? '#ef4444' : '#9ca3af' }} />
-                          <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                            Current Streak
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="text-2xl font-bold" style={{ color: streak.current_streak > 0 ? '#ef4444' : '#6b7280' }}>
-                            {streak.current_streak}
-                          </div>
-                          <div className="text-xs text-right" style={{ color: 'var(--color-text-secondary)' }}>
-                            <div>Best: {streak.longest_streak}</div>
-                            <div>Week: {streak.weekly_progress}/{streak.weekly_goal}</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {achievements.length > 0 && (
-                      <div
-                        className="p-3 rounded-lg"
-                        style={{
-                          backgroundColor: '#f0f9ff',
-                          border: '1px solid #bae6fd'
-                        }}
-                      >
-                        <div className="flex items-center space-x-2 mb-2">
-                          <Trophy className="w-4 h-4" style={{ color: '#0ea5e9' }} />
-                          <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                            Achievements
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="text-2xl font-bold" style={{ color: '#0ea5e9' }}>
-                            {achievements.length}
-                          </div>
-                          <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                            {achievements.length === 9 ? 'All unlocked! 🎉' : `${achievements.length}/9 unlocked`}
-                          </div>
-                        </div>
-                      </div>
-                    )}
 
                     <div className="grid grid-cols-2 gap-4">
                       <div
@@ -782,29 +613,6 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
                 )}
               </div>
 
-              {user && (
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-2">
-                      <Trophy className="w-5 h-5" style={{ color: '#f59e0b' }} />
-                      <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                        Achievements
-                      </h3>
-                    </div>
-                    <button
-                      onClick={() => toggleSection('achievements')}
-                      className="p-1 rounded transition-colors"
-                      style={{ color: 'var(--color-text-secondary)' }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                    >
-                      {sectionsExpanded.achievements ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </button>
-                  </div>
-
-                  {sectionsExpanded.achievements && <AchievementPanel userId={user.id} />}
-                </div>
-              )}
             </div>
             )}
           </div>
@@ -818,56 +626,25 @@ export const ThemedSidebar: React.FC<ThemedSidebarProps> = ({ isOpen, onToggle, 
             }}
           >
               {railItems.map((item) => (
-                item.id !== 'pomodoro' && (
-                  <Tooltip key={item.id} content={item.label} position="right">
-                    <button
-                      onClick={() => handleRailItemClick(item)}
-                      className="p-2 rounded-lg transition-colors"
-                      style={{
-                        backgroundColor: 'var(--color-surface)',
-                        color: 'var(--color-text-secondary)',
-                        border: '1px solid var(--color-border)'
-                      }}
-                      aria-label={item.label}
-                      title={item.label}
-                    >
-                      <item.icon className="w-5 h-5" />
-                    </button>
-                  </Tooltip>
-                )
-              ))}
-              
-              {/* Pomodoro Button */}
-              {user && currentDocument && (
-                <Tooltip content="Start Pomodoro timer" position="right">
+                <Tooltip key={item.id} content={item.label} position="right">
                   <button
-                    id="step-focus-timer"
-                    data-tour="pomodoro-button"
-                    onClick={() => timerService.toggleTimer(user?.id, currentDocument?.id)}
+                    onClick={() => handleRailItemClick(item)}
                     className="p-2 rounded-lg transition-colors"
                     style={{
                       backgroundColor: 'var(--color-surface)',
                       color: 'var(--color-text-secondary)',
                       border: '1px solid var(--color-border)'
                     }}
-                    aria-label="Pomodoro"
-                    title="Pomodoro"
+                    aria-label={item.label}
+                    title={item.label}
                   >
-                    🍅
+                    <item.icon className="w-5 h-5" />
                   </button>
                 </Tooltip>
-              )}
+              ))}
             </div>
         </div>
       </aside>
-
-      {/* Pomodoro Dashboard Modal */}
-      {user && (
-        <PomodoroDashboard
-          isOpen={showPomodoroDashboard}
-          onClose={() => setShowPomodoroDashboard(false)}
-        />
-      )}
 
       {/* Related Documents Modals */}
       {currentDocument && (

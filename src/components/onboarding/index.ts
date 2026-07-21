@@ -1,5 +1,4 @@
 export { OnboardingProvider, useOnboarding } from './OnboardingProvider'
 export { SpotlightTour } from './SpotlightTour'
-export { PeerReviewPreview, AIReviewPreview } from './PeerReviewPreview'
 export type { TourStep } from './SpotlightTour'
 export type { OnboardingContextType, TourType } from './OnboardingProvider'
