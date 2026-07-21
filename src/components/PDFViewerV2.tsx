@@ -1681,32 +1681,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       )
     },
     renderHighlights: (props: RenderHighlightsProps) => {
-      // #region agent log
-      (() => {
-        try {
-          const isDev = !!(import.meta as any)?.env?.DEV;
-          if (!isDev) return;
-          fetch('/api/debug/log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              location: 'PDFViewerV2.tsx:1686',
-              message: 'renderHighlights entry',
-              data: {
-                pageIndex: props.pageIndex,
-                highlightsCount: Array.isArray(highlightsRef.current) ? highlightsRef.current.length : 0,
-              },
-              timestamp: Date.now(),
-              sessionId: 'debug-session',
-              runId: 'run1',
-              hypothesisId: 'C',
-            }),
-          }).catch(() => {});
-        } catch {
-          // swallow
-        }
-      })();
-      // #endregion
       // Render existing highlights - use ref to avoid plugin recreation on highlight changes
       // Safety check: ensure highlightsRef.current is defined and is an array
       const highlights = Array.isArray(highlightsRef.current) ? highlightsRef.current : []
@@ -1725,82 +1699,13 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             return highlightAreas
               .filter((area) => area.pageIndex === props.pageIndex)
               .map((area, idx) => {
-                // #region agent log
                 const cssProps = props.getCssProperties(area, props.rotation);
-                (() => {
-                  try {
-                    const isDev = !!(import.meta as any)?.env?.DEV;
-                    if (!isDev) return;
-                    fetch('/api/debug/log', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        location: 'PDFViewerV2.tsx:1704',
-                        message: 'Highlight area CSS properties',
-                        data: {
-                          highlightId: highlight.id,
-                          areaIndex: idx,
-                          left: cssProps.left,
-                          top: cssProps.top,
-                          width: cssProps.width,
-                          height: cssProps.height,
-                          position: cssProps.position,
-                          hasOverflow: (cssProps as any).overflow !== undefined,
-                        },
-                        timestamp: Date.now(),
-                        sessionId: 'debug-session',
-                        runId: 'run1',
-                        hypothesisId: 'C',
-                      }),
-                    }).catch(() => {});
-                  } catch {
-                    // swallow
-                  }
-                })();
-                // #endregion
                 return (
                 <div
                   key={`${highlight.id}-${idx}`}
                   data-highlight-id={highlight.id}
                   data-saved-highlight="true"
                   ref={(el) => {
-                    // #region agent log
-                    if (el) {
-                      const computed = window.getComputedStyle(el);
-                      const textLayer = el.closest('.rpv-core__text-layer');
-                      const textLayerComputed = textLayer ? window.getComputedStyle(textLayer as Element) : null;
-                      (() => {
-                        try {
-                          const isDev = !!(import.meta as any)?.env?.DEV;
-                          if (!isDev) return;
-                          fetch('/api/debug/log', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              location: 'PDFViewerV2.tsx:1715',
-                              message: 'Highlight element computed styles',
-                              data: {
-                                overflow: computed.overflow,
-                                overflowX: computed.overflowX,
-                                overflowY: computed.overflowY,
-                                width: computed.width,
-                                maxWidth: computed.maxWidth,
-                                textLayerOverflow: textLayerComputed?.overflow,
-                                textLayerOverflowX: textLayerComputed?.overflowX,
-                                textLayerMaxWidth: textLayerComputed?.maxWidth,
-                              },
-                              timestamp: Date.now(),
-                              sessionId: 'debug-session',
-                              runId: 'run1',
-                              hypothesisId: 'A,B,D',
-                            }),
-                          }).catch(() => {});
-                        } catch {
-                          // swallow
-                        }
-                      })();
-                    }
-                    // #endregion
                   }}
                   style={{
                     background: highlight.color_hex || '#ffeb3b',

@@ -45,29 +45,6 @@ updates:
       - dependency-name: "react-dom"
         update-types: ["version-update:semver-major"]
 
-  # Chrome extension has its own package.json
-  - package-ecosystem: npm
-    directory: "/chrome-extension"
-    schedule:
-      interval: weekly
-      day: monday
-      time: "05:00"
-      timezone: "UTC"
-    open-pull-requests-limit: 5
-    versioning-strategy: widen
-    commit-message:
-      prefix: chore(extension)
-      include: scope
-    labels:
-      - dependencies
-      - automated
-      - chrome-extension
-    groups:
-      extension-deps:
-        update-types:
-          - "patch"
-          - "minor"
-
   # GitHub Actions workflows — keep action versions current
   - package-ecosystem: github-actions
     directory: "/"

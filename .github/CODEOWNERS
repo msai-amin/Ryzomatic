@@ -9,7 +9,6 @@
 /.github/                               @msai-amin
 /supabase/migrations/                   @msai-amin
 /api/                                   @msai-amin
-/chrome-extension/                      @msai-amin
 /scripts/                               @msai-amin
 /src/services/supabaseAuthService.ts    @msai-amin
 /src/services/googleAuthService.ts      @msai-amin

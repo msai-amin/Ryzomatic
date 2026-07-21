@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Send, Loader2, Sparkles, FileText, Upload, BookOpen, Save, X } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { ChatMessage } from './ChatMessage'
-import { sendMessageToAI, askForClarification, getFurtherReading, synthesizeDocuments } from '../services/aiService'
+import { sendMessageToAI, askForClarification, getFurtherReading } from '../services/aiService'
 import { notesIntegrationService } from '../services/notesIntegrationService'
 import { Tooltip } from './Tooltip'
 
@@ -118,25 +118,6 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ onClose }) => {
 
   const createMessageId = () => `${Date.now()}_${Math.random().toString(36).slice(2)}`
 
-  // Check if query is requesting synthesis
-  const isSynthesisQuery = (query: string): boolean => {
-    const lowercaseQuery = query.toLowerCase()
-    const synthesisIndicators = [
-      'synthesize',
-      'compare these',
-      'across these',
-      'across all',
-      'literature review',
-      'summarize findings',
-      'compare papers',
-      'compare documents',
-      'synthesis',
-      'consolidate',
-      'aggregate',
-    ]
-    return synthesisIndicators.some(indicator => lowercaseQuery.includes(indicator))
-  }
-
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isTyping || !currentDocument) return
 
@@ -147,20 +128,6 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ onClose }) => {
 
     try {
       setTyping(true)
-
-      // Check if this is a synthesis query
-      if (isSynthesisQuery(userMessage)) {
-        // Show short guidance to use library for synthesis
-        addChatMessage({
-          role: 'assistant',
-          content: `**Synthesis across multiple documents?** Select 2+ documents in your Library, then click the **Synthesize** button in the toolbar.
-
-For now, I can help with questions about "${currentDocument.name}".`,
-          id: createMessageId()
-        })
-        setTyping(false)
-        return
-      }
 
       let documentContext = ''
       // CRITICAL: Use safe destructured array instead of accessing currentDocument directly
