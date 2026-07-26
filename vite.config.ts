@@ -81,15 +81,7 @@ export default defineConfig(({ mode }) => ({
     ],
     exclude: [
       'pdfjs-dist/web/pdf_viewer.mjs',
-      '@google-cloud/text-to-speech',
-      '@google-cloud/storage',
-      'googleapis',
-      'natural',
-      'citation-js',
-      'neo4j-driver',
-      'd3',
-      'vis-timeline',
-      'vis-data'
+      'd3'
     ]
   },
   build: {
@@ -107,7 +99,7 @@ export default defineConfig(({ mode }) => ({
           'supabase-vendor': ['@supabase/supabase-js'],
           'ai-vendor': ['@google/generative-ai', 'openai'],
           'aws-vendor': ['@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner'],
-          'utils-vendor': ['marked', 'compromise'],
+          'utils-vendor': ['marked'],
         },
         // Ensure PDF.js worker is copied to the correct location
         assetFileNames: (assetInfo) => {

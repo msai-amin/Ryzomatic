@@ -1,1 +1,0 @@
-# LOTUS tests package

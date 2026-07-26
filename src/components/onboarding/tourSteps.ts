@@ -92,73 +92,9 @@ export const RELATED_DOCS_TOUR_STEPS: TourStep[] = [
     targetId: 'onboarding-graph-navigation',
     title: 'Graph Navigation',
     body: 'Click and drag nodes to rearrange the graph. Hover over edges to see relationship details. Click a node to open that document. Scroll to zoom in and out. The graph helps you build a mental map of your research field.',
-    buttonLabel: 'Continue to Peer Review',
-    icon: '🧭',
-  },
-]
-
-/**
- * Peer Review Tour Steps
- * Guides users through the peer review features
- */
-export const PEER_REVIEW_TOUR_STEPS: TourStep[] = [
-  {
-    targetId: 'onboarding-peer-review-setup',
-    title: 'Get Started with Peer Review',
-    body: 'To use Peer Review, you need a document open. Upload a document from the Library or as a new file. Once a document is loaded, the Peer Review button will appear in the header.',
-    buttonLabel: 'Continue',
-    action: 'waitForDocument',
-    icon: '📄',
-    image: '/onboarding-images/03-main-UI-after-upload.png',
-  },
-  {
-    targetId: 'onboarding-peer-review-btn',
-    title: 'Peer Review Mode',
-    body: 'Click the "Peer Review" button in the header to enter editorial mode. This opens a split-view interface perfect for writing academic peer reviews while referencing the document.',
-    buttonLabel: 'Open Peer Review',
-    action: 'openPeerReview',
-    icon: '📝',
-  },
-  {
-    targetId: 'onboarding-editorial-layout',
-    title: 'Split-View Layout',
-    body: 'The document is on the left and your review editor is on the right. Scroll through the document while writing your review for easy reference. Perfect for detailed analysis.',
-    buttonLabel: 'Next',
-    icon: '👁️',
-    visualHint: 'editor',
-    image: '/onboarding-images/08.Peer-review-before-applying-AI-Referee.jpeg',
-  },
-  {
-    targetId: 'onboarding-ai-auto-review',
-    title: 'AI-Powered Auto Review',
-    body: 'Click the sparkles icon to generate an AI-powered peer review automatically. The AI analyzes the document and creates a structured review with strengths, weaknesses, and recommendations.',
-    buttonLabel: 'Next',
-    icon: '✨',
-    image: '/onboarding-images/09.peer-review-ai-referee.png',
-  },
-  {
-    targetId: 'onboarding-review-editor',
-    title: 'Rich Text Editor',
-    body: 'Write your review with full formatting support. Use the toolbar for bold, italic, lists, quotes, and more. Your review auto-saves as you type, so you never lose your work.',
-    buttonLabel: 'Next',
-    icon: '✍️',
-    visualHint: 'editor',
-  },
-  {
-    targetId: 'onboarding-review-customization',
-    title: 'Customize Your Review',
-    body: 'Adjust font family, size, and theme (light/dark) to match your preferences. Changes apply instantly to your review. Choose settings that make you most productive.',
-    buttonLabel: 'Next',
-    icon: '⚙️',
-  },
-  {
-    targetId: 'onboarding-download-review',
-    title: 'Download Your Review',
-    body: 'Export your review as a DOCX file with one click. Perfect for submitting to journals, sharing with colleagues, or archiving your peer review work.',
     buttonLabel: 'Complete Tour',
     action: 'finishTour',
-    icon: '📥',
-    image: '/onboarding-images/10. peer-review-final-step.png',
+    icon: '🧭',
   },
 ]
 

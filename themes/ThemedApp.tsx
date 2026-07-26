@@ -4,18 +4,14 @@ import { ThemedHeader } from './ThemedHeader'
 import { ThemedSidebar } from './ThemedSidebar'
 import { ThemedMainContent } from './ThemedMainContent'
 import { DocumentViewer } from '../src/components/DocumentViewer'
-import { PomodoroBottomBar } from '../src/components/PomodoroBottomBar'
 import { DetachedChatWindow } from '../src/components/DetachedChatWindow'
-import { useAchievementToasts } from '../src/components/AchievementToast'
 import { useAppStore } from '../src/store/appStore'
 import { useKeyboardShortcuts } from '../src/hooks/useKeyboardShortcuts'
 import { OnboardingProvider, SpotlightTour, useOnboarding } from '../src/components/onboarding'
 import { backgroundProcessingService } from '../src/services/backgroundProcessingService'
-import { timerService, TimerState } from '../src/services/timerService'
 import { CustomizableReadingWizard } from '../src/components/customReading/CustomizableReadingWizard'
 import { DocumentUpload } from '../src/components/DocumentUpload'
 import { AudioWidget } from '../src/components/AudioWidget'
-import { EditorialLayout } from '../src/components/Editorial/EditorialLayout'
 import { supabaseStorageService } from '../src/services/supabaseStorageService'
 
 // Wrapper component to use onboarding hook
@@ -25,23 +21,19 @@ const SpotlightTourWrapper: React.FC = () => {
 }
 
 const ThemedAppContent: React.FC = () => {
-  const [timerState, setTimerState] = useState<TimerState>(timerService.getState())
   const { currentTheme } = useTheme()
   const {
     user,
     currentDocument,
-    pomodoroIsRunning,
     libraryRefreshTrigger,
     isNavRailExpanded,
     setNavRailExpanded,
     isChatOpen,
     openCustomReadingWizard,
-    isEditorialMode,
     audioWidgetVisible,
     setCurrentDocument
   } = useAppStore()
-  const { showAchievement, AchievementToastContainer } = useAchievementToasts()
-  
+
   // Enable keyboard shortcuts
   useKeyboardShortcuts()
 
@@ -60,7 +52,7 @@ const ThemedAppContent: React.FC = () => {
         }
 
         console.log('ThemedApp: Restoring document from localStorage:', savedDocumentId)
-        
+
         // Load the document from Supabase storage
         const book = await supabaseStorageService.getBook(savedDocumentId)
         if (!book) {
@@ -70,7 +62,7 @@ const ThemedAppContent: React.FC = () => {
         }
 
         // Convert the book to a document format
-        const safePageTexts = Array.isArray(book.pageTexts) 
+        const safePageTexts = Array.isArray(book.pageTexts)
           ? book.pageTexts.map((text: any) => typeof text === 'string' ? text : String(text || ''))
           : []
         const safeCleanedPageTexts = Array.isArray(book.cleanedPageTexts)
@@ -156,23 +148,9 @@ const ThemedAppContent: React.FC = () => {
     }
   }, [])
 
-  // Subscribe to timer service
-  useEffect(() => {
-    const unsubscribe = timerService.subscribe(setTimerState)
-    return unsubscribe
-  }, [])
-
-
-  const workDurationSeconds = timerState.settings.workDuration * 60
-  const isTimerPristine =
-    !timerState.isRunning &&
-    timerState.mode === 'work' &&
-    timerState.timeLeft === workDurationSeconds
-  const hasActiveTimer = !isTimerPristine
-
   return (
     <OnboardingProvider>
-    <div 
+    <div
         className="min-h-screen"
         style={{
           backgroundColor: 'var(--color-background)',
@@ -181,30 +159,24 @@ const ThemedAppContent: React.FC = () => {
         }}
       >
       {/* Header */}
-      <ThemedHeader 
-        onUploadClick={handleOpenUpload} 
+      <ThemedHeader
+        onUploadClick={handleOpenUpload}
         isSidebarOpen={isNavRailExpanded}
       />
 
       {/* Main Layout */}
       <div className="flex">
         {/* Sidebar */}
-        <ThemedSidebar 
-          isOpen={isNavRailExpanded} 
+        <ThemedSidebar
+          isOpen={isNavRailExpanded}
           onToggle={() => setNavRailExpanded(!isNavRailExpanded)}
           refreshTrigger={libraryRefreshTrigger}
         />
 
         {/* Main Content */}
-        {isEditorialMode ? (
-          <main className="flex-1 flex flex-col h-[calc(100vh-80px)] overflow-hidden relative">
-             <EditorialLayout />
-          </main>
-        ) : (
         <ThemedMainContent>
           <DocumentViewer onUploadClick={handleOpenUpload} />
         </ThemedMainContent>
-        )}
       </div>
 
       {isChatOpen && <DetachedChatWindow />}
@@ -213,32 +185,15 @@ const ThemedAppContent: React.FC = () => {
       {showUploadModal && (
         <DocumentUpload onClose={() => setShowUploadModal(false)} />
       )}
-      
+
       {/* AudioWidget - Persistent across re-renders, only visible when document is loaded */}
-      {currentDocument && !isEditorialMode && audioWidgetVisible && <AudioWidget />}
-
-      {/* Pomodoro Bottom Bar - Visible when there is an active or paused session */}
-      {user && currentDocument && hasActiveTimer && (
-        <PomodoroBottomBar 
-          onExpand={() => {
-            // Open the full Pomodoro timer in the header
-            const pomodoroButton = document.querySelector('[data-tour="pomodoro-button"]') as HTMLElement
-            if (pomodoroButton) {
-              pomodoroButton.click()
-            }
-          }}
-        />
-      )}
-
-
-      {/* Achievement Toast Container */}
-      <AchievementToastContainer />
+      {currentDocument && audioWidgetVisible && <AudioWidget />}
 
       {/* Onboarding System */}
       <SpotlightTourWrapper />
 
       {/* Theme Switcher (for development/testing) */}
-      <div 
+      <div
         className="fixed top-24 right-4 z-50"
         style={{ display: process.env.NODE_ENV === 'development' ? 'block' : 'none' }}
       >

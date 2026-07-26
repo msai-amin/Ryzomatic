@@ -35,7 +35,7 @@ export const SpotlightTour: React.FC<SpotlightTourProps> = ({ steps = [], onActi
     if (!currentStepData) return
 
     // Skip spotlight for setup/welcome steps (they use centered modals)
-    if (currentStepData.targetId === 'onboarding-welcome' || currentStepData.targetId === 'onboarding-peer-review-setup') {
+    if (currentStepData.targetId === 'onboarding-welcome') {
       return
     }
 
@@ -174,7 +174,7 @@ export const SpotlightTour: React.FC<SpotlightTourProps> = ({ steps = [], onActi
   useEffect(() => {
     if (isActive && currentStepData) {
       // Skip for welcome/setup steps (they use centered modals)
-      if (currentStepData.targetId === 'onboarding-welcome' || currentStepData.targetId === 'onboarding-peer-review-setup') {
+      if (currentStepData.targetId === 'onboarding-welcome') {
         return
       }
       
@@ -254,7 +254,7 @@ export const SpotlightTour: React.FC<SpotlightTourProps> = ({ steps = [], onActi
     }
 
     // For actions that open modals/views or wait for setup, wait a bit then continue
-    if (currentStepData.action === 'openGraph' || currentStepData.action === 'openPeerReview' || currentStepData.action === 'waitForDocument') {
+    if (currentStepData.action === 'openGraph' || currentStepData.action === 'waitForDocument') {
       // These actions handle nextStep() themselves with setTimeout
       return
     }
@@ -275,7 +275,7 @@ export const SpotlightTour: React.FC<SpotlightTourProps> = ({ steps = [], onActi
   if (!isActive || !currentStepData) return null
 
   // Special handling for welcome step and setup steps (centered modal)
-  if (currentStepData.targetId === 'onboarding-welcome' || currentStepData.targetId === 'onboarding-peer-review-setup') {
+  if (currentStepData.targetId === 'onboarding-welcome') {
     return (
       <div className="fixed inset-0 z-[100002] flex items-center justify-center font-sans">
         {/* Backdrop */}
@@ -384,15 +384,6 @@ export const SpotlightTour: React.FC<SpotlightTourProps> = ({ steps = [], onActi
             >
               <span className="text-xl">📊</span>
               <span>Start Related Documents Tour</span>
-            </button>
-            <button
-              onClick={() => {
-                if (onAction) onAction('startPeerReviewTour')
-              }}
-              className="px-6 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white font-semibold rounded-md transition-colors flex items-center justify-center gap-2"
-            >
-              <span className="text-xl">📝</span>
-              <span>Start Peer Review Tour</span>
             </button>
                    <div className="flex flex-col gap-3">
                      <label className="flex items-center gap-2 cursor-pointer" style={{ color: 'var(--color-text-secondary)' }}>

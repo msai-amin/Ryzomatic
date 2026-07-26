@@ -193,12 +193,6 @@ export const BookCard: React.FC<BookCardProps> = ({
           {book.notes_count}
         </div>
       )}
-      {book.pomodoro_sessions_count > 0 && (
-        <div className="flex items-center gap-1">
-          <Clock className="w-3 h-3" />
-          {book.pomodoro_sessions_count}
-        </div>
-      )}
       <div className="flex items-center gap-1">
         <HardDrive className="w-3 h-3" />
         {formatFileSize(book.file_size_bytes)}

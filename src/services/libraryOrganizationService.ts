@@ -55,12 +55,11 @@ export interface LibraryFilters {
   tags?: string[];
   isFavorite?: boolean;
   hasNotes?: boolean;
-  hasAudio?: boolean;
   fileSizeRange?: { min: number; max: number };
 }
 
 export interface SortOptions {
-  field: 'title' | 'created_at' | 'last_read_at' | 'reading_progress' | 'file_size_bytes' | 'notes_count' | 'pomodoro_sessions_count';
+  field: 'title' | 'created_at' | 'last_read_at' | 'reading_progress' | 'file_size_bytes' | 'notes_count';
   order: 'asc' | 'desc';
 }
 
@@ -1041,14 +1040,6 @@ class LibraryOrganizationService {
           query = query.gt('notes_count', 0);
         } else {
           query = query.eq('notes_count', 0);
-        }
-      }
-
-      if (filters.hasAudio !== undefined) {
-        if (filters.hasAudio) {
-          query = query.gt('pomodoro_sessions_count', 0);
-        } else {
-          query = query.eq('pomodoro_sessions_count', 0);
         }
       }
 

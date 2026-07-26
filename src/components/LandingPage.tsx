@@ -100,7 +100,7 @@ const LandingPage: React.FC = () => {
         "100 vision extraction pages per month",
         "10GB storage",
         "All features enabled",
-        "Highlights, notes, TTS, Pomodoro",
+        "Highlights, notes, TTS",
         "Document relationships",
         "Community support"
       ]

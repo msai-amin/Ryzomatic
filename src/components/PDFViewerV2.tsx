@@ -26,7 +26,7 @@ import { highlightService, Highlight as HighlightType } from '../services/highli
 import { useTheme } from '../../themes/ThemeProvider'
 import { getPDFWorkerSrc, configurePDFWorker } from '../utils/pdfjsConfig'
 import { parseTextWithBreaks, TextSegment } from '../utils/readingModeUtils'
-import { Eye, BookOpen, FileText, Type, Highlighter, Sparkles, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ZoomIn, ZoomOut, RotateCw, Search, Palette, Moon, Sun, Maximize2, StickyNote, Library, Upload, MousePointer, Save, MessageSquare, Lightbulb, X, PenTool, ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
+import { Eye, BookOpen, FileText, Type, Highlighter, Sparkles, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ZoomIn, ZoomOut, RotateCw, Search, Palette, Moon, Sun, Maximize2, StickyNote, Library, Upload, MousePointer, Save, MessageSquare, Lightbulb, X, ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
 import { ContextMenu, createAIContextMenuOptions } from './ContextMenu'
 import { getPDFTextSelectionContext, hasTextSelection } from '../utils/textSelection'
 import { notesService } from '../services/notesService'
@@ -63,9 +63,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     setChatMode,
     toggleChat,
     isChatOpen,
-    setHasUnsavedChanges,
-    addReviewCitation,
-    isEditorialMode
+    setHasUnsavedChanges
   } = useAppStore()
 
   // 1. Get values from the (now safe) hook
@@ -191,13 +189,8 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   const [showLibrary, setShowLibrary] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(isEditorialMode)
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
-
-  // Sync header collapsed state with editorial mode
-  useEffect(() => {
-    setIsHeaderCollapsed(isEditorialMode)
-  }, [isEditorialMode])
   const [selectionEnabled, setSelectionEnabled] = useState(true)
 
   // CRITICAL: Update color state when safeAnnotationColors changes
@@ -931,18 +924,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
     setContextMenu(null)
   }, [normalizedDocumentId, normalizedUserId, normalizedCurrentPage, pageTextsLength, userId]) // Use length (number) instead of array - document?.id is same as normalizedDocumentId
 
-  const handleIncludeInReview = useCallback(() => {
-    // Access normalizedPageTexts from closure - it's guaranteed to be an array
-    const pageText = normalizedPageTexts[normalizedCurrentPage - 1]
-    const context = getPDFTextSelectionContext(normalizedCurrentPage, pageText)
-    if (context && context.selectedText) {
-      const citation = `> "${context.selectedText}" (Page ${normalizedCurrentPage})`
-      addReviewCitation(citation)
-      console.log('Citation added to review')
-    }
-    setContextMenu(null)
-  }, [normalizedCurrentPage, pageTextsLength, addReviewCitation]) // Use length (number) instead of array
-
   // Sync highlights ref with state
   // CRITICAL: Use array length instead of array reference to prevent React comparison issues
   // React's 'co' function can receive undefined for previous dependency array on first render.
@@ -1537,38 +1518,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             display: 'flex',
             gap: '8px'
           }}>
-            {isEditorialMode ? (
-              <button
-                style={{
-                  backgroundColor: 'var(--color-surface-hover, #1f2937)',
-                  border: '1px solid var(--color-border, #374151)',
-                  borderRadius: '6px',
-                  padding: '6px 10px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  color: 'var(--color-text-primary, #f9fafb)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '4px',
-                  flex: 1,
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface, #111827)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-hover, #1f2937)'}
-                onClick={() => {
-                  if (props.selectedText) {
-                    const pageNumber = (props.highlightAreas?.[0]?.pageIndex ?? 0) + 1
-                    const citation = `> "${props.selectedText}" (Page ${pageNumber})`
-                    addReviewCitation(citation)
-                  }
-                  props.cancel()
-                }}
-              >
-                <PenTool className="w-3.5 h-3.5" />
-                Review
-              </button>
-            ) : (
             <button
               style={{
                 backgroundColor: 'var(--color-surface-hover, #1f2937)',
@@ -1612,7 +1561,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
               <StickyNote className="w-3.5 h-3.5" />
               Save Note
             </button>
-            )}
             {/* Delete Highlight button - only show if selection matches existing highlight */}
             {existingHighlight && (
               <button
@@ -1681,32 +1629,6 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
       )
     },
     renderHighlights: (props: RenderHighlightsProps) => {
-      // #region agent log
-      (() => {
-        try {
-          const isDev = !!(import.meta as any)?.env?.DEV;
-          if (!isDev) return;
-          fetch('/api/debug/log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              location: 'PDFViewerV2.tsx:1686',
-              message: 'renderHighlights entry',
-              data: {
-                pageIndex: props.pageIndex,
-                highlightsCount: Array.isArray(highlightsRef.current) ? highlightsRef.current.length : 0,
-              },
-              timestamp: Date.now(),
-              sessionId: 'debug-session',
-              runId: 'run1',
-              hypothesisId: 'C',
-            }),
-          }).catch(() => {});
-        } catch {
-          // swallow
-        }
-      })();
-      // #endregion
       // Render existing highlights - use ref to avoid plugin recreation on highlight changes
       // Safety check: ensure highlightsRef.current is defined and is an array
       const highlights = Array.isArray(highlightsRef.current) ? highlightsRef.current : []
@@ -1725,82 +1647,13 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
             return highlightAreas
               .filter((area) => area.pageIndex === props.pageIndex)
               .map((area, idx) => {
-                // #region agent log
                 const cssProps = props.getCssProperties(area, props.rotation);
-                (() => {
-                  try {
-                    const isDev = !!(import.meta as any)?.env?.DEV;
-                    if (!isDev) return;
-                    fetch('/api/debug/log', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        location: 'PDFViewerV2.tsx:1704',
-                        message: 'Highlight area CSS properties',
-                        data: {
-                          highlightId: highlight.id,
-                          areaIndex: idx,
-                          left: cssProps.left,
-                          top: cssProps.top,
-                          width: cssProps.width,
-                          height: cssProps.height,
-                          position: cssProps.position,
-                          hasOverflow: (cssProps as any).overflow !== undefined,
-                        },
-                        timestamp: Date.now(),
-                        sessionId: 'debug-session',
-                        runId: 'run1',
-                        hypothesisId: 'C',
-                      }),
-                    }).catch(() => {});
-                  } catch {
-                    // swallow
-                  }
-                })();
-                // #endregion
                 return (
                 <div
                   key={`${highlight.id}-${idx}`}
                   data-highlight-id={highlight.id}
                   data-saved-highlight="true"
                   ref={(el) => {
-                    // #region agent log
-                    if (el) {
-                      const computed = window.getComputedStyle(el);
-                      const textLayer = el.closest('.rpv-core__text-layer');
-                      const textLayerComputed = textLayer ? window.getComputedStyle(textLayer as Element) : null;
-                      (() => {
-                        try {
-                          const isDev = !!(import.meta as any)?.env?.DEV;
-                          if (!isDev) return;
-                          fetch('/api/debug/log', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              location: 'PDFViewerV2.tsx:1715',
-                              message: 'Highlight element computed styles',
-                              data: {
-                                overflow: computed.overflow,
-                                overflowX: computed.overflowX,
-                                overflowY: computed.overflowY,
-                                width: computed.width,
-                                maxWidth: computed.maxWidth,
-                                textLayerOverflow: textLayerComputed?.overflow,
-                                textLayerOverflowX: textLayerComputed?.overflowX,
-                                textLayerMaxWidth: textLayerComputed?.maxWidth,
-                              },
-                              timestamp: Date.now(),
-                              sessionId: 'debug-session',
-                              runId: 'run1',
-                              hypothesisId: 'A,B,D',
-                            }),
-                          }).catch(() => {});
-                        } catch {
-                          // swallow
-                        }
-                      })();
-                    }
-                    // #endregion
                   }}
                   style={{
                     background: highlight.color_hex || '#ffeb3b',
@@ -3131,9 +2984,7 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           options={createAIContextMenuOptions(
             handleClarification,
             handleFurtherReading,
-            handleSaveNote,
-            handleIncludeInReview,
-            isEditorialMode
+            handleSaveNote
           )}
           onClose={() => setContextMenu(null)}
         />

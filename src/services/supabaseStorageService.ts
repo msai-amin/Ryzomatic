@@ -57,35 +57,6 @@ class SupabaseStorageService {
   private currentUserId: string | null = null;
   private hasWarnedLegacyUserAudio = false;
 
-  // #region agent log
-  private agentLog(
-    location: string,
-    message: string,
-    data: Record<string, any>,
-    hypothesisId: string
-  ) {
-    try {
-      if (typeof window === 'undefined') return;
-      const isDev = !!(import.meta as any)?.env?.DEV;
-      if (!isDev) return;
-      fetch('/api/debug/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          location,
-          message,
-          data,
-          timestamp: Date.now(),
-          sessionId: 'debug-session',
-          runId: 'run1',
-          hypothesisId,
-        }),
-      }).catch(() => {});
-    } catch {
-      // swallow
-    }
-  }
-  // #endregion
 
   // Initialize with current user
   setCurrentUser(userId: string | null) {
@@ -161,20 +132,6 @@ class SupabaseStorageService {
 
   // Books Management
   async saveBook(book: SavedBook): Promise<string> {
-    // #region agent log
-    this.agentLog(
-      'supabaseStorageService.ts:132',
-      'saveBook entry',
-      {
-        bookId: book.id,
-        userId: this.currentUserId,
-        bookType: book.type,
-        hasFileData: !!book.fileData,
-        fileName: book.fileName,
-      },
-      'D'
-    );
-    // #endregion
     this.ensureAuthenticated();
     
     try {
@@ -217,18 +174,6 @@ class SupabaseStorageService {
         }
 
         // Upload to S3
-        // #region agent log
-        this.agentLog(
-          'supabaseStorageService.ts:175',
-          'Before S3 upload',
-          {
-            fileSizeMB: (fileSize / 1024 / 1024).toFixed(2),
-            userId: this.currentUserId,
-            bookId: book.id,
-          },
-          'E'
-        );
-        // #endregion
         const uploadResult = await bookStorageService.uploadBook(fileBlob, {
           userId: this.currentUserId!,
           bookId: book.id,
@@ -238,14 +183,6 @@ class SupabaseStorageService {
           fileSize: fileSize,
           totalPages: book.totalPages
         });
-        // #region agent log
-        this.agentLog(
-          'supabaseStorageService.ts:185',
-          'After S3 upload',
-          { s3Key: uploadResult.s3Key, uploadSuccess: !!uploadResult.s3Key },
-          'E'
-        );
-        // #endregion
 
         s3Key = uploadResult.s3Key;
         
@@ -309,23 +246,6 @@ class SupabaseStorageService {
         .single();
       
       if (error) {
-        // #region agent log
-        this.agentLog(
-          'supabaseStorageService.ts:246',
-          'Database upsert error',
-          {
-            errorCode: error.code,
-            errorMessage: error.message,
-            errorDetails: (error as any).details,
-            errorHint: (error as any).hint,
-            userId: this.currentUserId,
-            bookId: book.id,
-            hasS3Key: !!s3Key,
-            s3Key,
-          },
-          'C'
-        );
-        // #endregion
         // If database save fails, try to clean up S3 upload
         if (s3Key) {
           try {
@@ -405,29 +325,6 @@ class SupabaseStorageService {
       return data.id;
 
     } catch (error) {
-      // #region agent log
-      const err = error as Error;
-      this.agentLog(
-        'supabaseStorageService.ts:325',
-        'saveBook catch block',
-        {
-          errorMessage: err.message,
-          errorName: err.name,
-          hasStack: !!err.stack,
-          bookId: book.id,
-          userId: this.currentUserId,
-          bookType: book.type,
-          hasFileData: !!book.fileData,
-          fileSize:
-            book.fileData instanceof Blob
-              ? book.fileData.size
-              : book.fileData instanceof ArrayBuffer
-                ? book.fileData.byteLength
-                : 'unknown',
-        },
-        'B'
-      );
-      // #endregion
       logger.error('Error saving book', { bookId: book.id }, error as Error);
       throw error;
     }
@@ -1268,7 +1165,6 @@ class SupabaseStorageService {
     is_favorite?: boolean;
     custom_metadata?: Record<string, any>;
     notes_count?: number;
-    pomodoro_sessions_count?: number;
   }): Promise<void> {
     this.ensureAuthenticated();
     
@@ -1326,10 +1222,9 @@ class SupabaseStorageService {
       tags?: string[];
       isFavorite?: boolean;
       hasNotes?: boolean;
-      hasAudio?: boolean;
     } = {},
     sort: {
-      field: 'title' | 'created_at' | 'last_read_at' | 'reading_progress' | 'file_size_bytes' | 'notes_count' | 'pomodoro_sessions_count';
+      field: 'title' | 'created_at' | 'last_read_at' | 'reading_progress' | 'file_size_bytes' | 'notes_count';
       order: 'asc' | 'desc';
     } = { field: 'last_read_at', order: 'desc' },
     limit: number = 50,
@@ -1383,14 +1278,6 @@ class SupabaseStorageService {
         }
       }
 
-      if (filters.hasAudio !== undefined) {
-        if (filters.hasAudio) {
-          query = query.gt('pomodoro_sessions_count', 0);
-        } else {
-          query = query.eq('pomodoro_sessions_count', 0);
-        }
-      }
-
       if (filters.collections && filters.collections.length > 0) {
         query = query.in('book_collections.collection_id', filters.collections);
       }
@@ -1435,55 +1322,12 @@ class SupabaseStorageService {
       'last_read_at': 'last_read_at',
       'reading_progress': 'reading_progress',
       'file_size_bytes': 'file_size_bytes',
-      'notes_count': 'notes_count',
-      'pomodoro_sessions_count': 'pomodoro_sessions_count'
+      'notes_count': 'notes_count'
     };
 
     return fieldMap[field] || 'last_read_at';
   }
 
-  // Update book counts when notes or audio are added/removed
-  async updateBookCounts(bookId: string, type: 'notes' | 'audio', delta: number): Promise<void> {
-    this.ensureAuthenticated();
-    
-    try {
-      const updateField = type === 'notes' ? 'notes_count' : 'pomodoro_sessions_count';
-      
-      // First get the current value
-      const { data: currentData, error: fetchError } = await supabase
-        .from('user_books')
-        .select(updateField)
-        .eq('id', bookId)
-        .eq('user_id', this.currentUserId!)
-        .single();
-      
-      if (fetchError) throw fetchError;
-      
-      // Then update with new value
-      const currentValue = (currentData as any)?.[updateField] || 0;
-      const { error } = await supabase
-        .from('user_books')
-        .update({
-          [updateField]: currentValue + delta
-        })
-        .eq('id', bookId)
-        .eq('user_id', this.currentUserId!);
-
-      if (error) {
-        throw errorHandler.createError(
-          `Failed to update book counts: ${error.message}`,
-          ErrorType.DATABASE,
-          ErrorSeverity.HIGH,
-          { context: 'updateBookCounts', bookId, type, delta, error: error.message }
-        );
-      }
-
-      logger.info('Book counts updated', { bookId, type, delta, userId: this.currentUserId });
-    } catch (error) {
-      logger.error('Error updating book counts', { bookId, type, delta }, error as Error);
-      throw error;
-    }
-  }
 }
 
 export const supabaseStorageService = new SupabaseStorageService();

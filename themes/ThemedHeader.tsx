@@ -12,9 +12,7 @@ import {
   FileText,
   Volume2,
   StickyNote,
-  Library,
-  PenTool,
-  Timer
+  Library
 } from 'lucide-react'
 import { useAppStore } from '../src/store/appStore'
 import { TypographySettings } from '../src/components/TypographySettings'
@@ -46,7 +44,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     libraryRefreshTrigger,
     pdfViewer,
     isChatOpen,
-    hasSeenPomodoroTour,
     setCurrentDocument,
     isRightSidebarOpen,
     setIsRightSidebarOpen,
@@ -54,8 +51,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
     hasUnsavedChanges,
     setHasUnsavedChanges,
     closeDocumentWithoutSaving,
-    isEditorialMode,
-    setEditorialMode,
     audioWidgetVisible,
     setAudioWidgetVisible
   } = useAppStore()
@@ -75,12 +70,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
 
   // Handle logo click to return to main UI
   const handleLogoClick = () => {
-    // If in Peer Review mode, exit editorial mode first (return to PDF viewer)
-    if (isEditorialMode) {
-      setEditorialMode(false)
-      return
-    }
-
     if (!currentDocument) {
       // No document open, nothing to do
       return
@@ -235,50 +224,26 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-4 sm:flex-nowrap">
-            {/* Tools Group: Pomodoro + AI Assistant */}
+            {/* Tools Group: Audio + AI Assistant */}
             <div className="flex items-center gap-2">
-              {user && currentDocument && (
-                <>
-                  {/* Audio Widget Toggle - Show when widget is closed */}
-                  {!audioWidgetVisible && !isEditorialMode && (
-                    <Tooltip content="Open Audio Widget" position="bottom">
-                      <button
-                        onClick={() => setAudioWidgetVisible(true)}
-                        className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all hover:bg-[var(--color-surface-hover)]"
-                        style={{ 
-                          backgroundColor: 'transparent', 
-                          border: '1px solid var(--color-border)',
-                          color: 'var(--color-text-primary)'
-                        }}
-                        aria-label="Open Audio Widget"
-                      >
-                        <Volume2 className="h-4 w-4 flex-shrink-0" />
-                        <span className="hidden sm:inline">Audio</span>
-                      </button>
-                    </Tooltip>
-                  )}
-                  
-                  {/* Editorial Mode Audio Controls - Show reopen button when audio widget is closed */}
-                  {isEditorialMode && !audioWidgetVisible && (
-                    <Tooltip content="Open Audio Widget" position="bottom">
-                      <button
-                        onClick={() => setAudioWidgetVisible(true)}
-                        className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all hover:bg-[var(--color-surface-hover)]"
-                        style={{ 
-                          backgroundColor: 'transparent', 
-                          border: '1px solid var(--color-border)',
-                          color: 'var(--color-text-primary)'
-                        }}
-                        aria-label="Open Audio Widget"
-                      >
-                        <Volume2 className="h-4 w-4 flex-shrink-0" />
-                        <span className="hidden sm:inline">Audio</span>
-                      </button>
-                    </Tooltip>
-                  )}
-                </>
+              {user && currentDocument && !audioWidgetVisible && (
+                <Tooltip content="Open Audio Widget" position="bottom">
+                  <button
+                    onClick={() => setAudioWidgetVisible(true)}
+                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all hover:bg-[var(--color-surface-hover)]"
+                    style={{
+                      backgroundColor: 'transparent',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)'
+                    }}
+                    aria-label="Open Audio Widget"
+                  >
+                    <Volume2 className="h-4 w-4 flex-shrink-0" />
+                    <span className="hidden sm:inline">Audio</span>
+                  </button>
+                </Tooltip>
               )}
-              
+
               <Tooltip content="Ask the AI Assistant" position="bottom">
                 <button
                   data-tour="ai-assistant-button"
@@ -525,25 +490,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                 </button>
               </Tooltip>
 
-              {/* Peer Review */}
-              <Tooltip content="Toggle Peer Review Mode" position="bottom">
-                <button
-                  id="onboarding-peer-review-btn"
-                  data-onboarding="onboarding-peer-review-btn"
-                  onClick={() => setEditorialMode(!isEditorialMode)}
-                  className="flex items-center gap-2 rounded-lg border px-3 py-1 text-sm font-medium transition-colors"
-                  style={{
-                    color: isEditorialMode ? 'var(--color-primary)' : 'var(--color-primary)',
-                    borderColor: isEditorialMode ? 'var(--color-primary)' : 'var(--color-primary)',
-                    backgroundColor: isEditorialMode ? 'var(--color-primary-light)' : 'transparent'
-                  }}
-                  aria-label="Toggle Peer Review Mode"
-                  title="Open Peer Review Panel"
-                >
-                  <PenTool className="h-4 w-4" />
-                  <span>Peer Review</span>
-                </button>
-              </Tooltip>
             </div>
           </div>
         )}
@@ -655,52 +601,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                           <li>"What are the main points of this chapter?"</li>
                           <li>"Explain this concept in simpler terms"</li>
                           <li>"What does this paragraph mean?"</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-3">
-                      <Timer className="h-6 w-6" style={{ color: 'var(--color-primary)' }} />
-                      <h3
-                        className="text-lg font-semibold"
-                        style={{ color: 'var(--color-text-primary)' }}
-                      >
-                        Pomodoro Timer
-                      </h3>
-                    </div>
-                    <div
-                      className="space-y-3 text-sm"
-                      style={{ color: 'var(--color-text-secondary)' }}
-                    >
-                      <p>Stay focused and productive with timed work sessions and breaks.</p>
-                      <div className="space-y-2">
-                        <h4
-                          className="font-medium"
-                          style={{ color: 'var(--color-text-primary)' }}
-                        >
-                          How to use:
-                        </h4>
-                        <ul className="ml-2 list-disc space-y-1">
-                          <li>Click the 🍅 tomato icon in the header</li>
-                          <li>Start a 25-minute work session</li>
-                          <li>Take 5-minute breaks between sessions</li>
-                          <li>After 4 sessions, take a 15-minute long break</li>
-                        </ul>
-                      </div>
-                      <div className="space-y-2">
-                        <h4
-                          className="font-medium"
-                          style={{ color: 'var(--color-text-primary)' }}
-                        >
-                          Features:
-                        </h4>
-                        <ul className="ml-2 list-disc space-y-1">
-                          <li>Customizable work and break durations</li>
-                          <li>Auto-start options for breaks and sessions</li>
-                          <li>Progress tracking and achievements</li>
-                          <li>Notifications when sessions end</li>
                         </ul>
                       </div>
                     </div>
@@ -845,7 +745,6 @@ export const ThemedHeader: React.FC<ThemedHeaderProps> = ({ onUploadClick, isSid
                         Best Practices:
                       </h4>
                       <ul className="space-y-1">
-                        <li>• Use Pomodoro for focused reading sessions</li>
                         <li>• Combine TTS with note-taking for better retention</li>
                         <li>• Ask AI questions while reading for deeper understanding</li>
                         <li>• Try different note templates for different content types</li>
