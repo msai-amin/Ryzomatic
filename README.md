@@ -1,477 +1,129 @@
-# AI Research Platform (ryzomatic)
+ryzomatic
 
-An intelligent academic reading platform that transforms how researchers manage, read, and analyze documents. Built with React, TypeScript, and modern web technologies, AI Research Platform combines AI-powered insights, natural text-to-speech, and advanced document management to create a comprehensive research workflow solution.
+A research reading platform that reads academic PDFs aloud with word-level highlighting, and recommends what to read next from the OpenAlex citation graph.
 
-## 🌟 Key Features
+Live app · React 18 + TypeScript · Supabase/pgvector · Vercel serverless
 
-### 📚 Document Management
-- **Multi-format Support**: Upload and process PDF and text documents
-- **Intelligent Text Extraction**: Automatic content extraction from PDFs using PDF.js with OCR fallback
-- **Library Organization**: 
-  - Collections and folders for organizing documents
-  - Tags and metadata for easy categorization
-  - Advanced search with full-text indexing
-  - Filter by type, date, tags, and more
-- **Cloud Storage**: Secure document storage with Supabase and AWS S3
-- **Document Relationships**: AI-powered automatic graph generation showing connections between documents
+<!-- TODO: replace with a 20-second GIF of TTS word-sync running over a real PDF.
+     This is the single highest-value thing on the page. Record with Kap or LICEcap,
+     keep it under 5MB, commit to docs/assets/demo.gif -->
+![Demo](docs/assets/demo.gif)
+***
+Why I built it
 
-### 📖 Advanced PDF Viewer
-- **Professional Viewing**: Zoom, rotation, page navigation, and text extraction
-- **Multiple View Modes**: 
-  - Text-only mode for distraction-free reading
-  - PDF view with full rendering
-  - Split view combining both
-  - Reading mode with optimized typography
-- **Scroll Modes**: Single page or continuous scroll viewing
-- **Page Navigation**: Quick jump to any page, keyboard shortcuts
-- **Text Selection**: Select and interact with text for highlighting, notes, and AI queries
+Reading papers is a bottleneck that tooling has mostly ignored. Reference managers solved storage (Zotero, Mendeley); AI tools solved summarising (NotebookLM, Elicit). Neither helps with the actual act of getting through a 30-page methods section — especially for people who read slowly, read in a second language, or want to read while commuting.
 
-### 🎧 Text-to-Speech (TTS)
-- **Multiple Providers**: 
-  - Azure Cognitive Services (premium voices)
-  - Google Cloud TTS
-  - Native browser TTS (fallback)
-- **Natural Voice Reading**: High-quality voices with word-level highlighting
-- **Customizable Settings**:
-  - Adjustable speed (0.5x - 2x)
-  - Pitch and volume control
-  - Voice selection (gender, language, style)
-- **Reading Modes**:
-  - Read current page
-  - Read from current page to end
-  - Read selected text
-- **Smart Text Cleanup**: Automatic removal of publication metadata for cleaner audio
+ryzomatic is my attempt at the reading layer: a PDF viewer that can read to you at the word level, remembers what you highlighted, and tells you what to read next.
 
-### 🤖 AI-Powered Features
+I built it solo over ~10 months. Below are the three parts I think are actually worth reviewing.
 
-#### AI Chat Assistant
-- **Context-Aware Conversations**: AI understands your current document and reading context
-- **Multiple Chat Modes**:
-  - **General Chat**: Ask questions about your documents
-  - **Clarification Mode**: Get simplified explanations of complex text
-  - **Further Reading**: Discover related topics and resources
-- **Structured RAG**: Advanced retrieval-augmented generation with semantic search
-- **Note Integration**: AI can reference your existing notes for better context
-- **Multi-Model Support**: Uses Gemini (primary) and OpenAI GPT-4o-mini (fallback)
+***
+Three things worth looking at
 
-#### Paper Recommendations
-- **OpenAlex Integration**: Discover relevant academic papers based on your documents
-- **Intelligent Recommendations**:
-  - **Related Works**: Papers connected in the citation graph
-  - **Cited By**: Papers that cite your current document
-  - **Content-Based**: For drafts without DOIs, uses Gemini AI to extract search queries
-- **Hybrid Ranking**: Multi-factor scoring combining:
-  - Citation graph similarity
-  - Citation count
-  - Recency
-  - Topic overlap
-  - Open access availability
-  - Venue quality
-- **Smart Filtering**: Filter by year, citations, open access status
-- **User Feedback**: Mark papers as relevant/not relevant to improve recommendations
-- **Persistent Caching**: Recommendations saved locally and in database
+1. Word-level TTS sync over a rendered PDF
 
-#### Document Relationship Graph
-- **Automatic Mapping**: AI analyzes semantic relationships between documents
-- **Visual Graph**: Interactive network visualization of document connections
-- **Relationship Explanations**: AI-generated summaries explaining how documents relate
-- **Smart Discovery**: Find related documents you might have missed
+The problem. Highlighting each word as it's spoken sounds trivial and isn't. Speech synthesis emits boundary events in audio time against the string you submitted. A PDF's text lives in a separately rendered text layer with its own coordinate space and its own tokenisation — PDF.js will happily split a word across spans, or merge two words that were never adjacent on the page. There is no shared index between "the 412th character of the string I sent to Azure" and "the DOM node currently painted at x=203, y=88."
 
-### ✍️ Annotation & Notes
+What I did. Providers expose a uniform speak(text, onEnd, onWord) contract where onWord fires with (word, charIndex). charIndex is the offset into the submitted string, which I map back onto PDF.js text-layer spans via an offset table built at extraction time. Long documents are chunked below each provider's character ceiling and the offsets are rebased per chunk, so highlighting stays correct across chunk boundaries — this was where most of the bugs lived.
 
-#### Highlighting System
-- **Multi-Color Highlights**: Choose from multiple color options
-- **Smart Highlighting**: Highlights that connect related ideas across your library
-- **Highlight Management**: 
-  - View all highlights in a document
-  - Filter by color
-  - Search highlights
-  - Export highlights
-- **Context Preservation**: Highlights include surrounding text context
+Where it still breaks. Ligatures and hyphenated line-breaks desync the highlight by a word or two; two-column layouts with sidebars occasionally produce out-of-order spans. Both are documented in the issues.
 
-#### Notes System
-- **Contextual Notes**: Create notes linked to specific document sections
-- **AI-Enhanced Notes**: Save AI responses as notes with one click
-- **Note Organization**: 
-  - Notes linked to pages and documents
-  - Searchable note content
-  - Notes can reference document context
-- **Rich Formatting**: Notes support markdown and emoji formatting
+src/services/azureTTSService.ts, src/services/ttsManager.ts
 
-### ⏱️ Productivity Tools
+2. A three-tier TTS cache, because synthesis is billed per character
 
-#### Pomodoro Timer
-- **Focus Sessions**: 25-minute focus blocks with breaks
-- **Gamification**: 
-  - Achievement system
-  - Streaks and milestones
-  - Productivity stats
-- **Session Tracking**: Monitor your reading and study time
-- **Flexible Timer**: Customizable session and break durations
+Azure and Google Cloud both bill per character synthesised. Naively, re-opening a paper re-synthesises it and re-bills it — and users re-read the same papers constantly. So audio is cached at three levels:
 
-### 🎨 Customization
+Tier	Store	Purpose
+1	In-memory LRU, 50 entries	Instant replay within a session
+2	Supabase tts_audio_cache	Survives reloads, shared across a user's devices
+3	Provider API	Cold path only
+	Cache keys are a SHA-256 over text + voiceName + speakingRate + pitch via crypto.subtle — so changing the voice or speed correctly misses, but re-reading the same page at the same settings never re-bills.
 
-#### Typography Settings
-- **Font Options**: Serif, Sans Serif, and Monospace fonts
-- **Size Control**: Adjustable font size (12px - 24px)
-- **Line Height**: Customizable line spacing (1.2 - 2.5)
-- **Max Width**: Control reading width (400px - 1200px)
-- **Themes**: 
-  - Light mode
-  - Dark mode
-  - Sepia mode
-  - Reading mode (optimized for focus)
-- **Text Alignment**: Left, center, or justified
-- **Focus Mode**: Dim surrounding content for better focus
-- **Reading Guide**: Visual guide to help track reading position
+src/services/ttsCacheService.ts
 
-### 🔍 Search & Discovery
-- **Full-Text Search**: Search across all document content
-- **Library Search**: Find documents by title, tags, or content
-- **Semantic Search**: AI-powered semantic document search
-- **Filter Options**: Multiple filter criteria for refined results
+3. A hybrid recommender over the OpenAlex citation graph
 
-### 🔐 Security & Privacy
-- **Authentication**: Secure authentication with Supabase Auth
-- **Row-Level Security**: Database-level security policies
-- **Encrypted Storage**: Secure document storage
-- **Privacy-First**: Your documents and data remain private
+"Related papers" from a single similarity metric is a known-bad experience: pure citation overlap surfaces ancient canonical papers, pure recency surfaces noise. So recommendations are a weighted combination of six normalised signals:
 
-### 📱 Progressive Web App
-- **Installable**: Install as a native app on any device
-- **Offline Support**: Access cached documents offline
-- **Responsive Design**: Beautiful UI that works on desktop, tablet, and mobile
+citationSimilarity  0.30   position in the seed paper's citation neighbourhood
+citationCount       0.25   quality proxy
+recency             0.15   
+topicOverlap        0.15   OpenAlex concept overlap with the seed
+openAccess          0.10   can the user actually read it
+venueQuality        0.05   
 
-## 🛠️ Tech Stack
+Each scorer returns 0–100 independently, so weights are tunable without touching the scorers. The open-access term is a deliberate product choice, not an information-retrieval one: a perfect recommendation behind a paywall is a bad recommendation. Users can mark results relevant/not-relevant, which persists but does not yet feed back into ranking — see below.
 
-### Frontend
-- **Framework**: React 18 + TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS + Headless UI
-- **State Management**: Zustand
-- **PDF Processing**: PDF.js + react-pdf
+src/services/openAlexRecommendationService.ts
 
-### Backend
-- **Database**: Supabase (PostgreSQL with pgvector)
-- **Storage**: AWS S3 + Supabase Storage
-- **Serverless Functions**: Vercel Serverless Functions
-- **Authentication**: Supabase Auth
+***
+Architecture
 
-### AI & Services
-- **AI Models**: 
-  - Google Gemini 2.5 Flash (primary)
-  - OpenAI GPT-4o-mini (fallback)
-- **TTS Providers**:
-  - Azure Cognitive Services
-  - Google Cloud TTS
-  - Native Browser TTS
-- **External APIs**:
-  - OpenAlex (paper recommendations)
-  - Google Drive (optional integration)
+React 18 + TypeScript (Vite)  ──  Zustand state, 63 components
+        │
+        ├── PDF.js text layer ──── TTS manager ──┬── Azure Cognitive Services
+        │                                        ├── Google Cloud TTS
+        │                                        └── Browser SpeechSynthesis  (fallback chain)
+        │
+        ├── Vercel serverless (14 functions) ──── Gemini 2.5 Flash → GPT-4o-mini (fallback)
+        │
+        └── Supabase ──── Postgres + pgvector (RAG), Auth + row-level security, Storage
+                          74 migrations
 
-### Development Tools
-- **Testing**: Vitest + Playwright
-- **Linting**: ESLint
-- **Type Checking**: TypeScript
-- **CI/CD**: GitHub Actions
+The provider fallback chain is load-bearing rather than decorative: Azure gives the best voices but is the most likely to fail on quota, so ttsManager degrades Azure → Google → native browser TTS without interrupting playback. Same pattern on the LLM side, Gemini → OpenAI.
 
-## 🚀 Getting Started
+Scale: ~61k lines of TypeScript, 63 components, 46 services, 14 serverless functions, 74 database migrations.
 
-### Prerequisites
+Testing and CI
 
-- Node.js 20+
-- npm or yarn
-- Supabase account (for database and auth)
-- AWS account (for S3 storage, optional)
-- AI API keys (Gemini and/or OpenAI)
+37 GitHub Actions workflows, 22 test suites (Vitest unit, Playwright E2E). Beyond the usual lint/test/build, the pipeline runs CodeQL, secret scanning, dependency review, license compliance, bundle-size limits, Lighthouse budgets, circular-dependency detection, and synthetic production smoke tests.
 
-### Installation
+This is more CI than a solo project strictly needs. I built it out deliberately, because the failure mode I cared about was silently shipping a broken PDF viewer to the small number of people actually using the thing, and I had no QA but myself.
 
-1. **Clone the repository**:
-```bash
-git clone <repository-url>
-cd Ryzomatic
-```
+***
+What I'd do differently
 
-2. **Install dependencies**:
-```bash
+Honest section, because I think it's the most useful thing here.
+
+I built far too much. There are seven feature areas in this app — reader, TTS, AI chat, recommendations, knowledge graph, annotations, and a Pomodoro timer with an achievement system. Roughly three of those earn their keep. The Pomodoro timer exists because it was fun to build on a Sunday, not because a single user asked for it. If I started again I would ship the TTS reader alone and nothing else, and only add the second thing once the first had users who complained about its absence.
+
+I never validated the core assumption. The product asks people to move their PDF library into a new tool. That's an enormous switching cost against Zotero, which is free and twenty years entrenched. I should have tested that migration willingness with ten conversations before writing 61k lines of TypeScript. I didn't, and it's the assumption most likely to be fatal.
+
+The relevance feedback loop is unfinished. Users can mark recommendations relevant or not; that signal is stored and then ignored. Closing the loop — even a naive per-user reweighting of the six coefficients — is the highest-value thing left in the codebase and it's maybe two days of work. It's unfinished because I kept starting new features instead.
+
+Cost per user is unmodelled. TTS synthesis, OCR, vision extraction and LLM calls all carry real marginal cost, and the free tier grants all of them generously. The caching layer above was reactive — I built it after a bill surprised me — rather than something I designed for up front.
+
+***
+Running it locally
+
+Requires Node 20+, a Supabase project, and at least one AI key (Gemini has a free tier).
+
+git clone https://github.com/msai-amin/Ryzomatic.git && cd Ryzomatic
 npm install
-```
+cp .env.example .env.local     # add Supabase URL/key + Gemini or OpenAI key
+                               # Azure/Google TTS and AWS S3 are optional
+vercel dev --listen 3001       # serverless functions + frontend
 
-3. **Set up environment variables**:
-```bash
-cp .env.example .env.local
-```
+Apply migrations from supabase/migrations/ before first run. Full setup notes: docs/deployment/DEPLOYMENT.md.
 
-Edit `.env.local` and add your configuration:
-```env
-# Supabase
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+Documentation
 
-# AI Services (at least one required)
-VITE_GEMINI_API_KEY=your_gemini_api_key
-VITE_OPENAI_API_KEY=your_openai_api_key
+Architecture and database schema
+Paper recommendation system
+AI features
+UI component guide
 
-# TTS (optional)
-AZURE_TTS_KEY=your_azure_key
-AZURE_TTS_REGION=your_azure_region
-GOOGLE_CLOUD_TTS_KEY=your_google_key
+<details>
+<summary>Full feature list</summary>
 
-# AWS S3 (optional, for file storage)
-AWS_ACCESS_KEY_ID=your_aws_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret
-AWS_S3_BUCKET=your_bucket_name
-AWS_REGION=us-east-1
-```
+Multi-format upload (PDF, TXT) with OCR fallback · collections, tags, full-text and semantic search · PDF viewer with text-only / split / reading modes · multi-provider TTS with word highlighting and speed control · context-aware AI chat with structured RAG · clarification and further-reading modes · OpenAlex paper recommendations with filtering and feedback · AI-generated document relationship graph · multi-colour highlights with cross-document linking · contextual notes with markdown · Pomodoro timer with streaks and achievements · typography and theme controls (light/dark/sepia/reading) · focus mode and reading guide · installable PWA with offline caching.
 
-4. **Set up Supabase**:
-   - Create a new Supabase project
-   - Run migrations from `supabase/migrations/` directory
-   - Configure Row-Level Security policies
+</details>
 
-5. **Start development server**:
-```bash
-# For local development with Vercel functions
-vercel dev --listen 3001
+License
 
-# Or use Vite dev server (frontend only)
-npm run dev
-```
+MIT — see LICENSE.
 
-6. **Open your browser**:
-Navigate to `http://localhost:3001`
-
-### Get API Keys
-
-- **Gemini**: https://makersuite.google.com/app/apikey (Free tier available)
-- **OpenAI**: https://platform.openai.com/api-keys
-- **Supabase**: https://supabase.com (Free tier available)
-- **Azure TTS**: https://azure.microsoft.com/services/cognitive-services/text-to-speech/
-- **Google Cloud TTS**: https://cloud.google.com/text-to-speech
-
-## 📖 Usage Guide
-
-### Uploading Documents
-
-1. Click the "Upload" button in the header
-2. Drag and drop files or click to browse
-3. Supported formats: `.pdf`, `.txt`
-4. Documents are automatically processed and indexed
-
-### Using AI Chat
-
-1. Open a document
-2. Click the "AI Chat" button to open the chat panel
-3. Ask questions about the document
-4. Use context menu (right-click on selected text) for:
-   - **Ask for Clarification**: Get simplified explanations
-   - **Get Further Reading**: Discover related topics
-   - **Save as Note**: Save selected text as a note
-
-### Getting Paper Recommendations
-
-1. Open a document (preferably with DOI or OpenAlex ID)
-2. Expand "Paper Recommendations" in the sidebar
-3. Click "Get Recommendations" to fetch relevant papers
-4. Filter by year, citations, or open access status
-5. Switch between "Related Works" and "Cited By"
-6. Mark papers as relevant to improve future recommendations
-
-### Using Text-to-Speech
-
-1. Open a PDF document
-2. Click the speaker icon (🔊) in the toolbar
-3. Adjust settings (voice, speed, pitch) via the settings icon
-4. Click play to start reading
-5. Choose reading mode:
-   - Read current page
-   - Read from here to end
-   - Read selected text
-
-### Creating Highlights
-
-1. Select text in a PDF or text document
-2. Choose a highlight color
-3. Highlights are automatically saved
-4. View all highlights in the Highlights panel
-5. Search and filter highlights
-
-### Taking Notes
-
-1. Select text and right-click
-2. Choose "Save as Note"
-3. Or create notes directly from the Notes panel
-4. Notes are linked to document pages
-5. AI can reference your notes in conversations
-
-### Using Pomodoro Timer
-
-1. Click the Pomodoro button in the header
-2. Set your focus duration (default: 25 minutes)
-3. Click "Start" to begin a session
-4. Track your productivity and achievements
-5. View stats in the Pomodoro dashboard
-
-### Customizing Reading Experience
-
-1. Click the Typography Settings button (⚙️) in the header
-2. Adjust:
-   - Font family, size, and line height
-   - Max reading width
-   - Theme (light, dark, sepia, reading)
-   - Text alignment
-   - Focus mode and reading guide
-
-## 📁 Project Structure
-
-```
-AI Research Platform-serverless/
-├── src/
-│   ├── components/          # React components
-│   │   ├── PaperRecommendationsPanel.tsx
-│   │   ├── ChatPanel.tsx
-│   │   ├── PDFViewerV2.tsx
-│   │   ├── AudioWidget.tsx
-│   │   ├── PomodoroTimer.tsx
-│   │   └── ...
-│   ├── services/            # Business logic
-│   │   ├── aiService.ts
-│   │   ├── openAlexRecommendationService.ts
-│   │   ├── highlightService.ts
-│   │   ├── ttsManager.ts
-│   │   └── ...
-│   ├── store/               # State management
-│   │   └── appStore.ts
-│   └── themes/              # Themed components
-│       ├── ThemedApp.tsx
-│       ├── ThemedSidebar.tsx
-│       └── ...
-├── api/                     # Serverless functions
-│   ├── recommendations/
-│   ├── documents/
-│   ├── text/
-│   └── ...
-├── supabase/
-│   └── migrations/          # Database migrations
-├── docs/                    # Documentation
-│   ├── features/
-│   ├── guides/
-│   └── architecture/
-└── tests/                   # Test files
-    └── e2e/
-```
-
-## 🔧 Configuration
-
-### AI Integration
-
-The app supports multiple AI providers with automatic fallback:
-- **Primary**: Google Gemini (faster, more cost-effective)
-- **Fallback**: OpenAI GPT-4o-mini (when Gemini unavailable)
-
-Configure in `.env.local`:
-```env
-VITE_GEMINI_API_KEY=your_key
-VITE_OPENAI_API_KEY=your_key
-```
-
-### TTS Configuration
-
-Multiple TTS providers supported:
-- **Azure TTS**: Premium voices, best quality
-- **Google Cloud TTS**: Good quality, reasonable pricing
-- **Native Browser TTS**: Free fallback
-
-### Database Setup
-
-1. Create Supabase project
-2. Run migrations in order:
-   ```bash
-   # Apply all migrations
-   supabase db push
-   ```
-3. Configure RLS policies
-4. Set up storage buckets
-
-## 🧪 Testing
-
-### Run Tests
-
-```bash
-# Unit tests
-npm run test
-
-# E2E tests
-npm run test:e2e
-
-# Type checking
-npm run type-check
-
-# Linting
-npm run lint
-```
-
-### Test Coverage
-
-```bash
-npm run test:coverage
-```
-
-## 🚢 Building for Production
-
-```bash
-# Build
-npm run build
-
-# Preview production build
-npm run preview
-```
-
-The built files will be in the `dist` directory.
-
-## 📚 Documentation
-
-- [UI Documentation](./docs/guides/UI_DOCUMENTATION.md) - Complete UI component guide
-- [Paper Recommendations](./docs/features/paper-recommendations/IMPLEMENTATION.md) - Paper recommendation system
-- [AI Features](./docs/features/ai/AI_FEATURES_QUICK_START.md) - AI chat and notes
-- [Database Schema](./docs/architecture/DATABASE_SCHEMA.md) - Database structure
-- [Deployment Guide](./docs/deployment/DEPLOYMENT.md) - Production deployment
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Add tests if applicable
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
-
-### Development Guidelines
-
-- Follow TypeScript best practices
-- Write tests for new features
-- Update documentation
-- Follow the existing code style
-- Ensure all tests pass before submitting PR
-
-## 📄 License
-
-MIT License - see [LICENSE](./LICENSE) file for details
-
-## 🙏 Acknowledgments
-
-- **OpenAlex** for paper recommendation data
-- **PDF.js** for PDF rendering
-- **Supabase** for backend infrastructure
-- **Vercel** for serverless hosting
-- **Google Gemini** and **OpenAI** for AI capabilities
-
-## 📞 Support
-
-For issues, questions, or contributions, please open an issue on GitHub.
-
----
-
-**Built with ❤️ for researchers and academics**
+<!-- TODO: there is currently no LICENSE file in the repo despite this claim.
+     Run: npx license mit -o "Amin Amou" > LICENSE -->
