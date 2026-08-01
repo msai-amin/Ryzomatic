@@ -21,14 +21,14 @@ jobs:
       - name: Checkout code
         # Security: Pin to specific commit SHA instead of version tag for supply chain security
         # Example: uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false  # Not needed for stale action, but helps with private repos
 
       - name: Mark Stale Issues and Pull Requests
         # Security: Pin to specific commit SHA instead of version tag for supply chain security
         # Example: uses: actions/stale@<commit-sha>
-        uses: actions/stale@v9
+        uses: actions/stale@v11
         with:
           # Mark as stale after 30 days of inactivity
           days-before-stale: 30
