@@ -1,0 +1,4 @@
+Migration,Name,Description
+001,initial_schema,Core tables
+002,add_profile_policy,RLS for profiles
+003,storage_buckets,S3 wiring
