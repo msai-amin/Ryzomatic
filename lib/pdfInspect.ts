@@ -29,7 +29,7 @@
  * All conversions go through `pageAlignment` so the rule lives in one place.
  */
 
-import { alignPages, ocrPagesToIndices, type ExtractorPage } from '../../../src/utils/pageAlignment'
+import { alignPages, ocrPagesToIndices, type ExtractorPage } from '../src/utils/pageAlignment'
 
 export interface PdfInspectResult {
   /** Dense, length === pageCount. Markdown; caller must strip before TTS. */
