@@ -116,6 +116,67 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
  * `content` benefits from keeping it. Doing the strip here would force a second
  * round-trip or duplicate the logic.
  */
+/**
+ * Route bytes to the right extractor and shape the response.
+ *
+ * The two lanes return different shapes on purpose: office formats have no
+ * intrinsic pagination and yield one Markdown blob, while PDFs yield a
+ * page-indexed array plus OCR routing signals. A single merged shape would
+ * force every caller to branch anyway, so the discriminant is explicit.
+ */
+async function respondWithExtraction(res: VercelResponse, bytes: Buffer, fileName: string) {
+  const extension = fileName.toLowerCase().split('.').pop() ?? '';
+
+  if (extension === 'pdf') {
+    const { inspectPdf } = await import('./lib/pdfInspect.js');
+    const r = await inspectPdf(bytes);
+
+    return res.status(200).json({
+      kind: 'pdf',
+      // Markdown, deliberately. The client strips it before it reaches
+      // pageTexts (TTS reads that), but keeps it for content.
+      pages: r.pageMarkdown,
+      pageCount: r.pageCount,
+      needsOcrByIndex: r.needsOcrByIndex,
+      ocrPageIndices: r.ocrPageIndices,
+      ocrReasonByIndex: r.ocrReasonByIndex,
+      missingPages: r.missingPages,
+      metadata: {
+        fileName,
+        fileType: 'pdf',
+        pdfType: r.pdfType,
+        confidence: r.confidence,
+        hasEncodingIssues: r.hasEncodingIssues,
+        isComplexLayout: r.isComplexLayout,
+        title: r.title,
+        processingTime: r.processingTimeMs,
+      },
+    });
+  }
+
+  const { isAnydocSupported, extractWithAnydoc } = await import('./lib/anydocExtract.js');
+  if (!isAnydocSupported(fileName)) {
+    return res.status(400).json({
+      error: 'Unsupported format',
+      details: `.${extension} is not handled by this endpoint.`,
+    });
+  }
+
+  const started = Date.now();
+  const result = await extractWithAnydoc(bytes, fileName);
+
+  return res.status(200).json({
+    markdown: result.markdown,
+    metadata: {
+      fileName,
+      fileType: result.extension,
+      blockCount: result.blockCount,
+      tableCount: result.tableCount,
+      processingTime: Date.now() - started,
+    },
+  });
+}
+
 async function handleExtract(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -153,6 +214,38 @@ async function handleExtract(req: VercelRequest, res: VercelResponse) {
 
     const tierLimit = TIER_LIMITS[profile?.tier as keyof typeof TIER_LIMITS] || TIER_LIMITS.free;
 
+    // Re-extraction path: the document is already in S3, so the client sends
+    // its key instead of re-uploading megabytes it already has. Params travel
+    // as query rather than body because `bodyParser` is disabled on this
+    // endpoint for formidable's benefit.
+    const s3Key = typeof req.query.s3Key === 'string' ? req.query.s3Key : undefined;
+    const documentId = typeof req.query.documentId === 'string' ? req.query.documentId : undefined;
+
+    if (s3Key && documentId) {
+      // Ownership check before touching S3 — the key alone must never be
+      // sufficient to read a document. Mirrors handleOCRProcess.
+      const { data: document, error: docError } = await supabase
+        .from('user_books')
+        .select('id, s3_key, file_name')
+        .eq('id', documentId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (docError || !document || document.s3_key !== s3Key) {
+        return res.status(404).json({ error: 'Document not found or access denied' });
+      }
+
+      const s3Response = await s3Client.send(
+        new GetObjectCommand({ Bucket: process.env.AWS_S3_BUCKET!, Key: s3Key })
+      );
+      if (!s3Response.Body) {
+        return res.status(502).json({ error: 'Failed to download document from storage' });
+      }
+
+      const bytes = await streamToBuffer(s3Response.Body as Readable);
+      return respondWithExtraction(res, bytes, document.file_name || 'document.pdf');
+    }
+
     const form = formidable({ maxFileSize: tierLimit.maxFileSize, maxFiles: 1 });
     const [, files] = await new Promise<[formidable.Fields, formidable.Files]>(
       (resolve, reject) => {
@@ -169,29 +262,9 @@ async function handleExtract(req: VercelRequest, res: VercelResponse) {
     }
 
     const fileName = file.originalFilename || 'document';
-    const { isAnydocSupported, extractWithAnydoc } = await import('./lib/anydocExtract.js');
-
-    if (!isAnydocSupported(fileName)) {
-      return res.status(400).json({
-        error: 'Unsupported format',
-        details: `.${fileName.split('.').pop()} is not handled by this endpoint. PDFs use the client-side pipeline.`,
-      });
-    }
-
     const bytes = await fs.readFile(file.filepath);
-    const started = Date.now();
-    const result = await extractWithAnydoc(bytes, fileName);
 
-    return res.status(200).json({
-      markdown: result.markdown,
-      metadata: {
-        fileName,
-        fileType: result.extension,
-        blockCount: result.blockCount,
-        tableCount: result.tableCount,
-        processingTime: Date.now() - started,
-      },
-    });
+    return respondWithExtraction(res, bytes, fileName);
   } catch (error: any) {
     // A missing or unloadable native binary lands here rather than crashing
     // every other action multiplexed through this function.

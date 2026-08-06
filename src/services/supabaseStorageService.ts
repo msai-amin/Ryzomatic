@@ -5,6 +5,7 @@ import { bookStorageService } from './bookStorageService';
 import { configurePDFWorker } from '../utils/pdfjsConfig';
 import { googleAuthService } from './googleAuthService';
 import { documentContentService } from './documentContentService';
+import { FEATURES } from '../config/featureFlags';
 
 export interface SavedBook {
   id: string;
@@ -593,6 +594,40 @@ class SupabaseStorageService {
           if (data.file_type === 'pdf') {
             // EXTRACT PAGETEXTS ON-DEMAND for TTS functionality
             // Since page_texts column was removed to save storage, extract them now
+            //
+            // This runs on EVERY open of an existing PDF, so it — not the upload
+            // path — is where a change of extraction engine reaches documents
+            // users already have. It must stay gated on the same flag as upload:
+            // if the two paths disagreed, the same document would yield different
+            // pageTexts depending on how it was reached, and page_texts_cleaned
+            // (derived from one of them) would drift out of sync with the other.
+            let inspectorHandled = false;
+            if (FEATURES.pdfInspector && data.s3_key) {
+              try {
+                const { inspectPdfByKey } = await import('./pdfInspectorService');
+                const inspection = await inspectPdfByKey(data.s3_key, data.id);
+
+                if (inspection.success && inspection.pageTexts.length === inspection.pageCount) {
+                  book.pageTexts = inspection.pageTexts;
+                  inspectorHandled = true;
+                  logger.info('pageTexts extracted via pdf-inspector', context, {
+                    totalPages: inspection.pageCount,
+                    ocrPages: inspection.ocrPageIndices.length,
+                    pdfType: inspection.pdfType,
+                  });
+                } else {
+                  logger.warn('pdf-inspector declined on re-extraction, using PDF.js', context, undefined, {
+                    error: inspection.error,
+                  });
+                }
+              } catch (inspectorError) {
+                logger.warn('pdf-inspector threw on re-extraction, using PDF.js', context, inspectorError as Error);
+              }
+            }
+
+            // PDF.js path — unchanged, and still the fallback whenever the flag
+            // is off or the inspector declined.
+            if (!inspectorHandled) {
             try {
               logger.info('Extracting pageTexts for TTS functionality', context);
               const { extractStructuredText } = await import('../utils/pdfTextExtractor');
@@ -679,8 +714,9 @@ class SupabaseStorageService {
               logger.warn('Failed to extract pageTexts, TTS will not be available', context, extractError as Error);
               book.pageTexts = []; // Empty array if extraction fails
             }
+            } // end !inspectorHandled
           }
-          
+
         } catch (error) {
           logger.error('Error downloading book from S3', context, error as Error);
           throw errorHandler.createError(

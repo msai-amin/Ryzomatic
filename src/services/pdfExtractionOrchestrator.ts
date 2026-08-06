@@ -27,6 +27,8 @@ import {
   type DoclingOptions
 } from './doclingService';
 import { extractDocument, isAnydocSupported } from './documentExtractionService';
+import { inspectPdfFile } from './pdfInspectorService';
+import { indicesToPageNumbers } from '../utils/pageAlignment';
 import { FEATURES } from '../config/featureFlags';
 
 export interface ExtractionResult {
@@ -36,7 +38,7 @@ export interface ExtractionResult {
   totalPages: number
   pdfData?: Blob | ArrayBuffer
   qualityReport: DocumentQualityReport
-  extractionMethod: 'pdfjs' | 'hybrid' | 'vision' | 'ocr' | 'docling' | 'anydoc'
+  extractionMethod: 'pdfjs' | 'hybrid' | 'vision' | 'ocr' | 'docling' | 'anydoc' | 'inspector'
   needsOCR: boolean
   ocrStatus: 'not_needed' | 'pending' | 'processing' | 'completed' | 'user_declined'
   visionPagesUsed: number[]
@@ -520,6 +522,88 @@ export async function extractWithHybridPipeline(
       context,
       { fileName, fileSize, fileType: fileExt, anydocAttempted: useAnydoc }
     )
+  }
+
+  // PDF lane: pdf-inspector resolves multi-column reading order and reports
+  // *why* a page is unreadable, so OCR can be routed per page instead of
+  // guessed from character counts. PDF.js remains the fallback — it is the
+  // only engine that also renders the viewer, so it can never be removed.
+  if (FEATURES.pdfInspector && file instanceof File) {
+    try {
+      const inspection = await inspectPdfFile(file)
+
+      if (inspection.success && inspection.pageTexts.some(t => t.trim().length > 0)) {
+        const processingTime = Date.now() - startTime
+
+        // Page numbers here are 1-based to match DocumentQualityReport, which
+        // 29 consumers already read that way. inspection.* is 0-based.
+        const problematicPages = indicesToPageNumbers(inspection.ocrPageIndices)
+        const ocrIndexSet = new Set(inspection.ocrPageIndices)
+
+        const qualityReport: DocumentQualityReport = {
+          totalPages: inspection.pageCount,
+          pageMetrics: inspection.pageTexts.map((text, idx) => ({
+            pageNumber: idx + 1,
+            charCount: text.length,
+            wordCount: text.split(/\s+/).filter(Boolean).length,
+            lineCount: text.split('\n').length,
+            specialCharRatio: 0,
+            // Confidence is document-level; per-page we only know whether the
+            // extractor flagged it, so score is binary rather than invented.
+            qualityScore: ocrIndexSet.has(idx) ? 20 : 95,
+            needsVisionFallback: ocrIndexSet.has(idx),
+            issues: inspection.ocrReasonByIndex[idx] ? [inspection.ocrReasonByIndex[idx]] : [],
+          })),
+          overallScore: Math.round(inspection.confidence * 100),
+          problematicPages,
+          extractionMethod: 'inspector',
+          summary: {
+            successfulPages: inspection.pageCount - inspection.ocrPageIndices.length,
+            poorQualityPages: inspection.ocrPageIndices.length,
+            failedPages: inspection.missingPages.length,
+          },
+        }
+
+        logger.info('pdf-inspector extraction succeeded', context, {
+          pageCount: inspection.pageCount,
+          pdfType: inspection.pdfType,
+          confidence: inspection.confidence,
+          ocrPages: inspection.ocrPageIndices.length,
+          missingPages: inspection.missingPages.length,
+          processingTime: inspection.processingTimeMs,
+        })
+
+        return {
+          success: true,
+          content: inspection.pageMarkdown.join('\n\n'),
+          pageTexts: inspection.pageTexts,
+          totalPages: inspection.pageCount,
+          pdfData: await file.arrayBuffer(),
+          qualityReport,
+          extractionMethod: 'inspector',
+          needsOCR: inspection.ocrPageIndices.length > 0,
+          ocrStatus: inspection.ocrPageIndices.length > 0 ? 'pending' : 'not_needed',
+          visionPagesUsed: [],
+          metadata: {
+            pdfJsPages: 0,
+            visionPages: 0,
+            ocrPages: inspection.ocrPageIndices.length,
+            processingTime,
+            qualitySummary:
+              `pdf-inspector: ${inspection.pdfType}, ` +
+              `${Math.round(inspection.confidence * 100)}% confidence, ` +
+              `${inspection.ocrPageIndices.length} page(s) need OCR`,
+          },
+        }
+      }
+
+      logger.warn('pdf-inspector declined, falling back to PDF.js', context, undefined, {
+        error: inspection.error,
+      })
+    } catch (inspectorError) {
+      // Never let the new engine break extraction — PDF.js still works.
+      logger.warn('pdf-inspector threw, falling back to PDF.js', context, inspectorError as Error)
+    }
   }
 
   // Use the existing PDF.js extraction pipeline
