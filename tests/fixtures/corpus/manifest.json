@@ -1,0 +1,30 @@
+{
+  "generatedBy": "scripts/generate-test-corpus.mjs",
+  "note": "Regenerate with: node scripts/generate-test-corpus.mjs",
+  "fixtures": {
+    "sentinel-5p.pdf": {
+      "kind": "pdf",
+      "pageCount": 5,
+      "sentinel": true
+    },
+    "sentinel-30p.pdf": {
+      "kind": "pdf",
+      "pageCount": 30,
+      "sentinel": true
+    },
+    "sentinel-gap-3p.pdf": {
+      "kind": "pdf",
+      "pageCount": 3,
+      "sentinel": true,
+      "blankPages": [
+        2
+      ],
+      "note": "Page 2 is intentionally blank; pages 1 and 3 carry sentinels."
+    },
+    "table.csv": {
+      "kind": "csv",
+      "rows": 4,
+      "note": "Markdown-leak fixture for the office lane."
+    }
+  }
+}
