@@ -17,7 +17,32 @@ import { isDoclingSupported, getMimeTypesForDocling } from '../services/doclingS
 import { canPerformVisionExtraction } from '../services/visionUsageService'
 import { configurePDFWorker } from '../utils/pdfjsConfig'
 import { supabase } from '../../lib/supabase'
+import { FEATURES } from '../config/featureFlags'
 // PDF.js will be imported dynamically to avoid ES module issues
+
+/**
+ * What the file picker will actually let through.
+ *
+ * Keep this in lockstep with the validation branch in handleFiles and with the
+ * "Supported formats" list below it — the three drifting apart is what produced
+ * the bug where the picker accepted .docx and the orchestrator threw on it.
+ *
+ * The office/e-book set only appears once the anydoc lane is live.
+ */
+const PDF_AND_TEXT_TYPES =
+  '.txt,.md,.pdf,application/pdf,text/plain,text/markdown'
+
+const OFFICE_TYPES = [
+  '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx',
+  '.odt', '.ods', '.odp', '.rtf', '.epub', '.csv',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+].join(',')
+
+const ACCEPTED_FILE_TYPES = FEATURES.docExtractionV2
+  ? `${PDF_AND_TEXT_TYPES},${OFFICE_TYPES}`
+  : PDF_AND_TEXT_TYPES
 
 interface DocumentUploadProps {
   onClose: () => void
@@ -142,7 +167,26 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
           throw error;
         }
       } else if (isDoclingFile) {
-        // Docling-supported formats (DOCX, PPTX, XLSX, images)
+        // Office/image formats. The Docling tier that used to handle these is
+        // excluded from deployment (.vercelignore — the ~4GB Python bundle
+        // exceeds Vercel limits), so /api/docling 404s and the orchestrator
+        // hard-throws at pdfExtractionOrchestrator.ts:497 with a message that
+        // leaks implementation detail at the user.
+        //
+        // Until the anydoc lane lands (FEATURES.docExtractionV2), reject these
+        // here with something actionable instead of letting them fail deep in
+        // the pipeline.
+        if (!FEATURES.docExtractionV2) {
+          const error = errorHandler.createError(
+            `${fileExt.toUpperCase()} files aren't supported yet — please convert to PDF and try again. Word, PowerPoint and Excel support is coming.`,
+            ErrorType.VALIDATION,
+            ErrorSeverity.MEDIUM,
+            context,
+            { fileName: file.name, fileType: fileExt, reason: 'docExtractionV2_disabled' }
+          );
+          throw error;
+        }
+
         const maxSize = 50 * 1024 * 1024; // 50MB for documents
         if (file.size > maxSize) {
           const error = errorHandler.createError(
@@ -209,7 +253,11 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
             doclingOptions: {
               enableOcr: true,
               extractTables: true,
-              extractFormulas: true,
+              // extractFormulas intentionally omitted — it was a Docling option
+              // that never delivered anything (the tier is excluded from
+              // deployment), and formulaService.ts, the only code that could
+              // have consumed formula output, had zero importers and was
+              // deleted. Reinstate only alongside a real math-extraction path.
               preserveLayout: true,
             },
             visionOptions: {
@@ -1051,7 +1099,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
             </p>
             <input
               type="file"
-              accept=".txt,.pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg,.tiff,.html,application/pdf,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/png,image/jpeg,image/tiff,text/html"
+              accept={ACCEPTED_FILE_TYPES}
               onChange={handleFileInput}
               className="hidden"
               id="file-upload"
@@ -1100,16 +1148,21 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
             <p className="text-caption font-medium mb-2">Supported formats:</p>
             <ul className="space-y-1 text-caption">
               <li>• PDF documents (.pdf)</li>
-              <li>• Word documents (.docx)</li>
-              <li>• PowerPoint presentations (.pptx)</li>
-              <li>• Excel spreadsheets (.xlsx)</li>
-              <li>• Images (.png, .jpg, .jpeg, .tiff)</li>
               <li>• Text files (.txt, .md)</li>
-              <li>• HTML files (.html)</li>
+              {FEATURES.docExtractionV2 && (
+                <>
+                  <li>• Word documents (.doc, .docx)</li>
+                  <li>• PowerPoint presentations (.ppt, .pptx)</li>
+                  <li>• Excel spreadsheets (.xls, .xlsx)</li>
+                  <li>• OpenDocument (.odt, .ods, .odp)</li>
+                  <li>• E-books and rich text (.epub, .rtf, .csv)</li>
+                </>
+              )}
             </ul>
             <p className="mt-3 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
-              Documents are processed with Docling for superior table, formula, and layout extraction.
-              If Docling is unavailable, PDFs fall back to intelligent 3-tier extraction with AI vision enhancement.
+              {FEATURES.docExtractionV2
+                ? 'PDFs use a multi-tier pipeline with AI vision enhancement for low-quality pages. Office and e-book formats are converted server-side.'
+                : 'PDFs use a multi-tier extraction pipeline with AI vision enhancement for low-quality pages. Word, PowerPoint and Excel support is coming — convert to PDF for now.'}
             </p>
           </div>
 
