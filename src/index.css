@@ -1,3 +1,7 @@
+/* Reader redesign (wave A) — scoped under .reader-v3, inert unless the
+   readerV3 flag applies that class. */
+@import './styles/readerTheme.css';
+
 /* PDF.js Text Layer Styles */
 @import 'pdfjs-dist/web/pdf_viewer.css';
 

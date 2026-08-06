@@ -10,7 +10,7 @@
  * Keep this tiny. If flags multiply, graduate to a real provider.
  */
 
-type FlagKey = 'docExtractionV2' | 'pdfInspector'
+type FlagKey = 'docExtractionV2' | 'pdfInspector' | 'readerV3'
 
 const DEFAULTS: Record<FlagKey, boolean> = {
   // Office/e-book extraction via @firecrawl/anydoc, replacing the dead Docling
@@ -25,11 +25,18 @@ const DEFAULTS: Record<FlagKey, boolean> = {
   // open (user_books.page_texts was dropped in migration 004). Flipping this
   // changes what every already-uploaded PDF produces.
   pdfInspector: false,
+
+  // Reader redesign, wave A: warm palette, visible rail labels, grouped view
+  // controls, reading-progress ring. Presentation only — no data dependencies,
+  // no change to extraction or storage. Applied as a scope class on the reader
+  // root, so turning it off removes one class and restores the current look.
+  readerV3: false,
 }
 
 const ENV_KEYS: Record<FlagKey, string> = {
   docExtractionV2: 'VITE_FF_DOC_EXTRACTION_V2',
   pdfInspector: 'VITE_FF_PDF_INSPECTOR',
+  readerV3: 'VITE_FF_READER_V3',
 }
 
 function readEnv(key: string): boolean | null {
@@ -67,5 +74,8 @@ export const FEATURES = {
   },
   get pdfInspector() {
     return isFeatureEnabled('pdfInspector')
+  },
+  get readerV3() {
+    return isFeatureEnabled('readerV3')
   },
 }
