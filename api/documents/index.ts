@@ -93,6 +93,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return handleOCRProcess(req, res);
     case 'ocr-status':
       return handleOCRStatus(req, res);
+    case 'extract':
+      return handleExtract(req, res);
     default:
       // Handle relationship actions and document description actions
       return handleRelationshipActions(req, res);
@@ -102,6 +104,105 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 /**
  * Handle document upload
  */
+/**
+ * Extract text from an office / e-book file via anydoc.
+ *
+ * Folded into this endpoint rather than given its own `/api/parse` because the
+ * project sits at 12 of 12 functions on the Vercel Hobby plan — `api/debug/`
+ * was already sacrificed to stay under the cap, so there is no slot left.
+ *
+ * Returns Markdown *and* nothing else: converting to plain text is the client's
+ * job, because `pageTexts` must never carry markup (TTS reads it aloud) while
+ * `content` benefits from keeping it. Doing the strip here would force a second
+ * round-trip or duplicate the logic.
+ */
+async function handleExtract(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const rateLimitResult = await checkRateLimit(user.id, 'upload');
+    Object.entries(getRateLimitHeaders(rateLimitResult)).forEach(([key, value]) => {
+      res.setHeader(key, value);
+    });
+
+    if (!rateLimitResult.allowed) {
+      return res.status(429).json({
+        error: 'Rate limit exceeded',
+        limit: rateLimitResult.limit,
+        reset_at: rateLimitResult.resetAt?.toISOString(),
+      });
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('tier')
+      .eq('id', user.id)
+      .single();
+
+    const tierLimit = TIER_LIMITS[profile?.tier as keyof typeof TIER_LIMITS] || TIER_LIMITS.free;
+
+    const form = formidable({ maxFileSize: tierLimit.maxFileSize, maxFiles: 1 });
+    const [, files] = await new Promise<[formidable.Fields, formidable.Files]>(
+      (resolve, reject) => {
+        form.parse(req as any, (err, fields, parsed) => {
+          if (err) reject(err);
+          else resolve([fields, parsed]);
+        });
+      }
+    );
+
+    const file = Array.isArray(files.file) ? files.file[0] : files.file;
+    if (!file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const fileName = file.originalFilename || 'document';
+    const { isAnydocSupported, extractWithAnydoc } = await import('./lib/anydocExtract.js');
+
+    if (!isAnydocSupported(fileName)) {
+      return res.status(400).json({
+        error: 'Unsupported format',
+        details: `.${fileName.split('.').pop()} is not handled by this endpoint. PDFs use the client-side pipeline.`,
+      });
+    }
+
+    const bytes = await fs.readFile(file.filepath);
+    const started = Date.now();
+    const result = await extractWithAnydoc(bytes, fileName);
+
+    return res.status(200).json({
+      markdown: result.markdown,
+      metadata: {
+        fileName,
+        fileType: result.extension,
+        blockCount: result.blockCount,
+        tableCount: result.tableCount,
+        processingTime: Date.now() - started,
+      },
+    });
+  } catch (error: any) {
+    // A missing or unloadable native binary lands here rather than crashing
+    // every other action multiplexed through this function.
+    console.error('Document extraction error:', error);
+    return res.status(500).json({
+      error: 'Extraction failed',
+      details: error?.message ?? 'Unknown error',
+    });
+  }
+}
+
 async function handleUpload(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });

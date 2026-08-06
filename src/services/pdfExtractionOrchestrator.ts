@@ -20,12 +20,14 @@ import {
 import { configurePDFWorker } from '../utils/pdfjsConfig';
 import { logger } from './logger';
 import { errorHandler, ErrorType, ErrorSeverity } from './errorHandler';
-import { 
-  processWithDocling, 
-  isDoclingSupported, 
+import {
+  processWithDocling,
+  isDoclingSupported,
   type DoclingResult,
-  type DoclingOptions 
+  type DoclingOptions
 } from './doclingService';
+import { extractDocument, isAnydocSupported } from './documentExtractionService';
+import { FEATURES } from '../config/featureFlags';
 
 export interface ExtractionResult {
   success: boolean
@@ -34,7 +36,7 @@ export interface ExtractionResult {
   totalPages: number
   pdfData?: Blob | ArrayBuffer
   qualityReport: DocumentQualityReport
-  extractionMethod: 'pdfjs' | 'hybrid' | 'vision' | 'ocr' | 'docling'
+  extractionMethod: 'pdfjs' | 'hybrid' | 'vision' | 'ocr' | 'docling' | 'anydoc'
   needsOCR: boolean
   ocrStatus: 'not_needed' | 'pending' | 'processing' | 'completed' | 'user_declined'
   visionPagesUsed: number[]
@@ -392,24 +394,35 @@ export async function extractWithHybridPipeline(
   // ========================================
   // STRATEGY 1: Try Docling First (if enabled)
   // ========================================
-  if (useDocling && isDoclingSupported(fileName)) {
-    try {
-      logger.info('Attempting Docling extraction', context)
+  // When FEATURES.docExtractionV2 is on, office/e-book formats go to anydoc
+  // instead of Docling. Docling is excluded from deployment (.vercelignore —
+  // the ~4GB Python bundle exceeds Vercel limits), so its branch always 404s
+  // and falls through; anydoc is the live replacement. PDFs are handled by
+  // Strategy 2 either way — anydoc flattens page boundaries, which would break
+  // the page-indexed pageTexts contract.
+  const useAnydoc = FEATURES.docExtractionV2 && isAnydocSupported(fileName)
 
-      const doclingResult = await processWithDocling(file, fileName, {
-        enableOcr: options.doclingOptions?.enableOcr ?? true,
-        extractTables: options.doclingOptions?.extractTables ?? true,
-        extractFormulas: options.doclingOptions?.extractFormulas ?? true,
-        preserveLayout: options.doclingOptions?.preserveLayout ?? true,
-      })
+  if (useAnydoc || (useDocling && isDoclingSupported(fileName))) {
+    try {
+      logger.info(useAnydoc ? 'Attempting anydoc extraction' : 'Attempting Docling extraction', context)
+
+      const doclingResult = useAnydoc
+        ? await extractDocument(file as File, fileName)
+        : await processWithDocling(file, fileName, {
+            enableOcr: options.doclingOptions?.enableOcr ?? true,
+            extractTables: options.doclingOptions?.extractTables ?? true,
+            preserveLayout: options.doclingOptions?.preserveLayout ?? true,
+          })
 
       if (doclingResult.success && doclingResult.text.trim().length > 0) {
         const processingTime = Date.now() - startTime
 
-        // Build page texts from Docling structure
+        // Page texts must stay markup-free: they feed TTS via useAudioText.
+        // documentExtractionService already strips anydoc's Markdown, and
+        // Docling returned plain text here, so this stays plain either way.
         const pageTexts = doclingResult.structure.pages.map(p => p.text)
-        
-        // Use markdown content as primary (better formatting) or fall back to plain text
+
+        // Content keeps its structure — chat, notes and search benefit from it.
         const content = doclingResult.markdown || doclingResult.text
 
         // Create a quality report for Docling results
@@ -428,7 +441,7 @@ export async function extractWithHybridPipeline(
           })),
           overallScore: 95,
           problematicPages: [],
-          extractionMethod: 'docling',
+          extractionMethod: useAnydoc ? 'anydoc' : 'docling',
           summary: {
             successfulPages: pageTexts.length,
             poorQualityPages: 0,
@@ -443,7 +456,7 @@ export async function extractWithHybridPipeline(
           totalPages: doclingResult.metadata.pageCount,
           pdfData: file instanceof File ? await file.arrayBuffer() : file,
           qualityReport,
-          extractionMethod: 'docling',
+          extractionMethod: useAnydoc ? 'anydoc' : 'docling',
           needsOCR: false,
           ocrStatus: 'not_needed',
           visionPagesUsed: [],
@@ -488,18 +501,24 @@ export async function extractWithHybridPipeline(
   // ========================================
   logger.info('Using PDF.js fallback extraction', context)
   
-  // For non-PDF files that Docling couldn't handle, we can't use PDF.js
+  // PDF.js only reads PDFs, so a non-PDF reaching here means the document tier
+  // above declined. The message is user-facing (it surfaces in the upload
+  // dialog), so it should say what the user can do rather than name the
+  // internal component that failed.
   const fileExt = fileName.split('.').pop()?.toLowerCase()
   if (fileExt && fileExt !== 'pdf') {
-    const errorMessage = `Cannot extract text from .${fileExt} file - Docling unavailable and PDF.js only supports PDFs`
+    const errorMessage = useAnydoc
+      ? `Could not extract text from this .${fileExt} file. It may be corrupt, password-protected, or empty.`
+      : `.${fileExt.toUpperCase()} files aren't supported yet — please convert to PDF and try again.`
+
     logger.error('Unsupported file type for fallback', context, new Error(errorMessage))
-    
+
     throw errorHandler.createError(
       errorMessage,
       ErrorType.PDF_PROCESSING,
       ErrorSeverity.HIGH,
       context,
-      { fileName, fileSize, fileType: fileExt }
+      { fileName, fileSize, fileType: fileExt, anydocAttempted: useAnydoc }
     )
   }
 
