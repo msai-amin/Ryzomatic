@@ -103,6 +103,31 @@ describeIfAvailable('pdf-inspector golden corpus', () => {
     })
   })
 
+  describe('ocrReasonsByPage shape — an array, not a map', () => {
+    // The name suggests a map keyed by page. It is an ARRAY of
+    // { page, reasons[] } with a 1-based `page`. Inspecting it as JSON shows
+    // numeric keys "0","1" — those are array positions, and reading them as
+    // page keys produced "[object Object]" reasons in the quality report.
+    it('exposes 1-based page numbers and a reasons array', () => {
+      const { pagesNeedingOcr, ocrReasonsByPage } = inspector.extractPagesMarkdown(
+        load('sentinel-gap-3p.pdf')
+      )
+
+      expect(Array.isArray(ocrReasonsByPage)).toBe(true)
+
+      if (ocrReasonsByPage.length > 0) {
+        const entry = ocrReasonsByPage[0]
+        expect(entry).toHaveProperty('page')
+        expect(entry).toHaveProperty('reasons')
+        expect(Array.isArray(entry.reasons)).toBe(true)
+        expect(typeof entry.reasons[0]).toBe('string')
+
+        // `page` is 1-based and agrees with pagesNeedingOcr.
+        expect(pagesNeedingOcr).toContain(entry.page)
+      }
+    })
+  })
+
   describe('document metadata', () => {
     it('classifies the clean sentinels as text-based with full confidence', () => {
       const meta = inspector.processPdf(load('sentinel-5p.pdf'))

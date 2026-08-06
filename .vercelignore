@@ -1,7 +1,3 @@
-# Exclude Docling API from deployment - bundle exceeds Vercel limits (~4GB)
-# Frontend falls back to PDF.js when /api/docling is unavailable
-api/docling/
-
 # Exclude LOTUS Python function - lotus-ai + pandas + transitive deps exceed Vercel deploy size limit (~4GB)
 # Use /api/lotus/synthesis (TS) only; set LOTUS_API_URL to an external LOTUS service for synthesis
 api/lotus/index.py

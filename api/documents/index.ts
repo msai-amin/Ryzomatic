@@ -105,18 +105,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
  * Handle document upload
  */
 /**
- * Extract text from an office / e-book file via anydoc.
- *
- * Folded into this endpoint rather than given its own `/api/parse` because the
- * project sits at 12 of 12 functions on the Vercel Hobby plan — `api/debug/`
- * was already sacrificed to stay under the cap, so there is no slot left.
- *
- * Returns Markdown *and* nothing else: converting to plain text is the client's
- * job, because `pageTexts` must never carry markup (TTS reads it aloud) while
- * `content` benefits from keeping it. Doing the strip here would force a second
- * round-trip or duplicate the logic.
- */
-/**
  * Route bytes to the right extractor and shape the response.
  *
  * The two lanes return different shapes on purpose: office formats have no
@@ -128,7 +116,7 @@ async function respondWithExtraction(res: VercelResponse, bytes: Buffer, fileNam
   const extension = fileName.toLowerCase().split('.').pop() ?? '';
 
   if (extension === 'pdf') {
-    const { inspectPdf } = await import('./lib/pdfInspect.js');
+    const { inspectPdf } = await import('../../lib/pdfInspect.js');
     const r = await inspectPdf(bytes);
 
     return res.status(200).json({
@@ -154,7 +142,7 @@ async function respondWithExtraction(res: VercelResponse, bytes: Buffer, fileNam
     });
   }
 
-  const { isAnydocSupported, extractWithAnydoc } = await import('./lib/anydocExtract.js');
+  const { isAnydocSupported, extractWithAnydoc } = await import('../../lib/anydocExtract.js');
   if (!isAnydocSupported(fileName)) {
     return res.status(400).json({
       error: 'Unsupported format',
@@ -177,6 +165,21 @@ async function respondWithExtraction(res: VercelResponse, bytes: Buffer, fileNam
   });
 }
 
+/**
+ * Extraction entry point for both lanes.
+ *
+ * Folded into this endpoint rather than given its own `/api/parse` because the
+ * project sits at 12 of 12 functions on the Vercel Hobby plan — `api/debug/`
+ * was already sacrificed to stay under the cap, so there is no slot left. For
+ * the same reason the extractor helpers live in the root `lib/`, not under
+ * `api/`: every file under `api/` is a function candidate on Vercel, so a
+ * helper placed there would consume a slot (and break the build, having no
+ * default export).
+ *
+ * Returns Markdown and nothing else: converting to plain text is the client's
+ * job, because `pageTexts` must never carry markup (TTS reads it aloud) while
+ * `content` benefits from keeping it.
+ */
 async function handleExtract(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });

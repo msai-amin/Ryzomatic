@@ -13,7 +13,7 @@ import { OCRConsentDialog } from './OCRConsentDialog'
 import { calculateOCRCredits } from '../utils/ocrUtils'
 import { extractStructuredText } from '../utils/pdfTextExtractor'
 import { extractWithFallback, extractWithHybridPipeline } from '../services/pdfExtractionOrchestrator'
-import { isDoclingSupported, getMimeTypesForDocling } from '../services/doclingService'
+import { isAnydocSupported } from '../services/documentExtractionService'
 import { canPerformVisionExtraction } from '../services/visionUsageService'
 import { configurePDFWorker } from '../utils/pdfjsConfig'
 import { supabase } from '../../lib/supabase'
@@ -152,7 +152,8 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
       // Validate file
       const fileExt = file.name.toLowerCase().split('.').pop() || '';
-      const isDoclingFile = isDoclingSupported(file.name);
+      // Office/e-book formats handled by the anydoc lane.
+      const isOfficeFile = isAnydocSupported(file.name);
       
       if (file.type === 'application/pdf') {
         const validation = validatePDFFile(file, context);
@@ -166,16 +167,11 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
           );
           throw error;
         }
-      } else if (isDoclingFile) {
-        // Office/image formats. The Docling tier that used to handle these is
-        // excluded from deployment (.vercelignore — the ~4GB Python bundle
-        // exceeds Vercel limits), so /api/docling 404s and the orchestrator
-        // hard-throws at pdfExtractionOrchestrator.ts:497 with a message that
-        // leaks implementation detail at the user.
-        //
-        // Until the anydoc lane lands (FEATURES.docExtractionV2), reject these
-        // here with something actionable instead of letting them fail deep in
-        // the pipeline.
+      } else if (isOfficeFile) {
+        // Office/e-book formats are served by the anydoc lane. When that lane
+        // is off there is no extractor for them at all, so reject here with
+        // something actionable rather than letting the request fail deep in the
+        // pipeline with a message that leaks implementation detail.
         if (!FEATURES.docExtractionV2) {
           const error = errorHandler.createError(
             `${fileExt.toUpperCase()} files aren't supported yet — please convert to PDF and try again. Word, PowerPoint and Excel support is coming.`,
@@ -219,7 +215,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
         }
       }
 
-      if (file.type === 'application/pdf' || isDoclingFile) {
+      if (file.type === 'application/pdf' || isOfficeFile) {
         // Get user info for vision fallback
         const fileTypeLabel = fileExt === 'pdf' ? 'PDF' : fileExt.toUpperCase();
         setExtractionProgress(`Extracting text from ${fileTypeLabel}...`)
@@ -245,21 +241,12 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
           logger.warn('Could not get user info for vision fallback', context, authError as Error)
         }
 
-        // Use the hybrid pipeline (Docling first, PDF.js fallback)
+        // Hybrid pipeline: anydoc for office formats, pdf-inspector or PDF.js
+        // for PDFs, with Gemini Vision as the OCR tier. Which extractor runs is
+        // decided by feature flags inside the orchestrator, not here.
         const extractionResult = await trackPerformance(
           'extractWithHybridPipeline',
           () => extractWithHybridPipeline(file, {
-            useDocling: true, // Try Docling first for better extraction
-            doclingOptions: {
-              enableOcr: true,
-              extractTables: true,
-              // extractFormulas intentionally omitted — it was a Docling option
-              // that never delivered anything (the tier is excluded from
-              // deployment), and formulaService.ts, the only code that could
-              // have consumed formula output, had zero importers and was
-              // deleted. Reinstate only alongside a real math-extraction path.
-              preserveLayout: true,
-            },
             visionOptions: {
               enabled: !!userId && !!authToken, // Enable vision fallback if user is authenticated
               userId,
@@ -272,15 +259,15 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
         );
 
         // Show quality report based on extraction method
-        if (extractionResult.extractionMethod === 'docling') {
-          const tableInfo = extractionResult.metadata.doclingTables 
-            ? `\n✓ ${extractionResult.metadata.doclingTables} tables detected` 
+        if (extractionResult.extractionMethod === 'anydoc') {
+          const tableInfo = extractionResult.metadata.tables 
+            ? `\n✓ ${extractionResult.metadata.tables} tables detected` 
             : '';
-          const figureInfo = extractionResult.metadata.doclingFigures 
-            ? `\n✓ ${extractionResult.metadata.doclingFigures} figures detected` 
+          const figureInfo = extractionResult.metadata.figures 
+            ? `\n✓ ${extractionResult.metadata.figures} figures detected` 
             : '';
           setExtractionProgress(
-            `✓ ${extractionResult.totalPages} pages extracted with Docling` +
+            `✓ Document extracted` +
             tableInfo + figureInfo
           )
         } else if (extractionResult.metadata.visionPages > 0) {

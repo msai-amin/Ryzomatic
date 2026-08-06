@@ -20,15 +20,16 @@
  *
  *   pages[].page      0-based, observed dense
  *   pages[].needsOcr  0-based, parallel to pages[]
- *   pagesNeedingOcr   1-BASED
- *   ocrReasonsByPage  keyed by position within pagesNeedingOcr, not by page
+ *   pagesNeedingOcr   1-BASED array of page numbers
+ *   ocrReasonsByPage  1-BASED array of { page, reasons[] } — NOT a map, despite
+ *                     the name; its numeric indices are array positions
  *
  * The feasibility study asserted `page` was 1-based and sparse. It is not.
  * Implementing that assumption would have shifted every document by one page.
  * All conversions go through `pageAlignment` so the rule lives in one place.
  */
 
-import { alignPages, ocrPagesToIndices, type ExtractorPage } from '../../../src/utils/pageAlignment'
+import { alignPages, ocrPagesToIndices, type ExtractorPage } from '../src/utils/pageAlignment'
 
 export interface PdfInspectResult {
   /** Dense, length === pageCount. Markdown; caller must strip before TTS. */
@@ -90,15 +91,28 @@ export async function inspectPdf(bytes: Buffer): Promise<PdfInspectResult> {
     .filter((i) => i >= 0)
   const ocrPageIndices = [...new Set([...fromList, ...fromFlags])].sort((a, b) => a - b)
 
-  // `ocrReasonsByPage` is keyed by position within `pagesNeedingOcr`, not by
-  // page number — re-key it to 0-based page indices so callers never have to
-  // know that.
+  // `ocrReasonsByPage` is an ARRAY of `{ page, reasons[] }`, where `page` is
+  // 1-BASED — despite the name, it is not a map keyed by page. Its numeric
+  // indices are just array positions, which is easy to mistake for keys when
+  // inspecting it as JSON. Re-key to 0-based page indices and flatten the
+  // reason list to a readable string so callers never see either detail.
   const ocrReasonByIndex: Record<number, string> = {}
-  const reasons = extracted?.ocrReasonsByPage ?? {}
-  fromList.forEach((pageIdx, positionInList) => {
-    const reason = reasons[String(positionInList)] ?? reasons[positionInList]
-    if (reason) ocrReasonByIndex[pageIdx] = String(reason)
-  })
+  const reasonEntries: Array<{ page?: number; reasons?: string[] }> = Array.isArray(
+    extracted?.ocrReasonsByPage
+  )
+    ? extracted.ocrReasonsByPage
+    : []
+
+  for (const entry of reasonEntries) {
+    if (!Number.isInteger(entry?.page)) continue
+    const pageIdx = (entry.page as number) - 1
+    if (pageIdx < 0 || pageIdx >= pageCount) continue
+    const reasons = Array.isArray(entry.reasons) ? entry.reasons.filter(Boolean) : []
+    if (reasons.length) {
+      // e.g. 'suspected_garbled_text' -> 'suspected garbled text'
+      ocrReasonByIndex[pageIdx] = reasons.map((r) => String(r).replace(/_/g, ' ')).join(', ')
+    }
+  }
 
   return {
     pageMarkdown: aligned.pageTexts,

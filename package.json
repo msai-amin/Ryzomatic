@@ -21,6 +21,7 @@
     "test:ci": "vitest run --coverage",
     "test:e2e:ci": "playwright test --reporter=json",
     "check-env": "node scripts/check-env.js",
+    "try:extract": "node scripts/try-extractors.mjs",
     "postinstall": "node scripts/ensure-rollup.cjs",
     "prepare": "husky install"
   },

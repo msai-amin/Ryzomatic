@@ -1,10 +1,10 @@
 /**
  * Office / e-book extraction via `@firecrawl/anydoc`.
  *
- * Replaces the Docling tier, which is excluded from deployment in
- * `.vercelignore` because its ~4GB Python bundle exceeds Vercel's limits. Every
- * `/api/docling` call 404s, so `.docx`/`.pptx`/`.xlsx` uploads reached the
- * orchestrator's non-PDF branch and threw.
+ * Replaced the Docling tier, since deleted. Docling was excluded from
+ * deployment because its ~4GB Python bundle exceeded Vercel's limits, so every
+ * `/api/docling` call 404'd and `.docx`/`.pptx`/`.xlsx` uploads fell through to
+ * the orchestrator's non-PDF branch and threw.
  *
  * anydoc is a 7.6MB Rust addon with no ML models and no external services. It
  * publishes a `linux-x64-gnu` binary matching Vercel's Node runtime (verified)
