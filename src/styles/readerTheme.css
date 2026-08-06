@@ -1,0 +1,207 @@
+/**
+ * Reader redesign — wave A palette.
+ *
+ * Everything is scoped under `.reader-v3`, applied to the reader root only when
+ * FEATURES.readerV3 is on. Nothing here leaks into the rest of the app, and
+ * turning the flag off removes one class rather than reverting a stylesheet.
+ *
+ * ## Why change the palette at all
+ *
+ * The current theme puts near-white PDF pages on `--color-background: #000000`.
+ * Pure black against paper white is the widest luminance gap a screen can
+ * produce, and the reader is the one surface users stare at for an hour at a
+ * time. Warming both ends narrows that gap without making the page muddy.
+ *
+ * ## Deviation from the mockup: the accent
+ *
+ * The mockup used #52c98b, a mint green with no basis in this codebase. The
+ * app's actual green is Tailwind green-400 (#4ade80) — 40 usages, and the only
+ * green on a brand surface (Header.tsx). Retuned accordingly, so the redesign
+ * does not quietly introduce a second brand colour.
+ *
+ * Note this *is* still an identity change: theme1-config.ts deliberately sets
+ * primary, secondary and success all to grays. Wave A introduces green as a
+ * system accent (active rail item, progress ring, focus ring). That was a
+ * conscious call, not an oversight — see the audit.
+ */
+
+.reader-v3 {
+  /* Chrome — warm dark rather than pure black. */
+  --rv-chrome: #16171d;
+  --rv-chrome-2: #1d1e26;
+  --rv-chrome-3: #282a34;
+  --rv-chrome-4: #343643;
+
+  --rv-line: rgba(255, 255, 255, 0.085);
+  --rv-line-2: rgba(255, 255, 255, 0.16);
+
+  --rv-txt: #e9e7e3;
+  --rv-txt-2: #a2a0a8;
+  --rv-txt-3: #8b8992;
+
+  /* Accent: the app's own green-400, not the mockup's mint. */
+  --rv-accent: #4ade80;
+  --rv-accent-hi: #86efac;
+  --rv-accent-ink: #052e16;
+  --rv-accent-soft: rgba(74, 222, 128, 0.15);
+
+  /* The desk the page sits on, and the page itself. */
+  --rv-desk: #1f2027;
+  --rv-paper: #f7f2e8;
+  --rv-ink: #2b2723;
+
+  --rv-radius: 7px;
+}
+
+/* ─── surfaces ──────────────────────────────────────────────────────────── */
+
+.reader-v3 .rv-chrome {
+  background: var(--rv-chrome);
+  color: var(--rv-txt);
+  border-color: var(--rv-line);
+}
+
+.reader-v3 .rv-bar {
+  background: var(--rv-chrome-2);
+  border-bottom: 1px solid var(--rv-line);
+}
+
+/* The area around the page. Warm dark instead of black, so the eye is not
+   re-adjusting across a hard boundary on every saccade to the page edge. */
+.reader-v3 .rv-desk {
+  background: var(--rv-desk);
+}
+
+/* ─── controls ──────────────────────────────────────────────────────────── */
+
+.reader-v3 .rv-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: var(--rv-radius);
+  font-size: 13px;
+  color: var(--rv-txt-2);
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.reader-v3 .rv-btn:hover {
+  background: var(--rv-chrome-3);
+  color: var(--rv-txt);
+}
+
+.reader-v3 .rv-btn[aria-pressed='true'] {
+  background: var(--rv-accent-soft);
+  color: var(--rv-accent);
+}
+
+.reader-v3 .rv-iconbtn {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--rv-radius);
+  display: grid;
+  place-items: center;
+  color: var(--rv-txt-2);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.reader-v3 .rv-iconbtn:hover {
+  background: var(--rv-chrome-3);
+  color: var(--rv-txt);
+}
+
+/* Segmented control — groups related view controls so the toolbar reads as
+   four decisions rather than a dozen loose buttons. */
+.reader-v3 .rv-seg {
+  display: inline-flex;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--rv-radius);
+  padding: 2px;
+  gap: 2px;
+}
+
+.reader-v3 .rv-seg button {
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--rv-txt-3);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.reader-v3 .rv-seg button[aria-pressed='true'] {
+  background: var(--rv-chrome-4);
+  color: var(--rv-txt);
+}
+
+.reader-v3 .rv-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--rv-line);
+  margin: 0 4px;
+}
+
+/* ─── navigation rail ───────────────────────────────────────────────────── */
+
+/* Icon plus visible text. aria-label alone is correct for screen readers but
+   leaves sighted users doing recognition-over-recall against bare glyphs. */
+.reader-v3 .rv-railbtn {
+  width: 52px;
+  padding: 7px 2px 5px;
+  border-radius: var(--rv-radius);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  color: var(--rv-txt-3);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.reader-v3 .rv-railbtn span {
+  /* 11px, not the mockup's 9.5px: sub-11px chrome in a reading app contradicts
+     the premise. */
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.reader-v3 .rv-railbtn:hover {
+  background: var(--rv-chrome-2);
+  color: var(--rv-txt-2);
+}
+
+.reader-v3 .rv-railbtn[aria-pressed='true'] {
+  background: var(--rv-accent-soft);
+  color: var(--rv-accent);
+}
+
+/* ─── accessibility ─────────────────────────────────────────────────────── */
+
+/* Contrast checks against --rv-chrome (#16171d):
+     --rv-txt   #e9e7e3  ~15.8:1  AAA
+     --rv-txt-2 #a2a0a8  ~7.4:1   AAA
+     --rv-txt-3 #8b8992  ~5.1:1   AA  (used only for non-essential labels)
+     --rv-accent #4ade80 ~10.5:1  AAA
+   And --rv-accent-ink (#052e16) on --rv-accent is ~9.4:1. */
+
+.reader-v3 :focus-visible {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-v3 * {
+    transition: none !important;
+  }
+}

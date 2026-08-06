@@ -33,6 +33,8 @@ import { notesService } from '../services/notesService'
 import { HighlightColorPopover } from './HighlightColorPopover'
 import { OCRBanner, OCRStatusBadge } from './OCRStatusBadge'
 import { pollOCRStatus, requestOCRProcess } from '../services/ocrService'
+import { FEATURES } from '../config/featureFlags'
+import { ReadingProgressRing } from './reader/ReadingProgressRing'
 import { HighlightManagementPanel } from './HighlightManagementPanel'
 import { NotesPanel } from './NotesPanel'
 // Lazy-load: ~2,600 LOC modal only mounts when the user opens the library.
@@ -2653,14 +2655,18 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
   // Render PDF viewer with custom toolbar
   return (
     <>
-      <div 
-        style={{ 
+      <div
+        // reader-v3 scopes the wave-A palette (src/styles/readerTheme.css).
+        // Flag off => no class => the current appearance is untouched, so
+        // rollback removes a class rather than reverting styles.
+        className={FEATURES.readerV3 ? 'reader-v3' : undefined}
+        style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          display: 'flex', 
+          display: 'flex',
           flexDirection: 'column',
           width: '100%',
           height: '100%',
@@ -2668,10 +2674,12 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         }}
       >
         {/* Custom Toolbar */}
-        <div 
-          className="flex flex-wrap items-center justify-center gap-4 px-4 py-3 border-b transition-all duration-300"
-          style={{ 
-            backgroundColor: 'var(--color-surface)', 
+        <div
+          className={`flex flex-wrap items-center justify-center gap-4 px-4 py-3 border-b transition-all duration-300${FEATURES.readerV3 ? ' rv-bar' : ''}`}
+          style={{
+            // rv-bar supplies its own warm background/border when readerV3 is
+            // on; these remain the fallback for the current theme.
+            backgroundColor: 'var(--color-surface)',
             borderColor: 'var(--color-border)',
             minHeight: isHeaderCollapsed ? '48px' : '60px',
             overflow: isHeaderCollapsed ? 'hidden' : 'visible',
@@ -2763,6 +2771,17 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
                 of {numPages || 0}
               </span>
             </div>
+
+            {/* Reading position. The bare "of N" above answers "where does this
+                end"; the ring answers "how far in am I" without the user doing
+                the division. Additive — the existing controls are unchanged. */}
+            {FEATURES.readerV3 && (
+              <ReadingProgressRing
+                currentPage={pdfViewer.currentPage}
+                totalPages={numPages || null}
+                annotationCount={safeHighlights.length}
+              />
+            )}
             
             <button
               onClick={() => {
@@ -2994,17 +3013,21 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
         )}
         
         {/* PDF Viewer */}
-        <div 
-          style={{ 
-            flex: 1, 
+        <div
+          style={{
+            flex: 1,
             overflow: 'hidden',
-            backgroundColor: 'var(--color-background, #000000)',
+            // The desk the page sits on. Pure black against a near-white page
+            // is the widest luminance gap a screen can produce, and this is the
+            // surface users stare at for an hour. readerV3 warms it via
+            // .rv-desk; the inline value stays as the current-theme fallback.
+            backgroundColor: FEATURES.readerV3 ? undefined : 'var(--color-background, #000000)',
             borderLeft: '1px solid var(--color-border, #374151)',
             userSelect: selectionEnabled ? 'text' : 'none',
             cursor: selectionEnabled ? undefined as unknown as string : 'pointer'
-          }} 
+          }}
           onContextMenu={handleContextMenu}
-          className={`pdf-viewer-container ${pdfViewer.darkMode ? 'pdf-viewer-dark-mode' : ''}`}
+          className={`pdf-viewer-container ${pdfViewer.darkMode ? 'pdf-viewer-dark-mode' : ''}${FEATURES.readerV3 ? ' rv-desk' : ''}`}
         >
           {/* Override selection preview color - use neutral browser selection color, not highlight color */}
           <style>{`
