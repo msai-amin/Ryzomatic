@@ -2,7 +2,7 @@
  * Client shim for the anydoc office/e-book extraction lane.
  *
  * Posts to `/api/documents?action=extract` and adapts the response to the
- * existing `DoclingResult` shape, so the orchestrator's Strategy-1 block
+ * `ExtractedDocument` shape, so the orchestrator's Strategy-1 block
  * (`pdfExtractionOrchestrator.ts:394-470`) needs no structural change — only a
  * swap of which function it calls.
  *
@@ -10,8 +10,8 @@
  *
  * The orchestrator splits markup and plain text:
  *
- *     pageTexts = doclingResult.structure.pages.map(p => p.text)   // PLAIN
- *     content   = doclingResult.markdown || doclingResult.text      // markdown
+ *     pageTexts = result.structure.pages.map(p => p.text)   // PLAIN
+ *     content   = result.markdown || result.text            // markdown
  *
  * `pageTexts` feeds TTS (`useAudioText.ts`), so `structure.pages[].text` and
  * `text` must be markup-free, while `markdown` keeps its structure for chat,
@@ -30,9 +30,40 @@
  * that would shift if the chunker were ever retuned.
  */
 
-import type { DoclingResult } from './doclingService'
 import { markdownToPlainText } from '../utils/markdownToPlainText'
 import { authService } from './supabaseAuthService'
+
+/**
+ * Result contract for the office/e-book lane.
+ *
+ * Structurally identical to the old `DoclingResult`, deliberately: the
+ * orchestrator's Strategy-1 block was written against this shape, so keeping it
+ * meant the Docling→anydoc swap changed which function was called and nothing
+ * else. Now that `doclingService` is gone, the type lives with its only
+ * remaining producer and carries a name describing what it is rather than which
+ * library once produced it.
+ */
+export interface ExtractedDocument {
+  success: boolean
+  /** Structure intact — for content, chat, notes and search. */
+  markdown: string
+  /** Plain text — safe for `pageTexts`, which TTS reads aloud. */
+  text: string
+  metadata: {
+    pageCount: number
+    tables: number
+    figures: number
+    fileType: string
+    fileName: string
+  }
+  structure: {
+    pages: Array<{
+      pageNumber: number
+      text: string
+    }>
+  }
+  error?: string
+}
 
 /** Formats handled by the anydoc lane. PDFs stay on the existing pipeline. */
 const SUPPORTED_EXTENSIONS = new Set([
@@ -47,7 +78,7 @@ export function isAnydocSupported(fileName: string): boolean {
   return SUPPORTED_EXTENSIONS.has(fileName.toLowerCase().split('.').pop() ?? '')
 }
 
-function emptyResult(fileName: string, error: string): DoclingResult {
+function emptyResult(fileName: string, error: string): ExtractedDocument {
   return {
     success: false,
     markdown: '',
@@ -65,12 +96,12 @@ function emptyResult(fileName: string, error: string): DoclingResult {
 }
 
 /**
- * Extract an office/e-book document to the DoclingResult shape.
+ * Extract an office/e-book document.
  *
  * Never throws: the orchestrator treats a `success: false` result as "this tier
- * declined" and continues its cascade, exactly as it did with Docling's 404s.
+ * declined" and continues its cascade.
  */
-export async function extractDocument(file: File, fileName: string): Promise<DoclingResult> {
+export async function extractDocument(file: File, fileName: string): Promise<ExtractedDocument> {
   if (!isAnydocSupported(fileName)) {
     return emptyResult(fileName, `Unsupported format for document extraction: ${fileName}`)
   }

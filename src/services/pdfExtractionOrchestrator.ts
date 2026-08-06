@@ -2,10 +2,10 @@
  * PDF Extraction Orchestrator
  * 
  * Central service that manages document extraction with multiple strategies:
- * 1. Docling (preferred) - Superior table, formula, and layout extraction
- * 2. PDF.js native extraction (fallback) - Fast, free
- * 3. Gemini Vision fallback (automatic for poor quality pages)
- * 4. GPT-5 Nano OCR (user-initiated for scanned documents)
+ * 1. anydoc - office/e-book formats (behind FEATURES.docExtractionV2)
+ * 2. pdf-inspector - PDF text, reading order, OCR routing (behind FEATURES.pdfInspector)
+ * 3. PDF.js native extraction - fallback, and the engine that renders the viewer
+ * 4. Gemini Vision / GPT-5 Nano - actual OCR; neither library above does OCR
  */
 
 import { extractStructuredText } from '../utils/pdfTextExtractor';
@@ -20,12 +20,6 @@ import {
 import { configurePDFWorker } from '../utils/pdfjsConfig';
 import { logger } from './logger';
 import { errorHandler, ErrorType, ErrorSeverity } from './errorHandler';
-import {
-  processWithDocling,
-  isDoclingSupported,
-  type DoclingResult,
-  type DoclingOptions
-} from './doclingService';
 import { extractDocument, isAnydocSupported } from './documentExtractionService';
 import { inspectPdfFile } from './pdfInspectorService';
 import { indicesToPageNumbers } from '../utils/pageAlignment';
@@ -38,7 +32,7 @@ export interface ExtractionResult {
   totalPages: number
   pdfData?: Blob | ArrayBuffer
   qualityReport: DocumentQualityReport
-  extractionMethod: 'pdfjs' | 'hybrid' | 'vision' | 'ocr' | 'docling' | 'anydoc' | 'inspector'
+  extractionMethod: 'pdfjs' | 'hybrid' | 'vision' | 'ocr' | 'anydoc' | 'inspector'
   needsOCR: boolean
   ocrStatus: 'not_needed' | 'pending' | 'processing' | 'completed' | 'user_declined'
   visionPagesUsed: number[]
@@ -48,8 +42,8 @@ export interface ExtractionResult {
     ocrPages: number
     processingTime: number
     qualitySummary: string
-    doclingTables?: number
-    doclingFigures?: number
+    tables?: number
+    figures?: number
   }
 }
 
@@ -66,10 +60,6 @@ export interface VisionFallbackOptions {
  * Options for hybrid extraction pipeline
  */
 export interface HybridExtractionOptions {
-  /** Use Docling as primary extraction method (default: true) */
-  useDocling?: boolean
-  /** Docling-specific options */
-  doclingOptions?: DoclingOptions
   /** Vision fallback options for PDF.js pipeline */
   visionOptions?: VisionFallbackOptions
 }
@@ -356,7 +346,7 @@ export async function extractWithFallback(
 }
 
 /**
- * Extract text using hybrid pipeline with Docling as primary method
+ * Extract text using the hybrid pipeline.
  * 
  * This is the preferred extraction method that provides:
  * - Superior table structure recognition
@@ -364,7 +354,8 @@ export async function extractWithFallback(
  * - Improved multi-column layout handling
  * - Support for more file formats (DOCX, PPTX, XLSX, images)
  * 
- * Falls back to PDF.js if Docling fails or is unavailable.
+ * Office/e-book formats go to anydoc; PDFs go to pdf-inspector when enabled,
+ * and to PDF.js otherwise. PDF.js is always the final fallback.
  * 
  * @param file - File object or ArrayBuffer containing the document
  * @param options - Hybrid extraction options
@@ -385,50 +376,38 @@ export async function extractWithHybridPipeline(
     fileSize
   }
 
-  // Default to using Docling unless explicitly disabled
-  const useDocling = options.useDocling !== false
 
   logger.info('Starting hybrid extraction pipeline', context, {
-    useDocling,
     fileType: fileName.split('.').pop()?.toLowerCase()
   })
 
   // ========================================
-  // STRATEGY 1: Try Docling First (if enabled)
+  // STRATEGY 1: Office / e-book formats (anydoc)
   // ========================================
-  // When FEATURES.docExtractionV2 is on, office/e-book formats go to anydoc
-  // instead of Docling. Docling is excluded from deployment (.vercelignore —
-  // the ~4GB Python bundle exceeds Vercel limits), so its branch always 404s
-  // and falls through; anydoc is the live replacement. PDFs are handled by
-  // Strategy 2 either way — anydoc flattens page boundaries, which would break
-  // the page-indexed pageTexts contract.
+  // PDFs deliberately skip this tier and fall through to Strategy 2: anydoc
+  // flattens a PDF into one Markdown string with no page boundaries, which
+  // would break the page-indexed pageTexts contract that 29 modules depend on.
   const useAnydoc = FEATURES.docExtractionV2 && isAnydocSupported(fileName)
 
-  if (useAnydoc || (useDocling && isDoclingSupported(fileName))) {
+  if (useAnydoc) {
     try {
-      logger.info(useAnydoc ? 'Attempting anydoc extraction' : 'Attempting Docling extraction', context)
+      logger.info('Attempting anydoc extraction', context)
 
-      const doclingResult = useAnydoc
-        ? await extractDocument(file as File, fileName)
-        : await processWithDocling(file, fileName, {
-            enableOcr: options.doclingOptions?.enableOcr ?? true,
-            extractTables: options.doclingOptions?.extractTables ?? true,
-            preserveLayout: options.doclingOptions?.preserveLayout ?? true,
-          })
+      const extracted = await extractDocument(file as File, fileName)
 
-      if (doclingResult.success && doclingResult.text.trim().length > 0) {
+      if (extracted.success && extracted.text.trim().length > 0) {
         const processingTime = Date.now() - startTime
 
         // Page texts must stay markup-free: they feed TTS via useAudioText.
-        // documentExtractionService already strips anydoc's Markdown, and
-        // Docling returned plain text here, so this stays plain either way.
-        const pageTexts = doclingResult.structure.pages.map(p => p.text)
+        // documentExtractionService already strips anydoc's Markdown before it
+        // reaches this field, so pageTexts stays speech-safe.
+        const pageTexts = extracted.structure.pages.map(p => p.text)
 
         // Content keeps its structure — chat, notes and search benefit from it.
-        const content = doclingResult.markdown || doclingResult.text
+        const content = extracted.markdown || extracted.text
 
-        // Create a quality report for Docling results
-        // Docling typically produces high-quality output
+        // anydoc parses office formats structurally rather than heuristically,
+        // so there is no per-page quality signal to compute — treat it as clean.
         const qualityReport: DocumentQualityReport = {
           totalPages: pageTexts.length,
           pageMetrics: pageTexts.map((text, idx) => ({
@@ -443,7 +422,7 @@ export async function extractWithHybridPipeline(
           })),
           overallScore: 95,
           problematicPages: [],
-          extractionMethod: useAnydoc ? 'anydoc' : 'docling',
+          extractionMethod: 'anydoc',
           summary: {
             successfulPages: pageTexts.length,
             poorQualityPages: 0,
@@ -455,10 +434,10 @@ export async function extractWithHybridPipeline(
           success: true,
           content,
           pageTexts,
-          totalPages: doclingResult.metadata.pageCount,
+          totalPages: extracted.metadata.pageCount,
           pdfData: file instanceof File ? await file.arrayBuffer() : file,
           qualityReport,
-          extractionMethod: useAnydoc ? 'anydoc' : 'docling',
+          extractionMethod: 'anydoc',
           needsOCR: false,
           ocrStatus: 'not_needed',
           visionPagesUsed: [],
@@ -467,35 +446,31 @@ export async function extractWithHybridPipeline(
             visionPages: 0,
             ocrPages: 0,
             processingTime,
-            qualitySummary: `Extracted with Docling: ${doclingResult.metadata.tables} tables, ${doclingResult.metadata.figures} figures detected`,
-            doclingTables: doclingResult.metadata.tables,
-            doclingFigures: doclingResult.metadata.figures
+            qualitySummary: `Extracted with anydoc: ${extracted.metadata.tables} table(s), ${extracted.metadata.figures} figure(s) detected`,
+            tables: extracted.metadata.tables,
+            figures: extracted.metadata.figures
           }
         }
 
-        logger.info('Docling extraction completed successfully', context, {
+        logger.info('anydoc extraction completed successfully', context, {
           pageCount: result.totalPages,
-          tables: doclingResult.metadata.tables,
-          figures: doclingResult.metadata.figures,
+          tables: extracted.metadata.tables,
+          figures: extracted.metadata.figures,
           contentLength: content.length,
           processingTime
         })
 
         return result
       } else {
-        // Docling returned but with no content - fall through to PDF.js
-        logger.warn('Docling extraction returned empty content, falling back to PDF.js', context, undefined, {
-          doclingError: doclingResult.error
+        // Extractor declined - fall through to the PDF.js pipeline
+        logger.warn('anydoc returned empty content, falling back to PDF.js', context, undefined, {
+          extractionError: extracted.error
         })
       }
-    } catch (doclingError) {
-      // Docling failed - log and fall through to PDF.js
-      logger.warn('Docling extraction failed, falling back to PDF.js', context, doclingError as Error)
+    } catch (extractionError) {
+      // Never let the office lane break extraction - PDF.js still works.
+      logger.warn('anydoc extraction failed, falling back to PDF.js', context, extractionError as Error)
     }
-  } else if (!isDoclingSupported(fileName)) {
-    logger.info('File type not supported by Docling, using PDF.js', context, {
-      fileType: fileName.split('.').pop()?.toLowerCase()
-    })
   }
 
   // ========================================
