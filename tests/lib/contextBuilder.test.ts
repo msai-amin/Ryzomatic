@@ -55,6 +55,8 @@ beforeAll(() => {
 
 // Import after mocks and env vars are set up
 import { ContextBuilder, contextBuilder } from '../../lib/contextBuilder';
+// Imported for its mock handle, so getConversationSummary's branches can be driven.
+import { memoryService } from '../../lib/memoryService.js';
 
 describe('ContextBuilder', () => {
   beforeEach(() => {
@@ -230,6 +232,168 @@ describe('ContextBuilder', () => {
       expect(filtered.length).toBe(2);
       expect(filtered[0].id).toBe('1');
       expect(filtered[1].id).toBe('3');
+    });
+  });
+
+  /**
+   * shouldUseMemoryContext gates real production behaviour: api/chat/stream.ts:130
+   * calls it, and only builds context (embedding + two Supabase round-trips) when
+   * it returns true. It was completely uncovered, so nothing stopped the keyword
+   * list being edited into always-true or always-false.
+   */
+  describe('shouldUseMemoryContext', () => {
+    it('fires on questions that refer back to the conversation', () => {
+      expect(contextBuilder.shouldUseMemoryContext('what did we discuss earlier')).toBe(true);
+      expect(contextBuilder.shouldUseMemoryContext('do you remember the sample size')).toBe(true);
+      expect(contextBuilder.shouldUseMemoryContext('you mentioned an instrument')).toBe(true);
+      expect(contextBuilder.shouldUseMemoryContext('as I said before')).toBe(true);
+    });
+
+    it('fires on cross-document queries', () => {
+      expect(contextBuilder.shouldUseMemoryContext('compare these two designs')).toBe(true);
+      expect(contextBuilder.shouldUseMemoryContext('find related work')).toBe(true);
+      expect(contextBuilder.shouldUseMemoryContext('anything similar in my library')).toBe(true);
+    });
+
+    it('stays off for a self-contained question about the current page', () => {
+      // The false branch is the one that matters for cost: every true here is an
+      // embedding call plus two Supabase queries before the model is even reached.
+      expect(contextBuilder.shouldUseMemoryContext('what is a fixed effect')).toBe(false);
+      expect(contextBuilder.shouldUseMemoryContext('explain equation 3')).toBe(false);
+      expect(contextBuilder.shouldUseMemoryContext('summarise this page')).toBe(false);
+    });
+
+    it('is case-insensitive', () => {
+      expect(contextBuilder.shouldUseMemoryContext('REMEMBER that result?')).toBe(true);
+      expect(contextBuilder.shouldUseMemoryContext('Compare These')).toBe(true);
+    });
+
+    it('handles an empty query without throwing', () => {
+      expect(contextBuilder.shouldUseMemoryContext('')).toBe(false);
+    });
+
+    it('matches on substrings — documented, not endorsed', () => {
+      // These are false positives: the indicators are matched with `includes`,
+      // not word boundaries, so ordinary prose trips them. Pinned deliberately
+      // so that tightening the heuristic is a visible, intentional test change
+      // rather than a silent behaviour shift.
+      expect(contextBuilder.shouldUseMemoryContext('what happened before the war')).toBe(true);
+      expect(contextBuilder.shouldUseMemoryContext('define comparERROR')).toBe(true);
+    });
+  });
+
+  /**
+   * buildContextText composes the block that is prepended to the model prompt.
+   * Private, but pure and load-bearing — a stray heading change here silently
+   * alters every chat request, so it is worth pinning directly.
+   */
+  describe('buildContextText', () => {
+    const build = (params: unknown) =>
+      (contextBuilder as unknown as {
+        buildContextText: (p: unknown) => string
+      }).buildContextText(params);
+
+    it('returns an empty string when there is nothing to say', () => {
+      // Must not emit bare headings — an empty "## Relevant Notes" tells the
+      // model notes were searched and found, which is the opposite of the truth.
+      expect(build({ memories: [], notes: [], highlights: [] })).toBe('');
+    });
+
+    it('renders each section only when it has content', () => {
+      const onlyNotes = build({
+        memories: [],
+        notes: [{ content: 'clustered at the district level', pageNumber: 12 }],
+        highlights: [],
+      });
+      expect(onlyNotes).toContain('## Relevant Notes');
+      expect(onlyNotes).not.toContain('## Previous Conversation Memory');
+      expect(onlyNotes).not.toContain('## Relevant Highlights');
+    });
+
+    it('labels every entry with its page number', () => {
+      const text = build({
+        memories: [],
+        notes: [{ content: 'note body', pageNumber: 7 }],
+        highlights: [{ text: 'highlighted span', pageNumber: 9, color: 'yellow' }],
+      });
+      expect(text).toContain('- Page 7: note body');
+      expect(text).toContain('- Page 9: "highlighted span"');
+    });
+
+    it('tags memories by entity type', () => {
+      const text = build({
+        memories: [{ entity_text: 'diff-in-diff', entity_type: 'method' }],
+        notes: [],
+        highlights: [],
+      });
+      expect(text).toContain('## Previous Conversation Memory');
+      expect(text).toContain('- method: diff-in-diff');
+    });
+
+    it('truncates a long note to 200 characters', () => {
+      // Unbounded notes would let a single note crowd out the rest of the
+      // context window.
+      const long = 'x'.repeat(500);
+      const text = build({
+        memories: [],
+        notes: [{ content: long, pageNumber: 1 }],
+        highlights: [],
+      });
+      expect(text).toContain('x'.repeat(200));
+      expect(text).not.toContain('x'.repeat(201));
+    });
+
+    it('does not truncate highlights', () => {
+      // Asymmetry worth pinning: a highlight is a verbatim quote the user chose,
+      // so clipping it mid-sentence would misrepresent them to the model.
+      const long = 'y'.repeat(500);
+      const text = build({
+        memories: [],
+        notes: [],
+        highlights: [{ text: long, pageNumber: 1, color: 'green' }],
+      });
+      expect(text).toContain(long);
+    });
+  });
+
+  /**
+   * getConversationSummary has three outcomes and they are not interchangeable:
+   * null means "no data", a sentence means "data but nothing extracted", and
+   * text means "here are the insights". Callers branch on the difference.
+   */
+  describe('getConversationSummary', () => {
+    it('returns null when the conversation has no memories', async () => {
+      vi.mocked(memoryService.getConversationMemories).mockResolvedValueOnce([] as never);
+      await expect(contextBuilder.getConversationSummary('conv-1')).resolves.toBeNull();
+    });
+
+    it('distinguishes "no insights yet" from "no memories"', async () => {
+      vi.mocked(memoryService.getConversationMemories).mockResolvedValueOnce([
+        { entity_type: 'topic', entity_text: 'panel data' },
+      ] as never);
+      await expect(contextBuilder.getConversationSummary('conv-2')).resolves.toBe(
+        'No insights extracted from this conversation yet.'
+      );
+    });
+
+    it('returns only insight entities, newline-joined', async () => {
+      vi.mocked(memoryService.getConversationMemories).mockResolvedValueOnce([
+        { entity_type: 'insight', entity_text: 'first insight' },
+        { entity_type: 'topic', entity_text: 'should be filtered out' },
+        { entity_type: 'insight', entity_text: 'second insight' },
+      ] as never);
+      const summary = await contextBuilder.getConversationSummary('conv-3');
+      expect(summary).toBe('first insight\nsecond insight');
+      expect(summary).not.toContain('should be filtered out');
+    });
+
+    it('degrades to null rather than throwing when the memory store fails', async () => {
+      // This runs inside a chat request; a rejection here would take down the
+      // whole response rather than just omitting the summary.
+      vi.mocked(memoryService.getConversationMemories).mockRejectedValueOnce(
+        new Error('supabase unreachable')
+      );
+      await expect(contextBuilder.getConversationSummary('conv-4')).resolves.toBeNull();
     });
   });
 });

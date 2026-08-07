@@ -26,7 +26,7 @@
     "prepare": "husky install"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx,mjs,cjs}": "eslint --max-warnings 0 --fix",
+    "*.{ts,tsx,js,jsx,mjs,cjs}": "eslint --max-warnings 0 --no-warn-ignored --fix",
     "*.{json,md,yml,yaml}": []
   },
   "dependencies": {
