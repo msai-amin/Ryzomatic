@@ -2975,7 +2975,29 @@ export const PDFViewerV2: React.FC<PDFViewerV2Props> = () => {
           >
             <Highlighter className="w-5 h-5" />
           </button>
-          
+
+          {/* Notes Panel toggle.
+              Before this existed, `setIsRightSidebarOpen(true)` was called from
+              exactly one place in the app — the "Save Note" action inside the
+              text-selection popover. Once a user closed the panel, the only way
+              back was to select text and save another note, so existing notes
+              became unreachable without creating a new one. This is the reopen
+              affordance; it mirrors the Highlight Management toggle above so the
+              two panels are discovered the same way. */}
+          <button
+            onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+            className="p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center"
+            style={{
+              color: 'var(--color-text-primary)',
+              backgroundColor: isRightSidebarOpen ? 'var(--color-primary-light)' : 'transparent'
+            }}
+            title={isRightSidebarOpen ? 'Hide Notes' : 'Show Notes'}
+            aria-label={isRightSidebarOpen ? 'Hide notes panel' : 'Show notes panel'}
+            aria-pressed={isRightSidebarOpen}
+          >
+            <StickyNote className="w-5 h-5" />
+          </button>
+
           {/* Toggle Selection/Highlight (Finger mode) */}
           <button
             onClick={() => setSelectionEnabled((v) => !v)}

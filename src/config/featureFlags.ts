@@ -26,11 +26,21 @@ const DEFAULTS: Record<FlagKey, boolean> = {
   // changes what every already-uploaded PDF produces.
   pdfInspector: false,
 
-  // Reader redesign, wave A: warm palette, visible rail labels, grouped view
-  // controls, reading-progress ring. Presentation only — no data dependencies,
-  // no change to extraction or storage. Applied as a scope class on the reader
-  // root, so turning it off removes one class and restores the current look.
-  readerV3: false,
+  // Reader redesign, wave A: warm palette and reading-progress ring.
+  // Presentation only — no data dependencies, no change to extraction or
+  // storage. Applied as a scope class on the reader root, so turning it off
+  // removes one class and restores the current look.
+  //
+  // DEFAULT ON. The justification is not taste: the current theme puts a
+  // near-white PDF page on `--color-background: #000000`, the widest luminance
+  // gap a display can produce, on the one surface a user stares at for an hour
+  // at a time. `--rv-desk: #1f2027` narrows it. That argument holds without
+  // any usage data, which is why this ships ahead of the rest of the redesign.
+  //
+  // Note what is NOT covered: `.rv-railbtn` and `.rv-seg` in readerTheme.css
+  // have no consumers. Those components were descoped from wave A, and the
+  // rules are left in place deliberately as the record of that gap.
+  readerV3: true,
 }
 
 const ENV_KEYS: Record<FlagKey, string> = {
