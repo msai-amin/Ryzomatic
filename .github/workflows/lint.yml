@@ -20,14 +20,14 @@ jobs:
       - name: Checkout code
         # Security: Pin to specific commit SHA instead of version tag for supply chain security
         # Example: uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0  # Full history needed to detect changed files
 
       - name: Run Super-Linter
         # Security: Pin to specific commit SHA instead of version tag for supply chain security
         # Example: uses: github/super-linter@<commit-sha>
-        uses: github/super-linter@v5
+        uses: github/super-linter@v7
         env:
           # Disable JavaScript/TypeScript ESLint validation - we use our own npm run lint step
           # Super-Linter v5 has issues with ESLint 9 flat config format
