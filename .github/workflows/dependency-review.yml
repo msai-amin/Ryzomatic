@@ -18,12 +18,12 @@ jobs:
       - name: Checkout code
         # Security: Pin to specific commit SHA instead of version tag for supply chain security
         # Example: uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Dependency Review
         # Security: Pin to specific commit SHA instead of version tag for supply chain security
         # Example: uses: actions/dependency-review-action@<commit-sha>
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@v5
         with:
           # Fail the workflow if vulnerabilities are found
           fail-on-severity: moderate
